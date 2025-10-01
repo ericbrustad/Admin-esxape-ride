@@ -26,12 +26,17 @@
     {
       "id": "m02",
       "title": "New Mission",
-      "type": "statement",
+      "type": "geofence_image",
       "rewards": {
         "points": 25
       },
       "content": {
-        "text": "r"
+        "lat": 44.953137,
+        "lng": -93.117371,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30,
+        "imageUrl": "https://mail.google.com/mail/u/0/#inbox/FMfcgzQcpwvCRqJMQDVHfVsJLkmlrmpp",
+        "overlayText": "dbdb"
       }
     }
   ]
