@@ -1,0 +1,27 @@
+{
+  "id": "msuite_esx",
+  "version": "0.6.1",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m01",
+      "title": "Welcome Quiz",
+      "type": "multiple_choice",
+      "content": {
+        "question": "Which city is Minnesota's capital?",
+        "choices": [
+          "Duluth",
+          "Saint Paul",
+          "Minneapolis"
+        ],
+        "answer": "Saint Paul"
+      },
+      "rewards": {
+        "points": 25
+      }
+    }
+  ]
+}
