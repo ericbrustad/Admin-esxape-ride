@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -26,17 +26,14 @@
     {
       "id": "m02",
       "title": "New Mission",
-      "type": "geofence_image",
+      "type": "short_answer",
       "rewards": {
         "points": 25
       },
       "content": {
-        "lat": 44.953137,
-        "lng": -93.117371,
-        "radiusMeters": 25,
-        "cooldownSeconds": 30,
-        "imageUrl": "https://mail.google.com/mail/u/0/#inbox/FMfcgzQcpwvCRqJMQDVHfVsJLkmlrmpp",
-        "overlayText": "dbdb"
+        "question": "v  ",
+        "answer": "vvv",
+        "acceptable": "s"
       }
     }
   ]
