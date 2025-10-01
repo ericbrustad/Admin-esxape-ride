@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.11",
+  "version": "0.6.12",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -25,12 +25,13 @@
     },
     {
       "id": "m02",
-      "title": "TEST",
+      "title": "Walrus",
       "type": "short_answer",
       "rewards": {
         "points": 25
       },
       "content": {
+        "imageUrl": "",
         "question": "v  ",
         "answer": "vvv",
         "acceptable": "s"
