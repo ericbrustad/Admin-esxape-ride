@@ -1,10 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import MultipleChoiceEditor from '../components/MultipleChoiceEditor';
 
-// missions: array of mission objects
-const [missions, setMissions] = useState([]);
-// which mission is selected in the left list
-const [selected, setSelected] = useState(0);
 
 // the mission currently being edited
 const current = missions[selected] || {};
