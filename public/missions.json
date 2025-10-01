@@ -60,14 +60,18 @@
     },
     {
       "id": "m05",
-      "title": "FAT AND UGLY",
-      "type": "video",
+      "title": "fat",
+      "type": "geofence_video",
       "rewards": {
         "points": 25
       },
       "content": {
-        "videoUrl": "https://youtu.be/xeviGB4AOXg?si=fGrdGmAW0cR0X0Hn",
-        "overlayText": "Fat"
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30,
+        "videoUrl": "https://youtu.be/xeviGB4AOXg?si=HROzn7awoA9GaFNz",
+        "overlayText": "sss"
       }
     }
   ]
