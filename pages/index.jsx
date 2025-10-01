@@ -1,5 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+// missions: array of mission objects
+const [missions, setMissions] = useState([]);
+// which mission is selected in the left list
+const [selected, setSelected] = useState(0);
+
+// the mission currently being edited
+const current = missions[selected] || {};
+
+// merge-only update for the current mission
+function updateCurrent(patch) {
+  setMissions(prev =>
+    prev.map((m, i) => (i === selected ? { ...m, ...patch } : m))
+  );
+}
+
 /** Field schemas per type */
 const TYPE_FIELDS = {
   'multiple_choice': [
