@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -56,6 +56,18 @@
       },
       "content": {
         "text": "fnfn"
+      }
+    },
+    {
+      "id": "m05",
+      "title": "FAT AND UGLY",
+      "type": "video",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "videoUrl": "https://youtu.be/xeviGB4AOXg?si=fGrdGmAW0cR0X0Hn",
+        "overlayText": "Fat"
       }
     }
   ]
