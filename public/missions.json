@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -72,6 +72,25 @@
         "cooldownSeconds": 30,
         "videoUrl": "https://youtu.be/xeviGB4AOXg?si=HROzn7awoA9GaFNz",
         "overlayText": "sss"
+      }
+    },
+    {
+      "id": "m06",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "how many side on a square",
+        "choices": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "answer": "4"
       }
     }
   ]
