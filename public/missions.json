@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -34,6 +34,18 @@
         "question": "v  ",
         "answer": "vvv",
         "acceptable": "s"
+      }
+    },
+    {
+      "id": "m03",
+      "title": "New Mission3",
+      "type": "video",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "videoUrl": "HTTPS://youtube.com/ video",
+        "overlayText": "Yes"
       }
     }
   ]
