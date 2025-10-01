@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -21,6 +21,17 @@
       },
       "rewards": {
         "points": 25
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "statement",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "text": "r"
       }
     }
   ]
