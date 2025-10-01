@@ -1,0 +1,38 @@
+{
+  "id": "msuite_esx",
+  "version": "0.2.0",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m01",
+      "title": "Welcome Quiz",
+      "type": "quiz",
+      "content": {
+        "question": "Which city is Minnesota's capital?",
+        "choices": [
+          "Duluth",
+          "Saint Paul",
+          "Minneapolis"
+        ],
+        "answer": "Saint Paul"
+      },
+      "rewards": {
+        "points": 25
+      }
+    },
+    {
+      "id": "m02",
+      "title": "Teaser Video",
+      "type": "video",
+      "content": {
+        "videoUrl": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+      },
+      "rewards": {
+        "points": 50
+      }
+    }
+  ]
+}
