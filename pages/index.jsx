@@ -1,16 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import MultipleChoiceEditor from '../components/MultipleChoiceEditor';
-
-
-// the mission currently being edited
-const current = missions[selected] || {};
-
-// merge-only update for the current mission
-function updateCurrent(patch) {
-  setMissions(prev =>
-    prev.map((m, i) => (i === selected ? { ...m, ...patch } : m))
-  );
-}
 
 /** Field schemas per type */
 const TYPE_FIELDS = {
@@ -56,17 +44,6 @@ const TYPE_OPTIONS = [
   { value:'ar_image', label:'AR Image' },
   { value:'ar_video', label:'AR Video' },
 ];
-{(((current?.kind || current?.type || '') + '')
-  .toLowerCase()
-  .replace(/\s+/g, '_') === 'multiple_choice') && (
-  <MultipleChoiceEditor
-    value={current.choices}
-    correctIndex={current.correctIndex}
-    onChange={({ choices, correctIndex }) =>
-      updateCurrent({ choices, correctIndex })
-    }
-  />
-)}
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const MODES = [
