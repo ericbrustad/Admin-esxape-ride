@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /** Field schemas per type (used for validation & non-MCQ rendering) */
 const TYPE_FIELDS = {
@@ -6,13 +6,18 @@ const TYPE_FIELDS = {
     { key: 'question', label: 'Question', type: 'text' },
     { key: 'choices', label: 'Choices (one per line)', type: 'multiline' },
     { key: 'answer', label: 'Correct Answer', type: 'text' },
+    { key: 'imageUrl', label: 'Image URL (optional)', type: 'text', optional: true },
   ],
   short_answer: [
     { key: 'question', label: 'Question', type: 'text' },
     { key: 'answer', label: 'Correct Answer', type: 'text' },
     { key: 'acceptable', label: 'Also Accept (comma-separated)', type: 'text' },
+    { key: 'imageUrl', label: 'Image URL (optional)', type: 'text', optional: true },
   ],
-  statement: [{ key: 'text', label: 'Statement Text', type: 'multiline' }],
+  statement: [
+    { key: 'text', label: 'Statement Text', type: 'multiline' },
+    { key: 'imageUrl', label: 'Image URL (optional)', type: 'text', optional: true },
+  ],
   video: [
     { key: 'videoUrl', label: 'Video URL (https)', type: 'text' },
     { key: 'overlayText', label: 'Overlay Text (optional)', type: 'text' },
@@ -56,6 +61,13 @@ const TYPE_OPTIONS = [
   { value: 'ar_video', label: 'AR Video' },
 ];
 
+const GAME_TYPES = ['Mystery', 'Chase', 'Race', 'Thriller', 'Hunt'];
+const MODES = [
+  { value: 'single', label: 'Single Player', collect: 1 },
+  { value: 'head2head', label: 'Head to Head', collect: 2 },
+  { value: 'multi', label: 'Multiple (4 players)', collect: 4 },
+];
+
 export default function Admin() {
   const [tab, setTab] = useState('missions');
   const [suite, setSuite] = useState(null);
@@ -87,6 +99,7 @@ export default function Admin() {
                     question: x.content?.question || '',
                     choices: x.content?.choices || [],
                     answer: x.content?.answer || '',
+                    imageUrl: x.content?.imageUrl || '',
                   },
                 }
               : x.type === 'video'
@@ -138,8 +151,6 @@ export default function Admin() {
     }
   }
 
-  useMemo(() => suite?.missions?.find((m) => m.id === selected) || null, [suite, selected]); // kept for future use
-
   function suggestId() {
     const base = 'm';
     let i = 1;
@@ -153,14 +164,16 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       rewards: { points: 25 },
-      content: { question: '', choices: [], answer: '' },
+      content: { question: '', choices: [], answer: '', imageUrl: '' },
     };
     setEditing(draft);
     setSelected(null);
     setDirty(true);
   }
   function editExisting(m) {
-    setEditing(JSON.parse(JSON.stringify(m)));
+    const needsImg = m.type === 'multiple_choice' || m.type === 'short_answer' || m.type === 'statement';
+    const content = needsImg ? { imageUrl: '', ...(m.content || {}) } : (m.content || {});
+    setEditing({ ...m, content });
     setSelected(m.id);
     setDirty(false);
   }
@@ -172,11 +185,11 @@ export default function Admin() {
   function defaultContentForType(t) {
     switch (t) {
       case 'multiple_choice':
-        return { question: '', choices: [], answer: '' };
+        return { question: '', choices: [], answer: '', imageUrl: '' };
       case 'short_answer':
-        return { question: '', answer: '', acceptable: '' };
+        return { question: '', answer: '', acceptable: '', imageUrl: '' };
       case 'statement':
-        return { text: '' };
+        return { text: '', imageUrl: '' };
       case 'video':
         return { videoUrl: '', overlayText: '' };
       case 'geofence_image':
@@ -197,6 +210,7 @@ export default function Admin() {
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number') continue;
+      if (f.optional) continue; // optional is allowed to be blank
       const v = editing.content?.[f.key];
       if (v === undefined || v === null || v === '') return setStatus('❌ Missing: ' + f.label);
     }
@@ -378,7 +392,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* Multiple-Choice custom UI */}
+                {/* Multiple-Choice custom UI with image preview */}
                 {editing.type === 'multiple_choice' ? (
                   <>
                     <Field label="Question">
@@ -403,20 +417,36 @@ export default function Admin() {
                         }}
                       />
                     </Field>
+
+                    <Field label="Image URL (optional)">
+                      <input
+                        style={S.input}
+                        placeholder="https://…"
+                        value={editing.content?.imageUrl || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, content: { ...editing.content, imageUrl: e.target.value } });
+                          setDirty(true);
+                        }}
+                      />
+                      <ImagePreview url={editing.content?.imageUrl} />
+                    </Field>
                   </>
                 ) : (
-                  // default renderer for the other mission types
+                  // default renderer for other mission types (adds preview when f.key === 'imageUrl')
                   (TYPE_FIELDS[editing.type] || []).map((f) => (
                     <Field key={f.key} label={f.label}>
                       {f.type === 'text' && (
-                        <input
-                          style={S.input}
-                          value={editing.content?.[f.key] || ''}
-                          onChange={(e) => {
-                            setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
-                            setDirty(true);
-                          }}
-                        />
+                        <>
+                          <input
+                            style={S.input}
+                            value={editing.content?.[f.key] || ''}
+                            onChange={(e) => {
+                              setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
+                              setDirty(true);
+                            }}
+                          />
+                          {f.key === 'imageUrl' && <ImagePreview url={editing.content?.imageUrl} />}
+                        </>
                       )}
                       {f.type === 'number' && (
                         <input
@@ -503,7 +533,7 @@ export default function Admin() {
                 value={config.game.type}
                 onChange={(e) => setConfig({ ...config, game: { ...config.game, type: e.target.value } })}
               >
-                {['Mystery', 'Chase', 'Race', 'Thriller', 'Hunt'].map((g) => (
+                {GAME_TYPES.map((g) => (
                   <option key={g} value={g}>
                     {g}
                   </option>
@@ -532,11 +562,7 @@ export default function Admin() {
                   setConfig({ ...config, splash: { ...config.splash, mode }, forms: { ...config.forms, players: collect } });
                 }}
               >
-                {[
-                  { value: 'single', label: 'Single Player' },
-                  { value: 'head2head', label: 'Head to Head' },
-                  { value: 'multi', label: 'Multiple (4 players)' },
-                ].map((m) => (
+                {MODES.map((m) => (
                   <option key={m.value} value={m.value}>
                     {m.label}
                   </option>
@@ -660,25 +686,54 @@ function Field({ label, children }) {
   );
 }
 
+/** Image preview (shows if URL looks http(s) and loads) */
+function ImagePreview({ url }) {
+  const [error, setError] = useState(false);
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Preview</div>
+      {!error && (
+        <img
+          src={url}
+          alt="preview"
+          onError={() => setError(true)}
+          style={{
+            display: 'block',
+            maxWidth: '100%',
+            maxHeight: 220,
+            borderRadius: 10,
+            border: '1px solid #2a323b',
+          }}
+        />
+      )}
+      {error && <div style={{ color: '#ffd166', fontSize: 12 }}>Could not load image.</div>}
+      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, display: 'inline-block', marginTop: 6 }}>
+        Open image
+      </a>
+    </div>
+  );
+}
+
 /** Multiple-Choice editor (A–E + radio). Stores the CORRECT ANSWER as a string. */
 function MCQEditor({ value, answer, onChange }) {
   const letters = ['A', 'B', 'C', 'D', 'E'];
   const choices = Array.isArray(value) ? [...value] : [];
   while (choices.length < 5) choices.push('');
 
-  // current correct index derived from stored answer string
   const correctIndex = choices.findIndex((c) => (c || '').trim() === (answer || '').trim());
 
   const setChoice = (i, text) => {
     const next = [...choices];
     next[i] = text;
     let idx = correctIndex;
-    if (!text.trim() && idx === i) idx = undefined; // cleared the correct line
+    if (!text.trim() && idx === i) idx = undefined;
     onChange({ choices: trimTrailingEmpty(next), correctIndex: idx });
   };
 
   const setCorrect = (i) => {
-    if (!choices[i]?.trim()) return; // can't select empty
+    if (!choices[i]?.trim()) return;
     onChange({ choices: trimTrailingEmpty(choices), correctIndex: i });
   };
 
@@ -687,12 +742,7 @@ function MCQEditor({ value, answer, onChange }) {
       {letters.map((L, i) => (
         <label
           key={i}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '24px 1fr 24px',
-            gap: 8,
-            alignItems: 'center',
-          }}
+          style={{ display: 'grid', gridTemplateColumns: '24px 1fr 24px', gap: 8, alignItems: 'center' }}
         >
           <span style={{ fontWeight: 700, opacity: 0.8 }}>{L}.</span>
           <input
@@ -815,7 +865,6 @@ function MapPicker({ lat, lng, radius, onChange }) {
 
   function gotoResult(place) {
     if (!mapRef.current || !markerRef.current) return;
-    const L = window.L;
     const latNum = Number(place.lat);
     const lonNum = Number(place.lon);
     const p = [latNum, lonNum];
@@ -874,7 +923,10 @@ function MapPicker({ lat, lng, radius, onChange }) {
         </div>
       )}
 
-      <div ref={divRef} style={{ width: '100%', height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #2a323b', marginBottom: 8 }} />
+      <div
+        ref={divRef}
+        style={{ width: '100%', height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #2a323b', marginBottom: 8 }}
+      />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
         <input type="range" min={5} max={2000} step={5} value={r} onChange={(e) => setR(Number(e.target.value))} />
         <code style={{ color: '#9fb0bf' }}>{r} m</code>
