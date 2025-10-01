@@ -1,14 +1,14 @@
 {
   "splash": {
     "enabled": true,
-    "mode": "single"
+    "mode": "head2head"
   },
   "game": {
     "title": "big BANK THEORY",
     "type": "Thriller"
   },
   "forms": {
-    "players": 1
+    "players": 2
   },
   "textRules": []
 }
