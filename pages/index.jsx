@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import MultipleChoiceEditor from '../components/MultipleChoiceEditor';
 
 // missions: array of mission objects
 const [missions, setMissions] = useState([]);
@@ -59,6 +60,17 @@ const TYPE_OPTIONS = [
   { value:'ar_image', label:'AR Image' },
   { value:'ar_video', label:'AR Video' },
 ];
+{(((current?.kind || current?.type || '') + '')
+  .toLowerCase()
+  .replace(/\s+/g, '_') === 'multiple_choice') && (
+  <MultipleChoiceEditor
+    value={current.choices}
+    correctIndex={current.correctIndex}
+    onChange={({ choices, correctIndex }) =>
+      updateCurrent({ choices, correctIndex })
+    }
+  />
+)}
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const MODES = [
