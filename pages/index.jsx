@@ -1,40 +1,33 @@
-// pages/index.jsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-/* =====================================================
-   SECTION [1] CONSTANTS / FIELD DEFINITIONS
-===================================================== */
-// [IX-1] Games state & modal inputs
-const [games, setGames] = useState([]);
-const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root
-const [showNewGame, setShowNewGame] = useState(false);
-const [newTitle, setNewTitle] = useState('');
-const [newType, setNewType]   = useState('Mystery');
-const [newMode, setNewMode]   = useState('single'); // single | head2head | multi
+/* =========================================================
+   0) TYPE / FORM DEFINITIONS
+   ---------------------------------------------------------
+   - TYPE_FIELDS drives the generic form renderer (labels+inputs)
+   - We handle some types with custom UIs:
+     * multiple_choice -> MultipleChoiceEditor
+     * geofence_* -> MapPicker
+     * ar_*        -> geofence toggle + MapPicker + previews
+   ========================================================= */
 
 const TYPE_FIELDS = {
   multiple_choice: [
     { key:'question', label:'Question', type:'text' },
-    { key:'choices',  label:'Choices (one per line)', type:'multiline' },
-    // 'answer' is handled by MultipleChoice5 radios, not here
-    { key:'imageUrl', label:'(Optional) Image URL', type:'text', required:false },
-    { key:'videoUrl', label:'(Optional) Video URL', type:'text', required:false },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   short_answer: [
-    { key:'question',   label:'Question', type:'text' },
-    { key:'answer',     label:'Correct Answer', type:'text' },
+    { key:'question', label:'Question', type:'text' },
+    { key:'answer', label:'Correct Answer', type:'text' },
     { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
-    { key:'imageUrl',   label:'(Optional) Image URL', type:'text', required:false },
-    { key:'videoUrl',   label:'(Optional) Video URL', type:'text', required:false },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   statement: [
-    { key:'text',     label:'Statement Text', type:'multiline' },
-    { key:'imageUrl', label:'(Optional) Image URL', type:'text', required:false },
-    { key:'videoUrl', label:'(Optional) Video URL', type:'text', required:false },
+    { key:'text', label:'Statement Text', type:'multiline' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   video: [
-    { key:'videoUrl',    label:'Video URL (https)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text', required:false },
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
   ],
   geofence_image: [
     { key:'lat', label:'Latitude', type:'number' },
@@ -42,7 +35,7 @@ const TYPE_FIELDS = {
     { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'imageUrl', label:'Image URL (https)', type:'text' },
-    { key:'overlayText', label:'Caption/Text', type:'text', required:false },
+    { key:'overlayText', label:'Caption/Text', type:'text' },
   ],
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
@@ -50,99 +43,658 @@ const TYPE_FIELDS = {
     { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'videoUrl', label:'Video URL (https)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text', required:false },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
   ],
   ar_image: [
-    // geofence controlled by separate toggle + map
-    { key:'markerUrl',  label:'Marker URL (image)', type:'text' },
-    { key:'assetUrl',   label:'AR Image Asset URL', type:'text' },
-    { key:'overlayText',label:'Overlay (optional)', type:'text', required:false },
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Overlay Image URL (png/jpg)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
+    // geofence handled below via toggle + MapPicker
   ],
   ar_video: [
-    { key:'markerUrl',  label:'Marker URL (image)', type:'text' },
-    { key:'assetUrl',   label:'AR Video URL (mp4/webm)', type:'text' },
-    { key:'overlayText',label:'Overlay (optional)', type:'text', required:false },
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
+    // geofence handled below via toggle + MapPicker
   ],
 };
 
 const TYPE_OPTIONS = [
   { value:'multiple_choice', label:'Multiple Choice' },
-  { value:'short_answer',    label:'Question (Short Answer)' },
-  { value:'statement',       label:'Statement' },
-  { value:'video',           label:'Video' },
-  { value:'geofence_image',  label:'Geo Fence Image' },
-  { value:'geofence_video',  label:'Geo Fence Video' },
-  { value:'ar_image',        label:'AR Image' },
-  { value:'ar_video',        label:'AR Video' },
+  { value:'short_answer', label:'Question (Short Answer)' },
+  { value:'statement', label:'Statement' },
+  { value:'video', label:'Video' },
+  { value:'geofence_image', label:'Geo Fence Image' },
+  { value:'geofence_video', label:'Geo Fence Video' },
+  { value:'ar_image', label:'AR Image' },
+  { value:'ar_video', label:'AR Video' },
 ];
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
-const MODES = [
-  { value:'single',    label:'Single Player',          collect:1 },
-  { value:'head2head', label:'Head to Head',           collect:2 },
-  { value:'multi',     label:'Multiple (4 players)',   collect:4 },
-];
 
-/* =====================================================
-   SECTION [2] UTILS: URL helpers, previews, etc.
-===================================================== */
+/* =========================================================
+   1) ROOT COMPONENT
+   ========================================================= */
+export default function Admin(){
+  const [tab, setTab] = useState('missions');
 
-function isLikelyVideo(url='') {
-  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
-}
-function isLikelyImage(url='') {
-  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
-}
+  // --- games & modal (NEW) ---
+  const [games, setGames] = useState([]);
+  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root game
+  const [showNewGame, setShowNewGame] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newType,  setNewType]  = useState('Mystery');
+  const [newMode,  setNewMode]  = useState('single'); // single | head2head | multi
 
-function toEmbedFileUrl(raw='') {
-  if (!raw) return { image:'', video:'', raw:'' };
-  let u = raw.trim();
+  const [suite, setSuite]   = useState(null);
+  const [config, setConfig] = useState(null);
+  const [status, setStatus] = useState('');
 
-  // Dropbox share -> direct file
-  // ?dl=0  -> ?raw=1  (or ?dl=1). Prefer raw=1 to hint inline
-  if (/dropbox\.com\/.*\?dl=0/i.test(u)) u = u.replace(/\?dl=0/i, '?raw=1');
-  if (/dropbox\.com\/s\//i.test(u) && !/[?&](raw|dl)=/i.test(u)) u += (u.includes('?')?'&':'?')+'raw=1';
+  const [selected, setSelected] = useState(null); // mission id selected in list
+  const [editing, setEditing]   = useState(null); // draft being edited
+  const [dirty, setDirty]       = useState(false);
 
-  // Google Drive “file/d/<id>/view” -> uc?export=view&id=<id>
-  const g = u.match(/drive\.google\.com\/file\/d\/([^/]+)\//i);
-  if (g && g[1]) u = `https://drive.google.com/uc?export=view&id=${g[1]}`;
+  const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  return {
-    raw,
-    image: isLikelyVideo(u) ? '' : u,
-    video: isLikelyVideo(u) ? u : '',
-  };
-}
+  // Load list of games once
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/games');
+        const j = await r.json();
+        if (j.ok) setGames(j.games || []);
+      } catch {}
+    })();
+  }, []);
 
-function ImagePreview({ url, height=120 }) {
-  if (!url) return null;
-  const isVid = isLikelyVideo(url);
+  // Slug-aware loader for missions/config (runs on first load and when game changes)
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const mUrl = activeSlug
+          ? `/games/${activeSlug}/missions.json`
+          : `/missions.json`;
+
+        const cUrl = activeSlug
+          ? `/api/config?slug=${encodeURIComponent(activeSlug)}`
+          : `/api/config`;
+
+        const [mres, cres] = await Promise.all([
+          fetch(mUrl, { cache:'no-store' }),
+          fetch(cUrl, { cache:'no-store' }),
+        ]);
+        const m = await mres.json();
+        const c = await (cres.ok ? cres.json() : Promise.resolve(defaultConfig()));
+
+        const normalized = {
+          ...m,
+          missions: (m.missions||[]).map(x =>
+            x.type==='quiz'
+              ? ({...x, type:'multiple_choice', content:{
+                  question: x.content?.question||'',
+                  choices:  x.content?.choices || [],
+                  // keep legacy 'answer' text if present
+                  answer:   x.content?.answer   || ''
+                }})
+              : x
+          )
+        };
+
+        setSuite(normalized);
+        setConfig({ ...defaultConfig(), ...c });
+        setStatus('');
+        setSelected(null);
+        setEditing(null);
+        setDirty(false);
+      } catch(e){
+        setStatus('Load failed: '+(e?.message||e));
+      }
+    })();
+  }, [activeSlug]);
+
+  function defaultConfig(){
+    return {
+      splash: { enabled: true, mode:'single' },
+      game:   { title: 'Untitled Game', type: 'Mystery' },
+      forms:  { players: 1 },
+      textRules: []
+    };
+  }
+
+  function defaultContentForType(t){
+    switch(t){
+      case 'multiple_choice': return {question:'', choices:[], correctIndex: undefined, mediaUrl:''};
+      case 'short_answer':    return {question:'', answer:'', acceptable:'', mediaUrl:''};
+      case 'statement':       return {text:'', mediaUrl:''};
+      case 'video':           return {videoUrl:'', overlayText:''};
+      case 'geofence_image':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
+      case 'geofence_video':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
+      case 'ar_image':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      case 'ar_video':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      default: return {};
+    }
+  }
+
+  // --- Save to GitHub (slug-aware) ---
+  async function saveAll(){
+    if (!suite || !config) return;
+    setStatus('Saving…');
+    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+    const [a,b] = await Promise.all([
+      fetch('/api/save'+qs,        { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) }),
+      fetch('/api/save-config'+qs, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config }) }),
+    ]);
+    const ok = a.ok && b.ok;
+    if (!ok) {
+      setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
+    } else {
+      setStatus('✅ Saved (files committed)');
+    }
+  }
+
+  // --- Missions list helpers ---
+  function suggestId(){
+    const base = 'm'; let i = 1;
+    const ids = new Set((suite?.missions||[]).map(m=>m.id));
+    while(ids.has(String(base + String(i).padStart(2,'0')))) i++;
+    return base + String(i).padStart(2,'0');
+  }
+  function startNew(){
+    const draft = { id: suggestId(), title:'New Mission', type:'multiple_choice', rewards:{points:25}, content: defaultContentForType('multiple_choice') };
+    setEditing(draft); setSelected(null); setDirty(true);
+  }
+  function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
+  function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
+  function bumpVersion(v){ const p = String(v||'0.0.0').split('.').map(n=>parseInt(n||'0',10)); while(p.length<3) p.push(0); p[2]+=1; return p.join('.'); }
+  function saveToList(){
+    if (!editing || !suite) return;
+    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+
+    // basic presence checks for non-number fields from schema
+    const fields = TYPE_FIELDS[editing.type] || [];
+    for (const f of fields){
+      if (f.type==='number') continue;
+      const v = editing.content?.[f.key];
+      if (v===undefined || v===null || (f.key!=='mediaUrl' && v==='')) return setStatus('❌ Missing: '+f.label);
+    }
+
+    const missions = [...(suite.missions||[])];
+    const i = missions.findIndex(m=>m.id===editing.id);
+    if (i>=0) missions[i]=editing; else missions.push(editing);
+    setSuite({...suite, missions, version: bumpVersion(suite.version||'0.0.0')});
+    setSelected(editing.id); setEditing(null); setDirty(false);
+    setStatus('✅ List updated (remember Save All)');
+  }
+  function removeMission(id){
+    if (!suite) return;
+    setSuite({...suite, missions:(suite.missions||[]).filter(m=>m.id!==id)});
+    if (selected===id) { setSelected(null); setEditing(null); }
+  }
+
+  // ----- SMS rules -----
+  function addSmsRule(){
+    if (!smsRule.missionId || !smsRule.message) { setStatus('❌ Pick mission and message'); return; }
+    const maxPlayers = config?.forms?.players || 1;
+    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
+    const rules = [...(config?.textRules||[]), {...smsRule, delaySec: Number(smsRule.delaySec||0)}];
+    setConfig({...config, textRules: rules});
+    setSmsRule({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
+    setStatus('✅ SMS rule added (remember Save All)');
+  }
+  function removeSmsRule(idx){
+    const rules = [...(config?.textRules||[])];
+    rules.splice(idx,1);
+    setConfig({...config, textRules: rules});
+  }
+
+  if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
   return (
-    <div style={{border:'1px solid #2a323b', borderRadius:10, padding:8}}>
-      {isVid ? (
-        <video src={url} style={{width:'100%', height}} controls />
-      ) : (
-        <img src={url} alt="preview" style={{width:'100%', height, objectFit:'cover', borderRadius:6}} />
+    <div style={S.body}>
+      <header style={S.header}>
+        <div style={S.wrap}>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            {['settings','missions','text','security'].map(t => (
+              <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>{t.toUpperCase()}</button>
+            ))}
+
+            {/* Game selector + New Game (NEW) */}
+            <div style={{display:'flex',alignItems:'center',gap:8, marginLeft:8}}>
+              <label style={{color:'#9fb0bf', fontSize:12}}>Game:</label>
+              <select
+                value={activeSlug}
+                onChange={e=>setActiveSlug(e.target.value)}
+                style={{...S.input, width:280}}
+              >
+                <option value="">(legacy root)</option>
+                {games.map(g => (
+                  <option key={g.slug} value={g.slug}>
+                    {g.title} — {g.slug} ({g.mode||'single'})
+                  </option>
+                ))}
+              </select>
+              <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
+            </div>
+
+            <button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
+            <a href={activeSlug?`/games/${activeSlug}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{...S.button}}>View missions.json</a>
+            <a href="/config.json" target="_blank" rel="noreferrer" style={{...S.button}}>View config.json</a>
+          </div>
+          <div style={{color:'#9fb0bf',marginTop:6,whiteSpace:'pre-wrap'}}>{status}</div>
+        </div>
+      </header>
+
+      {tab==='missions' && (
+        <main style={S.wrapGrid}>
+          {/* LEFT: mission list */}
+          <aside style={S.sidebar}>
+            <input placeholder="Search…" onChange={(e)=>{
+              const q=e.target.value.toLowerCase();
+              document.querySelectorAll('[data-m-title]').forEach(it=>{
+                const t=(it.getAttribute('data-m-title')||'').toLowerCase();
+                it.style.display = t.includes(q) ? '' : 'none';
+              });
+            }} style={S.search}/>
+            <div>
+              {(suite.missions||[]).map(m=> (
+                <div key={m.id} data-m-title={(m.title||'')+' '+m.id+' '+m.type} style={S.missionItem}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+                    <div onClick={()=>editExisting(m)} style={{cursor:'pointer'}}>
+                      <div style={{fontWeight:600}}>{m.title||m.id}</div>
+                      <div style={{color:'#9fb0bf',fontSize:12}}>{m.type} — id: {m.id}</div>
+                    </div>
+                    <button style={{...S.button, padding:'6px 10px'}} onClick={()=>removeMission(m.id)}>Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          {/* RIGHT: editor */}
+          <section style={S.editor}>
+            {!editing ? (
+              <div style={S.card}>
+                <p style={{marginTop:0,color:'#9fb0bf'}}>Select a mission or click <em>New Mission</em>.</p>
+                <button style={S.button} onClick={startNew}>+ New Mission</button>
+                <p style={{color:'#9fb0bf'}}>Version: <code>{suite.version||'0.0.0'}</code> • Total: <code>{suite.missions?.length||0}</code></p>
+              </div>
+            ) : (
+              <div style={S.card}>
+                <Field label="ID"><input style={S.input} value={editing.id} onChange={e=>{ setEditing({...editing, id:e.target.value}); setDirty(true); }}/></Field>
+                <Field label="Title"><input style={S.input} value={editing.title} onChange={e=>{ setEditing({...editing, title:e.target.value}); setDirty(true); }}/></Field>
+                <Field label="Type">
+                  <select style={S.input} value={editing.type} onChange={e=>{
+                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)}); setDirty(true);
+                  }}>{TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+                </Field>
+                <hr style={S.hr}/>
+
+                {/* MULTIPLE CHOICE custom editor */}
+                {editing.type==='multiple_choice' && (
+                  <div style={{marginBottom:12}}>
+                    <MultipleChoiceEditor
+                      value={Array.isArray(editing.content?.choices)? editing.content.choices : []}
+                      correctIndex={editing.content?.correctIndex}
+                      onChange={({ choices, correctIndex })=>{
+                        setEditing({...editing, content:{...editing.content, choices, correctIndex}});
+                        setDirty(true);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Geofence types map */}
+                {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
+                    <MapPicker
+                      lat={editing.content?.lat}
+                      lng={editing.content?.lng}
+                      radius={editing.content?.radiusMeters ?? 25}
+                      onChange={(lat,lng,rad)=>{
+                        setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
+                        setDirty(true);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* AR geofence toggle + map */}
+                {(editing.type==='ar_image' || editing.type==='ar_video') && (
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                      <input
+                        type="checkbox"
+                        checked={!!editing.content?.geofenceEnabled}
+                        onChange={e=>{
+                          const on = e.target.checked;
+                          const next = {...editing.content, geofenceEnabled:on};
+                          if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.2650; }
+                          setEditing({...editing, content: next});
+                          setDirty(true);
+                        }}
+                      />
+                      Enable geofence for this AR mission
+                    </label>
+                    {editing.content?.geofenceEnabled && (
+                      <MapPicker
+                        lat={editing.content?.lat}
+                        lng={editing.content?.lng}
+                        radius={editing.content?.radiusMeters ?? 25}
+                        onChange={(lat,lng,rad)=>{
+                          setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
+                          setDirty(true);
+                        }}
+                      />
+                    )}
+                    {editing.content?.geofenceEnabled && (
+                      <Field label="Cooldown (sec)">
+                        <input
+                          type="number" min={0} max={3600} style={S.input}
+                          value={editing.content?.cooldownSeconds ?? 30}
+                          onChange={e=>{
+                            const v = Number(e.target.value||0);
+                            setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
+                            setDirty(true);
+                          }}
+                        />
+                      </Field>
+                    )}
+                  </div>
+                )}
+
+                {/* GENERIC field renderer + media previews */}
+                {(TYPE_FIELDS[editing.type]||[]).map(f => (
+                  <Field key={f.key} label={f.label}>
+                    {f.type==='text' && (
+                      <>
+                        <input
+                          style={S.input}
+                          value={editing.content?.[f.key]||''}
+                          onChange={e=>{
+                            setEditing({...editing, content:{...editing.content,[f.key]:e.target.value}});
+                            setDirty(true);
+                          }}
+                        />
+                        {/* Inline previews for known media-like keys */}
+                        {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) &&
+                          <MediaPreview url={editing.content?.[f.key]} kind={f.key} />}
+                      </>
+                    )}
+                    {f.type==='number' && (
+                      <input
+                        type="number" min={f.min} max={f.max} style={S.input}
+                        value={editing.content?.[f.key]??''}
+                        onChange={e=>{
+                          const v = e.target.value===''? '': Number(e.target.value);
+                          setEditing({...editing, content:{...editing.content,[f.key]:v}});
+                          setDirty(true);
+                        }}
+                      />
+                    )}
+                    {f.type==='multiline' && (
+                      <textarea
+                        style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
+                        value={editing.content?.[f.key]||''}
+                        onChange={e=>{
+                          setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
+                          setDirty(true);
+                        }}
+                      />
+                    )}
+                  </Field>
+                ))}
+
+                <Field label="Points (Reward)">
+                  <input
+                    type="number" style={S.input}
+                    value={editing.rewards?.points??0}
+                    onChange={e=>{
+                      const v=e.target.value===''?0:Number(e.target.value);
+                      setEditing({...editing, rewards:{...(editing.rewards||{}), points:v}});
+                      setDirty(true);
+                    }}
+                  />
+                </Field>
+
+                <div style={{display:'flex',gap:8,marginTop:12}}>
+                  <button style={S.button} onClick={saveToList}>Add/Update in List</button>
+                  <button style={S.button} onClick={cancelEdit}>Cancel</button>
+                </div>
+                {dirty && <div style={{marginTop:6,color:'#ffd166'}}>Unsaved changes…</div>}
+              </div>
+            )}
+          </section>
+        </main>
       )}
-      <div style={{fontSize:12, color:'#9fb0bf', marginTop:6, wordBreak:'break-all'}}>{url}</div>
+
+      {tab==='settings' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{marginTop:0}}>Game Settings</h3>
+            <Field label="Game Title">
+              <input style={S.input} value={config.game.title} onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})} />
+            </Field>
+            <Field label="Game Type">
+              <select style={S.input} value={config.game.type} onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}>
+                {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+            <Field label="Stripe Splash Page">
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <label style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <input type="checkbox" checked={config.splash.enabled} onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})} />
+                  Enable Splash (game code & Stripe)
+                </label>
+              </div>
+            </Field>
+            <Field label="Mode (affects how many players to collect on splash)">
+              <select style={S.input} value={config.splash.mode} onChange={e=>{
+                const mode = e.target.value;
+                const players = mode==='head2head' ? 2 : mode==='multi' ? 4 : 1;
+                setConfig({...config, splash:{...config.splash, mode}, forms:{...config.forms, players}});
+              }}>
+                <option value="single">Single Player</option>
+                <option value="head2head">Head to Head (2)</option>
+                <option value="multi">Multiple (4)</option>
+              </select>
+            </Field>
+            <div style={{color:'#9fb0bf'}}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
+          </div>
+        </main>
+      )}
+
+      {tab==='text' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{marginTop:0}}>Text Message Rules</h3>
+            <div style={{display:'grid',gap:12, gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))'}}>
+              <Field label="Mission (geofence)">
+                <select style={S.input} value={smsRule.missionId} onChange={e=>setSmsRule({...smsRule, missionId:e.target.value})}>
+                  <option value="">— choose —</option>
+                  {(suite.missions||[]).map(m => <option key={m.id} value={m.id}>{m.id} — {m.title}</option>)}
+                </select>
+              </Field>
+              <Field label="Phone slot">
+                <select style={S.input} value={smsRule.phoneSlot} onChange={e=>setSmsRule({...smsRule, phoneSlot:Number(e.target.value)})}>
+                  {[1,2,3,4].map(n => <option key={n} value={n}>{'Player '+n}</option>)}
+                </select>
+              </Field>
+              <Field label="Delay (sec)"><input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={e=>setSmsRule({...smsRule, delaySec:e.target.value})}/></Field>
+              <Field label="Message"><input style={S.input} value={smsRule.message} onChange={e=>setSmsRule({...smsRule, message:e.target.value})}/></Field>
+            </div>
+            <div style={{marginTop:12}}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
+            <hr style={S.hr}/>
+            <ul style={{paddingLeft:18}}>
+              {(config.textRules||[]).map((r,i) => (
+                <li key={i} style={{marginBottom:8}}>
+                  <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
+                  <button style={{...S.button, marginLeft:8, padding:'6px 10px'}} onClick={()=>removeSmsRule(i)}>Remove</button>
+                </li>
+              ))}
+            </ul>
+            <p style={{color:'#9fb0bf'}}>Note: Your game should trigger SMS when the mission/geofence completes.</p>
+            <details style={{marginTop:8}}>
+              <summary style={{cursor:'pointer'}}>Send a quick test SMS now</summary>
+              <TestSMS/>
+            </details>
+          </div>
+        </main>
+      )}
+
+      {tab==='security' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{marginTop:0}}>Admin Credentials</h3>
+            <p style={{color:'#9fb0bf'}}>Change the Basic Auth login used for this admin. Requires current password.</p>
+            <ChangeAuth />
+            <hr style={S.hr}/>
+            <h3>Twilio Credentials</h3>
+            <p style={{color:'#ffd166'}}>Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.</p>
+            <ul>
+              <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
+              <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
+            </ul>
+          </div>
+        </main>
+      )}
+
+      {/* New Game modal */}
+      {showNewGame && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000}}>
+          <div style={{...S.card, width:420}}>
+            <h3 style={{marginTop:0}}>Create New Game</h3>
+            <Field label="Game Title">
+              <input style={S.input} value={newTitle} onChange={e=>setNewTitle(e.target.value)} />
+            </Field>
+            <Field label="Game Type">
+              <select style={S.input} value={newType} onChange={e=>setNewType(e.target.value)}>
+                {GAME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Mode">
+              <select style={S.input} value={newMode} onChange={e=>setNewMode(e.target.value)}>
+                <option value="single">Single Player</option>
+                <option value="head2head">Head to Head (2)</option>
+                <option value="multi">Multiple (4)</option>
+              </select>
+            </Field>
+            <div style={{display:'flex',gap:8,marginTop:12}}>
+              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
+              <button
+                style={S.button}
+                onClick={async()=>{
+                  if (!newTitle.trim()) return;
+                  const r = await fetch('/api/games', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({ title: newTitle.trim(), type: newType, mode: newMode })
+                  });
+                  const j = await r.json();
+                  if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
+                  // refresh list & switch to new game
+                  const rr = await fetch('/api/games'); const jj = await rr.json();
+                  if (jj.ok) setGames(jj.games||[]);
+                  setActiveSlug(j.slug);
+                  setNewTitle(''); setShowNewGame(false);
+                }}
+              >Create</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function isUrlKeyNeedingPreview(type, key, value) {
-  if (!value) return null;
-  const keys = new Set(['imageUrl','videoUrl','markerUrl','assetUrl']);
-  if (!keys.has(key)) return null;
-  const { image, video } = toEmbedFileUrl(value);
-  const url = video || image || value;
-  return <div style={{marginTop:8}}><ImagePreview url={url} /></div>;
+/* =========================================================
+   2) SMALL UI HELPERS & WIDGETS
+   ========================================================= */
+
+function Field({label, children}) {
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>
+      {children}
+    </div>
+  );
 }
 
-/* =====================================================
-   SECTION [3] MAP PICKER (Leaflet CDN)
-===================================================== */
+/** Multiple Choice Editor (A–E) with radio correct */
+function MultipleChoiceEditor({ value, correctIndex, onChange }) {
+  const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0,5) : []);
+  const [correct, setCorrect] = useState(
+    Number.isInteger(correctIndex) ? correctIndex : undefined
+  );
 
-function MapPicker({ lat, lng, radius, onChange }) {
+  useEffect(()=>{ setLocal(Array.isArray(value) ? value.slice(0,5) : []); }, [value]);
+  useEffect(()=>{ setCorrect(Number.isInteger(correctIndex) ? correctIndex : undefined); }, [correctIndex]);
+
+  function sync(nextChoices, nextCorrect){
+    const trimmed = nextChoices.map(s => (s||'').trim()).filter(Boolean).slice(0,5);
+    const ci = (Number.isInteger(nextCorrect) && nextCorrect < trimmed.length) ? nextCorrect : undefined;
+    onChange({ choices: trimmed, correctIndex: ci });
+  }
+
+  return (
+    <div style={{border:'1px solid #2a323b', borderRadius:10, padding:12}}>
+      <div style={{fontWeight:600, marginBottom:8}}>Choices (A–E)</div>
+      {[0,1,2,3,4].map(i => (
+        <div key={i} style={{display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8}}>
+          <input
+            type="radio"
+            name="mcq-correct"
+            checked={correct===i}
+            onChange={()=>{ setCorrect(i); sync(local, i); }}
+            title="Mark as correct"
+          />
+          <input
+            placeholder={`Choice ${String.fromCharCode(65+i)}`}
+            style={S.input}
+            value={local[i]||''}
+            onChange={e=>{
+              const next = [...local];
+              next[i] = e.target.value;
+              setLocal(next);
+              sync(next, correct);
+            }}
+          />
+        </div>
+      ))}
+      <div style={{color:'#9fb0bf', fontSize:12}}>
+        Leave blanks for unused options. Exactly one radio can be marked correct.
+      </div>
+    </div>
+  );
+}
+
+/** Shows <img> or <video> preview for a URL (best-effort) */
+function MediaPreview({ url, kind }) {
+  if (!url) return null;
+  const u = String(url).trim();
+  const lower = u.toLowerCase();
+  const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
+  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
+
+  return (
+    <div style={{marginTop:8}}>
+      <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
+      {isVideo ? (
+        <video src={u} controls style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b'}} />
+      ) : isImage ? (
+        <img src={u} alt="preview" style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b'}} />
+      ) : (
+        <a href={u} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
+      )}
+    </div>
+  );
+}
+
+/** Leaflet Map Picker (CDN) + Address search (Nominatim) + Use my location */
+function MapPicker({ lat, lng, radius, onChange }){
   const divRef = useRef(null);
   const mapRef = useRef(null);
   const circleRef = useRef(null);
@@ -154,8 +706,8 @@ function MapPicker({ lat, lng, radius, onChange }) {
   const [searching, setSearching] = useState(false);
   const defaultPos = [lat||44.9778, lng||-93.2650];
 
+  // Load Leaflet (CSS+JS via CDN)
   useEffect(()=>{
-    if (typeof window === 'undefined') return; // SSR guard
     if (window.L) { setReady(true); return; }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -213,7 +765,6 @@ function MapPicker({ lat, lng, radius, onChange }) {
       const data = await res.json();
       setResults(Array.isArray(data)?data:[]);
     }catch(err){
-      console.warn('Search failed', err);
       setResults([]);
     }finally{
       setSearching(false);
@@ -222,7 +773,6 @@ function MapPicker({ lat, lng, radius, onChange }) {
 
   function gotoResult(r){
     if (!mapRef.current || !markerRef.current) return;
-    const L = window.L;
     const lat = Number(r.lat), lon = Number(r.lon);
     const p = [lat, lon];
     markerRef.current.setLatLng(p);
@@ -264,802 +814,6 @@ function MapPicker({ lat, lng, radius, onChange }) {
       </div>
     </div>
   );
-}
-
-/* =====================================================
-   SECTION [4] MULTIPLE CHOICE (A–E + radio)
-===================================================== */
-
-function MultipleChoice5({ content, onChange }) {
-  const labels = ['A','B','C','D','E'];
-  const choices = Array.isArray(content?.choices) ? [...content.choices] : [];
-  while (choices.length < 5) choices.push('');
-
-  const currentAnswer = content?.answer ?? '';
-  const set = (i, val) => {
-    const next = [...choices];
-    next[i] = val;
-    let nextAnswer = currentAnswer;
-    // if the answer string no longer matches any choice, clear it
-    if (!next.includes(currentAnswer)) nextAnswer = '';
-    onChange({ choices: next.filter(Boolean), answer: nextAnswer });
-  };
-
-  const pickAnswer = (i) => {
-    const val = choices[i] || '';
-    onChange({ choices: choices.filter(Boolean), answer: val });
-  };
-
-  return (
-    <div role="group" aria-label="Multiple choice editor" style={{display:'grid', gap:8}}>
-      {choices.map((val, i) => (
-        <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:8, alignItems:'center' }}>
-          <div style={{width:26, textAlign:'center', color:'#9fb0bf'}}>{labels[i]}</div>
-          <input
-            style={S.input}
-            placeholder={`Choice ${labels[i]}`}
-            value={val}
-            onChange={e => set(i, e.target.value)}
-          />
-          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#9fb0bf' }}>
-            <input
-              type="radio"
-              name="mc_correct"
-              checked={currentAnswer === (choices[i] || '') && !!choices[i]}
-              onChange={()=> pickAnswer(i)}
-              disabled={!choices[i]}
-            />
-            Correct
-          </label>
-        </div>
-      ))}
-      <div style={{color:'#9fb0bf', fontSize:12}}>
-        Tip: leave any unused rows blank. At least two choices are required; don’t forget to mark the correct answer.
-      </div>
-    </div>
-  );
-}
-
-/* =====================================================
-   SECTION [4A] THEME EDITOR (Splash, Mission Default, Per-Mission)
-===================================================== */
-
-function ThemeEditor({ value, onChange }) {
-  const v = {
-    fontFamily: value?.fontFamily ?? 'system-ui, Arial, sans-serif',
-    fontSize:   Number(value?.fontSize ?? 18),
-    textColor:  value?.textColor ?? '#ffffff',
-    align:      value?.align ?? 'center',
-    backgroundColor:   value?.backgroundColor ?? '#0b0c10',
-    backgroundImageUrl: value?.backgroundImageUrl ?? '',
-    backgroundSize:    value?.backgroundSize ?? 'cover',
-  };
-
-  const set = (patch) => onChange({ ...v, ...patch });
-  const { image: bgImage, video: bgVideo } = toEmbedFileUrl(v.backgroundImageUrl || '');
-  const previewUrl = bgVideo || bgImage || '';
-
-  const fontOptions = [
-    { label:'System UI', value:'system-ui, Arial, sans-serif' },
-    { label:'Arial',     value:'Arial, Helvetica, sans-serif' },
-    { label:'Georgia',   value:'Georgia, serif' },
-    { label:'Courier New', value:'"Courier New", monospace' },
-    { label:'Inter (fallback to system)', value:'Inter, system-ui, Arial, sans-serif' },
-  ];
-
-  return (
-    <div style={{ display:'grid', gap:12 }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <Field label="Font family">
-          <select style={S.input} value={v.fontFamily} onChange={e=>set({fontFamily:e.target.value})}>
-            {fontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Base font size (px)">
-          <input type="number" min={10} max={48} style={S.input} value={v.fontSize}
-            onChange={e=>set({fontSize:Number(e.target.value||18)})}/>
-        </Field>
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-        <Field label="Text color">
-          <input type="color" value={v.textColor} onChange={e=>set({textColor:e.target.value})}
-            style={{ width:52, height:40, border:'1px solid #2a323b', borderRadius:10, background:'transparent' }}/>
-        </Field>
-        <Field label="Background color">
-          <input type="color" value={v.backgroundColor} onChange={e=>set({backgroundColor:e.target.value})}
-            style={{ width:52, height:40, border:'1px solid #2a323b', borderRadius:10, background:'transparent' }}/>
-        </Field>
-        <Field label="Text align">
-          <select style={S.input} value={v.align} onChange={e=>set({align:e.target.value})}>
-            {['left','center','right'].map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </Field>
-      </div>
-
-      <Field label="Background image URL (optional)">
-        <input style={S.input} placeholder="https://… (Dropbox/Drive share OK)"
-          value={v.backgroundImageUrl} onChange={e=>set({backgroundImageUrl:e.target.value})}/>
-        {v.backgroundImageUrl && <div style={{marginTop:8}}>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 200px', gap:12, alignItems:'start'}}>
-            <div>
-              <label style={{display:'block', fontSize:12, color:'#9fb0bf', marginBottom:6}}>Background size</label>
-              <select style={S.input} value={v.backgroundSize} onChange={e=>set({backgroundSize:e.target.value})}>
-                <option value="cover">cover</option>
-                <option value="contain">contain</option>
-              </select>
-              <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
-                Tip: use <code>cover</code> for wallpapers, <code>contain</code> for letterboxed images.
-              </div>
-            </div>
-            <div>
-              <div style={{fontSize:12,color:'#9fb0bf', marginBottom:6}}>Preview</div>
-              <ImagePreview url={previewUrl}/>
-            </div>
-          </div>
-        </div>}
-      </Field>
-
-      <div style={{
-        border:'1px dashed #2a323b', borderRadius:10, padding:14, background:'#0b0c10'
-      }}>
-        <div style={{
-          fontFamily:v.fontFamily, fontSize:v.fontSize, color:v.textColor, textAlign:v.align,
-          minHeight:100,
-          backgroundColor:v.backgroundColor,
-          backgroundImage: v.backgroundImageUrl ? `url("${previewUrl}")` : 'none',
-          backgroundRepeat:'no-repeat',
-          backgroundPosition:'center',
-          backgroundSize:v.backgroundSize,
-          borderRadius:10, padding:16
-        }}>
-          <div style={{opacity:0.85}}>Live style preview</div>
-          <div><b>Heading</b> / Button / Body text</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =====================================================
-   SECTION [5] MAIN ADMIN APP
-===================================================== */
-
-export default function Admin(){
-  // Tabs & core state
-  const [tab, setTab] = useState('missions');
-  const [suite, setSuite] = useState(null);
-  const [config, setConfig] = useState(null);
-  const [status, setStatus] = useState('');
-  const [selected, setSelected] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [dirty, setDirty] = useState(false);
-
-  // Text/SMS rules
-  const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
-
-  // Theme defaults / style helper
-  function withDefaultThemeStyle(style){
-    return {
-      inherit: true,
-      fontFamily: '',
-      fontSize:   '',
-      textColor:  '',
-      align:      '',
-      backgroundColor: '',
-      backgroundImageUrl: '',
-      backgroundSize: 'cover',
-      ...(style||{})
-    };
-  }
-  function defaultTheme(){
-    return {
-      fontFamily:'system-ui, Arial, sans-serif',
-      fontSize:18,
-      textColor:'#ffffff',
-      align:'center',
-      backgroundColor:'#0b0c10',
-      backgroundImageUrl:'',
-      backgroundSize:'cover',
-    };
-  }
-
-  // Initial load
-  useEffect(()=>{
-    (async()=>{
-      try{
-        const [mres, cres] = await Promise.all([
-          fetch('/missions.json', { cache:'no-store' }),
-          fetch('/api/config',   { cache:'no-store' }),
-        ]);
-        const m = await mres.json();
-        const c = await (cres.ok ? cres.json() : Promise.resolve(defaultConfig()));
-
-        const normalized = {
-          ...m,
-          missions: (m.missions||[]).map(x=> {
-            let base = x;
-
-            // Back-compat content add-ons
-            if (x.type==='quiz') {
-              base = ({...x, type:'multiple_choice', content:{
-                question: x.content?.question||'', choices: x.content?.choices||[], answer: x.content?.answer||'',
-                imageUrl: x.content?.imageUrl || '', videoUrl: x.content?.videoUrl || ''
-              }});
-            }
-            if (x.type==='video') base = ({...base, type:'video'});
-            if (base.type==='multiple_choice' || base.type==='short_answer' || base.type==='statement') {
-              base = ({
-                ...base,
-                content: {
-                  ...base.content,
-                  imageUrl: base.content?.imageUrl || '',
-                  videoUrl: base.content?.videoUrl || ''
-                }
-              });
-            }
-            if (base.type==='ar_image' || base.type==='ar_video') {
-              base = ({
-                ...base,
-                content: {
-                  geofenceEnabled: !!base.content?.geofenceEnabled,
-                  lat: base.content?.lat ?? '',
-                  lng: base.content?.lng ?? '',
-                  radiusMeters: base.content?.radiusMeters ?? 25,
-                  cooldownSeconds: base.content?.cooldownSeconds ?? 30,
-                  markerUrl: base.content?.markerUrl ?? '',
-                  assetUrl:  base.content?.assetUrl  ?? '',
-                  overlayText: base.content?.overlayText ?? ''
-                }
-              });
-            }
-
-            return { ...base, style: withDefaultThemeStyle(base.style) };
-          })
-        };
-
-        const mergedConfig = mergeConfigWithDefaults(c);
-        setSuite(normalized);
-        setConfig(mergedConfig);
-      } catch(e){
-        setStatus('Load failed: '+(e?.message||e));
-      }
-    })();
-  },[]);
-
-  function defaultConfig(){
-    return {
-      splash: { enabled: true, mode:'single' },
-      game:   { title: 'Untitled Game', type: 'Mystery' },
-      forms:  { players: 1 },
-      textRules: [],
-      theme: {
-        splash: defaultTheme(),
-        missionDefault: defaultTheme()
-      }
-    };
-  }
-  function mergeConfigWithDefaults(c){
-    const d = defaultConfig();
-    return {
-      ...d,
-      ...c,
-      theme: {
-        splash: { ...d.theme.splash, ...(c?.theme?.splash||{}) },
-        missionDefault: { ...d.theme.missionDefault, ...(c?.theme?.missionDefault||{}) }
-      }
-    };
-  }
-
-  // Save endpoints
-  function saveSuiteToGitHub(){
-    return fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) });
-  }
-  function saveConfigToGitHub(){
-    return fetch('/api/save-config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config }) });
-  }
-  async function saveAll(){
-    setStatus('Saving…');
-    const [a,b] = await Promise.all([saveSuiteToGitHub(), saveConfigToGitHub()]);
-    const ok = a.ok && b.ok;
-    if (!ok) {
-      const ta = await a.text(); const tb = await b.text();
-      setStatus('❌ Save failed:\n' + ta + '\n' + tb);
-    } else {
-      setStatus('✅ Saved (Vercel will redeploy)');
-    }
-  }
-
-  // Selection helpers
-  const current = useMemo(()=> suite?.missions?.find(m => m.id === selected) || null, [suite, selected]);
-  function suggestId(){
-    const base = 'm'; let i = 1;
-    const ids = new Set((suite?.missions||[]).map(m=>m.id));
-    while(ids.has(String(base + String(i).padStart(2,'0')))) i++;
-    return base + String(i).padStart(2,'0');
-  }
-  function startNew(){
-    const draft = {
-      id: suggestId(),
-      title:'New Mission',
-      type:'multiple_choice',
-      rewards:{points:25},
-      content:{question:'',choices:[],answer:'', imageUrl:'', videoUrl:''},
-      style: withDefaultThemeStyle({ inherit:true })
-    };
-    setEditing(draft); setSelected(null); setDirty(true);
-  }
-  function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
-  function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
-
-  // Defaults for each type
-  function defaultContentForType(t){
-    switch(t){
-      case 'multiple_choice': return {question:'',choices:[],answer:'', imageUrl:'', videoUrl:''};
-      case 'short_answer':    return {question:'',answer:'',acceptable:'', imageUrl:'', videoUrl:''};
-      case 'statement':       return {text:'', imageUrl:'', videoUrl:''};
-      case 'video':           return {videoUrl:'',overlayText:''};
-      case 'geofence_image':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
-      case 'geofence_video':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
-      case 'ar_image':        return {geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, markerUrl:'', assetUrl:'', overlayText:''};
-      case 'ar_video':        return {geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, markerUrl:'', assetUrl:'', overlayText:''};
-      default: return {};
-    }
-  }
-
-  // Save to list + validation
-  function saveToList(){
-    if (!editing || !suite) return;
-    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
-
-    // Validate required fields
-    const fields = TYPE_FIELDS[editing.type] || [];
-    for (const f of fields){
-      if (f.required === false) continue;
-      if (f.type === 'number') continue;
-      const v = editing.content?.[f.key];
-      if (Array.isArray(v)) {
-        if (v.filter(Boolean).length === 0) return setStatus('❌ Missing: ' + f.label);
-      } else {
-        if (v===undefined || v===null || v==='') return setStatus('❌ Missing: '+f.label);
-      }
-    }
-
-    // Multiple choice rule
-    if (editing.type === 'multiple_choice') {
-      const arr = (editing.content?.choices || []).filter(Boolean);
-      if (arr.length < 2) return setStatus('❌ Multiple Choice needs at least two choices');
-      if (!arr.includes(editing.content?.answer || '')) {
-        return setStatus('❌ Choose a correct answer (radio)');
-      }
-    }
-
-    // AR geofence check
-    if ((editing.type==='ar_image' || editing.type==='ar_video') && editing.content?.geofenceEnabled) {
-      const { lat, lng } = editing.content || {};
-      if (lat==='' || lng==='') return setStatus('❌ Geofence is ON — pick a map location first');
-    }
-
-    const missions = [...(suite.missions||[])];
-    const i = missions.findIndex(m=>m.id===editing.id);
-    if (i>=0) missions[i]=editing; else missions.push(editing);
-    setSuite({...suite, missions, version: bumpVersion(suite.version||'0.0.0')});
-    setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ List updated (remember Save All)');
-  }
-  function removeMission(id){
-    if (!suite) return;
-    setSuite({...suite, missions:(suite.missions||[]).filter(m=>m.id!==id)});
-    if (selected===id) { setSelected(null); setEditing(null); }
-  }
-  function bumpVersion(v){ const p = String(v||'0.0.0').split('.').map(n=>parseInt(n||'0',10)); while(p.length<3) p.push(0); p[2]+=1; return p.join('.'); }
-
-  // SMS rules
-  function addSmsRule(){
-    if (!smsRule.missionId || !smsRule.message) { setStatus('❌ Pick mission and message'); return; }
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules||[]), {...smsRule, delaySec: Number(smsRule.delaySec||0)}];
-    setConfig({...config, textRules: rules});
-    setSmsRule({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
-    setStatus('✅ SMS rule added (remember Save All)');
-  }
-  function removeSmsRule(idx){
-    const rules = [...(config?.textRules||[])];
-    rules.splice(idx,1);
-    setConfig({...config, textRules: rules});
-  }
-
-  if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
-
-  /* RENDER */
-  return (
-    <div style={S.body}>
-      {/* Header */}
-      <header style={S.header}>
-        <div style={S.wrap}>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-            {['settings','missions','text','security'].map(t => (
-              <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>{t.toUpperCase()}</button>
-            ))}
-            <button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
-            <a href="/missions.json" target="_blank" rel="noreferrer" style={{...S.button}}>View missions.json</a>
-            <a href="/config.json"   target="_blank" rel="noreferrer" style={{...S.button}}>View config.json</a>
-          </div>
-          <div style={{color:'#9fb0bf',marginTop:6,whiteSpace:'pre-wrap'}}>{status}</div>
-        </div>
-      </header>
-
-      {/* MISSIONS */}
-      {tab==='missions' && (
-        <main style={S.wrapGrid}>
-          <aside style={S.sidebar}>
-            <input placeholder="Search…" onChange={(e)=>{
-              const q=e.target.value.toLowerCase();
-              document.querySelectorAll('[data-m-title]').forEach(it=>{
-                const t=(it.getAttribute('data-m-title')||'').toLowerCase();
-                it.style.display = t.includes(q) ? '' : 'none';
-              });
-            }} style={S.search}/>
-            <div>
-              {(suite.missions||[]).map(m=> (
-                <div key={m.id} data-m-title={(m.title||'')+' '+m.id+' '+m.type} style={S.missionItem}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
-                    <div onClick={()=>editExisting(m)} style={{cursor:'pointer'}}>
-                      <div style={{fontWeight:600}}>{m.title||m.id}</div>
-                      <div style={{color:'#9fb0bf',fontSize:12}}>{m.type} — id: {m.id}</div>
-                    </div>
-                    <button style={{...S.button, padding:'6px 10px'}} onClick={()=>removeMission(m.id)}>Delete</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          <section style={S.editor}>
-            {!editing ? (
-              <div style={S.card}>
-                <p style={{marginTop:0,color:'#9fb0bf'}}>Select a mission or click <em>New Mission</em>.</p>
-                <button style={S.button} onClick={startNew}>+ New Mission</button>
-                <p style={{color:'#9fb0bf'}}>Version: <code>{suite.version||'0.0.0'}</code> • Total: <code>{suite.missions?.length||0}</code></p>
-              </div>
-            ) : (
-              <div style={S.card}>
-                {/* Identity */}
-                <Field label="ID"><input style={S.input} value={editing.id} onChange={e=>{ setEditing({...editing, id:e.target.value}); setDirty(true); }}/></Field>
-                <Field label="Title"><input style={S.input} value={editing.title} onChange={e=>{ setEditing({...editing, title:e.target.value}); setDirty(true); }}/></Field>
-
-                {/* Type */}
-                <Field label="Type">
-                  <select style={S.input} value={editing.type} onChange={e=>{
-                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)}); setDirty(true);
-                  }}>{TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
-                </Field>
-                <hr style={S.hr}/>
-
-                {/* AR Geofence toggle + map (optional) */}
-                {(editing.type==='ar_image' || editing.type==='ar_video') && (
-                  <div style={{marginBottom:12}}>
-                    <label style={{display:'flex',alignItems:'center',gap:8, marginBottom:8}}>
-                      <input
-                        type="checkbox"
-                        checked={!!editing.content?.geofenceEnabled}
-                        onChange={(e)=>{
-                          setEditing({...editing, content:{...editing.content, geofenceEnabled: e.target.checked}});
-                          setDirty(true);
-                        }}
-                      />
-                      Enable Geofence for this AR mission
-                    </label>
-
-                    {!!editing.content?.geofenceEnabled && (
-                      <div>
-                        <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
-                        <MapPicker
-                          lat={editing.content?.lat}
-                          lng={editing.content?.lng}
-                          radius={editing.content?.radiusMeters ?? 25}
-                          onChange={(lat,lng,rad)=>{
-                            setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
-                            setDirty(true);
-                          }}
-                        />
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))', gap:8}}>
-                          <Field label="Cooldown (sec)">
-                            <input
-                              type="number" min={0} max={3600} style={S.input}
-                              value={editing.content?.cooldownSeconds ?? 30}
-                              onChange={e=>{
-                                const v = e.target.value===''?30:Number(e.target.value);
-                                setEditing({...editing, content:{...editing.content, cooldownSeconds: v}});
-                                setDirty(true);
-                              }}
-                            />
-                          </Field>
-                          <div />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Geofence standard */}
-                {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
-                  <div style={{marginBottom:12}}>
-                    <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
-                    <MapPicker
-                      lat={editing.content?.lat}
-                      lng={editing.content?.lng}
-                      radius={editing.content?.radiusMeters ?? 25}
-                      onChange={(lat,lng,rad)=>{
-                        setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
-                        setDirty(true);
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Multiple Choice custom UI */}
-                {editing.type === 'multiple_choice' && (
-                  <div style={{ marginBottom:12 }}>
-                    <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Multiple Choice (A–E)</div>
-                    <MultipleChoice5
-                      content={editing.content}
-                      onChange={({ choices, answer }) => {
-                        setEditing({ ...editing, content: { ...editing.content, choices, answer }});
-                        setDirty(true);
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Dynamic fields (skip MC choices/answer here) */}
-                {(() => {
-                  const base = (TYPE_FIELDS[editing.type] || []);
-                  const visibleFields = editing.type === 'multiple_choice'
-                    ? base.filter(f => f.key !== 'choices' && f.key !== 'answer')
-                    : base;
-
-                  return visibleFields.map(f => (
-                    <Field key={f.key} label={f.label}>
-                      {f.type==='text' && (
-                        <div>
-                          <input
-                            style={S.input}
-                            value={editing.content?.[f.key] || ''}
-                            onChange={e => {
-                              setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value }});
-                              setDirty(true);
-                            }}
-                          />
-                          {isUrlKeyNeedingPreview(editing.type, f.key, editing.content?.[f.key])}
-                        </div>
-                      )}
-                      {f.type==='number' && (
-                        <input
-                          type="number" min={f.min} max={f.max} style={S.input}
-                          value={editing.content?.[f.key]??''}
-                          onChange={e=>{
-                            const v=e.target.value===''? '': Number(e.target.value);
-                            setEditing({...editing, content:{...editing.content,[f.key]:v}}); setDirty(true);
-                          }}
-                        />
-                      )}
-                      {f.type==='multiline' && (
-                        <textarea
-                          style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
-                          value={
-                            f.key==='choices'
-                              ? (editing.content?.choices||[]).join('\n')
-                              : (editing.content?.[f.key]||'')
-                          }
-                          onChange={e=>{
-                            if (f.key==='choices'){
-                              const lines=e.target.value.split('\n').map(s=>s.trim()).filter(Boolean);
-                              setEditing({...editing, content:{...editing.content, choices: lines}});
-                            } else {
-                              setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
-                            }
-                            setDirty(true);
-                          }}
-                        />
-                      )}
-                    </Field>
-                  ));
-                })()}
-
-                {/* NEW: Visual Style (per mission) */}
-                <hr style={S.hr}/>
-                <div style={{marginTop:8}}>
-                  <h3 style={{margin:'8px 0 6px 0'}}>Visual Style</h3>
-                  <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:8}}>
-                    <input
-                      type="checkbox"
-                      checked={!!(editing.style?.inherit ?? true)}
-                      onChange={(e)=>{
-                        setEditing({...editing, style: { ...(editing.style||{}), inherit: e.target.checked }});
-                        setDirty(true);
-                      }}
-                    />
-                    Use global mission default theme
-                  </label>
-
-                  {!(editing.style?.inherit ?? true) && (
-                    <ThemeEditor
-                      value={{
-                        fontFamily: editing.style?.fontFamily || '',
-                        fontSize:   editing.style?.fontSize || '',
-                        textColor:  editing.style?.textColor || '',
-                        align:      editing.style?.align || '',
-                        backgroundColor:   editing.style?.backgroundColor || '',
-                        backgroundImageUrl: editing.style?.backgroundImageUrl || '',
-                        backgroundSize:     editing.style?.backgroundSize || 'cover',
-                      }}
-                      onChange={(t)=>{
-                        setEditing({
-                          ...editing,
-                          style: { ...editing.style, ...t, inherit:false }
-                        });
-                        setDirty(true);
-                      }}
-                    />
-                  )}
-
-                  <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
-                    When “Use global mission default theme” is ON, this mission uses Settings → Theme → Mission Default Theme.
-                  </div>
-                </div>
-
-                {/* Points */}
-                <Field label="Points (Reward)">
-                  <input
-                    type="number" style={S.input}
-                    value={editing.rewards?.points??0}
-                    onChange={e=>{
-                      const v=e.target.value===''?0:Number(e.target.value);
-                      setEditing({...editing, rewards:{...(editing.rewards||{}), points:v}}); setDirty(true);
-                    }}
-                  />
-                </Field>
-
-                {/* Actions */}
-                <div style={{display:'flex',gap:8,marginTop:12}}>
-                  <button style={S.button} onClick={saveToList}>Add/Update in List</button>
-                  <button style={S.button} onClick={cancelEdit}>Cancel</button>
-                </div>
-                {dirty && <div style={{marginTop:6,color:'#ffd166'}}>Unsaved changes…</div>}
-              </div>
-            )}
-          </section>
-        </main>
-      )}
-
-      {/* SETTINGS */}
-      {tab==='settings' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{marginTop:0}}>Game Settings</h3>
-            <Field label="Game Title">
-              <input style={S.input} value={config.game.title} onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})} />
-            </Field>
-            <Field label="Game Type">
-              <select style={S.input} value={config.game.type} onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}>
-                {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </Field>
-            <Field label="Stripe Splash Page">
-              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <label style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <input type="checkbox" checked={config.splash.enabled} onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})} />
-                  Enable Splash (game code & Stripe)
-                </label>
-              </div>
-            </Field>
-            <Field label="Mode (affects how many players to collect on splash)">
-              <select style={S.input} value={config.splash.mode} onChange={e=>{
-                const mode = e.target.value;
-                const collect = (mode==='single')?1:(mode==='head2head')?2:4;
-                setConfig({...config, splash:{...config.splash, mode}, forms:{...config.forms, players: collect}});
-              }}>
-                {MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </Field>
-            <div style={{color:'#9fb0bf'}}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
-          </div>
-
-          {/* THEME SETTINGS */}
-          <div style={{...S.card, marginTop:16}}>
-            <h3 style={{marginTop:0}}>Theme (Display)</h3>
-
-            <h4 style={{margin:'6px 0'}}>Splash Theme</h4>
-            <ThemeEditor
-              value={config.theme.splash}
-              onChange={t=>setConfig({...config, theme:{...config.theme, splash:t}})}
-            />
-
-            <h4 style={{margin:'16px 0 6px'}}>Mission Default Theme</h4>
-            <ThemeEditor
-              value={config.theme.missionDefault}
-              onChange={t=>setConfig({...config, theme:{...config.theme, missionDefault:t}})}
-            />
-
-            <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
-              Missions with “Use global mission default theme” turned on will inherit these values.
-            </div>
-          </div>
-        </main>
-      )}
-
-      {/* TEXT RULES */}
-      {tab==='text' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{marginTop:0}}>Text Message Rules</h3>
-            <div style={{display:'grid',gap:12, gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))'}}>
-              <Field label="Mission (geofence)">
-                <select style={S.input} value={smsRule.missionId} onChange={e=>setSmsRule({...smsRule, missionId:e.target.value})}>
-                  <option value="">— choose —</option>
-                  {(suite.missions||[]).map(m => <option key={m.id} value={m.id}>{m.id} — {m.title}</option>)}
-                </select>
-              </Field>
-              <Field label="Phone slot">
-                <select style={S.input} value={smsRule.phoneSlot} onChange={e=>setSmsRule({...smsRule, phoneSlot:Number(e.target.value)})}>
-                  {[1,2,3,4].map(n => <option key={n} value={n}>{'Player '+n}</option>)}
-                </select>
-              </Field>
-              <Field label="Delay (sec)">
-                <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={e=>setSmsRule({...smsRule, delaySec:e.target.value})}/>
-              </Field>
-              <Field label="Message">
-                <input style={S.input} value={smsRule.message} onChange={e=>setSmsRule({...smsRule, message:e.target.value})}/>
-              </Field>
-            </div>
-            <div style={{marginTop:12}}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-            <hr style={S.hr}/>
-            <ul style={{paddingLeft:18}}>
-              {(config.textRules||[]).map((r,i) => (
-                <li key={i} style={{marginBottom:8}}>
-                  <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-                  <button style={{...S.button, marginLeft:8, padding:'6px 10px'}} onClick={()=>removeSmsRule(i)}>Remove</button>
-                </li>
-              ))}
-            </ul>
-            <p style={{color:'#9fb0bf'}}>Note: Your game should trigger SMS when the mission/geofence completes.</p>
-            <details style={{marginTop:8}}>
-              <summary style={{cursor:'pointer'}}>Send a quick test SMS now</summary>
-              <TestSMS/>
-            </details>
-          </div>
-        </main>
-      )}
-
-      {/* SECURITY */}
-      {tab==='security' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{marginTop:0}}>Admin Credentials</h3>
-            <p style={{color:'#9fb0bf'}}>Change the Basic Auth login used for this admin. Requires current password.</p>
-            <ChangeAuth />
-            <hr style={S.hr}/>
-            <h3>Twilio Credentials</h3>
-            <p style={{color:'#ffd166'}}>Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.</p>
-            <ul>
-              <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
-              <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
-            </ul>
-          </div>
-        </main>
-      )}
-    </div>
-  );
-}
-
-/* =====================================================
-   SECTION [6] TEST SMS + CHANGE AUTH
-===================================================== */
-
-function Field({label, children}) {
-  return (<div style={{marginBottom:12}}><div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>{children}</div>);
 }
 
 function TestSMS(){
@@ -1114,10 +868,9 @@ function ChangeAuth(){
   );
 }
 
-/* =====================================================
-   SECTION [7] STYLES
-===================================================== */
-
+/* =========================================================
+   3) STYLES
+   ========================================================= */
 const S = {
   body:{background:'#0b0c10',color:'#e9eef2',minHeight:'100vh',fontFamily:'system-ui, Arial, sans-serif'},
   header:{padding:16,background:'#11161a',borderBottom:'1px solid #1d2329'},
