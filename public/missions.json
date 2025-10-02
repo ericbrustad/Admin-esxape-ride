@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.20",
+  "version": "0.6.21",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -316,6 +316,31 @@
         "markerUrl": "https://www.dropbox.com/scl/fi/5j1fnwcmprbaxpwj9tj2q/2019-09-21-13.55.59.jpg?rlkey=16bs3tr4n9q3oeffnx164smus&st=e5krvhoz&dl=0",
         "assetUrl": "https://www.dropbox.com/scl/fi/mgll0jveor6tjld9bjzuw/2023-08-21-20.44.04.mov?rlkey=2oonuu35o2jmobnv1cm2m1kqi&st=f42m7bum&dl=0",
         "overlayText": "ss"
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
+      }
+    },
+    {
+      "id": "m13",
+      "title": "New Mission",
+      "type": "short_answer",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ff",
+        "answer": "fff",
+        "acceptable": "ff",
+        "imageUrl": "",
+        "videoUrl": ""
       },
       "style": {
         "inherit": true,
