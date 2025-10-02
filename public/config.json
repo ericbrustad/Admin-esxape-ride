@@ -4,8 +4,8 @@
     "mode": "single"
   },
   "game": {
-    "title": "New game yay",
-    "type": "Race"
+    "title": "bricks",
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
@@ -13,9 +13,9 @@
   "textRules": [],
   "theme": {
     "splash": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#550740",
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#100f10",
       "align": "left",
       "backgroundColor": "#e6eaf9",
       "backgroundImageUrl": "",
