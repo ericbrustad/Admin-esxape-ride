@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.2",
   "missions": [
     {
       "id": "m01",
@@ -10,6 +10,29 @@
       },
       "content": {
         "text": "Welcome to Bonkers! Ready to play?"
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission222",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "sss",
+        "choices": [
+          "2",
+          "1",
+          "2"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/4xb1u8k1g5e5g8nfqekvo/2020-04-29-07.00.51.png?rlkey=kpjx82n1b8jxsbes5zdv8ny8t&st=sknajmyt&dl=0",
+        "geofenceEnabled": true,
+        "lat": 44.9784,
+        "lng": -93.268164,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
       }
     }
   ]
