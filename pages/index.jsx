@@ -220,14 +220,17 @@ export default function Admin(){
     })();
   }, [activeSlug]);
 
-  function defaultConfig(){
-    return {
-      splash: { enabled: true, mode:'single' },
-      game:   { title: 'Untitled Game', type: 'Mystery' },
-      forms:  { players: 1 },
-      textRules: []
-    };
-  }
+ function defaultConfig(){
+  return {
+    splash: { enabled: true, mode:'single' },
+    game:   { title: 'Untitled Game', type: 'Mystery' },
+    forms:  { players: 1 },
+    textRules: [],
+    // NEW: power-ups saved per game; picked up later by the runtime
+    powerups: [] // [{ id, title, type:'smoke'|'clone', lat, lng, pickupRadius, durationSec, respawnSec, stock }]
+  };
+}
+
 
   function defaultContentForType(t){
     switch(t){
@@ -325,9 +328,12 @@ export default function Admin(){
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-            {['settings','missions','text','security'].map(t => (
-              <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>{t.toUpperCase()}</button>
-            ))}
+           {['settings','missions','powerups','text','security'].map(t => (
+  <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>
+    {t.toUpperCase()}
+  </button>
+))}
+
 
             {/* Game selector + New Game */}
             <div style={{display:'flex',alignItems:'center',gap:8, marginLeft:8}}>
@@ -574,6 +580,7 @@ export default function Admin(){
         </main>
       )}
 
+       
       {tab==='text' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -611,6 +618,22 @@ export default function Admin(){
           </div>
         </main>
       )}
+{tab==='powerups' && (
+  <main style={S.wrap}>
+    <div style={S.card}>
+      <h3 style={{marginTop:0}}>Power-Ups</h3>
+      <p style={{color:'#9fb0bf', marginTop: -8}}>
+        Place Smoke Bombs or Clones on the map. Players can pick them up when they
+        enter the pickup radius.
+      </p>
+
+      <PowerUpsEditor
+        config={config}
+        setConfig={setConfig}
+      />
+    </div>
+  </main>
+)}
 
       {/* New Game modal */}
       {showNewGame && (
@@ -753,6 +776,142 @@ function MediaPreview({ url, kind }) {
       ) : (
         <a href={raw} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
       )}
+    </div>
+  );
+}
+function PowerUpsEditor({ config, setConfig }) {
+  const list = Array.isArray(config?.powerups) ? config.powerups : [];
+
+  const [editing, setEditing] = useState(null);   // object or null
+  const [dirty, setDirty]     = useState(false);
+
+  function suggestPid(){
+    const base='p'; let i=1;
+    const ids = new Set(list.map(p=>p.id));
+    while(ids.has(base + String(i).padStart(2,'0'))) i++;
+    return base + String(i).padStart(2,'0');
+  }
+
+  function defaultPowerup(){
+    return {
+      id: suggestPid(),
+      title: 'Power-Up',
+      type: 'smoke',        // 'smoke' | 'clone'
+      lat: 44.9778,
+      lng: -93.2650,
+      pickupRadius: 15,     // meters to trigger pickup
+      durationSec: 60,      // how long effect lasts
+      respawnSec: 300,      // how long until it reappears (0 = no respawn)
+      stock: 1              // how many times it can be taken (0 = infinite)
+    };
+  }
+
+  function startNew(){ setEditing(defaultPowerup()); setDirty(true); }
+  function editItem(p){ setEditing(JSON.parse(JSON.stringify(p))); setDirty(false); }
+  function cancel(){ setEditing(null); setDirty(false); }
+
+  function saveToList(){
+    if (!editing) return;
+    if (!editing.id || !editing.title) return;
+    const next = [...list];
+    const i = next.findIndex(p => p.id === editing.id);
+    if (i>=0) next[i]=editing; else next.push(editing);
+    setConfig({...config, powerups: next});
+    setEditing(null); setDirty(false);
+  }
+
+  function removeItem(id){
+    const next = list.filter(p => p.id !== id);
+    setConfig({...config, powerups: next});
+    if (editing?.id === id) { setEditing(null); setDirty(false); }
+  }
+
+  return (
+    <div style={{display:'grid', gap:16, gridTemplateColumns:'320px 1fr', alignItems:'start'}}>
+      {/* LEFT: list */}
+      <aside style={S.sidebar}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+          <div style={{fontWeight:600}}>Placed Power-Ups</div>
+          <button style={{...S.button, padding:'6px 10px'}} onClick={startNew}>+ New</button>
+        </div>
+        <div>
+          {list.length === 0 && (
+            <div style={{color:'#9fb0bf'}}>No power-ups yet. Click <em>New</em> to add one.</div>
+          )}
+          {list.map(p => (
+            <div key={p.id} style={S.missionItem}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:8}}>
+                <div onClick={()=>editItem(p)} style={{cursor:'pointer'}}>
+                  <div style={{fontWeight:600}}>{p.title} <span style={{color:'#9fb0bf', fontWeight:400}}>({p.type})</span></div>
+                  <div style={{color:'#9fb0bf', fontSize:12}}>
+                    {p.lat?.toFixed?.(5)}, {p.lng?.toFixed?.(5)} • r: {p.pickupRadius||0}m
+                  </div>
+                </div>
+                <button style={{...S.button, padding:'6px 10px'}} onClick={()=>removeItem(p.id)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* RIGHT: editor */}
+      <section style={S.editor}>
+        {!editing ? (
+          <div style={S.card}>
+            <p style={{marginTop:0, color:'#9fb0bf'}}>Select a power-up or click <em>New</em>.</p>
+          </div>
+        ) : (
+          <div style={S.card}>
+            <Field label="ID">
+              <input style={S.input} value={editing.id} onChange={e=>{ setEditing({...editing, id:e.target.value}); setDirty(true); }} />
+            </Field>
+            <Field label="Title">
+              <input style={S.input} value={editing.title} onChange={e=>{ setEditing({...editing, title:e.target.value}); setDirty(true); }} />
+            </Field>
+            <Field label="Type">
+              <select style={S.input} value={editing.type} onChange={e=>{ setEditing({...editing, type:e.target.value}); setDirty(true); }}>
+                <option value="smoke">Smoke Bomb (invisibility)</option>
+                <option value="clone">Clone (decoy track)</option>
+              </select>
+            </Field>
+
+            <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Location & pickup radius</div>
+            <MapPicker
+              lat={editing.lat}
+              lng={editing.lng}
+              radius={editing.pickupRadius ?? 15}
+              onChange={(lat,lng,rad)=>{
+                setEditing({...editing, lat, lng, pickupRadius: rad});
+                setDirty(true);
+              }}
+            />
+
+            <div style={{display:'grid', gap:12, gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))'}}>
+              <Field label="Effect Duration (sec)">
+                <input type="number" min={1} max={3600} style={S.input}
+                  value={editing.durationSec ?? 60}
+                  onChange={e=>{ setEditing({...editing, durationSec:Number(e.target.value||0)}); setDirty(true); }} />
+              </Field>
+              <Field label="Respawn After (sec)">
+                <input type="number" min={0} max={86400} style={S.input}
+                  value={editing.respawnSec ?? 0}
+                  onChange={e=>{ setEditing({...editing, respawnSec:Number(e.target.value||0)}); setDirty(true); }} />
+              </Field>
+              <Field label="Stock (0 = infinite)">
+                <input type="number" min={0} max={9999} style={S.input}
+                  value={editing.stock ?? 1}
+                  onChange={e=>{ setEditing({...editing, stock:Number(e.target.value||0)}); setDirty(true); }} />
+              </Field>
+            </div>
+
+            <div style={{display:'flex', gap:8, marginTop:12}}>
+              <button style={S.button} onClick={saveToList}>Add/Update</button>
+              <button style={S.button} onClick={cancel}>Cancel</button>
+            </div>
+            {dirty && <div style={{marginTop:6,color:'#ffd166'}}>Unsaved changes…</div>}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
