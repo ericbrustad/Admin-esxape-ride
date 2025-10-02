@@ -119,12 +119,25 @@ export default function Admin(){
           ? `/api/config?slug=${encodeURIComponent(activeSlug)}`
           : `/api/config`;
 
-        const [mres, cres] = await Promise.all([
-          fetch(mUrl, { cache:'no-store' }),
-          fetch(cUrl, { cache:'no-store' }),
-        ]);
-        const m = await mres.json();
-        const c = await (cres.ok ? cres.json() : Promise.resolve(defaultConfig()));
+        // [A] helpers – put these near the top of the file (outside the component)
+async function fetchJsonSafe(url, fallback) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    const ct = r.headers.get('content-type') || '';
+    if (r.ok && ct.includes('application/json')) return await r.json();
+  } catch {}
+  return fallback;
+}
+async function fetchFirstJson(urls, fallback) {
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { cache: 'no-store' });
+      const ct = r.headers.get('content-type') || '';
+      if (r.ok && ct.includes('application/json')) return await r.json();
+    } catch {}
+  }
+  return fallback;
+}
 
         const normalized = {
           ...m,
