@@ -17,10 +17,22 @@
           "Saint Paul",
           "Minneapolis"
         ],
-        "answer": "Saint Paul"
+        "answer": "Saint Paul",
+        "imageUrl": "",
+        "videoUrl": ""
       },
       "rewards": {
         "points": 25
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -34,7 +46,18 @@
         "imageUrl": "",
         "question": "v  ",
         "answer": "vvv",
-        "acceptable": "s"
+        "acceptable": "s",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -45,7 +68,19 @@
         "points": 25
       },
       "content": {
-        "text": "Ggg"
+        "text": "Ggg",
+        "imageUrl": "",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -56,7 +91,19 @@
         "points": 25
       },
       "content": {
-        "text": "fnfn"
+        "text": "fnfn",
+        "imageUrl": "",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -73,6 +120,16 @@
         "cooldownSeconds": 30,
         "videoUrl": "https://youtu.be/xeviGB4AOXg?si=HROzn7awoA9GaFNz",
         "overlayText": "sss"
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -91,7 +148,19 @@
           "4",
           "5"
         ],
-        "answer": "4"
+        "answer": "4",
+        "imageUrl": "",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -109,7 +178,18 @@
           "3"
         ],
         "answer": "3",
-        "imageUrl": "https://drive.google.com/file/d/1eEIao3NzghtnmIu6-89mokDu5yWZhVKq/view"
+        "imageUrl": "https://drive.google.com/file/d/1eEIao3NzghtnmIu6-89mokDu5yWZhVKq/view",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -123,7 +203,18 @@
         "question": "ddd",
         "answer": "f",
         "acceptable": "ddd",
-        "imageUrl": "https://drive.google.com/file/d/1eEIao3NzghtnmIu6-89mokDu5yWZhVKq/view"
+        "imageUrl": "https://drive.google.com/file/d/1eEIao3NzghtnmIu6-89mokDu5yWZhVKq/view",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -139,7 +230,18 @@
           "v"
         ],
         "answer": "v",
-        "imageUrl": ""
+        "imageUrl": "",
+        "videoUrl": ""
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -158,6 +260,16 @@
         "markerUrl": "https://www.dropbox.com/scl/fi/5j1fnwcmprbaxpwj9tj2q/2019-09-21-13.55.59.jpg?rlkey=16bs3tr4n9q3oeffnx164smus&st=e5krvhoz&dl=0",
         "assetUrl": "https://www.dropbox.com/scl/fi/kqyc4gsf7kl16jacsmskh/2023-08-15-01.47.15.mp4?rlkey=xhraizuovy9ci0sap8uiig7ug&st=l7qj81rl&dl=0",
         "overlayText": "yes"
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -176,6 +288,16 @@
         "markerUrl": "https://www.dropbox.com/scl/fi/5j1fnwcmprbaxpwj9tj2q/2019-09-21-13.55.59.jpg?rlkey=16bs3tr4n9q3oeffnx164smus&st=e5krvhoz&dl=0",
         "assetUrl": "https://www.dropbox.com/scl/fi/5j1fnwcmprbaxpwj9tj2q/2019-09-21-13.55.59.jpg?rlkey=16bs3tr4n9q3oeffnx164smus&st=e5krvhoz&dl=0",
         "overlayText": "dd"
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     },
     {
@@ -194,6 +316,16 @@
         "markerUrl": "https://www.dropbox.com/scl/fi/5j1fnwcmprbaxpwj9tj2q/2019-09-21-13.55.59.jpg?rlkey=16bs3tr4n9q3oeffnx164smus&st=e5krvhoz&dl=0",
         "assetUrl": "https://www.dropbox.com/scl/fi/mgll0jveor6tjld9bjzuw/2023-08-21-20.44.04.mov?rlkey=2oonuu35o2jmobnv1cm2m1kqi&st=f42m7bum&dl=0",
         "overlayText": "ss"
+      },
+      "style": {
+        "inherit": true,
+        "fontFamily": "",
+        "fontSize": "",
+        "textColor": "",
+        "align": "",
+        "backgroundColor": "",
+        "backgroundImageUrl": "",
+        "backgroundSize": "cover"
       }
     }
   ]
