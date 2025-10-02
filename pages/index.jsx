@@ -1,17 +1,58 @@
-// pages/index.jsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-/* =========================================================================
-   SECTION 0 — Small fetch helpers (safe JSON, fallback-first)
-   ========================================================================= */
+/* =========================================================
+   0) HELPERS (top-level)
+   ========================================================= */
+
+// Normalize common CDN/share links into direct-render URLs
+function normalizeMediaUrl(u) {
+  if (!u) return '';
+  let url = String(u).trim();
+
+  // Dropbox -> direct content
+  if (url.includes('dropbox.com')) {
+    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+    // prefer raw=1 which returns the file bytes with correct content-type
+    if (url.includes('?')) {
+      url = url.replace(/(\?|&)dl=\d/gi, '$1raw=1');
+      if (!/[?&](raw=1)/.test(url)) url += '&raw=1';
+    } else {
+      url += '?raw=1';
+    }
+  }
+
+  // Google Drive -> direct content
+  const m = url.match(/https?:\/\/drive\.google\.com\/file\/d\/([^/]+)\//);
+  if (m) {
+    url = `https://drive.google.com/uc?export=download&id=${m[1]}`;
+  }
+
+  return url;
+}
+
+// Best-effort guess by extension (before we try/fallback render)
+function guessKindFromUrl(u) {
+  const base = String(u || '').split('?')[0].toLowerCase();
+  const isVideo = /\.(mp4|webm|mov)$/.test(base);
+  const isImage = /\.(png|jpg|jpeg|gif|webp|svg)$/.test(base);
+  if (isVideo) return 'video';
+  if (isImage) return 'image';
+  return 'unknown';
+}
+
+// Safe JSON fetch (returns fallback if not JSON/404/etc.)
 async function fetchJsonSafe(url, fallback) {
   try {
     const r = await fetch(url, { cache: 'no-store' });
     const ct = r.headers.get('content-type') || '';
-    if (r.ok && ct.includes('application/json')) return await r.json();
+    if (r.ok && ct.includes('application/json')) {
+      return await r.json();
+    }
   } catch {}
   return fallback;
 }
+
+// Try first-available JSON from a list of URLs
 async function fetchFirstJson(urls, fallback) {
   for (const u of urls) {
     try {
@@ -23,31 +64,28 @@ async function fetchFirstJson(urls, fallback) {
   return fallback;
 }
 
-/* =========================================================================
-   SECTION 1 — Type/Field definitions
-   - For MCQ/SA/Statement we support optional mediaUrl and optional geofence
-   ========================================================================= */
+/* =========================================================
+   0.1) TYPE / FORM DEFINITIONS
+   ========================================================= */
+
 const TYPE_FIELDS = {
   multiple_choice: [
     { key:'question',  label:'Question', type:'text' },
     { key:'mediaUrl',  label:'Image or Video URL (optional)', type:'text' }, // preview below
-    // geofence handled by toggle + MapPicker UI below
   ],
   short_answer: [
-    { key:'question',  label:'Question', type:'text' },
-    { key:'answer',    label:'Correct Answer', type:'text' },
-    { key:'acceptable',label:'Also Accept (comma-separated)', type:'text' },
-    { key:'mediaUrl',  label:'Image or Video URL (optional)', type:'text' }, // preview below
-    // geofence via toggle + MapPicker
+    { key:'question',   label:'Question', type:'text' },
+    { key:'answer',     label:'Correct Answer', type:'text' },
+    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
+    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   statement: [
-    { key:'text',      label:'Statement Text', type:'multiline' },
-    { key:'mediaUrl',  label:'Image or Video URL (optional)', type:'text' }, // preview below
-    // geofence via toggle + MapPicker
+    { key:'text',     label:'Statement Text', type:'multiline' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' },   // preview below
   ],
   video: [
-    { key:'videoUrl',   label:'Video URL (https)', type:'text' },
-    { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
+    { key:'videoUrl',    label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
   ],
   geofence_image: [
     { key:'lat',            label:'Latitude', type:'number' },
@@ -92,34 +130,34 @@ const TYPE_OPTIONS = [
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 
-/* =========================================================================
-   SECTION 2 — Root component
-   ========================================================================= */
+/* =========================================================
+   1) ROOT COMPONENT
+   ========================================================= */
 export default function Admin(){
   const [tab, setTab] = useState('missions');
 
-  // Games
+  // Games (multi-game) state
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root game
+  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy/root
   const [showNewGame, setShowNewGame] = useState(false);
-  const [newTitle, setNewTitle]       = useState('');
-  const [newType, setNewType]         = useState('Mystery');
-  const [newMode, setNewMode]         = useState('single'); // single | head2head | multi
+  const [newTitle, setNewTitle] = useState('');
+  const [newType,  setNewType]  = useState('Mystery');
+  const [newMode,  setNewMode]  = useState('single'); // single | head2head | multi
 
-  // Data
-  const [suite, setSuite]             = useState(null);
-  const [config, setConfig]           = useState(null);
-  const [status, setStatus]           = useState('');
+  // Admin data
+  const [suite, setSuite]   = useState(null);
+  const [config, setConfig] = useState(null);
+  const [status, setStatus] = useState('');
 
-  // Editor state
-  const [selected, setSelected]       = useState(null); // mission id
-  const [editing, setEditing]         = useState(null); // draft
-  const [dirty, setDirty]             = useState(false);
+  // Mission editor state
+  const [selected, setSelected] = useState(null); // mission id selected
+  const [editing, setEditing]   = useState(null); // current draft
+  const [dirty, setDirty]       = useState(false);
 
-  // SMS
-  const [smsRule, setSmsRule]         = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
+  // SMS rules
+  const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  // Load game list once
+  // Load games list
   useEffect(() => {
     (async () => {
       try {
@@ -134,17 +172,16 @@ export default function Admin(){
   useEffect(()=>{
     (async()=>{
       try{
-        const missionUrls = activeSlug
-          ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
-          : [`/missions.json`];
+        const mUrl = activeSlug ? `/games/${activeSlug}/missions.json` : `/missions.json`;
+        const cUrl = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
 
-        const configUrl = activeSlug
-          ? `/api/config?slug=${encodeURIComponent(activeSlug)}`
-          : `/api/config`;
+        const m = await fetchJsonSafe(
+          mUrl,
+          { id:'msuite_esx', version:'0.0.0', flow:{mode:'linear', start:'m01'}, missions: [] }
+        );
+        const c = await fetchJsonSafe(cUrl, defaultConfig());
 
-        const m = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c = await fetchJsonSafe(configUrl, defaultConfig());
-
+        // legacy 'quiz' -> 'multiple_choice'
         const normalized = {
           ...m,
           missions: (m.missions||[]).map(x =>
@@ -152,13 +189,7 @@ export default function Admin(){
               ? ({...x, type:'multiple_choice', content:{
                   question: x.content?.question||'',
                   choices:  x.content?.choices || [],
-                  answer:   x.content?.answer   || '',
-                  geofenceEnabled: !!x.content?.geofenceEnabled,
-                  lat: x.content?.lat ?? '',
-                  lng: x.content?.lng ?? '',
-                  radiusMeters: x.content?.radiusMeters ?? 25,
-                  cooldownSeconds: x.content?.cooldownSeconds ?? 30,
-                  mediaUrl: x.content?.mediaUrl || ''
+                  answer:   x.content?.answer   || ''
                 }})
               : x
           )
@@ -188,11 +219,14 @@ export default function Admin(){
   function defaultContentForType(t){
     switch(t){
       case 'multiple_choice':
-        return {question:'', choices:[], correctIndex: undefined, mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+        return {question:'', choices:[], correctIndex: undefined, mediaUrl:'',
+                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
       case 'short_answer':
-        return {question:'', answer:'', acceptable:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+        return {question:'', answer:'', acceptable:'', mediaUrl:'',
+                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
       case 'statement':
-        return {text:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+        return {text:'', mediaUrl:'',
+                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
       case 'video':
         return {videoUrl:'', overlayText:''};
       case 'geofence_image':
@@ -200,10 +234,13 @@ export default function Admin(){
       case 'geofence_video':
         return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
       case 'ar_image':
-        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+        return {markerUrl:'', assetUrl:'', overlayText:'',
+                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
       case 'ar_video':
-        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      default: return {};
+        return {markerUrl:'', assetUrl:'', overlayText:'',
+                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      default:
+        return {};
     }
   }
 
@@ -238,35 +275,16 @@ export default function Admin(){
   function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
   function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
   function bumpVersion(v){ const p = String(v||'0.0.0').split('.').map(n=>parseInt(n||'0',10)); while(p.length<3) p.push(0); p[2]+=1; return p.join('.'); }
-
   function saveToList(){
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // MCQ validity check
-    if (editing.type === 'multiple_choice') {
-      const arr = Array.isArray(editing.content?.choices) ? editing.content.choices.filter(Boolean) : [];
-      const ci  = editing.content?.correctIndex;
-      if (arr.length < 2) return setStatus('❌ Multiple Choice needs at least 2 choices.');
-      if (!(Number.isInteger(ci) && ci >= 0 && ci < arr.length)) return setStatus('❌ Pick exactly one correct answer (radio).');
-    }
-
-    // Required fields from schema (ignore optional mediaUrl)
+    // basic presence checks (skip optional mediaUrl)
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields){
       if (f.type==='number') continue;
       const v = editing.content?.[f.key];
-      if (f.key !== 'mediaUrl' && (v===undefined || v===null || v==='')) {
-        return setStatus('❌ Missing: '+f.label);
-      }
-    }
-
-    // If geofenceEnabled, ensure lat/lng
-    if (editing.content?.geofenceEnabled) {
-      const { lat, lng } = editing.content;
-      if (lat === '' || lng === '' || isNaN(Number(lat)) || isNaN(Number(lng))) {
-        return setStatus('❌ Enable geofence requires a valid location.');
-      }
+      if (v===undefined || v===null || (f.key!=='mediaUrl' && v==='')) return setStatus('❌ Missing: '+f.label);
     }
 
     const missions = [...(suite.missions||[])];
@@ -276,7 +294,6 @@ export default function Admin(){
     setSelected(editing.id); setEditing(null); setDirty(false);
     setStatus('✅ List updated (remember Save All)');
   }
-
   function removeMission(id){
     if (!suite) return;
     setSuite({...suite, missions:(suite.missions||[]).filter(m=>m.id!==id)});
@@ -301,9 +318,9 @@ export default function Admin(){
 
   if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
 
-  /* =========================================================================
-     SECTION 3 — Render
-     ========================================================================= */
+  /* =========================================================
+     RENDER
+     ========================================================= */
   return (
     <div style={S.body}>
       <header style={S.header}>
@@ -332,7 +349,7 @@ export default function Admin(){
             </div>
 
             <button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
-            <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{...S.button}}>View missions.json</a>
+            <a href={activeSlug?`/games/${activeSlug}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{...S.button}}>View missions.json</a>
             <a href="/config.json" target="_blank" rel="noreferrer" style={{...S.button}}>View config.json</a>
           </div>
           <div style={{color:'#9fb0bf',marginTop:6,whiteSpace:'pre-wrap'}}>{status}</div>
@@ -341,7 +358,7 @@ export default function Admin(){
 
       {tab==='missions' && (
         <main style={S.wrapGrid}>
-          {/* LEFT: list */}
+          {/* LEFT: mission list */}
           <aside style={S.sidebar}>
             <input placeholder="Search…" onChange={(e)=>{
               const q=e.target.value.toLowerCase();
@@ -384,7 +401,7 @@ export default function Admin(){
                 </Field>
                 <hr style={S.hr}/>
 
-                {/* MCQ custom editor */}
+                {/* MULTIPLE CHOICE custom editor */}
                 {editing.type==='multiple_choice' && (
                   <div style={{marginBottom:12}}>
                     <MultipleChoiceEditor
@@ -398,8 +415,8 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Optional geofence for MCQ/SA/Statement */}
-                {(editing.type==='multiple_choice' || editing.type==='short_answer' || editing.type==='statement') && (
+                {/* Optional geofence for MCQ / Short Answer / Statement / AR */}
+                {(['multiple_choice','short_answer','statement','ar_image','ar_video'].includes(editing.type)) && (
                   <div style={{marginBottom:12}}>
                     <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
                       <input
@@ -442,7 +459,7 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Geofence map for geofence_* types */}
+                {/* Geofence types map always visible */}
                 {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
@@ -455,54 +472,21 @@ export default function Admin(){
                         setDirty(true);
                       }}
                     />
-                  </div>
-                )}
-
-                {/* AR geofence toggle + map */}
-                {(editing.type==='ar_image' || editing.type==='ar_video') && (
-                  <div style={{marginBottom:12}}>
-                    <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                    <Field label="Cooldown (sec)">
                       <input
-                        type="checkbox"
-                        checked={!!editing.content?.geofenceEnabled}
+                        type="number" min={0} max={3600} style={S.input}
+                        value={editing.content?.cooldownSeconds ?? 30}
                         onChange={e=>{
-                          const on = e.target.checked;
-                          const next = {...editing.content, geofenceEnabled:on};
-                          if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.2650; }
-                          setEditing({...editing, content: next});
+                          const v = Number(e.target.value||0);
+                          setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
                           setDirty(true);
                         }}
                       />
-                      Enable geofence for this AR mission
-                    </label>
-                    {editing.content?.geofenceEnabled && (
-                      <>
-                        <MapPicker
-                          lat={editing.content?.lat}
-                          lng={editing.content?.lng}
-                          radius={editing.content?.radiusMeters ?? 25}
-                          onChange={(lat,lng,rad)=>{
-                            setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
-                            setDirty(true);
-                          }}
-                        />
-                        <Field label="Cooldown (sec)">
-                          <input
-                            type="number" min={0} max={3600} style={S.input}
-                            value={editing.content?.cooldownSeconds ?? 30}
-                            onChange={e=>{
-                              const v = Number(e.target.value||0);
-                              setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
-                              setDirty(true);
-                            }}
-                          />
-                        </Field>
-                      </>
-                    )}
+                    </Field>
                   </div>
                 )}
 
-                {/* Generic fields + media previews */}
+                {/* Generic field renderer + media previews */}
                 {(TYPE_FIELDS[editing.type]||[]).map(f => (
                   <Field key={f.key} label={f.label}>
                     {f.type==='text' && (
@@ -515,6 +499,7 @@ export default function Admin(){
                             setDirty(true);
                           }}
                         />
+                        {/* Inline previews for media-like keys (Dropbox/Drive supported) */}
                         {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) &&
                           <MediaPreview url={editing.content?.[f.key]} kind={f.key} />}
                       </>
@@ -690,9 +675,10 @@ export default function Admin(){
                   });
                   const j = await r.json();
                   if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
+                  // refresh list & switch to new game
                   const rr = await fetch('/api/games'); const jj = await rr.json();
                   if (jj.ok) setGames(jj.games||[]);
-                  setActiveSlug(j.slug);
+                  setActiveSlug(j.slug); // server returns { ok:true, slug }
                   setNewTitle(''); setShowNewGame(false);
                 }}
               >Create</button>
@@ -704,9 +690,9 @@ export default function Admin(){
   );
 }
 
-/* =========================================================================
-   SECTION 4 — Small UI helpers & widgets
-   ========================================================================= */
+/* =========================================================
+   2) SMALL UI HELPERS & WIDGETS
+   ========================================================= */
 
 function Field({label, children}) {
   return (
@@ -765,29 +751,56 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   );
 }
 
-/** Media preview for URLs */
+/** Robust media preview with Dropbox/Drive normalization and fallback */
 function MediaPreview({ url, kind }) {
+  const [mode, setMode] = useState('auto'); // 'auto' -> try img then video; or 'img'/'video' set by errors
   if (!url) return null;
-  const u = String(url).trim();
-  const lower = u.toLowerCase();
-  const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
-  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
+
+  const normalized = normalizeMediaUrl(url);
+  const guess = guessKindFromUrl(normalized);
+
+  // First attempt: image (unless we know it's a video)
+  const tryImage = mode==='auto' ? (guess !== 'video') : (mode==='img');
+  const tryVideo = mode==='auto' ? true : (mode==='video');
 
   return (
     <div style={{marginTop:8}}>
       <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
-      {isVideo ? (
-        <video src={u} controls style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b'}} />
-      ) : isImage ? (
-        <img src={u} alt="preview" style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b'}} />
-      ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
+
+      {/* Try image */}
+      {tryImage && (
+        <img
+          src={normalized}
+          alt="preview"
+          style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b', display: mode==='video' ? 'none' : 'block'}}
+          onError={()=> setMode(guess==='image' ? 'video' : 'video')}
+        />
       )}
+
+      {/* Try video (if guess is video OR image failed) */}
+      {tryVideo && (
+        <video
+          src={normalized}
+          controls
+          style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b', display: (guess==='video' || mode==='video') ? 'block' : 'none'}}
+          onError={()=> setMode('link')}
+        />
+      )}
+
+      {/* Final fallback: plain link */}
+      {mode==='link' && (
+        <a href={normalized} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
+      )}
+
+      {/* Small tip for Dropbox/Drive */}
+      <div style={{marginTop:6, color:'#6f8598', fontSize:11}}>
+        Tip: Dropbox/Drive share links are auto-converted for preview. If something won’t display, click “Open media”.
+      </div>
     </div>
   );
 }
 
-/** Leaflet Map Picker (CDN) + address search + "use my location" */
+/** Leaflet Map Picker (CDN) + Address search (Nominatim) + Use my location */
 function MapPicker({ lat, lng, radius, onChange }){
   const divRef = useRef(null);
   const mapRef = useRef(null);
@@ -800,6 +813,7 @@ function MapPicker({ lat, lng, radius, onChange }){
   const [searching, setSearching] = useState(false);
   const defaultPos = [lat||44.9778, lng||-93.2650];
 
+  // Load Leaflet (CSS+JS via CDN)
   useEffect(()=>{
     if (window.L) { setReady(true); return; }
     const link = document.createElement('link');
@@ -961,9 +975,9 @@ function ChangeAuth(){
   );
 }
 
-/* =========================================================================
-   SECTION 5 — Styles
-   ========================================================================= */
+/* =========================================================
+   3) STYLES
+   ========================================================= */
 const S = {
   body:{background:'#0b0c10',color:'#e9eef2',minHeight:'100vh',fontFamily:'system-ui, Arial, sans-serif'},
   header:{padding:16,background:'#11161a',borderBottom:'1px solid #1d2329'},
