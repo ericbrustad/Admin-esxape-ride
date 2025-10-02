@@ -10,5 +10,29 @@
   "forms": {
     "players": 2
   },
-  "textRules": []
+  "textRules": [],
+  "powerups": [
+    {
+      "id": "p01",
+      "title": "Power-Up",
+      "type": "clone",
+      "lat": 44.973144,
+      "lng": -93.211699,
+      "pickupRadius": 15,
+      "durationSec": 60,
+      "respawnSec": 300,
+      "stock": 1
+    },
+    {
+      "id": "p02",
+      "title": "smoke bomb downtown",
+      "type": "smoke",
+      "lat": 44.978684,
+      "lng": -93.267092,
+      "pickupRadius": 80,
+      "durationSec": 60,
+      "respawnSec": 300,
+      "stock": 1
+    }
+  ]
 }
