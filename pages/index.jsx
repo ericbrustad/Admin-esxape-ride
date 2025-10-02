@@ -802,7 +802,7 @@ const S = {
   header:{padding:16,background:'#11161a',borderBottom:'1px solid #1d2329'},
   wrap:{maxWidth:1100,margin:'0 auto',padding:16},
   wrapGrid:{display:'grid',gridTemplateColumns:'320px 1fr',gap:16,alignItems:'start',maxWidth:1200,margin:'0 auto',padding:16},
-  sidebar:{background:'#12181d',border:'1px solid '#1f262d',borderRadius:14,padding:12,position:'sticky',top:12,height:'calc(100vh - 120px)',overflow:'auto'},
+  sidebar:{background:'#12181d',border:'1px solid #1f262d',borderRadius:14,padding:12,position:'sticky',top:12,height:'calc(100vh - 120px)',overflow:'auto'},
   editor:{minHeight:'60vh'},
   card:{background:'#12181d',border:'1px solid '#1f262d',borderRadius:14,padding:16},
   missionItem:{borderBottom:'1px solid #1f262d',padding:'10px 4px'},
