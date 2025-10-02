@@ -1,41 +1,36 @@
-// =============================
-// [1] IMPORTS & CONSTANTS
-// =============================
+// =====================================================
+// SECTION [1] IMPORTS & CONSTANTS
+// =====================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /*
-[1.1] Supported field schemas per mission type.
-      - NEW: Optional media fields for multiple_choice, short_answer, statement:
-        * imageUrl (PNG/JPG/GIF/WEBP/SVG)
-        * videoUrl (MP4/WEBM/MOV)
-      - 'required: true' marks fields that must be filled; others are optional.
+TYPE_FIELDS
+- Core fields marked with required:true
+- NEW: Optional media fields for multiple_choice, short_answer, statement
 */
 const TYPE_FIELDS = {
   'multiple_choice': [
     { key:'question', label:'Question', type:'text',       required:true },
-    { key:'choices',  label:'Choices (one per line)', type:'multiline', required:true },
-    { key:'answer',   label:'Correct Answer',         type:'text',       required:true },
-    // Optional media:
+    { key:'choices',  label:'Choices (one per line)', type:'multiline', required:true }, // (hidden by custom UI)
+    { key:'answer',   label:'Correct Answer',         type:'text',       required:true }, // (hidden by custom UI)
     { key:'imageUrl', label:'(Optional) Image URL',   type:'text',       required:false },
     { key:'videoUrl', label:'(Optional) Video URL',   type:'text',       required:false },
   ],
   'short_answer': [
     { key:'question',   label:'Question',                       type:'text', required:true },
     { key:'answer',     label:'Correct Answer',                 type:'text', required:true },
-    { key:'acceptable', label:'Also Accept (comma-separated)',  type:'text', required:false }, // optional
-    // Optional media:
+    { key:'acceptable', label:'Also Accept (comma-separated)',  type:'text', required:false },
     { key:'imageUrl',   label:'(Optional) Image URL',           type:'text', required:false },
     { key:'videoUrl',   label:'(Optional) Video URL',           type:'text', required:false },
   ],
   'statement': [
     { key:'text',      label:'Statement Text',       type:'multiline', required:true },
-    // Optional media:
     { key:'imageUrl',  label:'(Optional) Image URL', type:'text',       required:false },
     { key:'videoUrl',  label:'(Optional) Video URL', type:'text',       required:false },
   ],
   'video': [
-    { key:'videoUrl',    label:'Video URL (https)',         type:'text', required:true },
-    { key:'overlayText', label:'Overlay Text (optional)',   type:'text', required:false },
+    { key:'videoUrl',    label:'Video URL (https)',       type:'text', required:true },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text', required:false },
   ],
   'geofence_image': [
     { key:'lat',            label:'Latitude',               type:'number' },
@@ -53,7 +48,6 @@ const TYPE_FIELDS = {
     { key:'videoUrl',       label:'Video URL (https)',      type:'text',   required:true },
     { key:'overlayText',    label:'Overlay Text (optional)',type:'text',   required:false },
   ],
-  // AR types — geofence is optional and managed in UI
   'ar_image': [
     { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)',  type:'text', required:true },
     { key:'assetUrl',    label:'Overlay Image URL (PNG/JPG)', type:'text', required:true },
@@ -85,49 +79,13 @@ const MODES = [
 ];
 
 
-// =============================
-// [2] MEDIA URL HELPERS & PREVIEWS
-// =============================
+// =====================================================
+// SECTION [2] MEDIA URL HELPERS & PREVIEWS
+// =====================================================
+function isLikelyImage(url){ return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url); }
+function isLikelyVideo(url){ return /\.(mp4|webm|mov)(\?.*)?$/i.test(url); }
 
-/*
-[2.1] Field-aware preview router
-      - markerUrl/imageUrl => image preview
-      - videoUrl           => video preview
-      - ar_image.assetUrl  => image preview
-      - ar_video.assetUrl  => video preview
-      - Fallback: extension check only if unknown field
-*/
-function isUrlKeyNeedingPreview(type, key, val){
-  if (!val || typeof val !== 'string') return null;
-
-  const { image, file } = toEmbedFileUrl(val);
-  const t = String(type || '');
-
-  // Force by field/type to avoid guessing issues
-  if (key === 'markerUrl' || key === 'imageUrl') return <ImagePreview url={image} />;
-  if (key === 'videoUrl')                         return <VideoPreview url={file} />;
-  if (t === 'ar_image' && key === 'assetUrl')     return <ImagePreview url={image} />;
-  if (t === 'ar_video' && key === 'assetUrl')     return <VideoPreview url={file} />;
-
-  // Fallback by extension (rare)
-  if (isLikelyVideo(file))  return <VideoPreview url={file} />;
-  if (isLikelyImage(image)) return <ImagePreview url={image} />;
-  return null;
-}
-
-/*
-[2.2] Extension heuristics (tight to reduce false positives)
-*/
-function isLikelyImage(url){
-  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
-}
-function isLikelyVideo(url){
-  return /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
-}
-
-/*
-[2.3] Convert Google Drive / Dropbox share links into direct file/thumbnail URLs
-*/
+/** Convert Google Drive / Dropbox share URLs into direct file/thumbnail URLs */
 function toEmbedFileUrl(url) {
   try {
     const u = new URL(url);
@@ -147,7 +105,7 @@ function toEmbedFileUrl(url) {
       }
     }
 
-    // Dropbox -> direct (image & video)
+    // Dropbox
     if (u.hostname.includes('dropbox.com')) {
       const direct = url
         .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
@@ -161,9 +119,22 @@ function toEmbedFileUrl(url) {
   }
 }
 
-/*
-[2.4] ImagePreview
-*/
+/** Field-aware preview router */
+function isUrlKeyNeedingPreview(type, key, val){
+  if (!val || typeof val !== 'string') return null;
+  const { image, file } = toEmbedFileUrl(val);
+  const t = String(type || '');
+
+  if (key === 'markerUrl' || key === 'imageUrl') return <ImagePreview url={image} />;
+  if (key === 'videoUrl')                         return <VideoPreview url={file} />;
+  if (t === 'ar_image' && key === 'assetUrl')     return <ImagePreview url={image} />;
+  if (t === 'ar_video' && key === 'assetUrl')     return <VideoPreview url={file} />;
+
+  if (isLikelyVideo(file))  return <VideoPreview url={file} />;
+  if (isLikelyImage(image)) return <ImagePreview url={image} />;
+  return null;
+}
+
 function ImagePreview({ url }) {
   const [error, setError] = useState(false);
   if (!url || !/^https?:\/\//i.test(url)) return null;
@@ -187,9 +158,6 @@ function ImagePreview({ url }) {
   );
 }
 
-/*
-[2.5] VideoPreview
-*/
 function VideoPreview({ url }) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   const canInline = /dl\.dropboxusercontent\.com/.test(url) || /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
@@ -215,10 +183,6 @@ function VideoPreview({ url }) {
   );
 }
 
-
-// =============================
-// [3] SMALL UI HELPERS
-// =============================
 function Field({label, children}){
   return (
     <div style={{marginBottom:12}}>
@@ -229,9 +193,9 @@ function Field({label, children}){
 }
 
 
-// =============================
-// [4] MAP PICKER (Leaflet + search)
-// =============================
+// =====================================================
+// SECTION [3] MAP PICKER (Leaflet + search)
+// =====================================================
 function MapPicker({ lat, lng, radius, onChange }){
   const divRef     = useRef(null);
   const mapRef     = useRef(null);
@@ -244,7 +208,6 @@ function MapPicker({ lat, lng, radius, onChange }){
   const [searching, setSearching] = useState(false);
   const defaultPos = [lat||44.9778, lng||-93.2650];
 
-  // [4.1] Load Leaflet (CDN)
   useEffect(()=>{
     if (typeof window !== 'undefined' && window.L) { setReady(true); return; }
     const link = document.createElement('link');
@@ -258,7 +221,6 @@ function MapPicker({ lat, lng, radius, onChange }){
     document.body.appendChild(s);
   },[]);
 
-  // [4.2] Init map + drag/click sync
   useEffect(()=>{
     if (!ready || !divRef.current) return;
     const L = window.L;
@@ -286,7 +248,6 @@ function MapPicker({ lat, lng, radius, onChange }){
     }
   }, [ready]);
 
-  // [4.3] Radius slider sync
   useEffect(()=>{
     if (circleRef.current && markerRef.current) {
       circleRef.current.setRadius(Number(r||25));
@@ -295,7 +256,6 @@ function MapPicker({ lat, lng, radius, onChange }){
     }
   }, [r]);
 
-  // [4.4] Address search via Nominatim
   async function doSearch(e){
     e?.preventDefault();
     if (!q.trim()) return;
@@ -305,7 +265,7 @@ function MapPicker({ lat, lng, radius, onChange }){
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
       const data = await res.json();
       setResults(Array.isArray(data)?data:[]);
-    }catch(err){
+    }catch{
       setResults([]);
     }finally{
       setSearching(false);
@@ -358,11 +318,63 @@ function MapPicker({ lat, lng, radius, onChange }){
 }
 
 
-// =============================
-// [5] MAIN ADMIN APP
-// =============================
+// =====================================================
+// SECTION [4] MULTIPLE CHOICE (A–E + radio)
+// =====================================================
+function MultipleChoice5({ content, onChange }) {
+  const choices = Array.isArray(content?.choices) ? content.choices.slice(0, 5) : [];
+  while (choices.length < 5) choices.push('');
+
+  const correctIndex = choices.findIndex(c => c && (content?.answer === c));
+
+  const setChoice = (i, v) => {
+    const next = choices.slice();
+    next[i] = v;
+    const nextAnswer = (correctIndex === i) ? v : (content?.answer || '');
+    onChange({ choices: next, answer: nextAnswer });
+  };
+
+  const setCorrect = (i) => {
+    onChange({ choices, answer: choices[i] || '' });
+  };
+
+  const labels = ['A','B','C','D','E'];
+
+  return (
+    <div>
+      {choices.map((val, i) => (
+        <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:8, alignItems:'center', marginBottom:8 }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <input
+              type="radio"
+              name="mc-correct"
+              checked={correctIndex === i}
+              disabled={!choices[i]}
+              onChange={() => setCorrect(i)}
+            />
+            <span style={{ width:20, display:'inline-block', color:'#9fb0bf' }}>{labels[i]}</span>
+          </label>
+          <input
+            style={S.input}
+            placeholder={`Choice ${labels[i]}`}
+            value={val}
+            onChange={(e)=> setChoice(i, e.target.value)}
+          />
+        </div>
+      ))}
+      <div style={{ color:'#9fb0bf', fontSize:12 }}>
+        Tip: Enter at least two choices and select the correct one with the radio.
+      </div>
+    </div>
+  );
+}
+
+
+// =====================================================
+// SECTION [5] MAIN ADMIN APP
+// =====================================================
 export default function Admin(){
-  // [5.1] Core state
+  // Core state
   const [tab, setTab] = useState('missions');
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
@@ -371,10 +383,10 @@ export default function Admin(){
   const [editing, setEditing] = useState(null);
   const [dirty, setDirty] = useState(false);
 
-  // [5.2] Text/SMS rules state
+  // Text/SMS rules
   const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  // [5.3] Initial load of missions + config with normalization
+  // Initial load + normalization
   useEffect(()=>{
     (async()=>{
       try{
@@ -431,7 +443,6 @@ export default function Admin(){
     })();
   },[]);
 
-  // [5.4] Defaults
   function defaultConfig(){
     return {
       splash: { enabled: true, mode:'single' },
@@ -441,7 +452,7 @@ export default function Admin(){
     };
   }
 
-  // [5.5] Save helpers (use your existing /api endpoints)
+  // Save endpoints (same as you already use)
   function saveSuiteToGitHub(){
     return fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) });
   }
@@ -460,7 +471,7 @@ export default function Admin(){
     }
   }
 
-  // [5.6] Selection helpers
+  // Selection helpers
   const current = useMemo(()=> suite?.missions?.find(m => m.id === selected) || null, [suite, selected]);
   function suggestId(){
     const base = 'm'; let i = 1;
@@ -481,7 +492,7 @@ export default function Admin(){
   function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
   function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
 
-  // [5.7] Default content factory
+  // Defaults for each type
   function defaultContentForType(t){
     switch(t){
       case 'multiple_choice': return {question:'',choices:[],answer:'', imageUrl:'', videoUrl:''};
@@ -496,20 +507,34 @@ export default function Admin(){
     }
   }
 
-  // [5.8] Insert/update/remove + version bump
+  // Save to list + validation
   function saveToList(){
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // Validation (only for required fields, skip numbers)
+    // Validate required fields (skip numbers; arrays ok)
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields){
-      if (f.required === false) continue;        // optional -> skip
-      if (f.type === 'number') continue;         // numeric handled by defaults
+      if (f.required === false) continue;
+      if (f.type === 'number') continue;
       const v = editing.content?.[f.key];
-      if (v===undefined || v===null || v==='') return setStatus('❌ Missing: '+f.label);
+      if (Array.isArray(v)) {
+        if (v.filter(Boolean).length === 0) return setStatus('❌ Missing: ' + f.label);
+      } else {
+        if (v===undefined || v===null || v==='') return setStatus('❌ Missing: '+f.label);
+      }
     }
 
+    // Extra rules for MC
+    if (editing.type === 'multiple_choice') {
+      const arr = (editing.content?.choices || []).filter(Boolean);
+      if (arr.length < 2) return setStatus('❌ Multiple Choice needs at least two choices');
+      if (!arr.includes(editing.content?.answer || '')) {
+        return setStatus('❌ Choose a correct answer (radio)');
+      }
+    }
+
+    // AR geofence check
     if ((editing.type==='ar_image' || editing.type==='ar_video') && editing.content?.geofenceEnabled) {
       const { lat, lng } = editing.content || {};
       if (lat==='' || lng==='') return setStatus('❌ Geofence is ON — pick a map location first');
@@ -529,7 +554,7 @@ export default function Admin(){
   }
   function bumpVersion(v){ const p = String(v||'0.0.0').split('.').map(n=>parseInt(n||'0',10)); while(p.length<3) p.push(0); p[2]+=1; return p.join('.'); }
 
-  // [5.9] SMS rule helpers
+  // SMS rules
   function addSmsRule(){
     if (!smsRule.missionId || !smsRule.message) { setStatus('❌ Pick mission and message'); return; }
     const maxPlayers = config?.forms?.players || 1;
@@ -545,10 +570,9 @@ export default function Admin(){
     setConfig({...config, textRules: rules});
   }
 
-  // [5.10] Early loading state
   if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
 
-  // [5.11] RENDER
+  // RENDER
   return (
     <div style={S.body}>
       {/* Header */}
@@ -613,7 +637,7 @@ export default function Admin(){
                 </Field>
                 <hr style={S.hr}/>
 
-                {/* AR: geofence toggle + map (optional) */}
+                {/* AR Geofence toggle + map (optional) */}
                 {(editing.type==='ar_image' || editing.type==='ar_video') && (
                   <div style={{marginBottom:12}}>
                     <label style={{display:'flex',alignItems:'center',gap:8, marginBottom:8}}>
@@ -659,7 +683,7 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Geofence (standard) */}
+                {/* Geofence standard */}
                 {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
@@ -675,50 +699,74 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Dynamic fields (with previews for media) */}
-                {(TYPE_FIELDS[editing.type]||[]).map(f => (
-                  <Field key={f.key} label={f.label}>
-                    {f.type==='text' && (
-                      <div>
+                {/* Multiple Choice custom UI */}
+                {editing.type === 'multiple_choice' && (
+                  <div style={{ marginBottom:12 }}>
+                    <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Multiple Choice (A–E)</div>
+                    <MultipleChoice5
+                      content={editing.content}
+                      onChange={({ choices, answer }) => {
+                        setEditing({ ...editing, content: { ...editing.content, choices, answer }});
+                        setDirty(true);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Dynamic fields (skip MC choices/answer here) */}
+                {(() => {
+                  const base = (TYPE_FIELDS[editing.type] || []);
+                  const visibleFields = editing.type === 'multiple_choice'
+                    ? base.filter(f => f.key !== 'choices' && f.key !== 'answer')
+                    : base;
+
+                  return visibleFields.map(f => (
+                    <Field key={f.key} label={f.label}>
+                      {f.type==='text' && (
+                        <div>
+                          <input
+                            style={S.input}
+                            value={editing.content?.[f.key] || ''}
+                            onChange={e => {
+                              setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value }});
+                              setDirty(true);
+                            }}
+                          />
+                          {isUrlKeyNeedingPreview(editing.type, f.key, editing.content?.[f.key])}
+                        </div>
+                      )}
+                      {f.type==='number' && (
                         <input
-                          style={S.input}
-                          value={editing.content?.[f.key]||''}
-                          onChange={e=>{ setEditing({...editing, content:{...editing.content,[f.key]:e.target.value}}); setDirty(true); }}
+                          type="number" min={f.min} max={f.max} style={S.input}
+                          value={editing.content?.[f.key]??''}
+                          onChange={e=>{
+                            const v=e.target.value===''? '': Number(e.target.value);
+                            setEditing({...editing, content:{...editing.content,[f.key]:v}}); setDirty(true);
+                          }}
                         />
-                        {isUrlKeyNeedingPreview(editing.type, f.key, editing.content?.[f.key])}
-                      </div>
-                    )}
-                    {f.type==='number' && (
-                      <input
-                        type="number" min={f.min} max={f.max} style={S.input}
-                        value={editing.content?.[f.key]??''}
-                        onChange={e=>{
-                          const v=e.target.value===''? '': Number(e.target.value);
-                          setEditing({...editing, content:{...editing.content,[f.key]:v}}); setDirty(true);
-                        }}
-                      />
-                    )}
-                    {f.type==='multiline' && (
-                      <textarea
-                        style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
-                        value={
-                          f.key==='choices'
-                            ? (editing.content?.choices||[]).join('\n')
-                            : (editing.content?.[f.key]||'')
-                        }
-                        onChange={e=>{
-                          if (f.key==='choices'){
-                            const lines=e.target.value.split('\n').map(s=>s.trim()).filter(Boolean);
-                            setEditing({...editing, content:{...editing.content, choices: lines}});
-                          } else {
-                            setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
+                      )}
+                      {f.type==='multiline' && (
+                        <textarea
+                          style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
+                          value={
+                            f.key==='choices'
+                              ? (editing.content?.choices||[]).join('\n')
+                              : (editing.content?.[f.key]||'')
                           }
-                          setDirty(true);
-                        }}
-                      />
-                    )}
-                  </Field>
-                ))}
+                          onChange={e=>{
+                            if (f.key==='choices'){
+                              const lines=e.target.value.split('\n').map(s=>s.trim()).filter(Boolean);
+                              setEditing({...editing, content:{...editing.content, choices: lines}});
+                            } else {
+                              setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
+                            }
+                            setDirty(true);
+                          }}
+                        />
+                      )}
+                    </Field>
+                  ));
+                })()}
 
                 {/* Points */}
                 <Field label="Points (Reward)">
@@ -844,9 +892,9 @@ export default function Admin(){
 }
 
 
-// =============================
-// [6] TEST SMS + CHANGE AUTH
-// =============================
+// =====================================================
+// SECTION [6] TEST SMS + CHANGE AUTH
+// =====================================================
 function TestSMS(){
   const [to, setTo]     = useState('');
   const [msg, setMsg]   = useState('Test message from admin');
@@ -900,9 +948,9 @@ function ChangeAuth(){
 }
 
 
-// =============================
-// [7] STYLE OBJECT (careful with quotes!)
-// =============================
+// =====================================================
+// SECTION [7] STYLE OBJECT (careful with quotes)
+// =====================================================
 const S = {
   body:{background:'#0b0c10',color:'#e9eef2',minHeight:'100vh',fontFamily:'system-ui, Arial, sans-serif'},
   header:{padding:16,background:'#11161a',borderBottom:'1px solid #1d2329'},
