@@ -4,8 +4,8 @@
     "mode": "single"
   },
   "game": {
-    "title": "fontier",
-    "type": "Mystery"
+    "title": "game name for index 2",
+    "type": "Chase"
   },
   "forms": {
     "players": 1
