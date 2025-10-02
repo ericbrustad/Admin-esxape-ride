@@ -12,5 +12,12 @@
     "type": "Race",
     "mode": "head2head",
     "createdAt": "2025-10-02T13:49:50.871Z"
+  },
+  {
+    "slug": "find-the-madman",
+    "title": "find the madman",
+    "type": "Chase",
+    "mode": "head2head",
+    "createdAt": "2025-10-02T16:42:17.710Z"
   }
 ]
