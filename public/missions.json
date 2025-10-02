@@ -1,9 +1,33 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.21",
+  "version": "0.6.22",
   "flow": {
     "mode": "linear",
     "start": "m01"
   },
-  "missions": []
+  "missions": [
+    {
+      "id": "m01",
+      "title": "New Missiondd",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "dd",
+        "choices": [
+          "d",
+          "d",
+          "d"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    }
+  ]
 }
