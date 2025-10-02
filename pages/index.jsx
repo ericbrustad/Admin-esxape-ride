@@ -370,7 +370,6 @@ function MultipleChoice5({ content, onChange }) {
 }
 
 
-*** BEGIN PATCH: REPLACE SECTION [5] MAIN ADMIN APP ***
 
 // =====================================================
 // SECTION [5] MAIN ADMIN APP
@@ -1008,7 +1007,6 @@ export default function Admin(){
   );
 }
 
-*** END PATCH ***
 
 // =====================================================
 // SECTION [6] TEST SMS + CHANGE AUTH
