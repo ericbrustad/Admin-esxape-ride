@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.12",
+  "version": "0.6.13",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -124,6 +124,22 @@
         "answer": "f",
         "acceptable": "ddd",
         "imageUrl": "https://drive.google.com/file/d/1eEIao3NzghtnmIu6-89mokDu5yWZhVKq/view"
+      }
+    },
+    {
+      "id": "m09",
+      "title": "New Missionvvvv",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "fff",
+        "choices": [
+          "v"
+        ],
+        "answer": "v",
+        "imageUrl": ""
       }
     }
   ]
