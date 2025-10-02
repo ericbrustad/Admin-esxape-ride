@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "head2head"
+  },
+  "game": {
+    "title": "chase you",
+    "type": "Race"
+  },
+  "forms": {
+    "players": 2
+  },
+  "textRules": []
+}
