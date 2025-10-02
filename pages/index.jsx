@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 /* =====================================================
    SECTION [1] CONSTANTS / FIELD DEFINITIONS
 ===================================================== */
+// [IX-1] Games state & modal inputs
+const [games, setGames] = useState([]);
+const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root
+const [showNewGame, setShowNewGame] = useState(false);
+const [newTitle, setNewTitle] = useState('');
+const [newType, setNewType]   = useState('Mystery');
+const [newMode, setNewMode]   = useState('single'); // single | head2head | multi
 
 const TYPE_FIELDS = {
   multiple_choice: [
