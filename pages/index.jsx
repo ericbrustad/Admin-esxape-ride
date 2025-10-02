@@ -1,62 +1,60 @@
-// =====================================================
-// SECTION [1] IMPORTS & CONSTANTS
-// =====================================================
+// pages/index.jsx
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-/*
-TYPE_FIELDS
-- Core fields marked with required:true
-- NEW: Optional media fields for multiple_choice, short_answer, statement
-*/
+/* =====================================================
+   SECTION [1] CONSTANTS / FIELD DEFINITIONS
+===================================================== */
+
 const TYPE_FIELDS = {
-  'multiple_choice': [
-    { key:'question', label:'Question', type:'text',       required:true },
-    { key:'choices',  label:'Choices (one per line)', type:'multiline', required:true }, // (hidden by custom UI)
-    { key:'answer',   label:'Correct Answer',         type:'text',       required:true }, // (hidden by custom UI)
-    { key:'imageUrl', label:'(Optional) Image URL',   type:'text',       required:false },
-    { key:'videoUrl', label:'(Optional) Video URL',   type:'text',       required:false },
+  multiple_choice: [
+    { key:'question', label:'Question', type:'text' },
+    { key:'choices',  label:'Choices (one per line)', type:'multiline' },
+    // 'answer' is handled by MultipleChoice5 radios, not here
+    { key:'imageUrl', label:'(Optional) Image URL', type:'text', required:false },
+    { key:'videoUrl', label:'(Optional) Video URL', type:'text', required:false },
   ],
-  'short_answer': [
-    { key:'question',   label:'Question',                       type:'text', required:true },
-    { key:'answer',     label:'Correct Answer',                 type:'text', required:true },
-    { key:'acceptable', label:'Also Accept (comma-separated)',  type:'text', required:false },
-    { key:'imageUrl',   label:'(Optional) Image URL',           type:'text', required:false },
-    { key:'videoUrl',   label:'(Optional) Video URL',           type:'text', required:false },
+  short_answer: [
+    { key:'question',   label:'Question', type:'text' },
+    { key:'answer',     label:'Correct Answer', type:'text' },
+    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
+    { key:'imageUrl',   label:'(Optional) Image URL', type:'text', required:false },
+    { key:'videoUrl',   label:'(Optional) Video URL', type:'text', required:false },
   ],
-  'statement': [
-    { key:'text',      label:'Statement Text',       type:'multiline', required:true },
-    { key:'imageUrl',  label:'(Optional) Image URL', type:'text',       required:false },
-    { key:'videoUrl',  label:'(Optional) Video URL', type:'text',       required:false },
+  statement: [
+    { key:'text',     label:'Statement Text', type:'multiline' },
+    { key:'imageUrl', label:'(Optional) Image URL', type:'text', required:false },
+    { key:'videoUrl', label:'(Optional) Video URL', type:'text', required:false },
   ],
-  'video': [
-    { key:'videoUrl',    label:'Video URL (https)',       type:'text', required:true },
+  video: [
+    { key:'videoUrl',    label:'Video URL (https)', type:'text' },
     { key:'overlayText', label:'Overlay Text (optional)', type:'text', required:false },
   ],
-  'geofence_image': [
-    { key:'lat',            label:'Latitude',               type:'number' },
-    { key:'lng',            label:'Longitude',              type:'number' },
-    { key:'radiusMeters',   label:'Geofence Radius (m)',    type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds',label:'Cooldown (sec)',         type:'number', min:5, max:240 },
-    { key:'imageUrl',       label:'Image URL (https)',      type:'text',   required:true },
-    { key:'overlayText',    label:'Caption/Text',           type:'text',   required:false },
+  geofence_image: [
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'imageUrl', label:'Image URL (https)', type:'text' },
+    { key:'overlayText', label:'Caption/Text', type:'text', required:false },
   ],
-  'geofence_video': [
-    { key:'lat',            label:'Latitude',               type:'number' },
-    { key:'lng',            label:'Longitude',              type:'number' },
-    { key:'radiusMeters',   label:'Geofence Radius (m)',    type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds',label:'Cooldown (sec)',         type:'number', min:5, max:240 },
-    { key:'videoUrl',       label:'Video URL (https)',      type:'text',   required:true },
-    { key:'overlayText',    label:'Overlay Text (optional)',type:'text',   required:false },
+  geofence_video: [
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text', required:false },
   ],
-  'ar_image': [
-    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)',  type:'text', required:true },
-    { key:'assetUrl',    label:'Overlay Image URL (PNG/JPG)', type:'text', required:true },
-    { key:'overlayText', label:'Overlay (optional)',          type:'text', required:false },
+  ar_image: [
+    // geofence controlled by separate toggle + map
+    { key:'markerUrl',  label:'Marker URL (image)', type:'text' },
+    { key:'assetUrl',   label:'AR Image Asset URL', type:'text' },
+    { key:'overlayText',label:'Overlay (optional)', type:'text', required:false },
   ],
-  'ar_video': [
-    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)', type:'text', required:true },
-    { key:'assetUrl',    label:'Overlay Video URL (MP4)',    type:'text', required:true },
-    { key:'overlayText', label:'Overlay (optional)',         type:'text', required:false },
+  ar_video: [
+    { key:'markerUrl',  label:'Marker URL (image)', type:'text' },
+    { key:'assetUrl',   label:'AR Video URL (mp4/webm)', type:'text' },
+    { key:'overlayText',label:'Overlay (optional)', type:'text', required:false },
   ],
 };
 
@@ -73,134 +71,75 @@ const TYPE_OPTIONS = [
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const MODES = [
-  { value:'single',    label:'Single Player',         collect:1 },
-  { value:'head2head', label:'Head to Head',          collect:2 },
-  { value:'multi',     label:'Multiple (4 players)',  collect:4 },
+  { value:'single',    label:'Single Player',          collect:1 },
+  { value:'head2head', label:'Head to Head',           collect:2 },
+  { value:'multi',     label:'Multiple (4 players)',   collect:4 },
 ];
 
+/* =====================================================
+   SECTION [2] UTILS: URL helpers, previews, etc.
+===================================================== */
 
-// =====================================================
-// SECTION [2] MEDIA URL HELPERS & PREVIEWS
-// =====================================================
-function isLikelyImage(url){ return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url); }
-function isLikelyVideo(url){ return /\.(mp4|webm|mov)(\?.*)?$/i.test(url); }
-
-/** Convert Google Drive / Dropbox share URLs into direct file/thumbnail URLs */
-function toEmbedFileUrl(url) {
-  try {
-    const u = new URL(url);
-
-    // Google Drive
-    if (u.hostname.includes('drive.google.com')) {
-      let id = u.searchParams.get('id');
-      if (!id) {
-        const m = url.match(/\/file\/d\/([^/]+)\//);
-        if (m) id = m[1];
-      }
-      if (id) {
-        return {
-          image: `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
-          file:  `https://drive.google.com/uc?export=download&id=${id}`
-        };
-      }
-    }
-
-    // Dropbox
-    if (u.hostname.includes('dropbox.com')) {
-      const direct = url
-        .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
-        .replace(/(\?|&)dl=0/, '$1raw=1');
-      return { image: direct, file: direct };
-    }
-
-    return { image: url, file: url };
-  } catch {
-    return { image: url, file: url };
-  }
+function isLikelyVideo(url='') {
+  return /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+}
+function isLikelyImage(url='') {
+  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
 }
 
-/** Field-aware preview router */
-function isUrlKeyNeedingPreview(type, key, val){
-  if (!val || typeof val !== 'string') return null;
-  const { image, file } = toEmbedFileUrl(val);
-  const t = String(type || '');
+function toEmbedFileUrl(raw='') {
+  if (!raw) return { image:'', video:'', raw:'' };
+  let u = raw.trim();
 
-  if (key === 'markerUrl' || key === 'imageUrl') return <ImagePreview url={image} />;
-  if (key === 'videoUrl')                         return <VideoPreview url={file} />;
-  if (t === 'ar_image' && key === 'assetUrl')     return <ImagePreview url={image} />;
-  if (t === 'ar_video' && key === 'assetUrl')     return <VideoPreview url={file} />;
+  // Dropbox share -> direct file
+  // ?dl=0  -> ?raw=1  (or ?dl=1). Prefer raw=1 to hint inline
+  if (/dropbox\.com\/.*\?dl=0/i.test(u)) u = u.replace(/\?dl=0/i, '?raw=1');
+  if (/dropbox\.com\/s\//i.test(u) && !/[?&](raw|dl)=/i.test(u)) u += (u.includes('?')?'&':'?')+'raw=1';
 
-  if (isLikelyVideo(file))  return <VideoPreview url={file} />;
-  if (isLikelyImage(image)) return <ImagePreview url={image} />;
-  return null;
+  // Google Drive “file/d/<id>/view” -> uc?export=view&id=<id>
+  const g = u.match(/drive\.google\.com\/file\/d\/([^/]+)\//i);
+  if (g && g[1]) u = `https://drive.google.com/uc?export=view&id=${g[1]}`;
+
+  return {
+    raw,
+    image: isLikelyVideo(u) ? '' : u,
+    video: isLikelyVideo(u) ? u : '',
+  };
 }
 
-function ImagePreview({ url }) {
-  const [error, setError] = useState(false);
-  if (!url || !/^https?:\/\//i.test(url)) return null;
+function ImagePreview({ url, height=120 }) {
+  if (!url) return null;
+  const isVid = isLikelyVideo(url);
   return (
-    <div style={{ marginTop: 8 }}>
-      {!error && (
-        <img
-          src={url}
-          alt="preview"
-          referrerPolicy="no-referrer"
-          onError={() => setError(true)}
-          loading="lazy"
-          style={{ display:'block', maxWidth:'100%', maxHeight:220, borderRadius:10, border:'1px solid #2a323b' }}
-        />
-      )}
-      {error && <div style={{ color:'#ffd166', fontSize:12 }}>Could not load thumbnail. The link may not be public.</div>}
-      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, display:'inline-block', marginTop:6 }}>
-        Open original
-      </a>
-    </div>
-  );
-}
-
-function VideoPreview({ url }) {
-  if (!url || !/^https?:\/\//i.test(url)) return null;
-  const canInline = /dl\.dropboxusercontent\.com/.test(url) || /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
-  return (
-    <div style={{ marginTop: 8 }}>
-      {canInline ? (
-        <video
-          src={url}
-          controls
-          playsInline
-          muted
-          style={{ display:'block', maxWidth:'100%', maxHeight:240, borderRadius:10, border:'1px solid #2a323b' }}
-        />
+    <div style={{border:'1px solid #2a323b', borderRadius:10, padding:8}}>
+      {isVid ? (
+        <video src={url} style={{width:'100%', height}} controls />
       ) : (
-        <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>
-          Inline preview not available. Open the original link.
-        </div>
+        <img src={url} alt="preview" style={{width:'100%', height, objectFit:'cover', borderRadius:6}} />
       )}
-      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, display:'inline-block', marginTop:6 }}>
-        Open original
-      </a>
+      <div style={{fontSize:12, color:'#9fb0bf', marginTop:6, wordBreak:'break-all'}}>{url}</div>
     </div>
   );
 }
 
-function Field({label, children}){
-  return (
-    <div style={{marginBottom:12}}>
-      <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>
-      {children}
-    </div>
-  );
+function isUrlKeyNeedingPreview(type, key, value) {
+  if (!value) return null;
+  const keys = new Set(['imageUrl','videoUrl','markerUrl','assetUrl']);
+  if (!keys.has(key)) return null;
+  const { image, video } = toEmbedFileUrl(value);
+  const url = video || image || value;
+  return <div style={{marginTop:8}}><ImagePreview url={url} /></div>;
 }
 
+/* =====================================================
+   SECTION [3] MAP PICKER (Leaflet CDN)
+===================================================== */
 
-// =====================================================
-// SECTION [3] MAP PICKER (Leaflet + search)
-// =====================================================
-function MapPicker({ lat, lng, radius, onChange }){
-  const divRef     = useRef(null);
-  const mapRef     = useRef(null);
-  const circleRef  = useRef(null);
-  const markerRef  = useRef(null);
+function MapPicker({ lat, lng, radius, onChange }) {
+  const divRef = useRef(null);
+  const mapRef = useRef(null);
+  const circleRef = useRef(null);
+  const markerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [r, setR] = useState(radius || 25);
   const [q, setQ] = useState('');
@@ -209,7 +148,8 @@ function MapPicker({ lat, lng, radius, onChange }){
   const defaultPos = [lat||44.9778, lng||-93.2650];
 
   useEffect(()=>{
-    if (typeof window !== 'undefined' && window.L) { setReady(true); return; }
+    if (typeof window === 'undefined') return; // SSR guard
+    if (window.L) { setReady(true); return; }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
@@ -265,7 +205,8 @@ function MapPicker({ lat, lng, radius, onChange }){
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
       const data = await res.json();
       setResults(Array.isArray(data)?data:[]);
-    }catch{
+    }catch(err){
+      console.warn('Search failed', err);
       setResults([]);
     }finally{
       setSearching(false);
@@ -274,6 +215,7 @@ function MapPicker({ lat, lng, radius, onChange }){
 
   function gotoResult(r){
     if (!mapRef.current || !markerRef.current) return;
+    const L = window.L;
     const lat = Number(r.lat), lon = Number(r.lon);
     const p = [lat, lon];
     markerRef.current.setLatLng(p);
@@ -317,65 +259,167 @@ function MapPicker({ lat, lng, radius, onChange }){
   );
 }
 
+/* =====================================================
+   SECTION [4] MULTIPLE CHOICE (A–E + radio)
+===================================================== */
 
-// =====================================================
-// SECTION [4] MULTIPLE CHOICE (A–E + radio)
-// =====================================================
 function MultipleChoice5({ content, onChange }) {
-  const choices = Array.isArray(content?.choices) ? content.choices.slice(0, 5) : [];
+  const labels = ['A','B','C','D','E'];
+  const choices = Array.isArray(content?.choices) ? [...content.choices] : [];
   while (choices.length < 5) choices.push('');
 
-  const correctIndex = choices.findIndex(c => c && (content?.answer === c));
-
-  const setChoice = (i, v) => {
-    const next = choices.slice();
-    next[i] = v;
-    const nextAnswer = (correctIndex === i) ? v : (content?.answer || '');
-    onChange({ choices: next, answer: nextAnswer });
+  const currentAnswer = content?.answer ?? '';
+  const set = (i, val) => {
+    const next = [...choices];
+    next[i] = val;
+    let nextAnswer = currentAnswer;
+    // if the answer string no longer matches any choice, clear it
+    if (!next.includes(currentAnswer)) nextAnswer = '';
+    onChange({ choices: next.filter(Boolean), answer: nextAnswer });
   };
 
-  const setCorrect = (i) => {
-    onChange({ choices, answer: choices[i] || '' });
+  const pickAnswer = (i) => {
+    const val = choices[i] || '';
+    onChange({ choices: choices.filter(Boolean), answer: val });
   };
-
-  const labels = ['A','B','C','D','E'];
 
   return (
-    <div>
+    <div role="group" aria-label="Multiple choice editor" style={{display:'grid', gap:8}}>
       {choices.map((val, i) => (
-        <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:8, alignItems:'center', marginBottom:8 }}>
-          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <input
-              type="radio"
-              name="mc-correct"
-              checked={correctIndex === i}
-              disabled={!choices[i]}
-              onChange={() => setCorrect(i)}
-            />
-            <span style={{ width:20, display:'inline-block', color:'#9fb0bf' }}>{labels[i]}</span>
-          </label>
+        <div key={i} style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:8, alignItems:'center' }}>
+          <div style={{width:26, textAlign:'center', color:'#9fb0bf'}}>{labels[i]}</div>
           <input
             style={S.input}
             placeholder={`Choice ${labels[i]}`}
             value={val}
-            onChange={(e)=> setChoice(i, e.target.value)}
+            onChange={e => set(i, e.target.value)}
           />
+          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:13, color:'#9fb0bf' }}>
+            <input
+              type="radio"
+              name="mc_correct"
+              checked={currentAnswer === (choices[i] || '') && !!choices[i]}
+              onChange={()=> pickAnswer(i)}
+              disabled={!choices[i]}
+            />
+            Correct
+          </label>
         </div>
       ))}
-      <div style={{ color:'#9fb0bf', fontSize:12 }}>
-        Tip: Enter at least two choices and select the correct one with the radio.
+      <div style={{color:'#9fb0bf', fontSize:12}}>
+        Tip: leave any unused rows blank. At least two choices are required; don’t forget to mark the correct answer.
       </div>
     </div>
   );
 }
 
+/* =====================================================
+   SECTION [4A] THEME EDITOR (Splash, Mission Default, Per-Mission)
+===================================================== */
 
+function ThemeEditor({ value, onChange }) {
+  const v = {
+    fontFamily: value?.fontFamily ?? 'system-ui, Arial, sans-serif',
+    fontSize:   Number(value?.fontSize ?? 18),
+    textColor:  value?.textColor ?? '#ffffff',
+    align:      value?.align ?? 'center',
+    backgroundColor:   value?.backgroundColor ?? '#0b0c10',
+    backgroundImageUrl: value?.backgroundImageUrl ?? '',
+    backgroundSize:    value?.backgroundSize ?? 'cover',
+  };
 
-// =====================================================
-// SECTION [5] MAIN ADMIN APP
-// =====================================================
+  const set = (patch) => onChange({ ...v, ...patch });
+  const { image: bgImage, video: bgVideo } = toEmbedFileUrl(v.backgroundImageUrl || '');
+  const previewUrl = bgVideo || bgImage || '';
+
+  const fontOptions = [
+    { label:'System UI', value:'system-ui, Arial, sans-serif' },
+    { label:'Arial',     value:'Arial, Helvetica, sans-serif' },
+    { label:'Georgia',   value:'Georgia, serif' },
+    { label:'Courier New', value:'"Courier New", monospace' },
+    { label:'Inter (fallback to system)', value:'Inter, system-ui, Arial, sans-serif' },
+  ];
+
+  return (
+    <div style={{ display:'grid', gap:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <Field label="Font family">
+          <select style={S.input} value={v.fontFamily} onChange={e=>set({fontFamily:e.target.value})}>
+            {fontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Base font size (px)">
+          <input type="number" min={10} max={48} style={S.input} value={v.fontSize}
+            onChange={e=>set({fontSize:Number(e.target.value||18)})}/>
+        </Field>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+        <Field label="Text color">
+          <input type="color" value={v.textColor} onChange={e=>set({textColor:e.target.value})}
+            style={{ width:52, height:40, border:'1px solid #2a323b', borderRadius:10, background:'transparent' }}/>
+        </Field>
+        <Field label="Background color">
+          <input type="color" value={v.backgroundColor} onChange={e=>set({backgroundColor:e.target.value})}
+            style={{ width:52, height:40, border:'1px solid #2a323b', borderRadius:10, background:'transparent' }}/>
+        </Field>
+        <Field label="Text align">
+          <select style={S.input} value={v.align} onChange={e=>set({align:e.target.value})}>
+            {['left','center','right'].map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Background image URL (optional)">
+        <input style={S.input} placeholder="https://… (Dropbox/Drive share OK)"
+          value={v.backgroundImageUrl} onChange={e=>set({backgroundImageUrl:e.target.value})}/>
+        {v.backgroundImageUrl && <div style={{marginTop:8}}>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 200px', gap:12, alignItems:'start'}}>
+            <div>
+              <label style={{display:'block', fontSize:12, color:'#9fb0bf', marginBottom:6}}>Background size</label>
+              <select style={S.input} value={v.backgroundSize} onChange={e=>set({backgroundSize:e.target.value})}>
+                <option value="cover">cover</option>
+                <option value="contain">contain</option>
+              </select>
+              <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
+                Tip: use <code>cover</code> for wallpapers, <code>contain</code> for letterboxed images.
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:12,color:'#9fb0bf', marginBottom:6}}>Preview</div>
+              <ImagePreview url={previewUrl}/>
+            </div>
+          </div>
+        </div>}
+      </Field>
+
+      <div style={{
+        border:'1px dashed #2a323b', borderRadius:10, padding:14, background:'#0b0c10'
+      }}>
+        <div style={{
+          fontFamily:v.fontFamily, fontSize:v.fontSize, color:v.textColor, textAlign:v.align,
+          minHeight:100,
+          backgroundColor:v.backgroundColor,
+          backgroundImage: v.backgroundImageUrl ? `url("${previewUrl}")` : 'none',
+          backgroundRepeat:'no-repeat',
+          backgroundPosition:'center',
+          backgroundSize:v.backgroundSize,
+          borderRadius:10, padding:16
+        }}>
+          <div style={{opacity:0.85}}>Live style preview</div>
+          <div><b>Heading</b> / Button / Body text</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =====================================================
+   SECTION [5] MAIN ADMIN APP
+===================================================== */
+
 export default function Admin(){
-  // Core state
+  // Tabs & core state
   const [tab, setTab] = useState('missions');
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
@@ -387,12 +431,12 @@ export default function Admin(){
   // Text/SMS rules
   const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  // Style helpers
+  // Theme defaults / style helper
   function withDefaultThemeStyle(style){
     return {
-      inherit: true,                     // true = use config.theme.missionDefault
-      fontFamily: '',                    // empty = fall back to global
-      fontSize:   '',                    // empty = fall back to global
+      inherit: true,
+      fontFamily: '',
+      fontSize:   '',
       textColor:  '',
       align:      '',
       backgroundColor: '',
@@ -413,7 +457,7 @@ export default function Admin(){
     };
   }
 
-  // Initial load + normalization
+  // Initial load
   useEffect(()=>{
     (async()=>{
       try{
@@ -463,7 +507,6 @@ export default function Admin(){
               });
             }
 
-            // NEW: attach/top-up per-mission style
             return { ...base, style: withDefaultThemeStyle(base.style) };
           })
         };
@@ -483,7 +526,6 @@ export default function Admin(){
       game:   { title: 'Untitled Game', type: 'Mystery' },
       forms:  { players: 1 },
       textRules: [],
-      // NEW: global theme (splash + mission defaults)
       theme: {
         splash: defaultTheme(),
         missionDefault: defaultTheme()
@@ -502,7 +544,7 @@ export default function Admin(){
     };
   }
 
-  // Save endpoints (same as before)
+  // Save endpoints
   function saveSuiteToGitHub(){
     return fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) });
   }
@@ -543,7 +585,7 @@ export default function Admin(){
   function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
   function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
 
-  // Defaults for each type (content only)
+  // Defaults for each type
   function defaultContentForType(t){
     switch(t){
       case 'multiple_choice': return {question:'',choices:[],answer:'', imageUrl:'', videoUrl:''};
@@ -563,7 +605,7 @@ export default function Admin(){
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // Validate required fields (skip numbers; arrays ok)
+    // Validate required fields
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields){
       if (f.required === false) continue;
@@ -576,7 +618,7 @@ export default function Admin(){
       }
     }
 
-    // Extra rules for MC
+    // Multiple choice rule
     if (editing.type === 'multiple_choice') {
       const arr = (editing.content?.choices || []).filter(Boolean);
       if (arr.length < 2) return setStatus('❌ Multiple Choice needs at least two choices');
@@ -623,7 +665,7 @@ export default function Admin(){
 
   if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
 
-  // RENDER
+  /* RENDER */
   return (
     <div style={S.body}>
       {/* Header */}
@@ -683,9 +725,7 @@ export default function Admin(){
                 {/* Type */}
                 <Field label="Type">
                   <select style={S.input} value={editing.type} onChange={e=>{
-                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)});
-                    // keep style object intact
-                    setDirty(true);
+                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)}); setDirty(true);
                   }}>{TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                 </Field>
                 <hr style={S.hr}/>
@@ -696,7 +736,7 @@ export default function Admin(){
                     <label style={{display:'flex',alignItems:'center',gap:8, marginBottom:8}}>
                       <input
                         type="checkbox"
-                        checked={!!editing.style?.inherit ? false : !!editing.content?.geofenceEnabled} // no coupling; keep as-is
+                        checked={!!editing.content?.geofenceEnabled}
                         onChange={(e)=>{
                           setEditing({...editing, content:{...editing.content, geofenceEnabled: e.target.checked}});
                           setDirty(true);
@@ -830,7 +870,7 @@ export default function Admin(){
                       type="checkbox"
                       checked={!!(editing.style?.inherit ?? true)}
                       onChange={(e)=>{
-                        setEditing({...editing, style: withDefaultThemeStyle({ ...editing.style, inherit: e.target.checked })});
+                        setEditing({...editing, style: { ...(editing.style||{}), inherit: e.target.checked }});
                         setDirty(true);
                       }}
                     />
@@ -851,7 +891,7 @@ export default function Admin(){
                       onChange={(t)=>{
                         setEditing({
                           ...editing,
-                          style: withDefaultThemeStyle({ ...t, inherit:false })
+                          style: { ...editing.style, ...t, inherit:false }
                         });
                         setDirty(true);
                       }}
@@ -859,7 +899,7 @@ export default function Admin(){
                   )}
 
                   <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
-                    When “Use global mission default theme” is ON, this mission will render using Settings → Theme → Mission Default Theme.
+                    When “Use global mission default theme” is ON, this mission uses Settings → Theme → Mission Default Theme.
                   </div>
                 </div>
 
@@ -920,7 +960,7 @@ export default function Admin(){
             <div style={{color:'#9fb0bf'}}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
           </div>
 
-          {/* NEW: THEME SETTINGS */}
+          {/* THEME SETTINGS */}
           <div style={{...S.card, marginTop:16}}>
             <h3 style={{marginTop:0}}>Theme (Display)</h3>
 
@@ -1007,17 +1047,21 @@ export default function Admin(){
   );
 }
 
+/* =====================================================
+   SECTION [6] TEST SMS + CHANGE AUTH
+===================================================== */
 
-// =====================================================
-// SECTION [6] TEST SMS + CHANGE AUTH
-// =====================================================
+function Field({label, children}) {
+  return (<div style={{marginBottom:12}}><div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>{children}</div>);
+}
+
 function TestSMS(){
-  const [to, setTo]     = useState('');
-  const [msg, setMsg]   = useState('Test message from admin');
+  const [to, setTo] = useState('');
+  const [msg, setMsg] = useState('Test message from admin');
   const [status, setStatus] = useState('');
   async function send(){
     setStatus('Sending…');
-    const res  = await fetch('/api/sms', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to, body: msg })});
+    const res = await fetch('/api/sms', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to, body: msg })});
     const text = await res.text();
     setStatus(res.ok ? '✅ Sent' : '❌ '+text);
   }
@@ -1038,11 +1082,11 @@ function ChangeAuth(){
   const [curPass, setCurPass] = useState('');
   const [newUser, setNewUser] = useState('');
   const [newPass, setNewPass] = useState('');
-  const [status, setStatus]   = useState('');
+  const [status, setStatus] = useState('');
   async function submit(){
     setStatus('Updating…');
     const res = await fetch('/api/change-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
-    const t   = await res.text();
+    const t = await res.text();
     setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ '+t);
   }
   return (
@@ -1063,10 +1107,10 @@ function ChangeAuth(){
   );
 }
 
+/* =====================================================
+   SECTION [7] STYLES
+===================================================== */
 
-// =====================================================
-// SECTION [7] STYLE OBJECT (careful with quotes)
-// =====================================================
 const S = {
   body:{background:'#0b0c10',color:'#e9eef2',minHeight:'100vh',fontFamily:'system-ui, Arial, sans-serif'},
   header:{padding:16,background:'#11161a',borderBottom:'1px solid #1d2329'},
