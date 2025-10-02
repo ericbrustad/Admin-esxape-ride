@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.3",
   "missions": [
     {
       "id": "m01",
@@ -31,6 +31,23 @@
         "geofenceEnabled": true,
         "lat": 44.9784,
         "lng": -93.268164,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m03",
+      "title": "New Mission",
+      "type": "statement",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "text": "ddd",
+        "mediaUrl": "https://www.dropbox.com/scl/fi/e0vr3gnj9bwbv00f9fmcy/2023-08-05-16.42.47.png?rlkey=w7bqr8bzpbj2qcylp3f8vl3i1&st=yhlnj17b&dl=0",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
         "radiusMeters": 25,
         "cooldownSeconds": 30
       }
