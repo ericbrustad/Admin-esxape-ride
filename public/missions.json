@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.18",
+  "version": "0.6.19",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -180,7 +180,7 @@
     },
     {
       "id": "m12",
-      "title": "New Mission",
+      "title": "New Mission2",
       "type": "ar_video",
       "rewards": {
         "points": 25
