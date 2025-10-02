@@ -370,6 +370,8 @@ function MultipleChoice5({ content, onChange }) {
 }
 
 
+*** BEGIN PATCH: REPLACE SECTION [5] MAIN ADMIN APP ***
+
 // =====================================================
 // SECTION [5] MAIN ADMIN APP
 // =====================================================
@@ -386,6 +388,32 @@ export default function Admin(){
   // Text/SMS rules
   const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
+  // Style helpers
+  function withDefaultThemeStyle(style){
+    return {
+      inherit: true,                     // true = use config.theme.missionDefault
+      fontFamily: '',                    // empty = fall back to global
+      fontSize:   '',                    // empty = fall back to global
+      textColor:  '',
+      align:      '',
+      backgroundColor: '',
+      backgroundImageUrl: '',
+      backgroundSize: 'cover',
+      ...(style||{})
+    };
+  }
+  function defaultTheme(){
+    return {
+      fontFamily:'system-ui, Arial, sans-serif',
+      fontSize:18,
+      textColor:'#ffffff',
+      align:'center',
+      backgroundColor:'#0b0c10',
+      backgroundImageUrl:'',
+      backgroundSize:'cover',
+    };
+  }
+
   // Initial load + normalization
   useEffect(()=>{
     (async()=>{
@@ -400,43 +428,50 @@ export default function Admin(){
         const normalized = {
           ...m,
           missions: (m.missions||[]).map(x=> {
+            let base = x;
+
+            // Back-compat content add-ons
             if (x.type==='quiz') {
-              return ({...x, type:'multiple_choice', content:{
+              base = ({...x, type:'multiple_choice', content:{
                 question: x.content?.question||'', choices: x.content?.choices||[], answer: x.content?.answer||'',
                 imageUrl: x.content?.imageUrl || '', videoUrl: x.content?.videoUrl || ''
               }});
             }
-            if (x.type==='video') return ({...x, type:'video'});
-            if (x.type==='multiple_choice' || x.type==='short_answer' || x.type==='statement') {
-              return ({
-                ...x,
+            if (x.type==='video') base = ({...base, type:'video'});
+            if (base.type==='multiple_choice' || base.type==='short_answer' || base.type==='statement') {
+              base = ({
+                ...base,
                 content: {
-                  ...x.content,
-                  imageUrl: x.content?.imageUrl || '',
-                  videoUrl: x.content?.videoUrl || ''
+                  ...base.content,
+                  imageUrl: base.content?.imageUrl || '',
+                  videoUrl: base.content?.videoUrl || ''
                 }
               });
             }
-            if (x.type==='ar_image' || x.type==='ar_video') {
-              return ({
-                ...x,
+            if (base.type==='ar_image' || base.type==='ar_video') {
+              base = ({
+                ...base,
                 content: {
-                  geofenceEnabled: !!x.content?.geofenceEnabled,
-                  lat: x.content?.lat ?? '',
-                  lng: x.content?.lng ?? '',
-                  radiusMeters: x.content?.radiusMeters ?? 25,
-                  cooldownSeconds: x.content?.cooldownSeconds ?? 30,
-                  markerUrl: x.content?.markerUrl ?? '',
-                  assetUrl:  x.content?.assetUrl  ?? '',
-                  overlayText: x.content?.overlayText ?? ''
+                  geofenceEnabled: !!base.content?.geofenceEnabled,
+                  lat: base.content?.lat ?? '',
+                  lng: base.content?.lng ?? '',
+                  radiusMeters: base.content?.radiusMeters ?? 25,
+                  cooldownSeconds: base.content?.cooldownSeconds ?? 30,
+                  markerUrl: base.content?.markerUrl ?? '',
+                  assetUrl:  base.content?.assetUrl  ?? '',
+                  overlayText: base.content?.overlayText ?? ''
                 }
               });
             }
-            return x;
+
+            // NEW: attach/top-up per-mission style
+            return { ...base, style: withDefaultThemeStyle(base.style) };
           })
         };
+
+        const mergedConfig = mergeConfigWithDefaults(c);
         setSuite(normalized);
-        setConfig({ ...defaultConfig(), ...c });
+        setConfig(mergedConfig);
       } catch(e){
         setStatus('Load failed: '+(e?.message||e));
       }
@@ -448,11 +483,27 @@ export default function Admin(){
       splash: { enabled: true, mode:'single' },
       game:   { title: 'Untitled Game', type: 'Mystery' },
       forms:  { players: 1 },
-      textRules: []
+      textRules: [],
+      // NEW: global theme (splash + mission defaults)
+      theme: {
+        splash: defaultTheme(),
+        missionDefault: defaultTheme()
+      }
+    };
+  }
+  function mergeConfigWithDefaults(c){
+    const d = defaultConfig();
+    return {
+      ...d,
+      ...c,
+      theme: {
+        splash: { ...d.theme.splash, ...(c?.theme?.splash||{}) },
+        missionDefault: { ...d.theme.missionDefault, ...(c?.theme?.missionDefault||{}) }
+      }
     };
   }
 
-  // Save endpoints (same as you already use)
+  // Save endpoints (same as before)
   function saveSuiteToGitHub(){
     return fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) });
   }
@@ -485,14 +536,15 @@ export default function Admin(){
       title:'New Mission',
       type:'multiple_choice',
       rewards:{points:25},
-      content:{question:'',choices:[],answer:'', imageUrl:'', videoUrl:''}
+      content:{question:'',choices:[],answer:'', imageUrl:'', videoUrl:''},
+      style: withDefaultThemeStyle({ inherit:true })
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
   function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
   function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
 
-  // Defaults for each type
+  // Defaults for each type (content only)
   function defaultContentForType(t){
     switch(t){
       case 'multiple_choice': return {question:'',choices:[],answer:'', imageUrl:'', videoUrl:''};
@@ -632,7 +684,9 @@ export default function Admin(){
                 {/* Type */}
                 <Field label="Type">
                   <select style={S.input} value={editing.type} onChange={e=>{
-                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)}); setDirty(true);
+                    const t=e.target.value; setEditing({...editing, type:t, content: defaultContentForType(t)});
+                    // keep style object intact
+                    setDirty(true);
                   }}>{TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                 </Field>
                 <hr style={S.hr}/>
@@ -643,7 +697,7 @@ export default function Admin(){
                     <label style={{display:'flex',alignItems:'center',gap:8, marginBottom:8}}>
                       <input
                         type="checkbox"
-                        checked={!!editing.content?.geofenceEnabled}
+                        checked={!!editing.style?.inherit ? false : !!editing.content?.geofenceEnabled} // no coupling; keep as-is
                         onChange={(e)=>{
                           setEditing({...editing, content:{...editing.content, geofenceEnabled: e.target.checked}});
                           setDirty(true);
@@ -768,6 +822,48 @@ export default function Admin(){
                   ));
                 })()}
 
+                {/* NEW: Visual Style (per mission) */}
+                <hr style={S.hr}/>
+                <div style={{marginTop:8}}>
+                  <h3 style={{margin:'8px 0 6px 0'}}>Visual Style</h3>
+                  <label style={{display:'flex', alignItems:'center', gap:8, marginBottom:8}}>
+                    <input
+                      type="checkbox"
+                      checked={!!(editing.style?.inherit ?? true)}
+                      onChange={(e)=>{
+                        setEditing({...editing, style: withDefaultThemeStyle({ ...editing.style, inherit: e.target.checked })});
+                        setDirty(true);
+                      }}
+                    />
+                    Use global mission default theme
+                  </label>
+
+                  {!(editing.style?.inherit ?? true) && (
+                    <ThemeEditor
+                      value={{
+                        fontFamily: editing.style?.fontFamily || '',
+                        fontSize:   editing.style?.fontSize || '',
+                        textColor:  editing.style?.textColor || '',
+                        align:      editing.style?.align || '',
+                        backgroundColor:   editing.style?.backgroundColor || '',
+                        backgroundImageUrl: editing.style?.backgroundImageUrl || '',
+                        backgroundSize:     editing.style?.backgroundSize || 'cover',
+                      }}
+                      onChange={(t)=>{
+                        setEditing({
+                          ...editing,
+                          style: withDefaultThemeStyle({ ...t, inherit:false })
+                        });
+                        setDirty(true);
+                      }}
+                    />
+                  )}
+
+                  <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
+                    When “Use global mission default theme” is ON, this mission will render using Settings → Theme → Mission Default Theme.
+                  </div>
+                </div>
+
                 {/* Points */}
                 <Field label="Points (Reward)">
                   <input
@@ -823,6 +919,27 @@ export default function Admin(){
               </select>
             </Field>
             <div style={{color:'#9fb0bf'}}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
+          </div>
+
+          {/* NEW: THEME SETTINGS */}
+          <div style={{...S.card, marginTop:16}}>
+            <h3 style={{marginTop:0}}>Theme (Display)</h3>
+
+            <h4 style={{margin:'6px 0'}}>Splash Theme</h4>
+            <ThemeEditor
+              value={config.theme.splash}
+              onChange={t=>setConfig({...config, theme:{...config.theme, splash:t}})}
+            />
+
+            <h4 style={{margin:'16px 0 6px'}}>Mission Default Theme</h4>
+            <ThemeEditor
+              value={config.theme.missionDefault}
+              onChange={t=>setConfig({...config, theme:{...config.theme, missionDefault:t}})}
+            />
+
+            <div style={{color:'#9fb0bf', fontSize:12, marginTop:6}}>
+              Missions with “Use global mission default theme” turned on will inherit these values.
+            </div>
           </div>
         </main>
       )}
@@ -891,6 +1008,7 @@ export default function Admin(){
   );
 }
 
+*** END PATCH ***
 
 // =====================================================
 // SECTION [6] TEST SMS + CHANGE AUTH
