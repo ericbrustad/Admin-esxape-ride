@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Game 1 thriller single player",
+    "type": "Thriller"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
