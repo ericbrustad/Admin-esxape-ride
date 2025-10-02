@@ -5,50 +5,64 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 /*
 [1.1] Supported field schemas per mission type.
-      - AR types now include marker/asset + optional geofence fields (handled in UI section).
+      - NEW: Optional media fields for multiple_choice, short_answer, statement:
+        * imageUrl (PNG/JPG/GIF/WEBP/SVG)
+        * videoUrl (MP4/WEBM/MOV)
+      - 'required: true' marks fields that must be filled; others are optional.
 */
 const TYPE_FIELDS = {
   'multiple_choice': [
-    { key:'question', label:'Question', type:'text' },
-    { key:'choices',  label:'Choices (one per line)', type:'multiline' },
-    { key:'answer',   label:'Correct Answer',         type:'text' },
+    { key:'question', label:'Question', type:'text',       required:true },
+    { key:'choices',  label:'Choices (one per line)', type:'multiline', required:true },
+    { key:'answer',   label:'Correct Answer',         type:'text',       required:true },
+    // Optional media:
+    { key:'imageUrl', label:'(Optional) Image URL',   type:'text',       required:false },
+    { key:'videoUrl', label:'(Optional) Video URL',   type:'text',       required:false },
   ],
   'short_answer': [
-    { key:'question',   label:'Question',                             type:'text' },
-    { key:'answer',     label:'Correct Answer',                       type:'text' },
-    { key:'acceptable', label:'Also Accept (comma-separated)',        type:'text' },
+    { key:'question',   label:'Question',                       type:'text', required:true },
+    { key:'answer',     label:'Correct Answer',                 type:'text', required:true },
+    { key:'acceptable', label:'Also Accept (comma-separated)',  type:'text', required:false }, // optional
+    // Optional media:
+    { key:'imageUrl',   label:'(Optional) Image URL',           type:'text', required:false },
+    { key:'videoUrl',   label:'(Optional) Video URL',           type:'text', required:false },
   ],
-  'statement': [{ key:'text', label:'Statement Text', type:'multiline' }],
+  'statement': [
+    { key:'text',      label:'Statement Text',       type:'multiline', required:true },
+    // Optional media:
+    { key:'imageUrl',  label:'(Optional) Image URL', type:'text',       required:false },
+    { key:'videoUrl',  label:'(Optional) Video URL', type:'text',       required:false },
+  ],
   'video': [
-    { key:'videoUrl',    label:'Video URL (https)',         type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)',   type:'text' },
+    { key:'videoUrl',    label:'Video URL (https)',         type:'text', required:true },
+    { key:'overlayText', label:'Overlay Text (optional)',   type:'text', required:false },
   ],
   'geofence_image': [
     { key:'lat',            label:'Latitude',               type:'number' },
     { key:'lng',            label:'Longitude',              type:'number' },
     { key:'radiusMeters',   label:'Geofence Radius (m)',    type:'number', min:5, max:2000 },
     { key:'cooldownSeconds',label:'Cooldown (sec)',         type:'number', min:5, max:240 },
-    { key:'imageUrl',       label:'Image URL (https)',      type:'text' },
-    { key:'overlayText',    label:'Caption/Text',           type:'text' },
+    { key:'imageUrl',       label:'Image URL (https)',      type:'text',   required:true },
+    { key:'overlayText',    label:'Caption/Text',           type:'text',   required:false },
   ],
   'geofence_video': [
     { key:'lat',            label:'Latitude',               type:'number' },
     { key:'lng',            label:'Longitude',              type:'number' },
     { key:'radiusMeters',   label:'Geofence Radius (m)',    type:'number', min:5, max:2000 },
     { key:'cooldownSeconds',label:'Cooldown (sec)',         type:'number', min:5, max:240 },
-    { key:'videoUrl',       label:'Video URL (https)',      type:'text' },
-    { key:'overlayText',    label:'Overlay Text (optional)',type:'text' },
+    { key:'videoUrl',       label:'Video URL (https)',      type:'text',   required:true },
+    { key:'overlayText',    label:'Overlay Text (optional)',type:'text',   required:false },
   ],
-  // AR types — core fields live here; geofence is presented in UI and written into content
+  // AR types — geofence is optional and managed in UI
   'ar_image': [
-    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)',  type:'text' },
-    { key:'assetUrl',    label:'Overlay Image URL (PNG/JPG)', type:'text' },
-    { key:'overlayText', label:'Overlay (optional)',          type:'text' },
+    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)',  type:'text', required:true },
+    { key:'assetUrl',    label:'Overlay Image URL (PNG/JPG)', type:'text', required:true },
+    { key:'overlayText', label:'Overlay (optional)',          type:'text', required:false },
   ],
   'ar_video': [
-    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)', type:'text' },
-    { key:'assetUrl',    label:'Overlay Video URL (MP4)',    type:'text' },
-    { key:'overlayText', label:'Overlay (optional)',         type:'text' },
+    { key:'markerUrl',   label:'Marker Image URL (PNG/JPG)', type:'text', required:true },
+    { key:'assetUrl',    label:'Overlay Video URL (MP4)',    type:'text', required:true },
+    { key:'overlayText', label:'Overlay (optional)',         type:'text', required:false },
   ],
 };
 
@@ -81,7 +95,7 @@ const MODES = [
       - videoUrl           => video preview
       - ar_image.assetUrl  => image preview
       - ar_video.assetUrl  => video preview
-      - Fallback to extension checks only if needed
+      - Fallback: extension check only if unknown field
 */
 function isUrlKeyNeedingPreview(type, key, val){
   if (!val || typeof val !== 'string') return null;
@@ -95,15 +109,14 @@ function isUrlKeyNeedingPreview(type, key, val){
   if (t === 'ar_image' && key === 'assetUrl')     return <ImagePreview url={image} />;
   if (t === 'ar_video' && key === 'assetUrl')     return <VideoPreview url={file} />;
 
-  // Fallback by extension (rare paths)
+  // Fallback by extension (rare)
   if (isLikelyVideo(file))  return <VideoPreview url={file} />;
   if (isLikelyImage(image)) return <ImagePreview url={image} />;
   return null;
 }
 
 /*
-[2.2] Simple extension heuristics
-      (kept tight to avoid false positives)
+[2.2] Extension heuristics (tight to reduce false positives)
 */
 function isLikelyImage(url){
   return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
@@ -114,8 +127,6 @@ function isLikelyVideo(url){
 
 /*
 [2.3] Convert Google Drive / Dropbox share links into direct file/thumbnail URLs
-      - Drive: returns a thumbnail for images and a 'file' href for original
-      - Dropbox: converts to dl.dropboxusercontent.com for direct fetches
 */
 function toEmbedFileUrl(url) {
   try {
@@ -151,8 +162,7 @@ function toEmbedFileUrl(url) {
 }
 
 /*
-[2.4] ImagePreview component
-      - Uses converted 'image' URL (Drive thumbnail / Dropbox direct)
+[2.4] ImagePreview
 */
 function ImagePreview({ url }) {
   const [error, setError] = useState(false);
@@ -178,9 +188,7 @@ function ImagePreview({ url }) {
 }
 
 /*
-[2.5] VideoPreview component
-      - Plays Dropbox direct MP4/WebM/MOV inline when possible
-      - Falls back to “Open original” link
+[2.5] VideoPreview
 */
 function VideoPreview({ url }) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
@@ -382,10 +390,21 @@ export default function Admin(){
           missions: (m.missions||[]).map(x=> {
             if (x.type==='quiz') {
               return ({...x, type:'multiple_choice', content:{
-                question: x.content?.question||'', choices: x.content?.choices||[], answer: x.content?.answer||''
+                question: x.content?.question||'', choices: x.content?.choices||[], answer: x.content?.answer||'',
+                imageUrl: x.content?.imageUrl || '', videoUrl: x.content?.videoUrl || ''
               }});
             }
             if (x.type==='video') return ({...x, type:'video'});
+            if (x.type==='multiple_choice' || x.type==='short_answer' || x.type==='statement') {
+              return ({
+                ...x,
+                content: {
+                  ...x.content,
+                  imageUrl: x.content?.imageUrl || '',
+                  videoUrl: x.content?.videoUrl || ''
+                }
+              });
+            }
             if (x.type==='ar_image' || x.type==='ar_video') {
               return ({
                 ...x,
@@ -455,7 +474,7 @@ export default function Admin(){
       title:'New Mission',
       type:'multiple_choice',
       rewards:{points:25},
-      content:{question:'',choices:[],answer:''}
+      content:{question:'',choices:[],answer:'', imageUrl:'', videoUrl:''}
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -465,9 +484,9 @@ export default function Admin(){
   // [5.7] Default content factory
   function defaultContentForType(t){
     switch(t){
-      case 'multiple_choice': return {question:'',choices:[],answer:''};
-      case 'short_answer':    return {question:'',answer:'',acceptable:''};
-      case 'statement':       return {text:''};
+      case 'multiple_choice': return {question:'',choices:[],answer:'', imageUrl:'', videoUrl:''};
+      case 'short_answer':    return {question:'',answer:'',acceptable:'', imageUrl:'', videoUrl:''};
+      case 'statement':       return {text:'', imageUrl:'', videoUrl:''};
       case 'video':           return {videoUrl:'',overlayText:''};
       case 'geofence_image':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
       case 'geofence_video':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
@@ -482,13 +501,15 @@ export default function Admin(){
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // Minimal validation (skip numeric)
+    // Validation (only for required fields, skip numbers)
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields){
-      if (f.type==='number') continue;
+      if (f.required === false) continue;        // optional -> skip
+      if (f.type === 'number') continue;         // numeric handled by defaults
       const v = editing.content?.[f.key];
       if (v===undefined || v===null || v==='') return setStatus('❌ Missing: '+f.label);
     }
+
     if ((editing.type==='ar_image' || editing.type==='ar_video') && editing.content?.geofenceEnabled) {
       const { lat, lng } = editing.content || {};
       if (lat==='' || lng==='') return setStatus('❌ Geofence is ON — pick a map location first');
