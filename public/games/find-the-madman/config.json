@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "head2head"
+  },
+  "game": {
+    "title": "find the madman",
+    "type": "Chase"
+  },
+  "forms": {
+    "players": 2
+  },
+  "textRules": []
+}
