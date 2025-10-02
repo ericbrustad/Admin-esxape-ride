@@ -4,11 +4,31 @@
     "mode": "single"
   },
   "game": {
-    "title": "Game 1 thriller single player",
-    "type": "Thriller"
+    "title": "bricks",
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
   },
-  "textRules": []
+  "textRules": [],
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#100f10",
+      "align": "left",
+      "backgroundColor": "#e6eaf9",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#ffffff",
+      "align": "center",
+      "backgroundColor": "#0b0c10",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  }
 }
