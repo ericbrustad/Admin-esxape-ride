@@ -1,15 +1,45 @@
 {
-  "version": "0.0.1",
+  "id": "msuite_esx",
+  "version": "0.6.23",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
   "missions": [
     {
       "id": "m01",
-      "title": "Welcome",
-      "type": "statement",
+      "title": "MC",
+      "type": "multiple_choice",
       "rewards": {
-        "points": 10
+        "points": 25
       },
       "content": {
-        "text": "Welcome to Game 1 thriller single player! Ready to play?"
+        "question": "square",
+        "choices": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "correctIndex": 3,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/g08lf6wyy2ta2j62xyens/2023-10-15-17.52.07.png?rlkey=axv5c4ka8je5gq1l1br48bz9b&st=3iuq8dmw&dl=0"
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "geofence_image",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "lat": 44.975485,
+        "lng": -93.287487,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30,
+        "imageUrl": "https://www.dropbox.com/scl/fi/g08lf6wyy2ta2j62xyens/2023-10-15-17.52.07.png?rlkey=axv5c4ka8je5gq1l1br48bz9b&st=3iuq8dmw&dl=0",
+        "overlayText": "the road"
       }
     }
   ]
