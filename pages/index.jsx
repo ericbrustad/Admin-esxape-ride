@@ -1,131 +1,151 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /* =========================================================
-   0) HELPERS (top-level)
+   0) SMALL UTILS (top-level helpers)
    ========================================================= */
 
-// Normalize common CDN/share links into direct-render URLs
+// Fetch JSON safely with a fallback (avoids HTML error pages blowing up .json())
+async function fetchJsonSafe(url, fallback) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (r.ok && ct.includes('application/json')) return await r.json();
+  } catch {}
+  return fallback;
+}
+
+// Try multiple URLs in order, return first valid JSON
+async function fetchFirstJson(urls, fallback) {
+  for (const u of urls) {
+    const j = await fetchJsonSafe(u, undefined);
+    if (j !== undefined) return j;
+  }
+  return fallback;
+}
+
+// Turn common sharing links into direct media URLs we can preview
 function normalizeMediaUrl(u) {
   if (!u) return '';
   let url = String(u).trim();
 
-  // Dropbox -> direct content
+  // Dropbox
+  // - https://www.dropbox.com/s/<id>/file.png?dl=0 -> https://dl.dropboxusercontent.com/s/<id>/file.png
+  // - ...?dl=1 or ...?raw=1 works too
   if (url.includes('dropbox.com')) {
-    url = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
-    // prefer raw=1 which returns the file bytes with correct content-type
-    if (url.includes('?')) {
-      url = url.replace(/(\?|&)dl=\d/gi, '$1raw=1');
-      if (!/[?&](raw=1)/.test(url)) url += '&raw=1';
-    } else {
-      url += '?raw=1';
-    }
+    try {
+      const loc = new URL(url);
+      // switch host
+      loc.host = 'dl.dropboxusercontent.com';
+      // normalize query
+      if (loc.searchParams.has('dl')) loc.searchParams.delete('dl');
+      loc.searchParams.set('raw', '1');
+      return loc.toString();
+    } catch { /* fallthrough */ }
   }
 
-  // Google Drive -> direct content
-  const m = url.match(/https?:\/\/drive\.google\.com\/file\/d\/([^/]+)\//);
-  if (m) {
-    url = `https://drive.google.com/uc?export=download&id=${m[1]}`;
+  // Google Drive
+  // - https://drive.google.com/file/d/<id>/view -> https://drive.google.com/uc?export=download&id=<id>
+  // You can also try "view" instead of "download" for inline display.
+  const g = url.match(/https?:\/\/drive\.google\.com\/file\/d\/([^/]+)\/(view|preview)/i);
+  if (g) {
+    const id = g[1];
+    return `https://drive.google.com/uc?export=download&id=${id}`;
   }
 
   return url;
 }
 
-// Best-effort guess by extension (before we try/fallback render)
-function guessKindFromUrl(u) {
-  const base = String(u || '').split('?')[0].toLowerCase();
-  const isVideo = /\.(mp4|webm|mov)$/.test(base);
-  const isImage = /\.(png|jpg|jpeg|gif|webp|svg)$/.test(base);
-  if (isVideo) return 'video';
-  if (isImage) return 'image';
-  return 'unknown';
-}
-
-// Safe JSON fetch (returns fallback if not JSON/404/etc.)
-async function fetchJsonSafe(url, fallback) {
-  try {
-    const r = await fetch(url, { cache: 'no-store' });
-    const ct = r.headers.get('content-type') || '';
-    if (r.ok && ct.includes('application/json')) {
-      return await r.json();
-    }
-  } catch {}
-  return fallback;
-}
-
-// Try first-available JSON from a list of URLs
-async function fetchFirstJson(urls, fallback) {
-  for (const u of urls) {
-    try {
-      const r = await fetch(u, { cache: 'no-store' });
-      const ct = r.headers.get('content-type') || '';
-      if (r.ok && ct.includes('application/json')) return await r.json();
-    } catch {}
+// Decide if URL *looks* like a video based on extension or known host hints
+function isLikelyVideo(u) {
+  if (!u) return false;
+  const lower = u.toLowerCase();
+  if (/\.(mp4|webm|mov)(\?|#|$)/.test(lower)) return true;
+  // Some direct links (Drive/Dropbox) may not have file extension — let user force video by suffix
+  if (lower.includes('drive.google.com') || lower.includes('dropbox')) {
+    // Heuristic: if query includes "video" or filename hints
+    if (/video|\.mp4|\.webm|\.mov/.test(lower)) return true;
   }
-  return fallback;
+  return false;
+}
+
+// URL ↔ state helpers (deep-linking the UI)
+function readUrlState() {
+  if (typeof window === 'undefined') return { game: '', mission: '' };
+  const sp = new URLSearchParams(window.location.search);
+  return { game: sp.get('game') || '', mission: sp.get('mission') || '' };
+}
+function writeUrlState({ game, mission }) {
+  if (typeof window === 'undefined') return;
+  const sp = new URLSearchParams(window.location.search);
+  if (game) sp.set('game', game); else sp.delete('game');
+  if (mission) sp.set('mission', mission); else sp.delete('mission');
+  const qs = sp.toString();
+  const next = qs ? `${location.pathname}?${qs}` : location.pathname;
+  window.history.replaceState(null, '', next);
 }
 
 /* =========================================================
-   0.1) TYPE / FORM DEFINITIONS
+   0.5) TYPE / FORM DEFINITIONS
+   - TYPE_FIELDS drives the generic renderer
+   - Some types have custom UIs (MCQ, geofence maps, AR)
    ========================================================= */
 
 const TYPE_FIELDS = {
   multiple_choice: [
-    { key:'question',  label:'Question', type:'text' },
-    { key:'mediaUrl',  label:'Image or Video URL (optional)', type:'text' }, // preview below
+    { key:'question', label:'Question', type:'text' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   short_answer: [
-    { key:'question',   label:'Question', type:'text' },
-    { key:'answer',     label:'Correct Answer', type:'text' },
+    { key:'question', label:'Question', type:'text' },
+    { key:'answer', label:'Correct Answer', type:'text' },
     { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
-    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text' }, // preview below
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   statement: [
-    { key:'text',     label:'Statement Text', type:'multiline' },
-    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' },   // preview below
+    { key:'text', label:'Statement Text', type:'multiline' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
   ],
   video: [
-    { key:'videoUrl',    label:'Video URL (https)', type:'text' },
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
     { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
   ],
   geofence_image: [
-    { key:'lat',            label:'Latitude', type:'number' },
-    { key:'lng',            label:'Longitude', type:'number' },
-    { key:'radiusMeters',   label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds',label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'imageUrl',       label:'Image URL (https)', type:'text' },
-    { key:'overlayText',    label:'Caption/Text', type:'text' },
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'imageUrl', label:'Image URL (https)', type:'text' },
+    { key:'overlayText', label:'Caption/Text', type:'text' },
   ],
   geofence_video: [
-    { key:'lat',            label:'Latitude', type:'number' },
-    { key:'lng',            label:'Longitude', type:'number' },
-    { key:'radiusMeters',   label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds',label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'videoUrl',       label:'Video URL (https)', type:'text' },
-    { key:'overlayText',    label:'Overlay Text (optional)', type:'text' },
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
   ],
   ar_image: [
-    { key:'markerUrl',   label:'AR Marker Image URL (png/jpg)', type:'text' },
-    { key:'assetUrl',    label:'AR Overlay Image URL (png/jpg)', type:'text' },
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Overlay Image URL (png/jpg)', type:'text' },
     { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-    // geofence handled via toggle + MapPicker
   ],
   ar_video: [
-    { key:'markerUrl',   label:'AR Marker Image URL (png/jpg)', type:'text' },
-    { key:'assetUrl',    label:'AR Video URL (mp4)', type:'text' },
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
     { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-    // geofence handled via toggle + MapPicker
   ],
 };
 
 const TYPE_OPTIONS = [
   { value:'multiple_choice', label:'Multiple Choice' },
-  { value:'short_answer',    label:'Question (Short Answer)' },
-  { value:'statement',       label:'Statement' },
-  { value:'video',           label:'Video' },
-  { value:'geofence_image',  label:'Geo Fence Image' },
-  { value:'geofence_video',  label:'Geo Fence Video' },
-  { value:'ar_image',        label:'AR Image' },
-  { value:'ar_video',        label:'AR Video' },
+  { value:'short_answer', label:'Question (Short Answer)' },
+  { value:'statement', label:'Statement' },
+  { value:'video', label:'Video' },
+  { value:'geofence_image', label:'Geo Fence Image' },
+  { value:'geofence_video', label:'Geo Fence Video' },
+  { value:'ar_image', label:'AR Image' },
+  { value:'ar_video', label:'AR Video' },
 ];
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
@@ -136,28 +156,28 @@ const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 export default function Admin(){
   const [tab, setTab] = useState('missions');
 
-  // Games (multi-game) state
+  // --- games & modal ---
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy/root
+  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root game
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType,  setNewType]  = useState('Mystery');
   const [newMode,  setNewMode]  = useState('single'); // single | head2head | multi
 
-  // Admin data
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
 
-  // Mission editor state
-  const [selected, setSelected] = useState(null); // mission id selected
-  const [editing, setEditing]   = useState(null); // current draft
+  const [selected, setSelected] = useState(null); // mission id selected in list
+  const [editing, setEditing]   = useState(null); // draft being edited
   const [dirty, setDirty]       = useState(false);
 
-  // SMS rules
   const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  // Load games list
+  // URL <-> state glue
+  const [pendingMissionId, setPendingMissionId] = useState(null);
+
+  // Load list of games once
   useEffect(() => {
     (async () => {
       try {
@@ -168,20 +188,29 @@ export default function Admin(){
     })();
   }, []);
 
-  // Slug-aware loader for missions/config
+  // Read ?game & ?mission on first mount
+  useEffect(() => {
+    const { game, mission } = readUrlState();
+    if (game) setActiveSlug(game);
+    if (mission) setPendingMissionId(mission);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Slug-aware loader for missions/config (runs on first load and when game changes)
   useEffect(()=>{
     (async()=>{
       try{
-        const mUrl = activeSlug ? `/games/${activeSlug}/missions.json` : `/missions.json`;
-        const cUrl = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
+        const missionUrls = activeSlug
+          ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
+          : [`/missions.json`];
 
-        const m = await fetchJsonSafe(
-          mUrl,
-          { id:'msuite_esx', version:'0.0.0', flow:{mode:'linear', start:'m01'}, missions: [] }
-        );
-        const c = await fetchJsonSafe(cUrl, defaultConfig());
+        const configUrl = activeSlug
+          ? `/api/config?slug=${encodeURIComponent(activeSlug)}`
+          : `/api/config`;
 
-        // legacy 'quiz' -> 'multiple_choice'
+        const m = await fetchFirstJson(missionUrls, { version:'0.0.0', missions: [] });
+        const c = await fetchJsonSafe(configUrl, defaultConfig());
+
         const normalized = {
           ...m,
           missions: (m.missions||[]).map(x =>
@@ -207,6 +236,23 @@ export default function Admin(){
     })();
   }, [activeSlug]);
 
+  // After suite loads, if URL had a mission that exists, select it once
+  useEffect(() => {
+    if (!pendingMissionId) return;
+    const exists = suite?.missions?.some(m => m.id === pendingMissionId);
+    if (exists) {
+      setSelected(pendingMissionId);
+      setPendingMissionId(null);
+    } else {
+      setPendingMissionId(null);
+    }
+  }, [suite, pendingMissionId]);
+
+  // Reflect game/mission in URL
+  useEffect(() => {
+    writeUrlState({ game: activeSlug || '', mission: selected || '' });
+  }, [activeSlug, selected]);
+
   function defaultConfig(){
     return {
       splash: { enabled: true, mode:'single' },
@@ -218,33 +264,19 @@ export default function Admin(){
 
   function defaultContentForType(t){
     switch(t){
-      case 'multiple_choice':
-        return {question:'', choices:[], correctIndex: undefined, mediaUrl:'',
-                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      case 'short_answer':
-        return {question:'', answer:'', acceptable:'', mediaUrl:'',
-                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      case 'statement':
-        return {text:'', mediaUrl:'',
-                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      case 'video':
-        return {videoUrl:'', overlayText:''};
-      case 'geofence_image':
-        return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
-      case 'geofence_video':
-        return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
-      case 'ar_image':
-        return {markerUrl:'', assetUrl:'', overlayText:'',
-                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      case 'ar_video':
-        return {markerUrl:'', assetUrl:'', overlayText:'',
-                geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      default:
-        return {};
+      case 'multiple_choice': return {question:'', choices:[], correctIndex: undefined, mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      case 'short_answer':    return {question:'', answer:'', acceptable:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      case 'statement':       return {text:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      case 'video':           return {videoUrl:'', overlayText:''};
+      case 'geofence_image':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
+      case 'geofence_video':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
+      case 'ar_image':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      case 'ar_video':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
+      default: return {};
     }
   }
 
-  // Save to GitHub (slug-aware)
+  // --- Save to GitHub (slug-aware) ---
   async function saveAll(){
     if (!suite || !config) return;
     setStatus('Saving…');
@@ -261,7 +293,7 @@ export default function Admin(){
     }
   }
 
-  // Missions list helpers
+  // --- Missions list helpers ---
   function suggestId(){
     const base = 'm'; let i = 1;
     const ids = new Set((suite?.missions||[]).map(m=>m.id));
@@ -279,12 +311,14 @@ export default function Admin(){
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // basic presence checks (skip optional mediaUrl)
+    // basic presence checks for non-number fields from schema (except optional mediaUrl)
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields){
       if (f.type==='number') continue;
       const v = editing.content?.[f.key];
-      if (v===undefined || v===null || (f.key!=='mediaUrl' && v==='')) return setStatus('❌ Missing: '+f.label);
+      if (f.key !== 'mediaUrl') {
+        if (v===undefined || v===null || v==='') return setStatus('❌ Missing: '+f.label);
+      }
     }
 
     const missions = [...(suite.missions||[])];
@@ -300,7 +334,7 @@ export default function Admin(){
     if (selected===id) { setSelected(null); setEditing(null); }
   }
 
-  // SMS rules
+  // ----- SMS rules -----
   function addSmsRule(){
     if (!smsRule.missionId || !smsRule.message) { setStatus('❌ Pick mission and message'); return; }
     const maxPlayers = config?.forms?.players || 1;
@@ -415,8 +449,8 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Optional geofence for MCQ / Short Answer / Statement / AR */}
-                {(['multiple_choice','short_answer','statement','ar_image','ar_video'].includes(editing.type)) && (
+                {/* Optional geofence for MCQ / Short / Statement */}
+                {(editing.type==='multiple_choice' || editing.type==='short_answer' || editing.type==='statement') && (
                   <div style={{marginBottom:12}}>
                     <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
                       <input
@@ -459,7 +493,7 @@ export default function Admin(){
                   </div>
                 )}
 
-                {/* Geofence types map always visible */}
+                {/* Geofence types map (always on) */}
                 {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
@@ -472,21 +506,54 @@ export default function Admin(){
                         setDirty(true);
                       }}
                     />
-                    <Field label="Cooldown (sec)">
-                      <input
-                        type="number" min={0} max={3600} style={S.input}
-                        value={editing.content?.cooldownSeconds ?? 30}
-                        onChange={e=>{
-                          const v = Number(e.target.value||0);
-                          setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
-                          setDirty(true);
-                        }}
-                      />
-                    </Field>
                   </div>
                 )}
 
-                {/* Generic field renderer + media previews */}
+                {/* AR geofence toggle + map */}
+                {(editing.type==='ar_image' || editing.type==='ar_video') && (
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                      <input
+                        type="checkbox"
+                        checked={!!editing.content?.geofenceEnabled}
+                        onChange={e=>{
+                          const on = e.target.checked;
+                          const next = {...editing.content, geofenceEnabled:on};
+                          if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.2650; }
+                          setEditing({...editing, content: next});
+                          setDirty(true);
+                        }}
+                      />
+                      Enable geofence for this AR mission
+                    </label>
+                    {editing.content?.geofenceEnabled && (
+                      <>
+                        <MapPicker
+                          lat={editing.content?.lat}
+                          lng={editing.content?.lng}
+                          radius={editing.content?.radiusMeters ?? 25}
+                          onChange={(lat,lng,rad)=>{
+                            setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
+                            setDirty(true);
+                          }}
+                        />
+                        <Field label="Cooldown (sec)">
+                          <input
+                            type="number" min={0} max={3600} style={S.input}
+                            value={editing.content?.cooldownSeconds ?? 30}
+                            onChange={e=>{
+                              const v = Number(e.target.value||0);
+                              setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
+                              setDirty(true);
+                            }}
+                          />
+                        </Field>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* GENERIC field renderer + media previews */}
                 {(TYPE_FIELDS[editing.type]||[]).map(f => (
                   <Field key={f.key} label={f.label}>
                     {f.type==='text' && (
@@ -499,7 +566,6 @@ export default function Admin(){
                             setDirty(true);
                           }}
                         />
-                        {/* Inline previews for media-like keys (Dropbox/Drive supported) */}
                         {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) &&
                           <MediaPreview url={editing.content?.[f.key]} kind={f.key} />}
                       </>
@@ -675,10 +741,9 @@ export default function Admin(){
                   });
                   const j = await r.json();
                   if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
-                  // refresh list & switch to new game
                   const rr = await fetch('/api/games'); const jj = await rr.json();
                   if (jj.ok) setGames(jj.games||[]);
-                  setActiveSlug(j.slug); // server returns { ok:true, slug }
+                  setActiveSlug(j.slug);
                   setNewTitle(''); setShowNewGame(false);
                 }}
               >Create</button>
@@ -751,51 +816,39 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   );
 }
 
-/** Robust media preview with Dropbox/Drive normalization and fallback */
+/** Shows <img> or <video> preview for a URL (best-effort, with Dropbox/Drive support) */
 function MediaPreview({ url, kind }) {
-  const [mode, setMode] = useState('auto'); // 'auto' -> try img then video; or 'img'/'video' set by errors
+  const [imgOk, setImgOk] = useState(true);
   if (!url) return null;
 
   const normalized = normalizeMediaUrl(url);
-  const guess = guessKindFromUrl(normalized);
+  const treatAsVideo = isLikelyVideo(normalized);
 
-  // First attempt: image (unless we know it's a video)
-  const tryImage = mode==='auto' ? (guess !== 'video') : (mode==='img');
-  const tryVideo = mode==='auto' ? true : (mode==='video');
-
-  return (
-    <div style={{marginTop:8}}>
-      <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
-
-      {/* Try image */}
-      {tryImage && (
+  // For Dropbox/Drive without extensions, try image first then fallback to video
+  if (!treatAsVideo && imgOk) {
+    return (
+      <div style={{marginTop:8}}>
+        <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
         <img
           src={normalized}
           alt="preview"
-          style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b', display: mode==='video' ? 'none' : 'block'}}
-          onError={()=> setMode(guess==='image' ? 'video' : 'video')}
+          onError={()=>setImgOk(false)}
+          style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b'}}
         />
-      )}
-
-      {/* Try video (if guess is video OR image failed) */}
-      {tryVideo && (
-        <video
-          src={normalized}
-          controls
-          style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b', display: (guess==='video' || mode==='video') ? 'block' : 'none'}}
-          onError={()=> setMode('link')}
-        />
-      )}
-
-      {/* Final fallback: plain link */}
-      {mode==='link' && (
-        <a href={normalized} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
-      )}
-
-      {/* Small tip for Dropbox/Drive */}
-      <div style={{marginTop:6, color:'#6f8598', fontSize:11}}>
-        Tip: Dropbox/Drive share links are auto-converted for preview. If something won’t display, click “Open media”.
       </div>
+    );
+  }
+
+  // Video path or image failed → try video
+  return (
+    <div style={{marginTop:8}}>
+      <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
+      <video src={normalized} controls style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b'}} />
+      {!treatAsVideo && (
+        <div style={{marginTop:6, fontSize:12, color:'#9fb0bf'}}>
+          If this isn’t a video, open original: <a href={url} target="_blank" rel="noreferrer" style={{textDecoration:'underline', color:'#9fb0bf'}}>link</a>
+        </div>
+      )}
     </div>
   );
 }
