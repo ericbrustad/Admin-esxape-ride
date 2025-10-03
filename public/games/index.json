@@ -5,12 +5,5 @@
     "type": "Thriller",
     "mode": "single",
     "createdAt": "2025-10-02T13:40:44.216Z"
-  },
-  {
-    "slug": "bonkers",
-    "title": "Bonkers",
-    "type": "Race",
-    "mode": "head2head",
-    "createdAt": "2025-10-02T13:49:50.871Z"
   }
 ]
