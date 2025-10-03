@@ -1039,9 +1039,7 @@ export default function Admin() {
   );
 }
 
-/* =====================================================================
-   4) SMALL COMPONENTS
-   ===================================================================== */
+// 4) SMALL COMPONENTS
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
