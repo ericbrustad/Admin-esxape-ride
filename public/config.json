@@ -1,0 +1,19 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Untitled Game",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "powerups": []
+}
