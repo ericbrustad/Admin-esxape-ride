@@ -19,12 +19,5 @@
     "type": "Chase",
     "mode": "head2head",
     "createdAt": "2025-10-02T16:42:17.710Z"
-  },
-  {
-    "slug": "chase-you",
-    "title": "chase you",
-    "type": "Race",
-    "mode": "head2head",
-    "createdAt": "2025-10-02T18:27:18.633Z"
   }
 ]
