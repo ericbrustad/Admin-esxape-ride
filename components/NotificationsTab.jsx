@@ -1,15 +1,13 @@
 // components/NotificationsTab.jsx
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { useUndo } from './UndoProvider';
 
 export default function NotificationsTab() {
   const { draft, mutateDraft } = useUndo();
   const cfg = draft.notifications || {};
   const audioRef = useRef();
-  const [custom, setCustom] = useState('');
 
   const set = (patch) => mutateDraft(d => ({ ...d, notifications: { ...d.notifications, ...patch }}));
-
   const play = () => { try { audioRef.current?.play(); } catch(_){} };
 
   return (
@@ -22,7 +20,7 @@ export default function NotificationsTab() {
         <label className="text-sm">Alarm sound</label>
         <div className="flex gap-3 flex-wrap">
           {['/sounds/alarm_1.mp3','/sounds/alarm_2.mp3', cfg.alarmSound].filter(Boolean).map((p,i)=>(
-            <button key={i} className={`px-3 py-2 rounded-xl border ${cfg.alarmSound===p?'bg-black text-white':''}`} onClick={()=>set({alarmSound:p})}>{p.split('/').pop()}</button>
+            <button key={i} className={`px-3 py-2 rounded-xl border ${cfg.alarmSound===p?'bg-black text-white':''}`} onClick={()=>set({alarmSound:p})}>{p?.split('/').pop() || 'custom'}</button>
           ))}
           <label className="px-3 py-2 rounded-xl border cursor-pointer">
             Upload
@@ -36,7 +34,7 @@ export default function NotificationsTab() {
           <audio ref={audioRef} src={cfg.alarmSound} />
         </div>
       </div>
-      <p className="text-xs text-gray-500">These settings are read by the game client to play a warning and final alarm.</p>
+      <p className="text-xs text-gray-500">Game client reads these to trigger warning/final alarms.</p>
     </div>
   );
 }

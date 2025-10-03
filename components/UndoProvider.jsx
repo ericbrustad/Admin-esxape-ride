@@ -29,7 +29,7 @@ export function UndoProvider({ initialDraft, children }) {
   const publish = useCallback(async () => {
     setPublished(draft);
     save(KEYS.PUBLISHED, draft);
-    // Hook: call your GitHub/API persist here if desired
+    // TODO: call your GitHub/API persist here if desired
     return true;
   }, [draft]);
 

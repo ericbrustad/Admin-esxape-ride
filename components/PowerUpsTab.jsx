@@ -13,10 +13,10 @@ export default function PowerUpsTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Power‑Ups</h3>
-        <button className="px-3 py-2 rounded-xl bg-black text-white" onClick={add}>Add Power‑Up</button>
+        <h3 className="text-lg font-semibold">Power-Ups</h3>
+        <button className="px-3 py-2 rounded-xl bg-black text-white" onClick={add}>Add Power-Up</button>
       </div>
-      {items.length===0 && <p className="text-sm text-gray-500">No power‑ups yet.</p>}
+      {items.length===0 && <p className="text-sm text-gray-500">No power-ups yet.</p>}
       <div className="grid gap-4">
         {items.map((it, i) => (
           <div key={i} className="rounded-2xl border p-4 grid md:grid-cols-5 gap-3">
@@ -28,7 +28,7 @@ export default function PowerUpsTab() {
           </div>
         ))}
       </div>
-      <p className="text-xs text-gray-500">Game client can read these and implement behavior per <code>key</code>.</p>
+      <p className="text-xs text-gray-500">Game client will implement behavior per <code>key</code>.</p>
     </div>
   );
 }

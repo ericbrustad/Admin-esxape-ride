@@ -12,7 +12,7 @@ export default function MonetizationTab() {
       <div>
         <label className="text-sm">Plan</label>
         <select className="mt-1 w-full border rounded-xl px-3 py-2" value={m.plan || 'one_time'} onChange={e=>set({plan:e.target.value})}>
-          <option value="one_time">One‑time</option>
+          <option value="one_time">One-time</option>
           <option value="subscription_monthly">Subscription (Monthly)</option>
           <option value="subscription_yearly">Subscription (Yearly)</option>
         </select>
@@ -25,7 +25,7 @@ export default function MonetizationTab() {
         <label className="text-sm">Stripe Price ID</label>
         <input className="mt-1 w-full border rounded-xl px-3 py-2" value={m.stripePriceId || ''} onChange={e=>set({stripePriceId:e.target.value})} placeholder="price_123..." />
       </div>
-      <p className="text-xs text-gray-500 md:col-span-3">Wire these to your checkout later. Keeping them here stabilizes schema now.</p>
+      <p className="text-xs text-gray-500 md:col-span-3">Schema ready; wire to checkout later.</p>
     </div>
   );
 }
