@@ -139,7 +139,16 @@ const TYPE_OPTIONS = [
   { value:'ar_video', label:'AR Video' },
 ];
 
-const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
+const GAME_TYPES = [
+  'Race',
+  'Chase',
+  'Capture the Flag',
+  'Seek and Destroy',
+  'Survivor',
+  'Mystery',
+  'Catch the Clone'
+];
+
 
 /* =========================================================
    2) ROOT COMPONENT
