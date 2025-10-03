@@ -948,6 +948,7 @@ export default function Admin() {
         </main>
       )}
 
+
       {/* TEST */}
       {tab === 'test' && (
         <main style={S.wrap}>
@@ -972,10 +973,6 @@ export default function Admin() {
                 style={{ width:'100%', height: '70vh', border:'1px solid #22303c', borderRadius: 12 }}
               />
             )}
-          </div>
-        </main>
-      )}
-     </ul>
           </div>
         </main>
       )}
