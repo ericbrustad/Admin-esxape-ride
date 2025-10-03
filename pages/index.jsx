@@ -389,8 +389,8 @@ export default function Admin() {
      S3) RENDER
      ========================================================= */
   return (
-    <header style={S.header}>
-  <div style={S.wrap}>
+   <div style={S.wrap}>
+      <header style={S.header}>
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       {/* Tabs (SECURITY removed from this group) */}
       {['settings', 'missions', 'text', 'powerups'].map((t) => (
