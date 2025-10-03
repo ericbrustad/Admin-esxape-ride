@@ -1,8 +1,4 @@
 // pages/index.jsx
-// Admin Page wired with: Undo/Drafts, Autosave, Import/Export, Power-Ups, Scoring, Notifications, Monetization, Preview.
-// NOTE: This file keeps placeholders for your existing features (URL sync, Games dropdown, MapPicker, MCQ editor, etc.).
-// Replace the placeholder comments with your real components where indicated.
-
 import React from 'react';
 import { UndoProvider, useUndo } from '../components/UndoProvider';
 import useAutosave from '../components/useAutosave';
@@ -14,9 +10,12 @@ import MonetizationTab from '../components/MonetizationTab';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PreviewPane from '../components/PreviewPane';
 import RolesGate from '../components/RolesGate';
+import SettingsTab from '../components/SettingsTab';
+import FirstRunModal from '../components/FirstRunModal';
 import { defaultGame } from '../lib/schema';
+import { getUserEmail } from '../lib/identity';
 
-function TopBar({ userEmail }) {
+function TopBar() {
   const { draft, undo, publish, discardDraft } = useUndo();
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
@@ -43,8 +42,8 @@ function Tabs() {
   const { draft, mutateDraft } = useUndo();
   const [tab, setTab] = React.useState('missions');
 
-  // URL sync for ?game & ?mission (basic example)
   React.useEffect(() => {
+    if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
     url.searchParams.set('game', draft.id);
     window.history.replaceState({}, '', url.toString());
@@ -52,7 +51,6 @@ function Tabs() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Games dropdown + New Game modal (placeholder area) */}
       <div className="rounded-2xl border p-4 flex flex-wrap gap-3 items-center">
         <span className="text-sm text-gray-500">[Games Dropdown here] [New Game modal button]</span>
       </div>
@@ -65,28 +63,25 @@ function Tabs() {
         <div className="rounded-2xl border p-4">
           <label className="text-sm">Game Duration (minutes, 0 = infinite)</label>
           <input className="mt-1 w-full border rounded-xl px-3 py-2" type="number" value={draft.durationMinutes ?? 0} onChange={e=>mutateDraft(d=>({...d,durationMinutes:Number(e.target.value)}))} />
-          <p className="text-xs text-gray-500 mt-2">Timer behavior lives in game client; these values configure it.</p>
+          <p className="text-xs text-gray-500 mt-2">Timer behavior in game client; admin configures the value here.</p>
         </div>
         <div className="rounded-2xl border p-4">
           <label className="text-sm">Tags / Slug (for GitHub saves)</label>
           <input className="mt-1 w-full border rounded-xl px-3 py-2" placeholder="slug-or-tag" onChange={e=>mutateDraft(d=>({...d, slug: e.target.value?.trim()}))} />
-          <p className="text-xs text-gray-500 mt-2">Use this to produce slug‑aware save paths.</p>
+          <p className="text-xs text-gray-500 mt-2">Use this to produce slug-aware save paths.</p>
         </div>
       </div>
 
-      {/* Tab bar */}
       <div className="flex gap-2 flex-wrap">
-        {['missions','powerups','scoring','notifications','monetization','import_export','preview'].map(t => (
+        {['missions','powerups','scoring','notifications','monetization','import_export','settings','preview'].map(t => (
           <button key={t} className={`px-3 py-2 rounded-xl border ${tab===t?'bg-black text-white':''}`} onClick={()=>setTab(t)}>{t.replace('_',' ')}</button>
         ))}
       </div>
 
-      {/* Mission Editor placeholder (replace with your real editor) */}
       {tab==='missions' && (
         <div className="rounded-2xl border p-4 space-y-4">
-          <div className="text-sm text-gray-500">[Your existing Missions editor mounts here: MCQ A–E, radio correct, Short, Statement, geofence toggles, AR toggle + MapPicker, media preview normalization, etc.]</div>
+          <div className="text-sm text-gray-500">[Your existing Missions editor mounts here: MCQ A–E + radio correct, Short, Statement, geofence toggles, AR toggle + MapPicker, media preview normalization, etc.]</div>
           <button className="px-3 py-2 rounded-xl bg-gray-100" onClick={()=>{
-            // Example: add a sample MCQ
             const sample = {
               id: Math.random().toString(36).slice(2),
               type: 'mcq',
@@ -99,7 +94,6 @@ function Tabs() {
             };
             mutateDraft(d => ({ ...d, missions: [...(d.missions||[]), sample] }));
           }}>Add Sample Mission</button>
-          <div className="text-xs text-gray-500">Remember: Use mutateDraft(...) anywhere you change state so Undo works.</div>
         </div>
       )}
 
@@ -108,11 +102,11 @@ function Tabs() {
       {tab==='notifications' && <NotificationsTab />}
       {tab==='monetization' && <MonetizationTab />}
       {tab==='import_export' && <ImportExportPanel />}
+      {tab==='settings' && <SettingsTab />}
       {tab==='preview' && (
         <PreviewPane mission={(draft.missions||[])[0]} game={draft} />
       )}
 
-      {/* Settings with Splash Mode (placeholder area) */}
       <div className="rounded-2xl border p-4">
         <span className="text-sm text-gray-500">[Settings → Splash Mode (single/head2head/multi) goes here]</span>
       </div>
@@ -120,18 +114,26 @@ function Tabs() {
   );
 }
 
-export default function AdminPage() {
-  // If you have auth, pass userEmail from your provider to RolesGate/TopBar
-  const userEmail = ''; // TODO: wire your auth email
+function AppShell() {
+  const userEmail = getUserEmail();
+  const { draft } = useUndo();
+  const roles = draft?.roles || { ownerEmails: [], editorEmails: [], viewerEmails: [] };
 
   return (
+    <div className="min-h-screen bg-white text-gray-900">
+      <FirstRunModal />
+      <RolesGate userEmail={userEmail} roles={roles} need="viewer" fallback={<div className="p-6 text-sm text-gray-600">Sign in to view admin (enter your email in Settings).</div>}>
+        <TopBar />
+        <Tabs />
+      </RolesGate>
+    </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
     <UndoProvider initialDraft={defaultGame()}>
-      <div className="min-h-screen bg-white text-gray-900">
-        <RolesGate userEmail={ericbrustad@gmail.com} roles={{ ownerEmails: [ericbrustad@gmail.com] }} need="viewer" fallback={<div className="p-6 text-sm text-gray-600">Sign in to view admin.</div>}>
-          <TopBar userEmail={ericbrustad@gmail.com} />
-          <Tabs />
-        </RolesGate>
-      </div>
+      <AppShell />
     </UndoProvider>
   );
 }
