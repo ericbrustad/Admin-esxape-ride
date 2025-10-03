@@ -425,21 +425,20 @@ export default function Admin() {
               style={S.search}
             />
             <div>
-              {(suite.missions || []).map((m) => (
-                <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
-                      <div style={{ fontWeight: 600 }}>{m.title || m.id}</div>
-                      <div style={{ color: '#9fb0bf', fontSize: 12 }}>
-                        {m.type} — id: {m.id}
-                      </div>
-                    </div>
-                    <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <SortableMissionsList
+                items={(suite.missions || [])}
+                selectedId={selected || null}
+                onSelect={(id)=>{
+                  const m = (suite.missions||[]).find(x=>x.id===id);
+                  if (m) editExisting(m);
+                }}
+                onDelete={(id)=>{ if (confirm('Delete this mission?')) removeMission(id); }}
+                onReorder={(next)=>{
+                  setSuite({ ...(suite||{}), missions: next });
+                  setDirty(true);
+                  setStatus('Reordered missions');
+                }}
+              />
             </div>
           </aside>
 
@@ -761,6 +760,19 @@ export default function Admin() {
             </div>
           </div>
 
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Display</h3>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={!!(config.display?.hideRadiusInGame)}
+                onChange={(e) => setConfig({ ...config, display: { ...(config.display || {}), hideRadiusInGame: e.target.checked } })}
+              />
+              Hide geofence radius in the game client
+            </label>
+            <div style={{ color: '#9fb0bf' }}>Players won’t see radius circles around missions or power-ups in-game. (Admin → MAP still shows rings.)</div>
+          </div>
+
           {/* Security moved here */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Security</h3>
@@ -823,6 +835,7 @@ export default function Admin() {
         </main>
       )}
 
+      
       {/* POWERUPS */}
       {tab === 'powerups' && (
         <main style={S.wrap}>
@@ -890,7 +903,11 @@ export default function Admin() {
                   </button>
                 </li>
               ))}
-            
+            </ul>
+          </div>
+        </main>
+      )}
+
       {/* MAP */}
       {tab === 'map' && (
         <main style={S.wrap}>
@@ -903,16 +920,11 @@ export default function Admin() {
               </label>
             </div>
             <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
-            <div style={{ color: '#9fb0bf', marginTop: 8 }}>This shows all geofenced missions and power-ups for the selected game.</div>
+            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power-ups for the selected game.</div>
           </div>
         </main>
       )}
-</ul>
-          </div>
-        </main>
-      )}
-
-      {/* New Game modal */}
+{/* New Game modal */}
       {showNewGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
           <div style={{ ...S.card, width: 420 }}>
@@ -1237,82 +1249,163 @@ const S = {
 };
 
 
+
+
 /* =====================================================================
-   MapOverview — Leaflet map overlaying all missions + power-ups
+   SortableMissionsList — drag/drop + up/down reordering
+   ===================================================================== */
+function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onDelete }) {
+  const [dragId, setDragId] = React.useState(null);
+
+  const onDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', id); };
+  const onDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect='move'; };
+  const onDrop = (e, id) => {
+    e.preventDefault();
+    const from = dragId, to = id;
+    if (!from || !to || from === to) return;
+    const cur = items.slice();
+    const fromIdx = cur.findIndex(x => x.id === from);
+    const toIdx = cur.findIndex(x => x.id === to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = cur.splice(fromIdx, 1);
+    cur.splice(toIdx, 0, moved);
+    onReorder && onReorder(cur);
+  };
+  const move = (id, dir) => {
+    const cur = items.slice();
+    const i = cur.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= cur.length) return;
+    const [m] = cur.splice(i, 1);
+    cur.splice(j, 0, m);
+    onReorder && onReorder(cur);
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {items.map((m) => (
+        <div
+          key={m.id}
+          draggable
+          onDragStart={(e) => onDragStart(e, m.id)}
+          onDragOver={onDragOver}
+          onDrop={(e) => onDrop(e, m.id)}
+          onClick={() => onSelect && onSelect(m.id)}
+          style={{ border: '1px solid #293744', borderRadius: 12, padding: 10, background: m.id === selectedId ? '#17212b' : '#0b1116', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', cursor: 'grab' }}
+        >
+          <div>
+            <div style={{ fontWeight: 600 }}>{m.title || 'Untitled'}</div>
+            <div style={{ fontSize: 12, color: '#9fb0bf' }}>{m.type} — id: {m.id}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, -1)}>↑</button>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, +1)}>↓</button>
+            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'6px 10px' }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
+      {items.length === 0 && <div style={{ color:'#9fb0bf', fontSize: 14 }}>No missions yet.</div>}
+    </div>
+  );
+}
+/* =====================================================================
+   MapOverview — Leaflet map overlaying all missions + power-ups (robust)
    ===================================================================== */
 function MapOverview({ missions=[], powerups=[], showRings=true }) {
   const divRef = React.useRef(null);
-  const mapRef = React.useRef(null);
-  const layerRef = React.useRef(null);
-  const [ready, setReady] = React.useState(false);
+  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
+
+  // helper: safely read lat/lng from various shapes
+  function getLL(src) {
+    if (!src) return null;
+    const c = src.content || src;
+    const lat = Number(c.lat ?? c.latitude ?? (c.center && c.center.lat));
+    const lng = Number(c.lng ?? c.longitude ?? (c.center && c.center.lng));
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return [lat, lng];
+  }
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (window.L) { setReady(true); return; }
+    if (window.L) { setLeafletReady(true); return; }
+    // add CSS
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(link);
+    // add JS
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     s.async = true;
-    s.onload = () => setReady(true);
+    s.onload = () => setLeafletReady(true);
     document.body.appendChild(s);
   }, []);
 
   React.useEffect(() => {
-    if (!ready || !divRef.current || typeof window === 'undefined') return;
+    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
 
-    if (!mapRef.current) {
-      mapRef.current = L.map(divRef.current, { center: [44.9778,-93.265], zoom: 12 });
+    // create or get map instance
+    if (!divRef.current._leaflet_map) {
+      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
-      }).addTo(mapRef.current);
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      divRef.current._leaflet_map = map;
     }
-    if (!layerRef.current) {
-      layerRef.current = L.layerGroup().addTo(mapRef.current);
-    } else {
-      layerRef.current.clearLayers();
-    }
+    const map = divRef.current._leaflet_map;
 
+    // clear or create overlay layer
+    if (!map._overviewLayer) {
+      map._overviewLayer = L.layerGroup().addTo(map);
+    } else {
+      map._overviewLayer.clearLayers();
+    }
+    const layer = map._overviewLayer;
     const bounds = L.latLngBounds([]);
 
-    // markers
-    const missionIcon = L.divIcon({ className: 'm-ic', html: '<div style="width:20px;height:20px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
-    const powerIcon   = L.divIcon({ className: 'p-ic', html: '<div style="width:20px;height:20px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
 
     (missions||[]).forEach((m) => {
-      const c = m.content || {};
-      const lat = Number(c.lat); const lng = Number(c.lng);
-      if (!c.geofenceEnabled || !isFinite(lat) || !isFinite(lng)) return;
+      const pos = getLL(m);
+      const c = (m && m.content) || {};
+      const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
+      if (!pos || !isFence) return;
       const rad = Number(c.radiusMeters || 0);
-      const pos = [lat, lng];
-      const mk = L.marker(pos, { icon: missionIcon }).addTo(layerRef.current);
+      const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
       const title = m.title || m.id || 'Mission';
       const t = m.type || '';
       mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layerRef.current);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
     (powerups||[]).forEach((p) => {
-      const lat = Number(p.lat); const lng = Number(p.lng);
-      if (!isFinite(lat) || !isFinite(lng)) return;
-      const rad = Number(p.pickupRadius || 0);
-      const pos = [lat, lng];
-      const mk = L.marker(pos, { icon: powerIcon }).addTo(layerRef.current);
+      const pos = getLL(p);
+      if (!pos) return;
+      const rad = Number(p.pickupRadius || p.radiusMeters || 0);
+      const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
       const title = p.title || p.type || 'Power-up';
       mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layerRef.current);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
-    if (bounds.isValid()) {
-      mapRef.current.fitBounds(bounds.pad(0.2));
-    }
-  }, [ready, missions, powerups, showRings]);
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+  }, [leafletReady, missions, powerups, showRings]);
 
-  return <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c' }} />;
+  return (
+    <div>
+      {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
+      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
+       ((powerups||[]).length === 0) && (
+        <div style={{ color: '#9fb0bf', marginTop: 8 }}>
+          No geofenced missions or power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power-ups with lat/lng.
+        </div>
+      )}
+    </div>
+  );
 }
