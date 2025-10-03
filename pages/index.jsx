@@ -1,63 +1,24 @@
+// pages/index.jsx
+// =========================================================
+// Admin (single page) — Slug-aware multi-game builder
+// Sections:
+//   S0  Helpers
+//   S1  Type/Options
+//   S2  Root Component (Admin)
+//   S3  Small UI Helpers & Widgets
+//   S4  Styles
+// =========================================================
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /* =========================================================
-   0) TOP-LEVEL HELPERS (safe to reuse)
+   S0) HELPERS (top-level)
+   ---------------------------------------------------------
+   - fetchJsonSafe / fetchFirstJson: tolerant JSON fetchers
+   - normalizeMediaUrl: handles Dropbox "share" → direct
+   - isImageUrl / isVideoUrl: basic URL sniffing
+   - allowedTypes: restrict types for head2head mode
    ========================================================= */
-function slugify(s) {
-  return String(s || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 60);
-}
-
-// Convert Dropbox / Google Drive share links to raw file URLs for previews
-function toRawFileUrl(u) {
-  if (!u) return u;
-  try {
-    const url = new URL(u);
-
-    // Dropbox
-    if (url.hostname.endsWith('dropbox.com')) {
-      // e.g. https://www.dropbox.com/scl/fi/... or /s/...
-      // Force direct content host + ?raw=1
-      url.hostname = 'dl.dropboxusercontent.com';
-      // strip “dl=0”, add raw=1
-      if (url.searchParams.has('dl')) url.searchParams.delete('dl');
-      url.searchParams.set('raw', '1');
-      return url.toString();
-    }
-
-    // Google Drive
-    // https://drive.google.com/file/d/<ID>/view → https://drive.google.com/uc?export=download&id=<ID>
-    if (url.hostname.includes('drive.google.com')) {
-      const m = url.pathname.match(/\/file\/d\/([^/]+)/);
-      if (m && m[1]) {
-        return `https://drive.google.com/uc?export=download&id=${m[1]}`;
-      }
-    }
-
-    return u;
-  } catch {
-    return u;
-  }
-}
-
-function extFromUrl(u) {
-  if (!u) return '';
-  try {
-    const url = new URL(u);
-    const p = url.pathname.toLowerCase();
-    const m = p.match(/\.([a-z0-9]+)$/);
-    return m ? m[1] : '';
-  } catch {
-    const m = String(u).toLowerCase().match(/\.([a-z0-9]+)(?:[\?#].*)?$/);
-    return m ? m[1] : '';
-  }
-}
-
-const IMG_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif']);
-const VID_EXTS = new Set(['mp4', 'webm', 'mov', 'm4v']);
 
 async function fetchJsonSafe(url, fallback) {
   try {
@@ -67,6 +28,7 @@ async function fetchJsonSafe(url, fallback) {
   } catch {}
   return fallback;
 }
+
 async function fetchFirstJson(urls, fallback) {
   for (const u of urls) {
     try {
@@ -78,206 +40,270 @@ async function fetchFirstJson(urls, fallback) {
   return fallback;
 }
 
-/* =========================================================
-   1) TYPE / FORM DEFINITIONS
-   ========================================================= */
-const TYPE_FIELDS = {
-  multiple_choice: [
-    { key:'question', label:'Question', type:'text' },
-    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
-  ],
-  short_answer: [
-    { key:'question', label:'Question', type:'text' },
-    { key:'answer', label:'Correct Answer', type:'text' },
-    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
-    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
-  ],
-  statement: [
-    { key:'text', label:'Statement Text', type:'multiline' },
-    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }, // preview below
-  ],
-  video: [
-    { key:'videoUrl', label:'Video URL (https)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-  ],
-  geofence_image: [
-    { key:'lat', label:'Latitude', type:'number' },
-    { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'imageUrl', label:'Image URL (https)', type:'text' },
-    { key:'overlayText', label:'Caption/Text', type:'text' },
-  ],
-  geofence_video: [
-    { key:'lat', label:'Latitude', type:'number' },
-    { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
-    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'videoUrl', label:'Video URL (https)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-  ],
-  ar_image: [
-    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
-    { key:'assetUrl',  label:'AR Overlay Image URL (png/jpg)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-  ],
-  ar_video: [
-    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
-    { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
-    { key:'overlayText', label:'Overlay Text (optional)', type:'text' },
-  ],
-};
+function normalizeMediaUrl(u) {
+  if (!u) return '';
+  let url = String(u).trim();
 
-const TYPE_OPTIONS = [
-  { value:'multiple_choice', label:'Multiple Choice' },
-  { value:'short_answer', label:'Question (Short Answer)' },
-  { value:'statement', label:'Statement' },
-  { value:'video', label:'Video' },
-  { value:'geofence_image', label:'Geo Fence Image' },
-  { value:'geofence_video', label:'Geo Fence Video' },
-  { value:'ar_image', label:'AR Image' },
-  { value:'ar_video', label:'AR Video' },
-];
+  // Dropbox share link → direct
+  // - https://www.dropbox.com/s/<id>/<name>?dl=0 → dl=1
+  // - https://www.dropbox.com/scl/fi/... → add ?dl=1
+  // - Optional: turn www.dropbox.com to dl.dropboxusercontent.com
+  try {
+    const link = new URL(url);
+    if (link.hostname.includes('dropbox.com')) {
+      // Prefer raw host for stable previewing
+      link.hostname = 'dl.dropboxusercontent.com';
+      // Remove explicit 'dl' param (raw host serves file directly)
+      link.searchParams.delete('dl');
+      url = link.toString();
+    }
+  } catch {
+    // if URL ctor fails, fall back to original
+  }
 
-const GAME_TYPES = [
+  return url;
+}
+
+function isImageUrl(u) {
+  if (!u) return false;
+  const lower = u.toLowerCase();
+  return /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
+}
+
+function isVideoUrl(u) {
+  if (!u) return false;
+  const lower = u.toLowerCase();
+  return /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
+}
+
+const H2H_TYPES = [
   'Race',
   'Chase',
   'Capture the Flag',
   'Seek and Destroy',
   'Survivor',
   'Mystery',
-  'Catch the Clone',
-  'Adventure',
-  'Thriller',
-  'IQ TEST',
-  'esXapeRide™',
+  'Catch the Clone'
 ];
 
+function allowedTypes(mode, allTypes) {
+  // Restrict the *Game Type* list when mode === head2head
+  if (mode === 'head2head') {
+    return allTypes.filter(t => H2H_TYPES.includes(t));
+  }
+  return allTypes;
+}
 
 /* =========================================================
-   2) ROOT COMPONENT
+   S1) TYPES / OPTIONS (form schema & dropdowns)
+   ---------------------------------------------------------
+   - TYPE_FIELDS drives the generic renderer
+   - Some types have custom UI:
+       * multiple_choice → MultipleChoiceEditor + optional geofence
+       * geofence_*      → always show map
+       * ar_*            → geofence toggle + map
+       * short/statement → optional geofence toggle
+   - NOTE: For MCQ, we do NOT declare "choices" here; handled by editor
    ========================================================= */
-export default function Admin(){
+
+const TYPE_FIELDS = {
+  multiple_choice: [
+    { key:'question', label:'Question', type:'text' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }
+  ],
+
+  short_answer: [
+    { key:'question', label:'Question', type:'text' },
+    { key:'answer', label:'Correct Answer', type:'text' },
+    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }
+  ],
+
+  statement: [
+    { key:'text', label:'Statement Text', type:'multiline' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' }
+  ],
+
+  video: [
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' }
+  ],
+
+  geofence_image: [
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'imageUrl', label:'Image URL (https)', type:'text' },
+    { key:'overlayText', label:'Caption/Text', type:'text' }
+  ],
+
+  geofence_video: [
+    { key:'lat', label:'Latitude', type:'number' },
+    { key:'lng', label:'Longitude', type:'number' },
+    { key:'radiusMeters', label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
+    { key:'videoUrl', label:'Video URL (https)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' }
+  ],
+
+  ar_image: [
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Overlay Image URL (png/jpg)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' }
+  ],
+
+  ar_video: [
+    { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
+    { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
+    { key:'overlayText', label:'Overlay Text (optional)', type:'text' }
+  ]
+};
+
+const TYPE_OPTIONS = [
+  { value:'multiple_choice', label:'Multiple Choice' },
+  { value:'short_answer',    label:'Question (Short Answer)' },
+  { value:'statement',       label:'Statement' },
+  { value:'video',           label:'Video' },
+  { value:'geofence_image',  label:'Geo Fence Image' },
+  { value:'geofence_video',  label:'Geo Fence Video' },
+  { value:'ar_image',        label:'AR Image' },
+  { value:'ar_video',        label:'AR Video' }
+];
+
+const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt','Capture the Flag','Seek and Destroy','Survivor','Catch the Clone'];
+
+/* =========================================================
+   S2) ROOT COMPONENT (ADMIN)
+   ========================================================= */
+export default function Admin() {
   const [tab, setTab] = useState('missions');
 
-  // Games
-  const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root game
+  // Games & modal
+  const [games, setGames]       = useState([]);
+  const [activeSlug, setActiveSlug] = useState(''); // '' = legacy single-game (root files)
   const [showNewGame, setShowNewGame] = useState(false);
-// S9 — New Game modal state
-const [newTitle, setNewTitle]         = useState('');
-const [newType,  setNewType]          = useState('Mystery');
-const [newMode,  setNewMode]          = useState('single');
-const [newDurationMin, setNewDurationMin] = useState(0);   // minutes (0 = infinite)
-const [newAlertMin,    setNewAlertMin]    = useState(10);  // minutes before end
 
+  // S9 — New Game modal state (includes duration + alert)
+  const [newTitle, setNewTitle]               = useState('');
+  const [newType,  setNewType]                = useState('Mystery');
+  const [newMode,  setNewMode]                = useState('single'); // single | head2head | multi
+  const [newDurationMin, setNewDurationMin]   = useState(0);        // minutes (0 = infinite)
+  const [newAlertMin,    setNewAlertMin]      = useState(10);       // minutes before end
 
-  // Data
-  const [suite, setSuite]   = useState(null);
-  const [config, setConfig] = useState(null);
+  // Core data
+  const [suite, setSuite]   = useState(null); // missions suite { id, version, flow, missions:[] }
+  const [config, setConfig] = useState(null); // config.json
   const [status, setStatus] = useState('');
 
   // Mission editing
-  const [selected, setSelected] = useState(null); // mission id in list
-  const [editing, setEditing]   = useState(null); // draft being edited
+  const [selected, setSelected] = useState(null); // mission id
+  const [editing, setEditing]   = useState(null); // draft mission object
   const [dirty, setDirty]       = useState(false);
 
-  // SMS rules
+  // SMS rules scratch
   const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
 
-  // Load list of games once
+  // Load games list once
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/games', { cache: 'no-store' });
+        const r = await fetch('/api/games');
         const j = await r.json();
         if (j.ok) setGames(j.games || []);
-      } catch {}
+      } catch (e) {
+        // ignore
+      }
     })();
   }, []);
 
-  // Slug-aware loader for missions/config
-  useEffect(()=>{
-    (async()=>{
-      try{
-        const mUrl = activeSlug
-          ? `/games/${activeSlug}/missions.json`
-          : `/missions.json`;
+  // Load missions & config when slug changes (or initial)
+  useEffect(() => {
+    (async () => {
+      try {
+        setStatus('');
+        const missionUrls = activeSlug
+          ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
+          : [`/missions.json`];
 
-        const cUrl = activeSlug
+        const configUrl = activeSlug
           ? `/api/config?slug=${encodeURIComponent(activeSlug)}`
           : `/api/config`;
 
-        // fetch with fallbacks
-        const m = await fetchJsonSafe(mUrl, { version:'0.0.0', missions: [] });
-        const c = await fetchJsonSafe(cUrl, defaultConfig());
+        const m = await fetchFirstJson(missionUrls, { id:'msuite_esx', version:'0.0.0', flow:{mode:'linear', start:'m01'}, missions:[] });
+        const c = await fetchJsonSafe(configUrl, defaultConfig());
 
+        // Normalize legacy quiz
         const normalized = {
           ...m,
-          missions: (m.missions||[]).map(x =>
-            x.type==='quiz'
-              ? ({...x, type:'multiple_choice', content:{
-                  question: x.content?.question||'',
-                  choices:  x.content?.choices || [],
-                  answer:   x.content?.answer   || ''
-                }})
+          missions: (m.missions || []).map(x =>
+            x.type === 'quiz'
+              ? ({
+                  ...x,
+                  type: 'multiple_choice',
+                  content: {
+                    question:   x.content?.question || '',
+                    choices:    x.content?.choices  || [],
+                    answer:     x.content?.answer   || '', // legacy free-text correct
+                    mediaUrl:   x.content?.mediaUrl || ''
+                  }
+                })
               : x
           )
         };
 
         setSuite(normalized);
         setConfig({ ...defaultConfig(), ...c });
-        setStatus('');
         setSelected(null);
         setEditing(null);
         setDirty(false);
-      } catch(e){
-        setStatus('Load failed: '+(e?.message||e));
+      } catch (e) {
+        setStatus('Load failed: ' + (e?.message || e));
       }
     })();
   }, [activeSlug]);
 
-// S6 — defaultConfig with duration + alert
-function defaultConfig(){
-  return {
-    splash: { enabled: true, mode:'single' },
-    game:   {
-      title: 'Untitled Game',
-      type:  'Mystery',
-      // NEW: duration in minutes (0 = infinite / count-up)
-      durationMinutes: 0,
-      // NEW: warn players when T-minus this many minutes
-      timerAlertMinutes: 10
-    },
-    forms:  { players: 1 },
-    textRules: [],
-    powerups: [] // [{ id, title, type:'smoke'|'clone', lat, lng, pickupRadius, durationSec, respawnSec, stock }]
-  };
-}
+  function defaultConfig() {
+    return {
+      splash: { enabled: true, mode:'single' },
+      game:   { title: 'Untitled Game', type: 'Mystery' },
+      timer:  { durationMinutes: 0, alertMinutesBeforeEnd: 10 }, // new global timer
+      forms:  { players: 1 },
+      textRules: []
+    };
+  }
 
-
-  function defaultContentForType(t){
-    switch(t){
-      case 'multiple_choice': return {question:'', choices:[], correctIndex: undefined, mediaUrl:''};
-      case 'short_answer':    return {question:'', answer:'', acceptable:'', mediaUrl:''};
-      case 'statement':       return {text:'', mediaUrl:''};
-      case 'video':           return {videoUrl:'', overlayText:''};
-      case 'geofence_image':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,imageUrl:'',overlayText:''};
-      case 'geofence_video':  return {lat:'',lng:'',radiusMeters:25,cooldownSeconds:30,videoUrl:'',overlayText:''};
-      case 'ar_image':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      case 'ar_video':        return {markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30};
-      default: return {};
+  function defaultContentForType(t) {
+    switch (t) {
+      case 'multiple_choice':
+        return { question:'', choices:[], correctIndex: undefined, mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+      case 'short_answer':
+        return { question:'', answer:'', acceptable:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+      case 'statement':
+        return { text:'', mediaUrl:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+      case 'video':
+        return { videoUrl:'', overlayText:'' };
+      case 'geofence_image':
+        return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
+      case 'geofence_video':
+        return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
+      case 'ar_image':
+        return { markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+      case 'ar_video':
+        return { markerUrl:'', assetUrl:'', overlayText:'', geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+      default:
+        return {};
     }
   }
 
   // Save to GitHub (slug-aware)
-  async function saveAll(){
+  async function saveAll() {
     if (!suite || !config) return;
     setStatus('Saving…');
     const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
-    const [a,b] = await Promise.all([
-      fetch('/api/save'+qs,        { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) }),
-      fetch('/api/save-config'+qs, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config }) }),
+    const [a, b] = await Promise.all([
+      fetch('/api/save' + qs,        { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ missions: suite }) }),
+      fetch('/api/save-config' + qs, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ config }) })
     ]);
     const ok = a.ok && b.ok;
     if (!ok) {
@@ -288,61 +314,95 @@ function defaultConfig(){
   }
 
   // Missions list helpers
-  function suggestId(){
+  function suggestId() {
     const base = 'm'; let i = 1;
-    const ids = new Set((suite?.missions||[]).map(m=>m.id));
-    while(ids.has(String(base + String(i).padStart(2,'0')))) i++;
-    return base + String(i).padStart(2,'0');
+    const ids = new Set((suite?.missions || []).map(m => m.id));
+    while (ids.has(String(base + String(i).padStart(2, '0')))) i++;
+    return base + String(i).padStart(2, '0');
   }
-  function startNew(){
-    const draft = { id: suggestId(), title:'New Mission', type:'multiple_choice', rewards:{points:25}, content: defaultContentForType('multiple_choice') };
+
+  function startNew() {
+    const draft = { id: suggestId(), title:'New Mission', type:'multiple_choice', rewards:{ points:25 }, content: defaultContentForType('multiple_choice') };
     setEditing(draft); setSelected(null); setDirty(true);
   }
-  function editExisting(m){ setEditing(JSON.parse(JSON.stringify(m))); setSelected(m.id); setDirty(false); }
-  function cancelEdit(){ setEditing(null); setSelected(null); setDirty(false); }
-  function bumpVersion(v){ const p = String(v||'0.0.0').split('.').map(n=>parseInt(n||'0',10)); while(p.length<3) p.push(0); p[2]+=1; return p.join('.'); }
-  function saveToList(){
+
+  function editExisting(m) {
+    setEditing(JSON.parse(JSON.stringify(m)));
+    setSelected(m.id);
+    setDirty(false);
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setSelected(null);
+    setDirty(false);
+  }
+
+  function bumpVersion(v) {
+    const p = String(v || '0.0.0').split('.').map(n => parseInt(n || '0', 10));
+    while (p.length < 3) p.push(0);
+    p[2] += 1;
+    return p.join('.');
+  }
+
+  function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // basic presence checks for non-number fields from schema
+    // presence checks (skip numbers & optional mediaUrl)
     const fields = TYPE_FIELDS[editing.type] || [];
-    for (const f of fields){
-      if (f.type==='number') continue;
+    for (const f of fields) {
+      if (f.type === 'number') continue;
       const v = editing.content?.[f.key];
-      if (v===undefined || v===null || (f.key!=='mediaUrl' && v==='')) return setStatus('❌ Missing: '+f.label);
+      if (v === undefined || v === null || (f.key !== 'mediaUrl' && v === '')) {
+        return setStatus('❌ Missing: ' + f.label);
+      }
     }
 
-    const missions = [...(suite.missions||[])];
-    const i = missions.findIndex(m=>m.id===editing.id);
-    if (i>=0) missions[i]=editing; else missions.push(editing);
-    setSuite({...suite, missions, version: bumpVersion(suite.version||'0.0.0')});
-    setSelected(editing.id); setEditing(null); setDirty(false);
+    const missions = [...(suite.missions || [])];
+    const i = missions.findIndex(m => m.id === editing.id);
+    if (i >= 0) missions[i] = editing; else missions.push(editing);
+
+    setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
+    setSelected(editing.id);
+    setEditing(null);
+    setDirty(false);
     setStatus('✅ List updated (remember Save All)');
   }
-  function removeMission(id){
+
+  function removeMission(id) {
     if (!suite) return;
-    setSuite({...suite, missions:(suite.missions||[]).filter(m=>m.id!==id)});
-    if (selected===id) { setSelected(null); setEditing(null); }
+    setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
+    if (selected === id) { setSelected(null); setEditing(null); }
   }
 
-  // SMS rules
-  function addSmsRule(){
+  // ----- SMS rules -----
+  function addSmsRule() {
     if (!smsRule.missionId || !smsRule.message) { setStatus('❌ Pick mission and message'); return; }
     const maxPlayers = config?.forms?.players || 1;
     if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules||[]), {...smsRule, delaySec: Number(smsRule.delaySec||0)}];
-    setConfig({...config, textRules: rules});
+    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
+    setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
     setStatus('✅ SMS rule added (remember Save All)');
   }
-  function removeSmsRule(idx){
-    const rules = [...(config?.textRules||[])];
-    rules.splice(idx,1);
-    setConfig({...config, textRules: rules});
+
+  function removeSmsRule(idx) {
+    const rules = [...(config?.textRules || [])];
+    rules.splice(idx, 1);
+    setConfig({ ...config, textRules: rules });
   }
 
-  if (!suite || !config) return (<main style={S.wrap}><div style={S.card}>Loading…</div></main>);
+  if (!suite || !config) {
+    return (
+      <main style={S.wrap}>
+        <div style={S.card}>Loading…</div>
+      </main>
+    );
+  }
+
+  // Derived list of game types (respect mode)
+  const typeChoices = allowedTypes(config.splash.mode, GAME_TYPES);
 
   /* =========================================================
      RENDER
@@ -352,12 +412,9 @@ function defaultConfig(){
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-           {['settings','missions','powerups','text','security'].map(t => (
-  <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>
-    {t.toUpperCase()}
-  </button>
-))}
-
+            {['settings','missions','text','security'].map(t => (
+              <button key={t} onClick={()=>setTab(t)} style={{...S.tab, ...(tab===t?S.tabActive:{})}}>{t.toUpperCase()}</button>
+            ))}
 
             {/* Game selector + New Game */}
             <div style={{display:'flex',alignItems:'center',gap:8, marginLeft:8}}>
@@ -377,33 +434,27 @@ function defaultConfig(){
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            <button onClick={startNew} style={{...S.button}}>＋ New Mission</button>
-            {/* S5 — Header toolbar: Save + links (slug-aware) */}
-<button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
-
-<a
-  href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
-  target="_blank"
-  rel="noreferrer"
-  style={{...S.button}}
->
-  View missions.json
-</a>
-
-<a
-  href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
-  target="_blank"
-  rel="noreferrer"
-  style={{...S.button}}
->
-  View config.json
-</a>
-
+            {/* Quick actions (right) */}
+            <button onClick={startNew} style={{...S.button, marginLeft:'auto'}}>+ New Mission</button>
+            <button onClick={saveAll} style={{...S.button}}>💾 Save All</button>
+            <a
+              href={activeSlug ? `/games/${activeSlug}/missions.json` : '/missions.json'}
+              target="_blank" rel="noreferrer" style={{...S.button}}
+            >
+              View missions.json
+            </a>
+            <a
+              href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/api/config'}
+              target="_blank" rel="noreferrer" style={{...S.button}}
+            >
+              View config.json
+            </a>
           </div>
           <div style={{color:'#9fb0bf',marginTop:6,whiteSpace:'pre-wrap'}}>{status}</div>
         </div>
       </header>
 
+      {/* ===== Missions ===== */}
       {tab==='missions' && (
         <main style={S.wrapGrid}>
           {/* LEFT: mission list */}
@@ -435,6 +486,7 @@ function defaultConfig(){
             {!editing ? (
               <div style={S.card}>
                 <p style={{marginTop:0,color:'#9fb0bf'}}>Select a mission or click <em>New Mission</em>.</p>
+                <button style={S.button} onClick={startNew}>+ New Mission</button>
                 <p style={{color:'#9fb0bf'}}>Version: <code>{suite.version||'0.0.0'}</code> • Total: <code>{suite.missions?.length||0}</code></p>
               </div>
             ) : (
@@ -448,7 +500,7 @@ function defaultConfig(){
                 </Field>
                 <hr style={S.hr}/>
 
-                {/* MULTIPLE CHOICE custom editor */}
+                {/* MULTIPLE CHOICE — custom editor */}
                 {editing.type==='multiple_choice' && (
                   <div style={{marginBottom:12}}>
                     <MultipleChoiceEditor
@@ -462,7 +514,51 @@ function defaultConfig(){
                   </div>
                 )}
 
-                {/* Geofence types map */}
+                {/* Optional geofence for MCQ / Short / Statement */}
+                {['multiple_choice','short_answer','statement'].includes(editing.type) && (
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
+                      <input
+                        type="checkbox"
+                        checked={!!editing.content?.geofenceEnabled}
+                        onChange={e=>{
+                          const on = e.target.checked;
+                          const next = {...editing.content, geofenceEnabled:on};
+                          if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.2650; }
+                          setEditing({...editing, content: next});
+                          setDirty(true);
+                        }}
+                      />
+                      Enable geofence for this mission
+                    </label>
+                    {editing.content?.geofenceEnabled && (
+                      <>
+                        <MapPicker
+                          lat={editing.content?.lat}
+                          lng={editing.content?.lng}
+                          radius={editing.content?.radiusMeters ?? 25}
+                          onChange={(lat,lng,rad)=>{
+                            setEditing({...editing, content:{...editing.content, lat, lng, radiusMeters: rad}});
+                            setDirty(true);
+                          }}
+                        />
+                        <Field label="Cooldown (sec)">
+                          <input
+                            type="number" min={0} max={3600} style={S.input}
+                            value={editing.content?.cooldownSeconds ?? 30}
+                            onChange={e=>{
+                              const v = Number(e.target.value||0);
+                              setEditing({...editing, content:{...editing.content, cooldownSeconds:v}});
+                              setDirty(true);
+                            }}
+                          />
+                        </Field>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Geofence types (always on map) */}
                 {(editing.type==='geofence_image' || editing.type==='geofence_video') && (
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Pick location & radius</div>
@@ -478,7 +574,7 @@ function defaultConfig(){
                   </div>
                 )}
 
-                {/* AR geofence toggle + map */}
+                {/* AR types — optional geofence */}
                 {(editing.type==='ar_image' || editing.type==='ar_video') && (
                   <div style={{marginBottom:12}}>
                     <label style={{display:'flex',gap:8,alignItems:'center',marginBottom:8}}>
@@ -522,46 +618,49 @@ function defaultConfig(){
                   </div>
                 )}
 
-                {/* GENERIC field renderer + media previews */}
-                {(TYPE_FIELDS[editing.type]||[]).map(f => (
-                  <Field key={f.key} label={f.label}>
-                    {f.type==='text' && (
-                      <>
+                {/* GENERIC schema fields + media previews */}
+                {(TYPE_FIELDS[editing.type]||[]).map(f => {
+                  const v = editing.content?.[f.key] ?? '';
+                  return (
+                    <Field key={f.key} label={f.label}>
+                      {f.type==='text' && (
+                        <>
+                          <input
+                            style={S.input}
+                            value={v}
+                            onChange={e=>{
+                              setEditing({...editing, content:{...editing.content,[f.key]:e.target.value}});
+                              setDirty(true);
+                            }}
+                          />
+                          {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) &&
+                            <MediaPreview url={editing.content?.[f.key]} kind={f.key} />}
+                        </>
+                      )}
+                      {f.type==='number' && (
                         <input
-                          style={S.input}
-                          value={editing.content?.[f.key]||''}
+                          type="number" min={f.min} max={f.max} style={S.input}
+                          value={v}
                           onChange={e=>{
-                            setEditing({...editing, content:{...editing.content,[f.key]:e.target.value}});
+                            const num = e.target.value==='' ? '' : Number(e.target.value);
+                            setEditing({...editing, content:{...editing.content,[f.key]:num}});
                             setDirty(true);
                           }}
                         />
-                        {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) &&
-                          <MediaPreview url={editing.content?.[f.key]} kind={f.key} />}
-                      </>
-                    )}
-                    {f.type==='number' && (
-                      <input
-                        type="number" min={f.min} max={f.max} style={S.input}
-                        value={editing.content?.[f.key]??''}
-                        onChange={e=>{
-                          const v = e.target.value===''? '': Number(e.target.value);
-                          setEditing({...editing, content:{...editing.content,[f.key]:v}});
-                          setDirty(true);
-                        }}
-                      />
-                    )}
-                    {f.type==='multiline' && (
-                      <textarea
-                        style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
-                        value={editing.content?.[f.key]||''}
-                        onChange={e=>{
-                          setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
-                          setDirty(true);
-                        }}
-                      />
-                    )}
-                  </Field>
-                ))}
+                      )}
+                      {f.type==='multiline' && (
+                        <textarea
+                          style={{...S.input, height:120, fontFamily:'ui-monospace, Menlo'}}
+                          value={v}
+                          onChange={e=>{
+                            setEditing({...editing, content:{...editing.content, [f.key]: e.target.value}});
+                            setDirty(true);
+                          }}
+                        />
+                      )}
+                    </Field>
+                  );
+                })}
 
                 <Field label="Points (Reward)">
                   <input
@@ -586,142 +685,101 @@ function defaultConfig(){
         </main>
       )}
 
-// S7 — SETTINGS TAB (with duration + alert)
-{tab==='settings' && (
-  <main style={S.wrap}>
-    <div style={S.card}>
-      <h3 style={{marginTop:0}}>Game Settings</h3>
+      {/* ===== Settings ===== */}
+      {tab==='settings' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{marginTop:0}}>Game Settings</h3>
 
-      <Field label="Game Title">
-        <input
-          style={S.input}
-          value={config.game.title}
-          onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})}
-        />
-      </Field>
-
-      <Field label="Game Type">
-        <select
-          style={S.input}
-          value={config.game.type}
-          onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}
-        >
-          {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
-        </select>
-      </Field>
-
-      <Field label="Stripe Splash Page">
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <label style={{display:'flex',gap:8,alignItems:'center'}}>
-            <input
-              type="checkbox"
-              checked={config.splash.enabled}
-              onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})}
-            />
-            Enable Splash (game code & Stripe)
-          </label>
-        </div>
-      </Field>
-
-      <Field label="Mode (affects how many players to collect on splash)">
-        <select
-          style={S.input}
-          value={config.splash.mode}
-          onChange={e=>{
-            const mode = e.target.value;
-            const players = mode==='head2head' ? 2 : mode==='multi' ? 4 : 1;
-            setConfig({...config, splash:{...config.splash, mode}, forms:{...config.forms, players}});
-          }}
-        >
-          <option value="single">Single Player</option>
-          <option value="head2head">Head to Head (2)</option>
-          <option value="multi">Multiple (4)</option>
-        </select>
-      </Field>
-      <div style={{color:'#9fb0bf', marginTop:-6, marginBottom:10}}>
-        Splash should render {config.forms.players} player info blocks (first name, email, phone).
-      </div>
-
-      {/* NEW: Duration + Alert */}
-      {(() => {
-        const dm = Number(config.game.durationMinutes || 0);
-        const h  = Math.floor(dm / 60);
-        const m  = dm % 60;
-        return (
-          <>
-            <Field label="Game Duration">
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, alignItems:'center'}}>
-                <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                  <input
-                    type="number"
-                    min={0}
-                    style={S.input}
-                    value={h}
-                    onChange={e=>{
-                      const nh = Math.max(0, Number(e.target.value||0));
-                      const nm = nh*60 + m;
-                      setConfig({...config, game:{...config.game, durationMinutes: nm}});
-                    }}
-                    placeholder="Hours"
-                  />
-                  <span style={{color:'#9fb0bf'}}>hours</span>
-                </div>
-                <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                  <input
-                    type="number"
-                    min={0}
-                    max={59}
-                    style={S.input}
-                    value={m}
-                    onChange={e=>{
-                      let mm = Math.max(0, Math.min(59, Number(e.target.value||0)));
-                      const nm = h*60 + mm;
-                      setConfig({...config, game:{...config.game, durationMinutes: nm}});
-                    }}
-                    placeholder="Minutes"
-                  />
-                  <span style={{color:'#9fb0bf'}}>minutes</span>
-                </div>
-                <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end'}}>
-                  <button
-                    style={S.button}
-                    onClick={()=>{
-                      setConfig({...config, game:{...config.game, durationMinutes: 0}});
-                    }}
-                  >
-                    Set Infinite (0)
-                  </button>
-                </div>
-              </div>
-              <div style={{color:'#9fb0bf', marginTop:6}}>
-                <b>0</b> = Infinite (timer counts up). Any value &ge; 15 minutes will count down on the game screen.
-              </div>
-            </Field>
-
-            <Field label="Timer Alert (minutes before end)">
+            <Field label="Game Title">
               <input
-                type="number"
-                min={1}
-                max={120}
                 style={S.input}
-                value={config.game.timerAlertMinutes ?? 10}
-                onChange={e=>{
-                  const val = Math.max(1, Number(e.target.value||10));
-                  setConfig({...config, game:{...config.game, timerAlertMinutes: val}});
-                }}
+                value={config.game.title}
+                onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})}
               />
-              <div style={{color:'#9fb0bf', marginTop:6}}>
-                Players hear an alarm at T-minus this many minutes (only for countdown timers).
+            </Field>
+
+            <Field label="Game Type">
+              <select
+                style={S.input}
+                value={config.game.type}
+                onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}
+              >
+                {typeChoices.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </Field>
+
+            <Field label="Stripe Splash Page">
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <label style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <input
+                    type="checkbox"
+                    checked={config.splash.enabled}
+                    onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})}
+                  />
+                  Enable Splash (game code & Stripe)
+                </label>
               </div>
             </Field>
-          </>
-        );
-      })()}
-    </div>
-  </main>
-)}
 
-       
+            <Field label="Mode (affects players collected on splash)">
+              <select
+                style={S.input}
+                value={config.splash.mode}
+                onChange={e=>{
+                  const mode = e.target.value;
+                  const players = mode==='head2head' ? 2 : mode==='multi' ? 4 : 1;
+                  // If current type not allowed under head2head, switch to first allowed
+                  const nextTypeList = allowedTypes(mode, GAME_TYPES);
+                  const nextType = nextTypeList.includes(config.game.type) ? config.game.type : nextTypeList[0];
+                  setConfig({
+                    ...config,
+                    game:{...config.game, type: nextType},
+                    splash:{...config.splash, mode},
+                    forms:{...config.forms, players}
+                  });
+                }}
+              >
+                <option value="single">Single Player</option>
+                <option value="head2head">Head to Head (2)</option>
+                <option value="multi">Multiple (4)</option>
+              </select>
+            </Field>
+
+            <Field label="Game Timer">
+              <div style={{display:'grid',gap:8, gridTemplateColumns:'1fr 1fr'}}>
+                <div>
+                  <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Duration (minutes, 0 = infinite)</div>
+                  <input
+                    type="number" min={0} style={S.input}
+                    value={config.timer?.durationMinutes ?? 0}
+                    onChange={e=>{
+                      const v = Math.max(0, Number(e.target.value||0));
+                      setConfig({...config, timer:{...config.timer, durationMinutes:v}});
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Alert before end (minutes)</div>
+                  <input
+                    type="number" min={0} style={S.input}
+                    value={config.timer?.alertMinutesBeforeEnd ?? 10}
+                    onChange={e=>{
+                      const v = Math.max(0, Number(e.target.value||0));
+                      setConfig({...config, timer:{...config.timer, alertMinutesBeforeEnd:v}});
+                    }}
+                  />
+                </div>
+              </div>
+              <div style={{color:'#9fb0bf',marginTop:6,fontSize:12}}>
+                In the game client: 0 = count up; otherwise count down, chime at alert mark, “TIME IS UP! GAME OVER. TRY AGAIN” at 0.
+              </div>
+            </Field>
+          </div>
+        </main>
+      )}
+
+      {/* ===== Text Rules ===== */}
       {tab==='text' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -759,128 +817,122 @@ function defaultConfig(){
           </div>
         </main>
       )}
-{tab==='powerups' && (
-  <main style={S.wrap}>
-    <div style={S.card}>
-      <h3 style={{marginTop:0}}>Power-Ups</h3>
-      <p style={{color:'#9fb0bf', marginTop: -8}}>
-        Place Smoke Bombs or Clones on the map. Players can pick them up when they
-        enter the pickup radius.
-      </p>
 
-      <PowerUpsEditor
-        config={config}
-        setConfig={setConfig}
-      />
-    </div>
-  </main>
-)}
-
-     // S8 — NEW GAME MODAL with duration + alert
-{showNewGame && (
-  <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000}}>
-    <div style={{...S.card, width:460}}>
-      <h3 style={{marginTop:0}}>Create New Game</h3>
-
-      <Field label="Game Title">
-        <input style={S.input} value={newTitle} onChange={e=>setNewTitle(e.target.value)} />
-      </Field>
-
-      <Field label="Game Type">
-        <select style={S.input} value={newType} onChange={e=>setNewType(e.target.value)}>
-          {GAME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </Field>
-
-      <Field label="Mode">
-        <select style={S.input} value={newMode} onChange={e=>setNewMode(e.target.value)}>
-          <option value="single">Single Player</option>
-          <option value="head2head">Head to Head (2)</option>
-          <option value="multi">Multiple (4)</option>
-        </select>
-      </Field>
-
-      <Field label="Game Duration">
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
-          <div>
-            <label style={{fontSize:12,color:'#9fb0bf'}}>Minutes (0 = infinite)</label>
-            <input
-              type="number"
-              min={0}
-              style={S.input}
-              value={newDurationMin}
-              onChange={e=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}
-            />
+      {/* ===== Security ===== */}
+      {tab==='security' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{marginTop:0}}>Admin Credentials</h3>
+            <p style={{color:'#9fb0bf'}}>Change the Basic Auth login used for this admin. Requires current password.</p>
+            <ChangeAuth />
+            <hr style={S.hr}/>
+            <h3>Twilio Credentials</h3>
+            <p style={{color:'#ffd166'}}>Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.</p>
+            <ul>
+              <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
+              <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
+            </ul>
           </div>
-          <div>
-            <label style={{fontSize:12,color:'#9fb0bf'}}>Alert at T-minus (min)</label>
-            <input
-              type="number"
-              min={1}
-              max={120}
-              style={S.input}
-              value={newAlertMin}
-              onChange={e=>setNewAlertMin(Math.max(1, Number(e.target.value||10)))}
-            />
+        </main>
+      )}
+
+      {/* ===== New Game modal ===== */}
+      {showNewGame && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000}}>
+          <div style={{...S.card, width:460}}>
+            <h3 style={{marginTop:0}}>Create New Game</h3>
+
+            <Field label="Game Title">
+              <input style={S.input} value={newTitle} onChange={e=>setNewTitle(e.target.value)} />
+            </Field>
+
+            <Field label="Mode">
+              <select style={S.input} value={newMode} onChange={e=>{
+                const m = e.target.value;
+                setNewMode(m);
+                // If current newType not allowed, switch to first allowed
+                const list = allowedTypes(m, GAME_TYPES);
+                if (!list.includes(newType)) setNewType(list[0]);
+              }}>
+                <option value="single">Single Player</option>
+                <option value="head2head">Head to Head (2)</option>
+                <option value="multi">Multiple (4)</option>
+              </select>
+            </Field>
+
+            <Field label="Game Type">
+              <select style={S.input} value={newType} onChange={e=>setNewType(e.target.value)}>
+                {allowedTypes(newMode, GAME_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+
+            <Field label="Timer">
+              <div style={{display:'grid',gap:8, gridTemplateColumns:'1fr 1fr'}}>
+                <div>
+                  <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Duration (minutes, 0 = infinite)</div>
+                  <input type="number" min={0} style={S.input} value={newDurationMin} onChange={e=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
+                </div>
+                <div>
+                  <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>Alert before end (minutes)</div>
+                  <input type="number" min={0} style={S.input} value={newAlertMin} onChange={e=>setNewAlertMin(Math.max(0, Number(e.target.value||0)))} />
+                </div>
+              </div>
+            </Field>
+
+            <div style={{display:'flex',gap:8,marginTop:12}}>
+              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
+              <button
+                style={S.button}
+                onClick={async()=>{
+                  if (!newTitle.trim()) { setStatus('❌ Title required'); return; }
+                  const r = await fetch('/api/games', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                      title: newTitle.trim(),
+                      type:  newType,
+                      mode:  newMode,
+                      durationMinutes: newDurationMin,
+                      alertMinutesBeforeEnd: newAlertMin
+                    })
+                  });
+                  const j = await r.json();
+                  if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
+                  // refresh list & switch to new game
+                  const rr = await fetch('/api/games'); const jj = await rr.json();
+                  if (jj.ok) setGames(jj.games||[]);
+                  setActiveSlug(j.game?.slug || j.slug); // accept either shape
+                  setNewTitle(''); setShowNewGame(false);
+                }}
+              >Create</button>
+            </div>
           </div>
         </div>
-      </Field>
-
-      <div style={{display:'flex',gap:8,marginTop:12}}>
-        <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
-        <button
-          style={S.button}
-          onClick={async()=>{
-            if (!newTitle.trim()) return;
-            const body = {
-              title: newTitle.trim(),
-              type:  newType,
-              mode:  newMode,
-              durationMinutes: Number(newDurationMin||0),
-              timerAlertMinutes: Number(newAlertMin||10)
-            };
-            const r = await fetch('/api/games', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify(body)
-            });
-            const j = await r.json();
-            if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
-            // refresh list & switch to new game
-            const rr = await fetch('/api/games'); const jj = await rr.json();
-            if (jj.ok) setGames(jj.games||[]);
-            setActiveSlug(j.slug);
-            setNewTitle(''); setNewType('Mystery'); setNewMode('single');
-            setNewDurationMin(0); setNewAlertMin(10);
-            setShowNewGame(false);
-          }}
-        >Create</button>
-      </div>
+      )}
     </div>
-  </div>
-)}
+  );
+}
 
 /* =========================================================
-   SECTION 2 — SMALL UI HELPERS & WIDGETS
+   S3) SMALL UI HELPERS & WIDGETS
    ========================================================= */
 
-function Field({ label, children }) {
+function Field({label, children}) {
   return (
-    <div style={{ marginBottom: 12 }}>
-      {/*... rest of the function */}
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>
+      {children}
     </div>
   );
 }
 
 /** Multiple Choice Editor (A–E) with radio correct */
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
-  const [local, setLocal] = React.useState(Array.isArray(value) ? value.slice(0,5) : []);
-  const [correct, setCorrect] = React.useState(
-    Number.isInteger(correctIndex) ? correctIndex : undefined
-  );
+  const [local, setLocal]   = useState(Array.isArray(value) ? value.slice(0,5) : []);
+  const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
 
-  React.useEffect(()=>{ setLocal(Array.isArray(value) ? value.slice(0,5) : []); }, [value]);
-  React.useEffect(()=>{ setCorrect(Number.isInteger(correctIndex) ? correctIndex : undefined); }, [correctIndex]);
+  useEffect(()=>{ setLocal(Array.isArray(value) ? value.slice(0,5) : []); }, [value]);
+  useEffect(()=>{ setCorrect(Number.isInteger(correctIndex) ? correctIndex : undefined); }, [correctIndex]);
 
   function sync(nextChoices, nextCorrect){
     const trimmed = nextChoices.map(s => (s||'').trim()).filter(Boolean).slice(0,5);
@@ -920,23 +972,22 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   );
 }
 
-/** Shows <img> or <video> preview for a URL (best-effort) */
+/** Shows <img> or <video> preview for a URL (with Dropbox direct fix) */
 function MediaPreview({ url, kind }) {
   if (!url) return null;
-  const u = String(url).trim();
-  const lower = u.toLowerCase();
-  const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
-  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
+  const raw = normalizeMediaUrl(url);
+  const isVid = isVideoUrl(raw);
+  const isImg = isImageUrl(raw);
 
   return (
     <div style={{marginTop:8}}>
       <div style={{color:'#9fb0bf', fontSize:12, marginBottom:6}}>Preview ({kind})</div>
-      {isVideo ? (
-        <video src={u} controls style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b'}} />
-      ) : isImage ? (
-        <img src={u} alt="preview" style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b'}} />
+      {isVid ? (
+        <video src={raw} controls style={{width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b'}} />
+      ) : isImg ? (
+        <img src={raw} alt="preview" style={{width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b'}} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
+        <a href={raw} target="_blank" rel="noreferrer" style={{color:'#9fb0bf', textDecoration:'underline'}}>Open media</a>
       )}
     </div>
   );
@@ -944,19 +995,19 @@ function MediaPreview({ url, kind }) {
 
 /** Leaflet Map Picker (CDN) + Address search (Nominatim) + Use my location */
 function MapPicker({ lat, lng, radius, onChange }){
-  const divRef = React.useRef(null);
-  const mapRef = React.useRef(null);
-  const circleRef = React.useRef(null);
-  const markerRef = React.useRef(null);
-  const [ready, setReady] = React.useState(false);
-  const [r, setR] = React.useState(radius || 25);
-  const [q, setQ] = React.useState('');
-  const [results, setResults] = React.useState([]);
-  const [searching, setSearching] = React.useState(false);
+  const divRef = useRef(null);
+  const mapRef = useRef(null);
+  const circleRef = useRef(null);
+  const markerRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [r, setR] = useState(radius || 25);
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const defaultPos = [lat||44.9778, lng||-93.2650];
 
   // Load Leaflet (CSS+JS via CDN)
-  React.useEffect(()=>{
+  useEffect(()=>{
     if (window.L) { setReady(true); return; }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -969,7 +1020,7 @@ function MapPicker({ lat, lng, radius, onChange }){
     document.body.appendChild(s);
   },[]);
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     if (!ready || !divRef.current) return;
     const L = window.L;
     if (!mapRef.current) {
@@ -996,7 +1047,7 @@ function MapPicker({ lat, lng, radius, onChange }){
     }
   }, [ready]);
 
-  React.useEffect(()=>{
+  useEffect(()=>{
     if (circleRef.current && markerRef.current) {
       circleRef.current.setRadius(Number(r||25));
       const p = markerRef.current.getLatLng();
@@ -1066,15 +1117,17 @@ function MapPicker({ lat, lng, radius, onChange }){
 }
 
 function TestSMS(){
-  const [to, setTo] = React.useState('');
-  const [msg, setMsg] = React.useState('Test message from admin');
-  const [status, setStatus] = React.useState('');
+  const [to, setTo]   = useState('');
+  const [msg, setMsg] = useState('Test message from admin');
+  const [status, setStatus] = useState('');
+
   async function send(){
     setStatus('Sending…');
     const res = await fetch('/api/sms', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ to, body: msg })});
     const text = await res.text();
     setStatus(res.ok ? '✅ Sent' : '❌ '+text);
   }
+
   return (
     <div style={{marginTop:8}}>
       <div style={{display:'grid',gap:8,gridTemplateColumns:'1fr 2fr auto',alignItems:'center'}}>
@@ -1088,17 +1141,19 @@ function TestSMS(){
 }
 
 function ChangeAuth(){
-  const [curUser, setCurUser] = React.useState('');
-  const [curPass, setCurPass] = React.useState('');
-  const [newUser, setNewUser] = React.useState('');
-  const [newPass, setNewPass] = React.useState('');
-  const [status, setStatus] = React.useState('');
+  const [curUser, setCurUser] = useState('');
+  const [curPass, setCurPass] = useState('');
+  const [newUser, setNewUser] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [status, setStatus]   = useState('');
+
   async function submit(){
     setStatus('Updating…');
     const res = await fetch('/api/change-auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
     const t = await res.text();
     setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ '+t);
   }
+
   return (
     <div style={{display:'grid',gap:8,gridTemplateColumns:'1fr 1fr'}}>
       <div>
@@ -1118,7 +1173,7 @@ function ChangeAuth(){
 }
 
 /* =========================================================
-   4) STYLES
+   S4) STYLES
    ========================================================= */
 const S = {
   body:{background:'#0b0c10',color:'#e9eef2',minHeight:'100vh',fontFamily:'system-ui, Arial, sans-serif'},
