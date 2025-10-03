@@ -1,0 +1,4 @@
+html, body { height: 100%; }
+* { box-sizing: border-box; }
+.page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.mapShell { height: clamp(360px, 65vh, 720px); width: 100%; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
