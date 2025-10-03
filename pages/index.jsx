@@ -363,9 +363,27 @@ export default function Admin(){
             </div>
 
             <button onClick={startNew} style={{...S.button}}>＋ New Mission</button>
-            <button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
-            <a href={activeSlug?`/games/${activeSlug}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{...S.button}}>View missions.json</a>
-            <a href="/config.json" target="_blank" rel="noreferrer" style={{...S.button}}>View config.json</a>
+            {/* S5 — Header toolbar: Save + links (slug-aware) */}
+<button onClick={saveAll} style={{...S.button, marginLeft:'auto'}}>💾 Save All</button>
+
+<a
+  href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
+  target="_blank"
+  rel="noreferrer"
+  style={{...S.button}}
+>
+  View missions.json
+</a>
+
+<a
+  href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
+  target="_blank"
+  rel="noreferrer"
+  style={{...S.button}}
+>
+  View config.json
+</a>
+
           </div>
           <div style={{color:'#9fb0bf',marginTop:6,whiteSpace:'pre-wrap'}}>{status}</div>
         </div>
