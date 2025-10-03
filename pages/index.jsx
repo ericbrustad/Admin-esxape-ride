@@ -860,11 +860,11 @@ function defaultConfig(){
   </div>
 )}
 
-
 /* =========================================================
    3) SMALL UI HELPERS & WIDGETS
    ========================================================= */
 function Field({label, children}) {
+
   return (
     <div style={{marginBottom:12}}>
       <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>
