@@ -1,0 +1,56 @@
+{
+  "id": "msuite_esx",
+  "version": "0.6.23",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m01",
+      "title": "New Missiondd",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "dd",
+        "choices": [
+          "d",
+          "d",
+          "d"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "dd",
+        "choices": [
+          "d",
+          "d",
+          "d"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/4xb1u8k1g5e5g8nfqekvo/2020-04-29-07.00.51.png?rlkey=kpjx82n1b8jxsbes5zdv8ny8t&st=sknajmyt&dl=0",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    }
+  ]
+}
