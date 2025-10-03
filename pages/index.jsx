@@ -120,6 +120,8 @@ export default function Admin() {
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
   const [newMode, setNewMode] = useState('single');
+  const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
+  const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
 
   // data
   const [suite, setSuite] = useState(null);
@@ -188,7 +190,13 @@ export default function Admin() {
         };
 
         setSuite(normalized);
-        setConfig({ ...defaultConfig(), ...c, powerups: Array.isArray(c.powerups) ? c.powerups : [] });
+        setConfig({
+          ...defaultConfig(),
+          ...c,
+          powerups: Array.isArray(c.powerups) ? c.powerups : [],
+          // make sure timer exists even for old configs
+          timer: { ...(defaultConfig().timer), ...(c.timer || {}) },
+        });
         setSelected(null);
         setEditing(null);
         setDirty(false);
@@ -204,6 +212,7 @@ export default function Admin() {
       splash: { enabled: true, mode: 'single' },
       game: { title: 'Untitled Game', type: 'Mystery' },
       forms: { players: 1 },
+      timer: { durationMinutes: 0, alertMinutes: 10 }, // <— NEW
       textRules: [],
       powerups: [],
     };
@@ -714,7 +723,41 @@ export default function Admin() {
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
-            <div style={{ color: '#9fb0bf' }}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
+
+            {/* NEW — Timer settings */}
+            <hr style={S.hr} />
+            <h4>Game Timer</h4>
+            <Field label="Duration (minutes — 0 = infinite; count UP)">
+              <input
+                type="number"
+                min={0}
+                max={24 * 60}
+                style={S.input}
+                value={config.timer?.durationMinutes ?? 0}
+                onChange={(e) => {
+                  const v = Math.max(0, Number(e.target.value || 0));
+                  setConfig({ ...config, timer: { ...(config.timer || {}), durationMinutes: v } });
+                }}
+              />
+            </Field>
+            <Field label="Alert before end (minutes — chime + warning)">
+              <input
+                type="number"
+                min={1}
+                max={120}
+                style={S.input}
+                value={config.timer?.alertMinutes ?? 10}
+                onChange={(e) => {
+                  const v = Math.max(1, Number(e.target.value || 1));
+                  setConfig({ ...config, timer: { ...(config.timer || {}), alertMinutes: v } });
+                }}
+              />
+            </Field>
+            <div style={{ color: '#9fb0bf' }}>
+              The game client should show the clock at the top-right above the objective.
+              If duration is 0 it counts up; otherwise it counts down, plays an alarm when{' '}
+              {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN”</b> at 0.
+            </div>
           </div>
 
           {/* Security moved here */}
@@ -869,6 +912,15 @@ export default function Admin() {
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
+
+            {/* NEW — Timer defaults for a fresh game */}
+            <Field label="Duration (minutes — 0 = infinite; count UP)">
+              <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin} onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
+            </Field>
+            <Field label="Alert before end (minutes)">
+              <input type="number" min={1} max={120} style={S.input} value={newAlertMin} onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))} />
+            </Field>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button style={S.button} onClick={() => setShowNewGame(false)}>Cancel</button>
               <button
@@ -878,7 +930,12 @@ export default function Admin() {
                   const r = await fetch('/api/games', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle.trim(), type: newType, mode: newMode }),
+                    body: JSON.stringify({
+                      title: newTitle.trim(),
+                      type: newType,
+                      mode: newMode,
+                      timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin }, // server may ignore; admin will still have defaults via merge
+                    }),
                   });
                   const j = await r.json();
                   if (!j.ok) { setStatus('❌ ' + (j.error || 'create failed')); return; }
