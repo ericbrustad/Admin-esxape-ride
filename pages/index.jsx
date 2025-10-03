@@ -127,8 +127,8 @@ export default function AdminPage() {
   return (
     <UndoProvider initialDraft={defaultGame()}>
       <div className="min-h-screen bg-white text-gray-900">
-        <RolesGate userEmail={userEmail} roles={{ ownerEmails: [userEmail] }} need="viewer" fallback={<div className="p-6 text-sm text-gray-600">Sign in to view admin.</div>}>
-          <TopBar userEmail={userEmail} />
+        <RolesGate userEmail={ericbrustad@gmail.com} roles={{ ownerEmails: [ericbrustad@gmail.com] }} need="viewer" fallback={<div className="p-6 text-sm text-gray-600">Sign in to view admin.</div>}>
+          <TopBar userEmail={ericbrustad@gmail.com} />
           <Tabs />
         </RolesGate>
       </div>
