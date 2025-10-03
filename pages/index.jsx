@@ -890,7 +890,7 @@ export default function Admin() {
                   </button>
                 </li>
               ))}
-       
+            
       {/* MAP */}
       {tab === 'map' && (
         <main style={S.wrap}>
@@ -903,11 +903,11 @@ export default function Admin() {
               </label>
             </div>
             <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
-            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power-ups for the selected game.</div>
+            <div style={{ color: '#9fb0bf', marginTop: 8 }}>This shows all geofenced missions and power-ups for the selected game.</div>
           </div>
         </main>
       )}
-     </ul>
+</ul>
           </div>
         </main>
       )}
@@ -1237,105 +1237,82 @@ const S = {
 };
 
 
-
 /* =====================================================================
-   MapOverview — Leaflet map overlaying all missions + power-ups (robust)
+   MapOverview — Leaflet map overlaying all missions + power-ups
    ===================================================================== */
 function MapOverview({ missions=[], powerups=[], showRings=true }) {
   const divRef = React.useRef(null);
-  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
-
-  // helper: safely read lat/lng from various shapes
-  function getLL(src) {
-    if (!src) return null;
-    const c = src.content || src;
-    const lat = Number(c.lat ?? c.latitude ?? (c.center && c.center.lat));
-    const lng = Number(c.lng ?? c.longitude ?? (c.center && c.center.lng));
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    return [lat, lng];
-  }
+  const mapRef = React.useRef(null);
+  const layerRef = React.useRef(null);
+  const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (window.L) { setLeafletReady(true); return; }
-    // add CSS
+    if (window.L) { setReady(true); return; }
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(link);
-    // add JS
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
     s.async = true;
-    s.onload = () => setLeafletReady(true);
+    s.onload = () => setReady(true);
     document.body.appendChild(s);
   }, []);
 
   React.useEffect(() => {
-    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+    if (!ready || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
 
-    // create or get map instance
-    if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
+    if (!mapRef.current) {
+      mapRef.current = L.map(divRef.current, { center: [44.9778,-93.265], zoom: 12 });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map);
-      divRef.current._leaflet_map = map;
+        attribution: '&copy; OpenStreetMap',
+      }).addTo(mapRef.current);
     }
-    const map = divRef.current._leaflet_map;
-
-    // clear or create overlay layer
-    if (!map._overviewLayer) {
-      map._overviewLayer = L.layerGroup().addTo(map);
+    if (!layerRef.current) {
+      layerRef.current = L.layerGroup().addTo(mapRef.current);
     } else {
-      map._overviewLayer.clearLayers();
+      layerRef.current.clearLayers();
     }
-    const layer = map._overviewLayer;
+
     const bounds = L.latLngBounds([]);
 
-    const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
-    const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    // markers
+    const missionIcon = L.divIcon({ className: 'm-ic', html: '<div style="width:20px;height:20px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const powerIcon   = L.divIcon({ className: 'p-ic', html: '<div style="width:20px;height:20px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
 
     (missions||[]).forEach((m) => {
-      const pos = getLL(m);
-      const c = (m && m.content) || {};
-      const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
-      if (!pos || !isFence) return;
+      const c = m.content || {};
+      const lat = Number(c.lat); const lng = Number(c.lng);
+      if (!c.geofenceEnabled || !isFinite(lat) || !isFinite(lng)) return;
       const rad = Number(c.radiusMeters || 0);
-      const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
+      const pos = [lat, lng];
+      const mk = L.marker(pos, { icon: missionIcon }).addTo(layerRef.current);
       const title = m.title || m.id || 'Mission';
       const t = m.type || '';
       mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layerRef.current);
       bounds.extend(pos);
     });
 
     (powerups||[]).forEach((p) => {
-      const pos = getLL(p);
-      if (!pos) return;
-      const rad = Number(p.pickupRadius || p.radiusMeters || 0);
-      const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
+      const lat = Number(p.lat); const lng = Number(p.lng);
+      if (!isFinite(lat) || !isFinite(lng)) return;
+      const rad = Number(p.pickupRadius || 0);
+      const pos = [lat, lng];
+      const mk = L.marker(pos, { icon: powerIcon }).addTo(layerRef.current);
       const title = p.title || p.type || 'Power-up';
       mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layerRef.current);
       bounds.extend(pos);
     });
 
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-  }, [leafletReady, missions, powerups, showRings]);
+    if (bounds.isValid()) {
+      mapRef.current.fitBounds(bounds.pad(0.2));
+    }
+  }, [ready, missions, powerups, showRings]);
 
-  return (
-    <div>
-      {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
-      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
-       ((powerups||[]).length === 0) && (
-        <div style={{ color: '#9fb0bf', marginTop: 8 }}>
-          No geofenced missions or power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power-ups with lat/lng.
-        </div>
-      )}
-    </div>
-  );
+  return <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c' }} />;
 }
