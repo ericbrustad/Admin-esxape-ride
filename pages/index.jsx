@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef } from 'react';
 
 /* =====================================================================
    0) HELPERS
@@ -931,6 +931,22 @@ export default function Admin() {
           </div>
         </main>
       )}
+
+{/* TEST */}
+      {tab === 'test' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>Test Game (Simulator)</h3>
+              <div style={{ display:'flex', gap:8 }}>
+                <button style={S.button} onClick={()=>testRef?.current?.start()}>Start</button>
+                <button style={S.button} onClick={()=>testRef?.current?.reset()}>Reset</button>
+              </div>
+            </div>
+            <GameTestbed ref={testRef} missions={(suite?.missions)||[]} config={(config)||{}} />
+          </div>
+        </main>
+      )}
 {/* New Game modal */}
       {showNewGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
@@ -1426,28 +1442,13 @@ function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onD
     </div>
   );
 }
-      {/* TEST */}
-      {tab === 'test' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h3 style={{ margin: 0 }}>Test Game (Simulator)</h3>
-              <div style={{ display:'flex', gap:8 }}>
-                <button style={S.button} onClick={()=>testRef?.current?.start()}>Start</button>
-                <button style={S.button} onClick={()=>testRef?.current?.reset()}>Reset</button>
-              </div>
-            </div>
-            <GameTestbed ref={testRef} missions={(suite?.missions)||[]} config={(config)||{}} />
-          </div>
-        </main>
-      )}
-
+      
 
 
 /* =====================================================================
    GameTestbed — lightweight simulator for missions + timer + scoring
    ===================================================================== */
-const GameTestbed = React.forwardRef(function GameTestbed({ missions = [], config = {} }, ref) {
+const GameTestbed = forwardRef(function GameTestbed({ missions = [], config = {} }, ref) {
   const [started, setStarted] = useState(false);
   const [idx, setIdx] = useState(0);
   const [score, setScore] = useState(0);
