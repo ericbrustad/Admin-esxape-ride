@@ -13,7 +13,7 @@ async function fetchJsonSafe(url) {
 export default function Game() {
   const router = useRouter();
   const slug = router.query.slug || '';
-  const channel = router.query.channel || 'published';
+  const channel = (router.query.channel || 'published').toString();
   const preview = !!router.query.preview;
 
   const [suite, setSuite] = useState(null);
@@ -21,7 +21,9 @@ export default function Game() {
 
   useEffect(() => {
     (async () => {
-      const base = slug ? `/games/${encodeURIComponent(slug)}` : '';
+      const base = slug
+        ? `/games/${encodeURIComponent(slug)}${channel === 'draft' ? '/draft' : ''}`
+        : '';
       const m = slug ? await fetchJsonSafe(`${base}/missions.json`) : await fetchJsonSafe('/missions.json');
       const c = slug ? await fetchJsonSafe(`${base}/config.json`)   : await fetchJsonSafe('/config.json');
       setSuite(m || { missions: [] });
