@@ -35,5 +35,6 @@
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }
-  }
+  },
+  "gameOrigin": "http://localhost:4000"
 }
