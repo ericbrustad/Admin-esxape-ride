@@ -5,12 +5,13 @@
   },
   "game": {
     "title": "bricks",
-    "type": "Mystery"
+    "type": "Thriller"
   },
   "forms": {
     "players": 1
   },
   "textRules": [],
+  "powerups": [],
   "theme": {
     "splash": {
       "fontFamily": "Georgia, serif",
