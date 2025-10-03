@@ -480,6 +480,7 @@ export default function Admin() {
                 setStatus('Reordered missions');
               }}
             />
+            </div>
           </aside>
 
           <section style={S.editor}>
