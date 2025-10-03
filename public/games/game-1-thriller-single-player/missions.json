@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.24",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -55,6 +55,42 @@
         "geofenceEnabled": false,
         "lat": "",
         "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m04",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "eee",
+        "choices": [],
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m05",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ee",
+        "choices": [],
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
         "radiusMeters": 25,
         "cooldownSeconds": 30
       }
