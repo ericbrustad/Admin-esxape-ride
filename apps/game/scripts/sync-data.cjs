@@ -9,11 +9,8 @@ function copyDir(src, dst) {
     const s = path.join(src, name);
     const d = path.join(dst, name);
     const st = fs.statSync(s);
-    if (st.isDirectory()) {
-      copyDir(s, d);
-    } else {
-      fs.copyFileSync(s, d);
-    }
+    if (st.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
   }
 }
 
