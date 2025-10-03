@@ -4,11 +4,15 @@
     "mode": "single"
   },
   "game": {
-    "title": "bricks",
-    "type": "Thriller"
+    "title": "CITY KITTY",
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
+  },
+  "timer": {
+    "durationMinutes": 30,
+    "alertMinutes": 10
   },
   "textRules": [],
   "powerups": [],
