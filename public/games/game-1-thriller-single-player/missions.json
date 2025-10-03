@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.32",
+  "version": "0.6.33",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -118,6 +118,30 @@
         "lat": 44.975849,
         "lng": -93.237662,
         "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m07",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ddd",
+        "choices": [
+          "d",
+          "d",
+          "s",
+          "s"
+        ],
+        "correctIndex": 3,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 255,
         "cooldownSeconds": 30
       }
     }
