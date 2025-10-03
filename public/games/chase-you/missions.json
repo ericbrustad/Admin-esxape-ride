@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.2",
   "missions": [
     {
       "id": "m01",
@@ -17,6 +17,24 @@
         ],
         "correctIndex": 0,
         "mediaUrl": "https://www.dropbox.com/scl/fi/e0vr3gnj9bwbv00f9fmcy/2023-08-05-16.42.47.png?rlkey=w7bqr8bzpbj2qcylp3f8vl3i1&st=yhlnj17b&dl=0"
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "ar_image",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "markerUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=lpllsynd&dl=0",
+        "assetUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=lpllsynd&dl=0",
+        "overlayText": "HELLO",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
       }
     }
   ]
