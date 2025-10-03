@@ -1,4 +1,3 @@
-// /pages/api/game/[slug].js
 export default async function handler(req, res) {
   const { slug } = req.query;
   const channel = (req.query.channel || 'published').toString(); // 'draft' | 'published'
