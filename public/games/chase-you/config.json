@@ -10,6 +10,10 @@
   "forms": {
     "players": 2
   },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
   "textRules": [],
   "powerups": [
     {
