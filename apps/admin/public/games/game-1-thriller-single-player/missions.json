@@ -1,0 +1,149 @@
+{
+  "id": "msuite_esx",
+  "version": "0.6.33",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m02",
+      "title": "welcome",
+      "type": "geofence_image",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "lat": 44.975485,
+        "lng": -93.287487,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30,
+        "imageUrl": "https://www.dropbox.com/scl/fi/g08lf6wyy2ta2j62xyens/2023-10-15-17.52.07.png?rlkey=axv5c4ka8je5gq1l1br48bz9b&st=3iuq8dmw&dl=0",
+        "overlayText": "the road"
+      }
+    },
+    {
+      "id": "m01",
+      "title": "you should know this",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "how many side on a square",
+        "choices": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "correctIndex": 3,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/icp7kmztx4nau5u87mzsr/2023-10-07-23.39.21.png?rlkey=yfwrn59jpu4d7l2wo7xvpg3we&st=of0hmea3&dl=0",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 630
+      }
+    },
+    {
+      "id": "m04",
+      "title": "find the suv",
+      "type": "statement",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "text": "look for this man",
+        "mediaUrl": "https://www.dropbox.com/scl/fi/gkr032zlq1liqmo66l8vr/2021-08-12-14.06.53.png?rlkey=0sfgpkz553ew4fr6xcrjspf95&st=4wzbuk1l&dl=0",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m03",
+      "title": "New Mission",
+      "type": "statement",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "text": "hrhh",
+        "mediaUrl": "https://www.dropbox.com/scl/fi/e0vr3gnj9bwbv00f9fmcy/2023-08-05-16.42.47.png?rlkey=w7bqr8bzpbj2qcylp3f8vl3i1&st=yhlnj17b&dl=0",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m05",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ee",
+        "choices": [],
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m06",
+      "title": "yes",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ffff",
+        "choices": [
+          "s",
+          "d",
+          "f"
+        ],
+        "correctIndex": 1,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/dmn1ks0mkugpbsx21hngg/2023-07-25-10.55.12.jpg?rlkey=hn66vswfatu6wgqu4bx31kgq6&st=59oltl8y&dl=0",
+        "geofenceEnabled": true,
+        "lat": 44.975849,
+        "lng": -93.237662,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m07",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ddd",
+        "choices": [
+          "d",
+          "d",
+          "s",
+          "s"
+        ],
+        "correctIndex": 3,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 255,
+        "cooldownSeconds": 30
+      }
+    }
+  ]
+}
