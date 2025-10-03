@@ -425,20 +425,21 @@ export default function Admin() {
               style={S.search}
             />
             <div>
-              <SortableMissionsList
-                items={(suite.missions || [])}
-                selectedId={selected || null}
-                onSelect={(id)=>{
-                  const m = (suite.missions||[]).find(x=>x.id===id);
-                  if (m) editExisting(m);
-                }}
-                onDelete={(id)=>{ if (confirm('Delete this mission?')) removeMission(id); }}
-                onReorder={(next)=>{
-                  setSuite({ ...(suite||{}), missions: next });
-                  setDirty(true);
-                  setStatus('Reordered missions');
-                }}
-              />
+              {(suite.missions || []).map((m) => (
+                <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
+                      <div style={{ fontWeight: 600 }}>{m.title || m.id}</div>
+                      <div style={{ color: '#9fb0bf', fontSize: 12 }}>
+                        {m.type} — id: {m.id}
+                      </div>
+                    </div>
+                    <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </aside>
 
@@ -760,19 +761,6 @@ export default function Admin() {
             </div>
           </div>
 
-          <div style={{ ...S.card, marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Display</h3>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={!!(config.display?.hideRadiusInGame)}
-                onChange={(e) => setConfig({ ...config, display: { ...(config.display || {}), hideRadiusInGame: e.target.checked } })}
-              />
-              Hide geofence radius in the game client
-            </label>
-            <div style={{ color: '#9fb0bf' }}>Players won’t see radius circles around missions or power-ups in-game. (Admin → MAP still shows rings.)</div>
-          </div>
-
           {/* Security moved here */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Security</h3>
@@ -835,7 +823,6 @@ export default function Admin() {
         </main>
       )}
 
-      
       {/* POWERUPS */}
       {tab === 'powerups' && (
         <main style={S.wrap}>
@@ -903,11 +890,7 @@ export default function Admin() {
                   </button>
                 </li>
               ))}
-            </ul>
-          </div>
-        </main>
-      )}
-
+       
       {/* MAP */}
       {tab === 'map' && (
         <main style={S.wrap}>
@@ -924,7 +907,12 @@ export default function Admin() {
           </div>
         </main>
       )}
-{/* New Game modal */}
+     </ul>
+          </div>
+        </main>
+      )}
+
+      {/* New Game modal */}
       {showNewGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
           <div style={{ ...S.card, width: 420 }}>
@@ -1250,70 +1238,12 @@ const S = {
 
 
 
-
-/* =====================================================================
-   SortableMissionsList — drag/drop + up/down reordering
-   ===================================================================== */
-function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onDelete }) {
-  const [dragId, setDragId] = React.useState(null);
-
-  const onDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', id); };
-  const onDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect='move'; };
-  const onDrop = (e, id) => {
-    e.preventDefault();
-    const from = dragId, to = id;
-    if (!from || !to || from === to) return;
-    const cur = items.slice();
-    const fromIdx = cur.findIndex(x => x.id === from);
-    const toIdx = cur.findIndex(x => x.id === to);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const [moved] = cur.splice(fromIdx, 1);
-    cur.splice(toIdx, 0, moved);
-    onReorder && onReorder(cur);
-  };
-  const move = (id, dir) => {
-    const cur = items.slice();
-    const i = cur.findIndex(x => x.id === id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= cur.length) return;
-    const [m] = cur.splice(i, 1);
-    cur.splice(j, 0, m);
-    onReorder && onReorder(cur);
-  };
-
-  return (
-    <div style={{ display: 'grid', gap: 8 }}>
-      {items.map((m) => (
-        <div
-          key={m.id}
-          draggable
-          onDragStart={(e) => onDragStart(e, m.id)}
-          onDragOver={onDragOver}
-          onDrop={(e) => onDrop(e, m.id)}
-          onClick={() => onSelect && onSelect(m.id)}
-          style={{ border: '1px solid #293744', borderRadius: 12, padding: 10, background: m.id === selectedId ? '#17212b' : '#0b1116', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', cursor: 'grab' }}
-        >
-          <div>
-            <div style={{ fontWeight: 600 }}>{m.title || 'Untitled'}</div>
-            <div style={{ fontSize: 12, color: '#9fb0bf' }}>{m.type} — id: {m.id}</div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
-            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, -1)}>↑</button>
-            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, +1)}>↓</button>
-            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'6px 10px' }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
-          </div>
-        </div>
-      ))}
-      {items.length === 0 && <div style={{ color:'#9fb0bf', fontSize: 14 }}>No missions yet.</div>}
-    </div>
-  );
-}
 /* =====================================================================
    MapOverview — Leaflet map overlaying all missions + power-ups (robust)
    ===================================================================== */
 function MapOverview({ missions=[], powerups=[], showRings=true }) {
-  const divRef = React.useRef(null);
-  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
+  const divRef = useRef(null);
+  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
 
   // helper: safely read lat/lng from various shapes
   function getLL(src) {
@@ -1325,7 +1255,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     return [lat, lng];
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setLeafletReady(true); return; }
     // add CSS
@@ -1341,7 +1271,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     document.body.appendChild(s);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
 
