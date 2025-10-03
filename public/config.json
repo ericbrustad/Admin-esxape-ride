@@ -4,14 +4,14 @@
     "mode": "single"
   },
   "game": {
-    "title": "CITY KITTY",
+    "title": "DEFAULT",
     "type": "Mystery"
   },
   "forms": {
     "players": 1
   },
   "timer": {
-    "durationMinutes": 30,
+    "durationMinutes": 0,
     "alertMinutes": 10
   },
   "textRules": [],
