@@ -861,14 +861,13 @@ function defaultConfig(){
 )}
 
 /* =========================================================
-   3) SMALL UI HELPERS & WIDGETS
+   SECTION 2 — SMALL UI HELPERS & WIDGETS
    ========================================================= */
 
-function Field({label, children}){
+function Field({ label, children }) {
   return (
-    <div style={{marginBottom:12}}>
-      <div style={{fontSize:12,color:'#9fb0bf',marginBottom:6}}>{label}</div>
-      {children}
+    <div style={{ marginBottom: 12 }}>
+      {/*... rest of the function */}
     </div>
   );
 }
