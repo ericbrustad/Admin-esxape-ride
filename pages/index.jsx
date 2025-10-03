@@ -389,55 +389,73 @@ export default function Admin() {
      S3) RENDER
      ========================================================= */
   return (
-    <div style={S.body}>
-      <header style={S.header}>
-        <div style={S.wrap}>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {['settings', 'missions', 'text', 'security', 'powerups'].map((t) => (
-              <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
-                {t.toUpperCase()}
-              </button>
-            ))}
+    <header style={S.header}>
+  <div style={S.wrap}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Tabs (SECURITY removed from this group) */}
+      {['settings', 'missions', 'text', 'powerups'].map((t) => (
+        <button
+          key={t}
+          onClick={() => setTab(t)}
+          style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}
+        >
+          {t.toUpperCase()}
+        </button>
+      ))}
 
-            {/* Game selector + New Game */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
-              <label style={{ color: '#9fb0bf', fontSize: 12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e) => setActiveSlug(e.target.value)} style={{ ...S.input, width: 280 }}>
-                <option value="">(legacy root)</option>
-                {games.map((g) => (
-                  <option key={g.slug} value={g.slug}>
-                    {g.title} — {g.slug} ({g.mode || 'single'})
-                  </option>
-                ))}
-              </select>
-              <button style={S.button} onClick={() => setShowNewGame(true)}>+ New Game</button>
-            </div>
+      {/* Game selector + New Game */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+        <label style={{ color: '#9fb0bf', fontSize: 12 }}>Game:</label>
+        <select
+          value={activeSlug}
+          onChange={(e) => setActiveSlug(e.target.value)}
+          style={{ ...S.input, width: 280 }}
+        >
+          <option value="">(legacy root)</option>
+          {games.map((g) => (
+            <option key={g.slug} value={g.slug}>
+              {g.title} — {g.slug} ({g.mode || 'single'})
+            </option>
+          ))}
+        </select>
+        <button style={S.button} onClick={() => setShowNewGame(true)}>+ New Game</button>
+      </div>
 
-            {/* Always-visible New Mission */}
-            <button onClick={startNew} style={{ ...S.button }}>+ New Mission</button>
+      {/* Always-visible New Mission */}
+      <button onClick={startNew} style={{ ...S.button }}>+ New Mission</button>
 
-            {/* Save + quick views (slug-aware config link) */}
-            <button onClick={saveAll} style={{ ...S.button, marginLeft: 'auto' }}>💾 Save All</button>
-            <a
-              href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...S.button }}
-            >
-              View missions.json
-            </a>
-            <a
-              href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...S.button }}
-            >
-              View config.json
-            </a>
-          </div>
-          <div style={{ color: '#9fb0bf', marginTop: 6, whiteSpace: 'pre-wrap' }}>{status}</div>
-        </div>
-      </header>
+      {/* Save + quick views (slug-aware) */}
+      <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
+      <a
+        href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...S.button }}
+      >
+        View missions.json
+      </a>
+      <a
+        href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
+        target="_blank"
+        rel="noreferrer"
+        style={{ ...S.button }}
+      >
+        View config.json
+      </a>
+
+      {/* SECURITY on the far right */}
+      <button
+        onClick={() => setTab('security')}
+        style={{ ...S.tab, ...(tab === 'security' ? S.tabActive : {}), marginLeft: 'auto' }}
+      >
+        SECURITY
+      </button>
+    </div>
+
+    <div style={{ color: '#9fb0bf', marginTop: 6, whiteSpace: 'pre-wrap' }}>{status}</div>
+  </div>
+</header>
+
 
       {tab === 'missions' && (
         <main style={S.wrapGrid}>
