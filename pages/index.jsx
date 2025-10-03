@@ -157,7 +157,7 @@ const GAME_TYPES = [
 /* =========================================================
    2) ROOT COMPONENT
    ========================================================= */
-export default function Admin(){
+export default function Admin();{
   const [tab, setTab] = useState('missions');
 
   // Games
