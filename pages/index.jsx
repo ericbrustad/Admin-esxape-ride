@@ -132,6 +132,127 @@ export default function Admin() {
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
   const [dirty, setDirty] = useState(false);
+  // --- Headless enhancements: autosave, undo, import/export ---
+  const AUTOSAVE_KEY = 'erix_admin_autosave_v1';
+  const UNDO_STACK_MAX = 30;
+  const undoRef = useRef([]);
+  const lastRef = useRef({ suite: null, config: null });
+  const saveTimer = useRef(null);
+  const impRef = useRef(null);
+  const [offerRestore, setOfferRestore] = useState(false);
+  const [restoreTS, setRestoreTS] = useState(null);
+
+  // Track changes and push to undo
+  useEffect(() => {
+    if (!suite || !config) return;
+    try {
+      const prev = lastRef.current;
+      const curr = { suite, config };
+      if (prev.suite === null && prev.config === null) {
+        lastRef.current = JSON.parse(JSON.stringify(curr));
+        return;
+      }
+      const prevStr = JSON.stringify(prev);
+      const currStr = JSON.stringify(curr);
+      if (prevStr !== currStr) {
+        undoRef.current.push(JSON.parse(prevStr));
+        if (undoRef.current.length > UNDO_STACK_MAX) undoRef.current.shift();
+        lastRef.current = JSON.parse(currStr);
+      }
+    } catch (_) {}
+  }, [suite, config]);
+
+  function undoOnce() {
+    const prev = undoRef.current.pop();
+    if (prev && prev.suite && prev.config) {
+      setSuite(prev.suite);
+      setConfig(prev.config);
+      setStatus('↩️ Undid last change');
+    } else {
+      setStatus('Nothing to undo');
+    }
+  }
+
+  // Autosave (debounced)
+  useEffect(() => {
+    if (!suite || !config) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ ts: Date.now(), suite, config }));
+      } catch {}
+    }, 1000);
+    return () => clearTimeout(saveTimer.current);
+  }, [suite, config]);
+
+  // Offer restore if a draft exists
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AUTOSAVE_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d?.suite && d?.config) {
+        setOfferRestore(true);
+        setRestoreTS(d.ts || null);
+      }
+    } catch {}
+  }, []);
+
+  function restoreAutosave() {
+    try {
+      const d = JSON.parse(localStorage.getItem(AUTOSAVE_KEY));
+      if (d?.suite && d?.config) {
+        setSuite(d.suite);
+        setConfig(d.config);
+        setStatus('✅ Restored autosave');
+      }
+      setOfferRestore(false);
+    } catch {}
+  }
+  function discardAutosave() {
+    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+    setOfferRestore(false);
+  }
+
+  // Export entire state (missions+config) as one JSON
+  function exportJSON() {
+    if (!suite || !config) return;
+    const payload = { missions: suite, config };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const slug = activeSlug || 'root';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `game_export_${slug}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // Import either combined {missions,config} or a missions.json or config.json
+  async function onImportFile(e) {
+    const f = e.target.files?.[0]; if (!f) return;
+    try {
+      const text = await f.text();
+      const json = JSON.parse(text);
+      if (json && json.missions && json.config) {
+        setSuite(json.missions);
+        setConfig(json.config);
+        setStatus('✅ Imported missions + config');
+      } else if (json && json.missions) {
+        setSuite(json);
+        setStatus('✅ Imported missions');
+      } else if (json && (json.splash || json.game || json.timer)) {
+        setConfig(json);
+        setStatus('✅ Imported config');
+      } else {
+        setStatus('❌ Unrecognized JSON format');
+      }
+    } catch (e) {
+      setStatus('❌ Import failed: ' + (e?.message || e));
+    } finally {
+      if (impRef.current) impRef.current.value='';
+    }
+  }
+
 
   // text rules
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
@@ -244,6 +365,7 @@ export default function Admin() {
 
   async function saveAll() {
     if (!suite || !config) return;
+    if (!window.confirm('Save to repository and overwrite existing files?')) return;
     setStatus('Saving…');
     const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
     const [a, b] = await Promise.all([
@@ -355,7 +477,9 @@ export default function Admin() {
      ===================================================================== */
   return (
     <div style={S.body}>
-      <header style={S.header}>
+      
+<header style={S.header}>
+
         <div style={S.wrap}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {['settings', 'missions', 'text', 'powerups'].map((t) => (
@@ -386,6 +510,11 @@ export default function Admin() {
             </button>
 
             {/* Save + quick links */}
+            <button onClick={undoOnce} style={{ ...S.button }}>↩️ Undo</button>
+            <button onClick={exportJSON} style={{ ...S.button }}>Export</button>
+            <button onClick={() => impRef.current?.click()} style={{ ...S.button }}>Import</button>
+            <input ref={impRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={onImportFile} />
+
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <a
               href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
@@ -407,6 +536,18 @@ export default function Admin() {
           <div style={{ color: '#9fb0bf', marginTop: 6, whiteSpace: 'pre-wrap' }}>{status}</div>
         </div>
       </header>
+      {offerRestore && (
+        <div style={{ background: '#2b323b', border: '1px solid #39424e', borderRadius: 10, padding: 12, margin: '12px auto', maxWidth: 1100 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ color: '#e9eef2' }}>Autosave found{restoreTS ? ` from ${new Date(restoreTS).toLocaleString()}` : ''}. Restore it?</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={S.button} onClick={restoreAutosave}>Restore</button>
+              <button style={S.button} onClick={discardAutosave}>Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* MISSIONS */}
       {tab === 'missions' && (
