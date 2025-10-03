@@ -1,15 +1,51 @@
 {
-  "version": "0.0.1",
+  "id": "msuite_esx",
+  "version": "0.6.25",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
   "missions": [
     {
       "id": "m01",
-      "title": "Welcome",
-      "type": "statement",
+      "title": "New Mission",
+      "type": "short_answer",
       "rewards": {
-        "points": 10
+        "points": 25
       },
       "content": {
-        "text": "Welcome to TEST! Ready to play?"
+        "question": "hi",
+        "answer": "hello",
+        "acceptable": "yes",
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m02",
+      "title": "Intro",
+      "type": "statement",
+      "role": "intro",
+      "rewards": {
+        "points": 0
+      },
+      "content": {
+        "text": "Welcome to the game!",
+        "mediaUrl": "https://www.dropbox.com/scl/fi/mhbct82r87gbjkiwr5oix/2023-08-29-11.24.16.png?rlkey=19ekq4gkxsbrbzf2xmi7fb94l&st=l1eawcsz&dl=0",
+        "styleEnabled": true,
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 295,
+        "cooldownSeconds": 30,
+        "style": {
+          "fontFamily": "ff",
+          "fontSize": 33
+        }
       }
     }
   ]
