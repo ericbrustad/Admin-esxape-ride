@@ -434,6 +434,24 @@ export default function Admin() {
                   if (m) editExisting(m);
                 }}
                 onDelete={(id)=>{ if (confirm('Delete this mission?')) removeMission(id); }}
+                onDuplicate={(id)=>{
+                  const cur = (suite.missions||[]);
+                  const idx = cur.findIndex(x=>x.id===id);
+                  if (idx>=0) {
+                    const orig = cur[idx];
+                    const clone = JSON.parse(JSON.stringify(orig));
+                    const ids = new Set(cur.map(x=>x.id));
+                    const base = (orig.id || 'm') + '-copy';
+                    let cand = base; let n=2;
+                    while (ids.has(cand)) { cand = base + '-' + (n++); }
+                    clone.id = cand;
+                    clone.title = (orig.title || 'Untitled') + ' (copy)';
+                    const next = cur.slice(); next.splice(idx+1, 0, clone);
+                    setSuite({ ...(suite||{}), missions: next });
+                    setDirty(true);
+                    setStatus('✅ Duplicated mission');
+                  }
+                }}
                 onReorder={(next)=>{
                   setSuite({ ...(suite||{}), missions: next });
                   setDirty(true);
@@ -1371,6 +1389,7 @@ function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onD
     onReorder && onReorder(cur);
   };
 
+  
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {items.map((m) => (
@@ -1381,16 +1400,24 @@ function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onD
           onDragOver={onDragOver}
           onDrop={(e) => onDrop(e, m.id)}
           onClick={() => onSelect && onSelect(m.id)}
-          style={{ border: '1px solid #293744', borderRadius: 12, padding: 10, background: m.id === selectedId ? '#17212b' : '#0b1116', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', cursor: 'grab' }}
+          style={{ border: '1px solid #293744', borderRadius: 12, padding: 10, background: m.id === selectedId ? '#17212b' : '#0b1116', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', cursor: 'grab' }}
         >
-          <div>
+          {/* Left: Delete */}
+          <div onClick={(e)=>e.stopPropagation()}>
+            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'6px 10px' }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
+          </div>
+
+          {/* Middle: Text */}
+          <div style={{ paddingLeft: 8 }}>
             <div style={{ fontWeight: 600 }}>{m.title || 'Untitled'}</div>
             <div style={{ fontSize: 12, color: '#9fb0bf' }}>{m.type} — id: {m.id}</div>
           </div>
+
+          {/* Right: Up/Down + Duplicate */}
           <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
             <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, -1)}>↑</button>
             <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, +1)}>↓</button>
-            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'6px 10px' }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => onDuplicate && onDuplicate(m.id)}>Duplicate</button>
           </div>
         </div>
       ))}
