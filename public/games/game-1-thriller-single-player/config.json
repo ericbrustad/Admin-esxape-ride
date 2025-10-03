@@ -11,6 +11,19 @@
     "players": 1
   },
   "textRules": [],
+  "powerups": [
+    {
+      "id": "p01",
+      "title": "smoke",
+      "type": "smoke",
+      "lat": 44.9778,
+      "lng": -93.265,
+      "pickupRadius": 960,
+      "durationSec": 60,
+      "respawnSec": 300,
+      "stock": 1
+    }
+  ],
   "theme": {
     "splash": {
       "fontFamily": "Georgia, serif",
