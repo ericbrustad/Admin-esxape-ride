@@ -123,7 +123,7 @@ export default function Admin() {
   const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
   const [showRings, setShowRings] = useState(true);
-  const [testChannel, setTestChannel] = useState('draft');
+  const [testChannel, setTestChannel] = useState('published');
   const gameBase = (typeof window !== 'undefined'
     ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
     : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
@@ -228,13 +228,13 @@ export default function Admin() {
     const baseGeo = { geofenceEnabled: false, lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30 };
     switch (t) {
       case 'multiple_choice':
-        return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
+        return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', styleEnabled: false, ...baseGeo };
       case 'short_answer':
-        return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
+        return { question: '', answer: '', acceptable: '', mediaUrl: '', styleEnabled: false, ...baseGeo };
       case 'statement':
-        return { text: '', mediaUrl: '', ...baseGeo };
+        return { text: '', mediaUrl: '', styleEnabled: false, ...baseGeo };
       case 'video':
-        return { videoUrl: '', overlayText: '', ...baseGeo };
+        return { videoUrl: '', overlayText: '', styleEnabled: false, ...baseGeo };
       case 'geofence_image':
         return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
       case 'geofence_video':
@@ -308,6 +308,20 @@ export default function Admin() {
     setSelected(null);
     setDirty(true);
   }
+
+function startNewRole(role) {
+  const t = 'statement';
+  const draft = {
+    id: suggestId(),
+    title: role === 'intro' ? 'Intro' : 'Finale',
+    type: t,
+    role, // 'intro' | 'final'
+    rewards: { points: 0 },
+    content: { ...defaultContentForType(t), text: role === 'intro' ? 'Welcome to the game!' : 'Congratulations!', styleEnabled: false }
+  };
+  setEditing(draft);
+}
+
   function editExisting(m) {
     setEditing(JSON.parse(JSON.stringify(m)));
     setSelected(m.id);
@@ -405,6 +419,13 @@ export default function Admin() {
             {/* Always show New Mission */}
             <button onClick={startNew} style={S.button}>
               + New Mission
+            </button>
+
+            <button onClick={() => startNewRole('intro')} style={{ ...S.button, background:'#0f1418' }}>
+              + Intro Mission
+            </button>
+            <button onClick={() => startNewRole('final')} style={{ ...S.button, background:'#0f1418' }}>
+              + Final Mission
             </button>
 
             {/* Save + quick links */}
@@ -686,6 +707,98 @@ export default function Admin() {
                     }}
                   />
                 </Field>
+
+{/* Appearance (per-mission) */}
+<div style={{ border:'1px solid #1f262d', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+  <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Appearance (optional)</div>
+  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom: 8 }}>
+    <input type="checkbox"
+      checked={!!editing.content?.styleEnabled}
+      onChange={(e) => {
+        const on = e.target.checked;
+        const base = editing.content?.style || {};
+        setEditing({ ...editing, content: { ...editing.content, styleEnabled: on, style: base } });
+        setDirty(true);
+      }}
+    />
+    Use custom appearance for this mission
+  </label>
+  {editing.content?.styleEnabled && (
+    <div style={{ display:'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
+      <Field label="Font Family">
+        <input
+          style={S.input}
+          placeholder="system-ui, Arial, sans-serif"
+          value={editing.content?.style?.fontFamily || ''}
+          onChange={(e) => {
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), fontFamily: e.target.value } } });
+            setDirty(true);
+          }}
+        />
+      </Field>
+      <Field label="Font Size (px)">
+        <input
+          type="number"
+          style={S.input}
+          value={Number(editing.content?.style?.fontSize ?? 18)}
+          onChange={(e) => {
+            const v = e.target.value === '' ? 0 : Number(e.target.value);
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), fontSize: v } } });
+            setDirty(true);
+          }}
+        />
+      </Field>
+      <Field label="Text Color (#hex)">
+        <input
+          style={S.input}
+          placeholder="#ffffff"
+          value={editing.content?.style?.textColor || ''}
+          onChange={(e) => {
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), textColor: e.target.value } } });
+            setDirty(true);
+          }}
+        />
+      </Field>
+      <Field label="Background Color (#hex)">
+        <input
+          style={S.input}
+          placeholder="#000000"
+          value={editing.content?.style?.backgroundColor || ''}
+          onChange={(e) => {
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), backgroundColor: e.target.value } } });
+            setDirty(true);
+          }}
+        />
+      </Field>
+      <Field label="Background Image URL">
+        <input
+          style={S.input}
+          placeholder="https://…"
+          value={editing.content?.style?.backgroundImageUrl || ''}
+          onChange={(e) => {
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), backgroundImageUrl: e.target.value } } });
+            setDirty(true);
+          }}
+        />
+      </Field>
+      <Field label="Background Size">
+        <select
+          style={S.input}
+          value={editing.content?.style?.backgroundSize || 'cover'}
+          onChange={(e) => {
+            setEditing({ ...editing, content: { ...editing.content, style: { ...(editing.content?.style||{}), backgroundSize: e.target.value } } });
+            setDirty(true);
+          }}
+        >
+          <option value="cover">cover</option>
+          <option value="contain">contain</option>
+          <option value="auto">auto</option>
+        </select>
+      </Field>
+    </div>
+  )}
+</div>
+
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button style={S.button} onClick={saveToList}>Add/Update in List</button>
