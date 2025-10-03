@@ -123,6 +123,7 @@ export default function Admin() {
   const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
   const [showRings, setShowRings] = useState(true);
+  const testRef = useRef(null);
 
   // data
   const [suite, setSuite] = useState(null);
@@ -359,7 +360,7 @@ export default function Admin() {
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {['settings', 'missions', 'text', 'powerups', 'map'].map((t) => (
+            {['settings', 'missions', 'text', 'powerups', 'map', 'test'].map((t) => (
               <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
                 {t.toUpperCase()}
               </button>
@@ -1404,7 +1405,7 @@ function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onD
         >
           {/* Left: Delete */}
           <div onClick={(e)=>e.stopPropagation()}>
-            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'6px 10px' }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
+            <button style={{ ...S.button, background:'#3a1f25', border:'1px solid #6b1e22', padding:'4px 8px', fontSize:12 }} onClick={() => onDelete && onDelete(m.id)}>Delete</button>
           </div>
 
           {/* Middle: Text */}
@@ -1425,3 +1426,178 @@ function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onD
     </div>
   );
 }
+      {/* TEST */}
+      {tab === 'test' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>Test Game (Simulator)</h3>
+              <div style={{ display:'flex', gap:8 }}>
+                <button style={S.button} onClick={()=>testRef?.current?.start()}>Start</button>
+                <button style={S.button} onClick={()=>testRef?.current?.reset()}>Reset</button>
+              </div>
+            </div>
+            <GameTestbed ref={testRef} missions={(suite?.missions)||[]} config={(config)||{}} />
+          </div>
+        </main>
+      )}
+
+
+
+/* =====================================================================
+   GameTestbed — lightweight simulator for missions + timer + scoring
+   ===================================================================== */
+const GameTestbed = React.forwardRef(function GameTestbed({ missions = [], config = {} }, ref) {
+  const [started, setStarted] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [elapsed, setElapsed] = useState(0); // seconds
+  const [status, setStatus] = useState('Idle');
+
+  const durationMin = Number(config?.timer?.durationMinutes || 0);
+  const alertMin = Number(config?.timer?.alertMinutes ?? 10);
+  const pointsPer = Number(config?.scoring?.pointsPerMission ?? 10);
+  const penalty = Number(config?.scoring?.penalty ?? 0);
+
+  const total = (missions || []).length;
+
+  // controls exposed to parent for header buttons
+  useEffect(() => {
+    if (!ref) return;
+    ref.current = {
+      start: () => { setStarted(true); setStatus('Running'); },
+      reset: () => { setStarted(false); setIdx(0); setScore(0); setElapsed(0); setStatus('Idle'); },
+    };
+  }, [ref]);
+
+  // tick timer
+  useEffect(() => {
+    if (!started) return;
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, [started]);
+
+  // auto-finish if duration set
+  const timeLimitSec = durationMin > 0 ? durationMin * 60 : null;
+  const timeLeft = timeLimitSec != null ? Math.max(0, timeLimitSec - elapsed) : null;
+  useEffect(() => {
+    if (timeLimitSec != null && elapsed >= timeLimitSec && started) {
+      setStarted(false);
+      setStatus('Time up');
+    }
+  }, [elapsed, timeLimitSec, started]);
+
+  const fmt = (sec) => {
+    const m = Math.floor(sec/60), s = sec % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  };
+
+  const cur = missions[idx] || null;
+  const complete = () => {
+    setScore((s)=> s + pointsPer);
+    next();
+  };
+  const fail = () => {
+    setScore((s)=> Math.max(0, s - penalty));
+    next();
+  };
+  const next = () => {
+    if (idx + 1 < total) {
+      setIdx(idx + 1);
+    } else {
+      setStarted(false);
+      setStatus('Finished');
+    }
+  };
+
+  const header = (
+    <div style={{ display:'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+      <div style={{ color:'#9fb0bf' }}>Status: <b>{status}</b> {started && timeLimitSec!=null && (timeLeft<=alertMin*60) && <span style={{ marginLeft: 8, color:'#f59e0b' }}>⚠ Alert</span>}</div>
+      <div style={{ fontWeight: 600 }}>Score: {score}</div>
+      <div style={{ fontVariantNumeric:'tabular-nums' }}>{timeLimitSec==null ? `Elapsed ${fmt(elapsed)}` : `Time ${fmt(timeLeft||0)}`}</div>
+    </div>
+  );
+
+  const renderMission = (m) => {
+    if (!m) return <div style={{ color:'#9fb0bf' }}>No mission.</div>;
+    const t = m.type || '';
+    const c = m.content || {};
+    const h4 = <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>{m.title || 'Untitled'}</div>;
+    const hint = c.hint || c.prompt || c.text || '';
+    if (t === 'multiple_choice') {
+      const choices = Array.isArray(c.choices) ? c.choices : [];
+      return (
+        <div>
+          {h4}
+          {hint && <div style={{ marginBottom: 8, color:'#9fb0bf' }}>{hint}</div>}
+          <div style={{ display:'grid', gap: 6, marginBottom: 8 }}>
+            {choices.map((ch, i) => (
+              <label key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <input type="radio" name={`mc_${m.id}`} />
+                {typeof ch === 'string' ? ch : (ch?.label ?? JSON.stringify(ch))}
+              </label>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button style={S.button} onClick={complete}>Submit</button>
+            <button style={S.button} onClick={fail}>Fail</button>
+          </div>
+        </div>
+      );
+    }
+    if (t === 'geofence_image' || t === 'geofence' || c.geofenceEnabled) {
+      return (
+        <div>
+          {h4}
+          {c.imageUrl && <img src={c.imageUrl} alt="" style={{ maxWidth:'100%', borderRadius: 8, marginBottom: 8 }} />}
+          <div style={{ color:'#9fb0bf', marginBottom: 8 }}>Simulate entering the mission geofence.</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button style={S.button} onClick={complete}>Simulate Enter (Complete)</button>
+            <button style={S.button} onClick={fail}>Fail</button>
+          </div>
+        </div>
+      );
+    }
+    // default/statement
+    return (
+      <div>
+        {h4}
+        {hint && <div style={{ marginBottom: 8, color:'#9fb0bf' }}>{hint}</div>}
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={S.button} onClick={complete}>Complete</button>
+          <button style={S.button} onClick={fail}>Fail</button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {header}
+      <div style={{ display:'grid', gridTemplateColumns:'320px 1fr', gap:12 }}>
+        <div style={{ border:'1px solid #22303c', borderRadius:12, padding:10, background:'#0b1116' }}>
+          <div style={{ fontWeight:600, marginBottom:6 }}>Missions</div>
+          <ol style={{ margin:0, paddingLeft:18 }}>
+            {(missions||[]).map((m, i) => (
+              <li key={m.id} style={{ marginBottom:4, color: i===idx ? '#e9eef2' : '#9fb0bf' }}>
+                <a href="#" onClick={(e)=>{ e.preventDefault(); setIdx(i); }} style={{ color: 'inherit' }}>
+                  {m.title || m.id || `Mission ${i+1}`}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div style={{ border:'1px solid #22303c', borderRadius:12, padding:12, background:'#0b1116' }}>
+          {renderMission(cur)}
+          <div style={{ marginTop:12, display:'flex', justifyContent:'space-between' }}>
+            <div>Mission {Math.min(idx+1, total)} / {total}</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button style={S.button} onClick={()=>setIdx(Math.max(0, idx-1))} disabled={idx<=0}>Prev</button>
+              <button style={S.button} onClick={()=>setIdx(Math.min(total-1, idx+1))} disabled={idx>=total-1}>Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
