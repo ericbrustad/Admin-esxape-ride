@@ -449,22 +449,37 @@ export default function Admin() {
               style={S.search}
             />
             <div>
-              {(suite.missions || []).map((m) => (
-                <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
-                      <div style={{ fontWeight: 600 }}>{m.title || m.id}</div>
-                      <div style={{ color: '#9fb0bf', fontSize: 12 }}>
-                        {m.type} — id: {m.id}
-                      </div>
-                    </div>
-                    <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+              {/* Sortable missions list */}
+            <SortableMissionsList
+              items={(suite.missions || [])}
+              selectedId={editing?.id || null}
+              onSelect={(id) => {
+                const m = (suite.missions || []).find((x) => x.id === id);
+                if (m) editExisting(m);
+              }}
+              onDelete={(id) => removeMission(id)}
+              onDuplicate={(id) => {
+                const cur = (suite.missions || []);
+                const idx = cur.findIndex((x) => x.id === id);
+                if (idx >= 0) {
+                  const orig = cur[idx];
+                  const clone = JSON.parse(JSON.stringify(orig));
+                  const ids = new Set(cur.map(x => x.id));
+                  const base = (orig.id || 'm') + '-copy';
+                  let cand = base; let n = 2;
+                  while (ids.has(cand)) { cand = base + '-' + (n++); }
+                  clone.id = cand;
+                  clone.title = (orig.title || 'Untitled') + ' (copy)';
+                  const next = cur.slice(); next.splice(idx + 1, 0, clone);
+                  setSuite({ ...suite, missions: next });
+                  setStatus('✅ Duplicated mission');
+                }
+              }}
+              onReorder={(next) => {
+                setSuite({ ...suite, missions: next });
+                setStatus('Reordered missions');
+              }}
+            />
           </aside>
 
           <section style={S.editor}>
@@ -1290,12 +1305,82 @@ const S = {
 
 
 
+
+/* =====================================================================
+   SortableMissionsList — delete (small, left) + up/down + duplicate
+   ===================================================================== */
+function SortableMissionsList({ items = [], selectedId, onSelect, onReorder, onDelete, onDuplicate }) {
+  const [dragId, setDragId] = useState(null);
+  const onDragStart = (e, id) => { setDragId(id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); };
+  const onDragOver  = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+  const onDrop = (e, id) => {
+    e.preventDefault();
+    const from = dragId, to = id;
+    if (!from || !to || from === to) return;
+    const cur = items.slice();
+    const fromIdx = cur.findIndex(x => x.id === from);
+    const toIdx   = cur.findIndex(x => x.id === to);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = cur.splice(fromIdx, 1);
+    cur.splice(toIdx, 0, moved);
+    onReorder && onReorder(cur);
+  };
+  const move = (id, dir) => {
+    const cur = items.slice();
+    const i = cur.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= cur.length) return;
+    const [m] = cur.splice(i, 1);
+    cur.splice(j, 0, m);
+    onReorder && onReorder(cur);
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {items.map((m) => (
+        <div
+          key={m.id}
+          draggable
+          onDragStart={(e) => onDragStart(e, m.id)}
+          onDragOver={onDragOver}
+          onDrop={(e) => onDrop(e, m.id)}
+          onClick={() => onSelect && onSelect(m.id)}
+          style={{ border: '1px solid #293744', borderRadius: 12, padding: 10, background: m.id === selectedId ? '#17212b' : '#0b1116', display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', cursor: 'grab' }}
+        >
+          {/* Left: Delete (small) */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <button
+              style={{ ...S.button, background: '#3a1f25', border: '1px solid #6b1e22', padding: '4px 8px', fontSize: 12 }}
+              onClick={() => onDelete && onDelete(m.id)}
+            >
+              Delete
+            </button>
+          </div>
+
+          {/* Middle: Text */}
+          <div style={{ paddingLeft: 8 }}>
+            <div style={{ fontWeight: 600 }}>{m.title || 'Untitled'}</div>
+            <div style={{ fontSize: 12, color: '#9fb0bf' }}>{m.type} — id: {m.id}</div>
+          </div>
+
+          {/* Right: Up/Down + Duplicate */}
+          <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, -1)}>↑</button>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => move(m.id, +1)}>↓</button>
+            <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => onDuplicate && onDuplicate(m.id)}>Duplicate</button>
+          </div>
+        </div>
+      ))}
+      {items.length === 0 && <div style={{ color: '#9fb0bf', fontSize: 14 }}>No missions yet.</div>}
+    </div>
+  );
+}
 /* =====================================================================
    MapOverview — Leaflet map overlaying all missions + power-ups (robust)
    ===================================================================== */
 function MapOverview({ missions=[], powerups=[], showRings=true }) {
-  const divRef = React.useRef(null);
-  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
+  const divRef = useRef(null);
+  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
 
   // helper: safely read lat/lng from various shapes
   function getLL(src) {
@@ -1307,7 +1392,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     return [lat, lng];
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setLeafletReady(true); return; }
     // add CSS
@@ -1323,7 +1408,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     document.body.appendChild(s);
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
 
