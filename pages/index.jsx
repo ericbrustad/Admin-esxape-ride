@@ -214,7 +214,8 @@ export default function Admin() {
       game: { title: 'Untitled Game', type: 'Mystery' },
       forms: { players: 1 },
       timer: { durationMinutes: 0, alertMinutes: 10 }, // <— NEW
-      textRules: [],
+       display: { hideRadiusInGame: false },   // ← add this line
+       textRules: [],
       powerups: [],
     };
   }
@@ -753,6 +754,26 @@ export default function Admin() {
                   setConfig({ ...config, timer: { ...(config.timer || {}), alertMinutes: v } });
                 }}
               />
+               <hr style={S.hr} />
+<h4>Display</h4>
+<label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+  <input
+    type="checkbox"
+    checked={!!(config.display?.hideRadiusInGame)}
+    onChange={(e) =>
+      setConfig({
+        ...config,
+        display: { ...(config.display || {}), hideRadiusInGame: e.target.checked },
+      })
+    }
+  />
+  Hide geofence radius in the game client
+</label>
+<div style={{ color: '#9fb0bf' }}>
+  Players won’t see radius circles around missions or power-ups in-game
+  (admin map still shows them).
+</div>
+
             </Field>
             <div style={{ color: '#9fb0bf' }}>
               The game client should show the clock at the top-right above the objective.
@@ -1235,6 +1256,7 @@ const S = {
   search: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2', marginBottom: 10 },
   hr: { border: '1px solid #1f262d', borderBottom: 'none' },
 };
+
 
 
 /* =====================================================================
