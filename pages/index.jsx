@@ -122,6 +122,7 @@ export default function Admin() {
   const [newMode, setNewMode] = useState('single');
   const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
+  const [showRings, setShowRings] = useState(true);
 
   // data
   const [suite, setSuite] = useState(null);
@@ -333,42 +334,7 @@ export default function Admin() {
   }
 
   // text rules
-  
-  async function deleteGame() {
-    if (!activeSlug) {
-      alert('Switch to a specific game first (use the Games list) to delete.');
-      return;
-    }
-    const confirmed = window.confirm(`Delete the game "${activeSlug}"? This removes its folder and updates games index.`);
-    if (!confirmed) return;
-    try {
-      setStatus('Deleting…');
-      const r = await fetch('/api/delete-game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: activeSlug }),
-      });
-      const j = await r.json().catch(()=>({}));
-      if (!r.ok || !j.ok) throw new Error(j?.error || await r.text());
-      // refresh list
-      try {
-        const res = await fetch('/api/games');
-        const g = await res.json();
-        if (g.ok) setGames(g.games || []);
-      } catch {}
-      // reset active to root and clear view
-      setActiveSlug('');
-      setSuite(null);
-      setConfig(null);
-      setSelected(null);
-      setEditing(null);
-      setDirty(false);
-      setStatus('✅ Game deleted');
-    } catch (e) {
-      setStatus('❌ Delete failed: ' + (e?.message || e));
-    }
-  }
-function addSmsRule() {
+  function addSmsRule() {
     if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
     const maxPlayers = config?.forms?.players || 1;
     if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
@@ -393,7 +359,7 @@ function addSmsRule() {
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {['settings', 'missions', 'text', 'powerups'].map((t) => (
+            {['settings', 'missions', 'text', 'powerups', 'map'].map((t) => (
               <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
                 {t.toUpperCase()}
               </button>
@@ -421,7 +387,6 @@ function addSmsRule() {
             </button>
 
             {/* Save + quick links */}
-            <button onClick={deleteGame} style={{ ...S.button, background:'#fee2e2', border:'1px solid #fecaca' }}>Delete Game</button>
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <a
               href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
@@ -925,7 +890,24 @@ function addSmsRule() {
                   </button>
                 </li>
               ))}
-            </ul>
+            
+      {/* MAP */}
+      {tab === 'map' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>Game Map</h3>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)} />
+                Show radius rings (admin only)
+              </label>
+            </div>
+            <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
+            <div style={{ color: '#9fb0bf', marginTop: 8 }}>This shows all geofenced missions and power-ups for the selected game.</div>
+          </div>
+        </main>
+      )}
+</ul>
           </div>
         </main>
       )}
@@ -1253,3 +1235,84 @@ const S = {
   search: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2', marginBottom: 10 },
   hr: { border: '1px solid #1f262d', borderBottom: 'none' },
 };
+
+
+/* =====================================================================
+   MapOverview — Leaflet map overlaying all missions + power-ups
+   ===================================================================== */
+function MapOverview({ missions=[], powerups=[], showRings=true }) {
+  const divRef = React.useRef(null);
+  const mapRef = React.useRef(null);
+  const layerRef = React.useRef(null);
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setReady(true); return; }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async = true;
+    s.onload = () => setReady(true);
+    document.body.appendChild(s);
+  }, []);
+
+  React.useEffect(() => {
+    if (!ready || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    if (!mapRef.current) {
+      mapRef.current = L.map(divRef.current, { center: [44.9778,-93.265], zoom: 12 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap',
+      }).addTo(mapRef.current);
+    }
+    if (!layerRef.current) {
+      layerRef.current = L.layerGroup().addTo(mapRef.current);
+    } else {
+      layerRef.current.clearLayers();
+    }
+
+    const bounds = L.latLngBounds([]);
+
+    // markers
+    const missionIcon = L.divIcon({ className: 'm-ic', html: '<div style="width:20px;height:20px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const powerIcon   = L.divIcon({ className: 'p-ic', html: '<div style="width:20px;height:20px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+
+    (missions||[]).forEach((m) => {
+      const c = m.content || {};
+      const lat = Number(c.lat); const lng = Number(c.lng);
+      if (!c.geofenceEnabled || !isFinite(lat) || !isFinite(lng)) return;
+      const rad = Number(c.radiusMeters || 0);
+      const pos = [lat, lng];
+      const mk = L.marker(pos, { icon: missionIcon }).addTo(layerRef.current);
+      const title = m.title || m.id || 'Mission';
+      const t = m.type || '';
+      mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layerRef.current);
+      bounds.extend(pos);
+    });
+
+    (powerups||[]).forEach((p) => {
+      const lat = Number(p.lat); const lng = Number(p.lng);
+      if (!isFinite(lat) || !isFinite(lng)) return;
+      const rad = Number(p.pickupRadius || 0);
+      const pos = [lat, lng];
+      const mk = L.marker(pos, { icon: powerIcon }).addTo(layerRef.current);
+      const title = p.title || p.type || 'Power-up';
+      mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layerRef.current);
+      bounds.extend(pos);
+    });
+
+    if (bounds.isValid()) {
+      mapRef.current.fitBounds(bounds.pad(0.2));
+    }
+  }, [ready, missions, powerups, showRings]);
+
+  return <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c' }} />;
+}
