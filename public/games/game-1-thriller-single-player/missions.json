@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.30",
+  "version": "0.6.31",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -39,7 +39,11 @@
           "5"
         ],
         "correctIndex": 3,
-        "mediaUrl": "https://www.dropbox.com/scl/fi/icp7kmztx4nau5u87mzsr/2023-10-07-23.39.21.png?rlkey=yfwrn59jpu4d7l2wo7xvpg3we&st=of0hmea3&dl=0"
+        "mediaUrl": "https://www.dropbox.com/scl/fi/icp7kmztx4nau5u87mzsr/2023-10-07-23.39.21.png?rlkey=yfwrn59jpu4d7l2wo7xvpg3we&st=of0hmea3&dl=0",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 630
       }
     },
     {
