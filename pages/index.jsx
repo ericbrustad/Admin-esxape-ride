@@ -146,7 +146,11 @@ const GAME_TYPES = [
   'Seek and Destroy',
   'Survivor',
   'Mystery',
-  'Catch the Clone'
+  'Catch the Clone',
+  'Adventure',
+  'Thriller',
+  'IQ TEST',
+  'esXapeRide™',
 ];
 
 
