@@ -164,9 +164,13 @@ export default function Admin(){
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState(''); // '' = legacy root game
   const [showNewGame, setShowNewGame] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newType,  setNewType]  = useState('Mystery');
-  const [newMode,  setNewMode]  = useState('single'); // single | head2head | multi
+// S9 — New Game modal state
+const [newTitle, setNewTitle]         = useState('');
+const [newType,  setNewType]          = useState('Mystery');
+const [newMode,  setNewMode]          = useState('single');
+const [newDurationMin, setNewDurationMin] = useState(0);   // minutes (0 = infinite)
+const [newAlertMin,    setNewAlertMin]    = useState(10);  // minutes before end
+
 
   // Data
   const [suite, setSuite]   = useState(null);
@@ -233,13 +237,20 @@ export default function Admin(){
     })();
   }, [activeSlug]);
 
- function defaultConfig(){
+// S6 — defaultConfig with duration + alert
+function defaultConfig(){
   return {
     splash: { enabled: true, mode:'single' },
-    game:   { title: 'Untitled Game', type: 'Mystery' },
+    game:   {
+      title: 'Untitled Game',
+      type:  'Mystery',
+      // NEW: duration in minutes (0 = infinite / count-up)
+      durationMinutes: 0,
+      // NEW: warn players when T-minus this many minutes
+      timerAlertMinutes: 10
+    },
     forms:  { players: 1 },
     textRules: [],
-    // NEW: power-ups saved per game; picked up later by the runtime
     powerups: [] // [{ id, title, type:'smoke'|'clone', lat, lng, pickupRadius, durationSec, respawnSec, stock }]
   };
 }
@@ -575,41 +586,140 @@ export default function Admin(){
         </main>
       )}
 
-      {tab==='settings' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{marginTop:0}}>Game Settings</h3>
-            <Field label="Game Title">
-              <input style={S.input} value={config.game.title} onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})} />
-            </Field>
-            <Field label="Game Type">
-              <select style={S.input} value={config.game.type} onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}>
-                {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </Field>
-            <Field label="Stripe Splash Page">
-              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                <label style={{display:'flex',gap:8,alignItems:'center'}}>
-                  <input type="checkbox" checked={config.splash.enabled} onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})} />
-                  Enable Splash (game code & Stripe)
-                </label>
+// S7 — SETTINGS TAB (with duration + alert)
+{tab==='settings' && (
+  <main style={S.wrap}>
+    <div style={S.card}>
+      <h3 style={{marginTop:0}}>Game Settings</h3>
+
+      <Field label="Game Title">
+        <input
+          style={S.input}
+          value={config.game.title}
+          onChange={e=>setConfig({...config, game:{...config.game, title:e.target.value}})}
+        />
+      </Field>
+
+      <Field label="Game Type">
+        <select
+          style={S.input}
+          value={config.game.type}
+          onChange={e=>setConfig({...config, game:{...config.game, type:e.target.value}})}
+        >
+          {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Stripe Splash Page">
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <label style={{display:'flex',gap:8,alignItems:'center'}}>
+            <input
+              type="checkbox"
+              checked={config.splash.enabled}
+              onChange={e=>setConfig({...config, splash:{...config.splash, enabled:e.target.checked}})}
+            />
+            Enable Splash (game code & Stripe)
+          </label>
+        </div>
+      </Field>
+
+      <Field label="Mode (affects how many players to collect on splash)">
+        <select
+          style={S.input}
+          value={config.splash.mode}
+          onChange={e=>{
+            const mode = e.target.value;
+            const players = mode==='head2head' ? 2 : mode==='multi' ? 4 : 1;
+            setConfig({...config, splash:{...config.splash, mode}, forms:{...config.forms, players}});
+          }}
+        >
+          <option value="single">Single Player</option>
+          <option value="head2head">Head to Head (2)</option>
+          <option value="multi">Multiple (4)</option>
+        </select>
+      </Field>
+      <div style={{color:'#9fb0bf', marginTop:-6, marginBottom:10}}>
+        Splash should render {config.forms.players} player info blocks (first name, email, phone).
+      </div>
+
+      {/* NEW: Duration + Alert */}
+      {(() => {
+        const dm = Number(config.game.durationMinutes || 0);
+        const h  = Math.floor(dm / 60);
+        const m  = dm % 60;
+        return (
+          <>
+            <Field label="Game Duration">
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, alignItems:'center'}}>
+                <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                  <input
+                    type="number"
+                    min={0}
+                    style={S.input}
+                    value={h}
+                    onChange={e=>{
+                      const nh = Math.max(0, Number(e.target.value||0));
+                      const nm = nh*60 + m;
+                      setConfig({...config, game:{...config.game, durationMinutes: nm}});
+                    }}
+                    placeholder="Hours"
+                  />
+                  <span style={{color:'#9fb0bf'}}>hours</span>
+                </div>
+                <div style={{display:'flex', gap:8, alignItems:'center'}}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    style={S.input}
+                    value={m}
+                    onChange={e=>{
+                      let mm = Math.max(0, Math.min(59, Number(e.target.value||0)));
+                      const nm = h*60 + mm;
+                      setConfig({...config, game:{...config.game, durationMinutes: nm}});
+                    }}
+                    placeholder="Minutes"
+                  />
+                  <span style={{color:'#9fb0bf'}}>minutes</span>
+                </div>
+                <div style={{display:'flex', alignItems:'center', justifyContent:'flex-end'}}>
+                  <button
+                    style={S.button}
+                    onClick={()=>{
+                      setConfig({...config, game:{...config.game, durationMinutes: 0}});
+                    }}
+                  >
+                    Set Infinite (0)
+                  </button>
+                </div>
+              </div>
+              <div style={{color:'#9fb0bf', marginTop:6}}>
+                <b>0</b> = Infinite (timer counts up). Any value &ge; 15 minutes will count down on the game screen.
               </div>
             </Field>
-            <Field label="Mode (affects how many players to collect on splash)">
-              <select style={S.input} value={config.splash.mode} onChange={e=>{
-                const mode = e.target.value;
-                const players = mode==='head2head' ? 2 : mode==='multi' ? 4 : 1;
-                setConfig({...config, splash:{...config.splash, mode}, forms:{...config.forms, players}});
-              }}>
-                <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
-                <option value="multi">Multiple (4)</option>
-              </select>
+
+            <Field label="Timer Alert (minutes before end)">
+              <input
+                type="number"
+                min={1}
+                max={120}
+                style={S.input}
+                value={config.game.timerAlertMinutes ?? 10}
+                onChange={e=>{
+                  const val = Math.max(1, Number(e.target.value||10));
+                  setConfig({...config, game:{...config.game, timerAlertMinutes: val}});
+                }}
+              />
+              <div style={{color:'#9fb0bf', marginTop:6}}>
+                Players hear an alarm at T-minus this many minutes (only for countdown timers).
+              </div>
             </Field>
-            <div style={{color:'#9fb0bf'}}>Splash should render {config.forms.players} player info blocks (first name, email, phone).</div>
-          </div>
-        </main>
-      )}
+          </>
+        );
+      })()}
+    </div>
+  </main>
+)}
 
        
       {tab==='text' && (
@@ -666,53 +776,90 @@ export default function Admin(){
   </main>
 )}
 
-      {/* New Game modal */}
-      {showNewGame && (
-        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000}}>
-          <div style={{...S.card, width:420}}>
-            <h3 style={{marginTop:0}}>Create New Game</h3>
-            <Field label="Game Title">
-              <input style={S.input} value={newTitle} onChange={e=>setNewTitle(e.target.value)} />
-            </Field>
-            <Field label="Game Type">
-              <select style={S.input} value={newType} onChange={e=>setNewType(e.target.value)}>
-                {GAME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </Field>
-            <Field label="Mode">
-              <select style={S.input} value={newMode} onChange={e=>setNewMode(e.target.value)}>
-                <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
-                <option value="multi">Multiple (4)</option>
-              </select>
-            </Field>
-            <div style={{display:'flex',gap:8,marginTop:12}}>
-              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
-              <button
-                style={S.button}
-                onClick={async()=>{
-                  const title = newTitle.trim();
-                  if (!title) return;
-                  const r = await fetch('/api/games', {
-                    method:'POST',
-                    headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({ title, type: newType, mode: newMode })
-                  });
-                  const j = await r.json();
-                  if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
-                  const rr = await fetch('/api/games'); const jj = await rr.json();
-                  if (jj.ok) setGames(jj.games||[]);
-                  setActiveSlug(j.slug);
-                  setNewTitle(''); setShowNewGame(false);
-                }}
-              >Create</button>
-            </div>
+     // S8 — NEW GAME MODAL with duration + alert
+{showNewGame && (
+  <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000}}>
+    <div style={{...S.card, width:460}}>
+      <h3 style={{marginTop:0}}>Create New Game</h3>
+
+      <Field label="Game Title">
+        <input style={S.input} value={newTitle} onChange={e=>setNewTitle(e.target.value)} />
+      </Field>
+
+      <Field label="Game Type">
+        <select style={S.input} value={newType} onChange={e=>setNewType(e.target.value)}>
+          {GAME_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </Field>
+
+      <Field label="Mode">
+        <select style={S.input} value={newMode} onChange={e=>setNewMode(e.target.value)}>
+          <option value="single">Single Player</option>
+          <option value="head2head">Head to Head (2)</option>
+          <option value="multi">Multiple (4)</option>
+        </select>
+      </Field>
+
+      <Field label="Game Duration">
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+          <div>
+            <label style={{fontSize:12,color:'#9fb0bf'}}>Minutes (0 = infinite)</label>
+            <input
+              type="number"
+              min={0}
+              style={S.input}
+              value={newDurationMin}
+              onChange={e=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}
+            />
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'#9fb0bf'}}>Alert at T-minus (min)</label>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              style={S.input}
+              value={newAlertMin}
+              onChange={e=>setNewAlertMin(Math.max(1, Number(e.target.value||10)))}
+            />
           </div>
         </div>
-      )}
+      </Field>
+
+      <div style={{display:'flex',gap:8,marginTop:12}}>
+        <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
+        <button
+          style={S.button}
+          onClick={async()=>{
+            if (!newTitle.trim()) return;
+            const body = {
+              title: newTitle.trim(),
+              type:  newType,
+              mode:  newMode,
+              durationMinutes: Number(newDurationMin||0),
+              timerAlertMinutes: Number(newAlertMin||10)
+            };
+            const r = await fetch('/api/games', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify(body)
+            });
+            const j = await r.json();
+            if (!j.ok) { setStatus('❌ '+ (j.error||'create failed')); return; }
+            // refresh list & switch to new game
+            const rr = await fetch('/api/games'); const jj = await rr.json();
+            if (jj.ok) setGames(jj.games||[]);
+            setActiveSlug(j.slug);
+            setNewTitle(''); setNewType('Mystery'); setNewMode('single');
+            setNewDurationMin(0); setNewAlertMin(10);
+            setShowNewGame(false);
+          }}
+        >Create</button>
+      </div>
     </div>
-  );
-}
+  </div>
+)}
+
 
 /* =========================================================
    3) SMALL UI HELPERS & WIDGETS
