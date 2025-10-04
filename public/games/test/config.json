@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "test",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
