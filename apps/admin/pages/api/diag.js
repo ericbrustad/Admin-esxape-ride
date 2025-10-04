@@ -1,15 +1,21 @@
 // apps/admin/pages/api/diag.js
+import { getEnvSnapshot } from '../../lib/github.js';
+
 export default async function handler(_req, res) {
-  const safe = (name) => Boolean(process.env[name]);
-  res.status(200).json({
-    ok: true,
-    env: {
-      REPO_OWNER: safe('REPO_OWNER'),
-      REPO_NAME: safe('REPO_NAME'),
-      GITHUB_TOKEN: safe('GITHUB_TOKEN'),
-      GITHUB_BRANCH: process.env.GITHUB_BRANCH || 'main',
-      GITHUB_BASE_DIR: process.env.GITHUB_BASE_DIR || '',
-      NEXT_PUBLIC_GAME_ORIGIN: safe('NEXT_PUBLIC_GAME_ORIGIN'),
-    }
-  });
+  try {
+    const snap = getEnvSnapshot();
+    res.status(200).json({
+      ok: true,
+      env: {
+        REPO_OWNER: snap.OWNER,
+        REPO_NAME: snap.REPO,
+        GITHUB_TOKEN: snap.TOKEN,
+        GITHUB_BRANCH: snap.BRANCH,
+        GITHUB_BASE_DIR: snap.BASE_DIR || '',
+        NEXT_PUBLIC_GAME_ORIGIN: Boolean(process.env.NEXT_PUBLIC_GAME_ORIGIN),
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
 }
