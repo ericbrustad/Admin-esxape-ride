@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.34",
+  "version": "0.6.35",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -47,6 +47,30 @@
       }
     },
     {
+      "id": "m07",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "ddd",
+        "choices": [
+          "d",
+          "d",
+          "s",
+          "s"
+        ],
+        "correctIndex": 3,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 255,
+        "cooldownSeconds": 30
+      }
+    },
+    {
       "id": "m08",
       "title": "horses",
       "type": "multiple_choice",
@@ -61,6 +85,29 @@
           "3"
         ],
         "correctIndex": 1,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m01",
+      "title": "robust",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "gg",
+        "choices": [
+          "d",
+          "f",
+          "g"
+        ],
+        "correctIndex": 2,
         "mediaUrl": "",
         "geofenceEnabled": false,
         "lat": "",
