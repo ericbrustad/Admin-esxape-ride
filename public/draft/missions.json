@@ -8,20 +8,38 @@
   "missions": [
     {
       "id": "m01",
-      "title": "VW",
+      "title": "New Mission",
+      "type": "short_answer",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "hi",
+        "answer": "hello",
+        "acceptable": "yes",
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
       "type": "multiple_choice",
       "rewards": {
         "points": 25
       },
       "content": {
-        "question": "sss",
+        "question": "xx",
         "choices": [
-          "d",
-          "f",
-          "s",
-          "s"
+          "x",
+          "x",
+          "x"
         ],
-        "correctIndex": 1,
+        "correctIndex": 0,
         "mediaUrl": "",
         "geofenceEnabled": false,
         "lat": "",
