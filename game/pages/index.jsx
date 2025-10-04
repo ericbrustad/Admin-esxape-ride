@@ -30,6 +30,17 @@ function haversine(a, b) {
   const s1 = Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(s1));
 }
+function ensureGoogleFontLoaded(gf) {
+  if (!gf) return;
+  if (typeof document === 'undefined') return;
+  const id = `gf-${gf}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
 
 export default function Game() {
   const { slug, channel, preview } = readUrlParams();
@@ -38,7 +49,7 @@ export default function Game() {
   const [idx, setIdx] = React.useState(0);
   const [points, setPoints] = React.useState(0);
   const [items, setItems] = React.useState([]);
-  const [overlay, setOverlay] = React.useState(null); // for mission-complete media
+  const [overlay, setOverlay] = React.useState(null); // mission-complete media
   const leafletReady = useLeaflet();
   const mapDiv = React.useRef(null);
   const mapRef = React.useRef(null);
@@ -46,7 +57,6 @@ export default function Game() {
 
   React.useEffect(() => {
     async function load() {
-      // config + missions from local /games/<slug>/(draft/)...
       const base = channel === 'draft' ? `/games/${encodeURIComponent(slug)}/draft` : `/games/${encodeURIComponent(slug)}`;
       const [c, m] = await Promise.all([
         fetch(`${base}/config.json`, { cache:'no-store' }).then(r=>r.ok?r.json():null),
@@ -57,6 +67,8 @@ export default function Game() {
         setMissions([]);
         return;
       }
+      // Load global theme font if any
+      if (c?.theme?.fontGF) ensureGoogleFontLoaded(c.theme.fontGF);
       setConfig(c);
       setMissions(Array.isArray(m.missions) ? m.missions : []);
       setIdx(0);
@@ -65,6 +77,14 @@ export default function Game() {
     }
     if (slug) load();
   }, [slug, channel]);
+
+  // load per-mission font when mission changes
+  React.useEffect(() => {
+    const m = missions[idx];
+    if (!m) return;
+    const gf = (m.appearance?.enabled && m.appearance?.fontGF) ? m.appearance.fontGF : (config?.theme?.fontGF || null);
+    if (gf) ensureGoogleFontLoaded(gf);
+  }, [missions, idx, config?.theme?.fontGF]);
 
   // init map
   React.useEffect(() => {
@@ -87,13 +107,12 @@ export default function Game() {
     }
   }, [leafletReady]);
 
-  // draw geofences of current mission & powerups (simple)
+  // draw geofences of current mission
   React.useEffect(() => {
     const L = window.L;
     const map = mapRef.current;
     if (!leafletReady || !map) return;
 
-    // Clear prior layer
     if (!map._playLayer) map._playLayer = L.layerGroup().addTo(map);
     map._playLayer.clearLayers();
 
@@ -108,13 +127,11 @@ export default function Game() {
   }, [leafletReady, missions, idx]);
 
   function completeMission(m) {
-    // rewards
     const pts = Number(m.rewards?.points || 0);
     if (pts) setPoints(p => p + pts);
     const newItems = Array.isArray(m.rewards?.items) ? m.rewards.items.filter(Boolean) : [];
     if (newItems.length) setItems(prev => [...prev, ...newItems]);
 
-    // mission complete overlay
     const mc = m.completion || {};
     if (mc.mediaType === 'audio' && mc.mediaUrl) {
       const a = new Audio(mc.mediaUrl); a.play().catch(()=>{});
@@ -126,20 +143,11 @@ export default function Game() {
       setOverlay({ kind:'message', message: mc.message || 'Mission complete!' });
     }
 
-    // next mission
     setIdx(i => Math.min(i + 1, (missions.length - 1)));
-  }
-
-  function distanceToMission(m, playerLatLng) {
-    const c = m?.content || {};
-    if (!c.geofenceEnabled || !c.lat || !c.lng) return Infinity;
-    const target = [Number(c.lat), Number(c.lng)];
-    return haversine(playerLatLng, target);
   }
 
   function useItem(name) {
     if (name.toLowerCase().includes('smoke')) {
-      // smoke effect overlay
       const elm = document.createElement('div');
       elm.style.position = 'fixed';
       elm.style.inset = '0';
@@ -160,16 +168,16 @@ export default function Game() {
 
   const m = missions[idx] || null;
 
+  const ap = (m?.appearance?.enabled ? m.appearance : (config?.theme || {})) || {};
   const appStyle = {};
-  const ap = m?.appearance?.enabled ? m.appearance : (config?.theme || {});
-  if (ap?.screenImg) appStyle.background = `url(${ap.screenImg}) center/cover no-repeat`;
-  else if (ap?.screenBg) appStyle.background = ap.screenBg;
+  if (ap.screenImg) appStyle.background = `url(${ap.screenImg}) center/cover no-repeat`;
+  else if (ap.screenBg) appStyle.background = ap.screenBg;
 
   const textStyle = {
-    fontFamily: ap?.fontFamily || 'inherit',
-    fontSize: (ap?.fontSize ?? 18) + 'px',
-    color: ap?.fontColor || '#fff',
-    background: ap?.fontBg || 'transparent',
+    fontFamily: ap.fontFamily || 'inherit',
+    fontSize: (ap.fontSize ?? 18) + 'px',
+    color: ap.fontColor || '#fff',
+    background: ap.fontBg || 'transparent',
     display: 'inline-block',
     padding: '6px 10px',
     borderRadius: 8,
@@ -178,16 +186,13 @@ export default function Game() {
   return (
     <main style={styles.main}>
       <div style={{ ...styles.app, ...appStyle }}>
-        {/* Header */}
         <div style={styles.topbar}>
           <div style={styles.title}>{config?.game?.title || 'Game'}</div>
           <div style={styles.score}>⭐ {points}</div>
         </div>
 
-        {/* Map */}
         <div ref={mapDiv} style={styles.map} />
 
-        {/* Backpack */}
         <div style={styles.backpackDock}>
           <button style={styles.backpackBtn} onClick={() => {
             const p = document.getElementById('backpack-panel');
@@ -214,7 +219,6 @@ export default function Game() {
           </div>
         </div>
 
-        {/* Mission Card */}
         <div style={styles.card}>
           {!m ? (
             <div style={{ color:'#9fb0bf' }}>No missions in this game.</div>
@@ -228,9 +232,7 @@ export default function Game() {
                     <div style={{ display:'grid', gap:6 }}>
                       {(m.content?.choices || []).map((c, i) => (
                         <button key={i} style={styles.choice}
-                          onClick={() => { // correctness optional for now
-                            completeMission(m);
-                          }}
+                          onClick={() => { completeMission(m); }}
                         >{c}</button>
                       ))}
                     </div>
@@ -251,7 +253,6 @@ export default function Game() {
                 )}
               </div>
 
-              {/* Geofence footer */}
               {m?.content?.geofenceEnabled && (
                 <div style={{ marginTop: 10, fontSize: 12, color:'#9fb0bf' }}>
                   Reach the marked area to unlock / complete.
@@ -262,7 +263,6 @@ export default function Game() {
           )}
         </div>
 
-        {/* Overlay for mission complete media */}
         {overlay && (
           <div style={styles.overlay}>
             <div style={styles.overlayCard}>
