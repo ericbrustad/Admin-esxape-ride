@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "ddd",
+    "type": "Chase"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
