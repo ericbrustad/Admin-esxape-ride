@@ -19,5 +19,12 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-04T15:33:53.069Z"
+  },
+  {
+    "slug": "test",
+    "title": "test",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-04T15:38:53.547Z"
   }
 ]
