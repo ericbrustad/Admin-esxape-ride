@@ -933,36 +933,41 @@ export default function Admin() {
       )}
 
       {/* TEST */}
-      {tab === 'test' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <h3 style={{ margin: 0 }}>Play Test</h3>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <label>Channel:&nbsp;
-                  <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
-                    <option value="draft">draft</option>
-                    <option value="published">published</option>
-                  </select>
-                </label>
-                <a href={(gameBase? `${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}` : '#')}
-                   target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none' }}>Open full window</a>
-              </div>
-            </div>
-            {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.</div>}
-            {gameBase && (
-              <iframe
-                src={`${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}&preview=1`}
-                style={{ width:'100%', height: '70vh', border:'1px solid #22303c', borderRadius: 12 }}
-              />
-            )}
-          </div>
-        </main>
+{tab === 'test' && (
+  <main style={S.wrap}>
+    <div style={S.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <h3 style={{ margin: 0 }}>Play Test</h3>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <label>
+            Channel:&nbsp;
+            <select value={testChannel} onChange={(e) => setTestChannel(e.target.value)} style={S.input}>
+              <option value="draft">draft</option>
+              <option value="published">published</option>
+            </select>
+          </label>
+
+          {/* Launcher opens the game in a new window/tab (uses NEXT_PUBLIC_GAME_ORIGIN if set) */}
+          <TestLauncher slug={activeSlug || ''} channel={testChannel} preferPretty={true} popup={false} />
+        </div>
+      </div>
+
+      {!gameBase && (
+        <div style={{ color: '#9fb0bf', marginBottom: 8 }}>
+          Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.
+        </div>
       )}
-     </ul>
-          </div>
-        </main>
+
+      {gameBase && (
+        <iframe
+          src={gameBase + '/?slug=' + (activeSlug || '') + '&channel=' + testChannel + '&preview=1'}
+          style={{ width: '100%', height: '70vh', border: '1px solid #22303c', borderRadius: 12 }}
+        />
       )}
+    </div>
+  </main>
+)}
 
       {/* New Game modal */}
       {showNewGame && (
