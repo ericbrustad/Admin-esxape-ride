@@ -1,59 +1,52 @@
 // pages/api/save.js
-// ----------------
-const GH = 'https://api.github.com';
-const owner  = process.env.REPO_OWNER;
-const repo   = process.env.REPO_NAME;
-const token  = process.env.GITHUB_TOKEN;
-const branch = process.env.REPO_BRANCH || 'main';
+// Uses bulkCommitMixed to write draft (and optional published) + mirror to /game/public/games/<slug>/draft
+import { joinPath, bulkCommitMixed } from '../../lib/github.js';
 
-const authHeaders = {
-  Authorization: `Bearer ${token}`,
-  'User-Agent': 'esx-admin',
-  Accept: 'application/vnd.github+json',
-};
+const pretty = obj => JSON.stringify(obj, null, 2) + '\n';
 
-async function getFile(path) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
-  const res = await fetch(url, { headers: authHeaders });
-  if (!res.ok) return null;
-  const json = await res.json();
-  const text = Buffer.from(json.content || '', 'base64').toString('utf8');
-  return { sha: json.sha, text };
-}
-
-async function putFile(path, text, message) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const head = await getFile(path);
-  const body = {
-    message,
-    content: Buffer.from(text, 'utf8').toString('base64'),
-    branch,
-    ...(head ? { sha: head.sha } : {}),
-  };
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { ...authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`GitHub PUT failed: ${res.status} ${await res.text()}`);
-  return res.json();
+function isLegacy(slug) {
+  const s = String(slug || '').trim().toLowerCase();
+  return s === '' || s === '(legacy root)' || s === 'legacy-root' || s === 'root';
 }
 
 export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ ok:false, error: 'Method not allowed' });
+
   try {
-    const { missions } = req.body || {};
-    const slug = (req.query.slug || '').toString().trim();
-    if (!missions) return res.status(400).send('no missions payload');
+    const body = req.body || {};
+    const slug = body.slug;
+    const config = body.config;
+    const missions = body.missions;
+    const channel = body.channel || 'draft'; // default to draft saves
+    if (!slug && !isLegacy(slug)) return res.status(400).json({ ok:false, error: 'Missing slug' });
 
-    const path = slug
-      ? `public/games/${slug}/missions.json`
-      : `public/missions.json`;
+    // determine base dir(s)
+    let adminBase, gameBase;
+    if (isLegacy(slug)) {
+      adminBase = channel === 'draft' ? joinPath('public', 'draft') : 'public';
+      gameBase = null; // legacy root mirroring not supported for game root
+    } else {
+      adminBase = channel === 'draft' ? joinPath('public/games', slug, 'draft') : joinPath('public/games', slug);
+      gameBase = joinPath('game/public/games', slug, channel === 'draft' ? 'draft' : '');
+    }
 
-    await putFile(path, JSON.stringify(missions, null, 2),
-      `chore: update missions.json via admin${slug ? ` (${slug})` : ''}`);
+    const files = [];
+    if (config) {
+      files.push({ path: joinPath(adminBase, 'config.json'), content: pretty(config) });
+      if (gameBase) files.push({ repoPath: joinPath(gameBase, 'config.json'), content: pretty(config) });
+    }
+    if (missions) {
+      files.push({ path: joinPath(adminBase, 'missions.json'), content: pretty(missions) });
+      if (gameBase) files.push({ repoPath: joinPath(gameBase, 'missions.json'), content: pretty(missions) });
+    }
 
-    res.status(200).send('ok');
-  } catch (e) {
-    res.status(500).send(String(e.message || e));
+    if (!files.length) return res.status(400).json({ ok:false, error: 'Nothing to save' });
+
+    // Single commit for all files
+    const commit = await bulkCommitMixed(files, `save ${slug || 'root'} [${channel}]`);
+    return res.status(200).json({ ok:true, wrote: files.map(f => f.repoPath || f.path), commitUrl: commit.htmlUrl });
+  } catch (err) {
+    console.error('save error:', err);
+    return res.status(500).json({ ok:false, error: String(err?.message || err) });
   }
 }
