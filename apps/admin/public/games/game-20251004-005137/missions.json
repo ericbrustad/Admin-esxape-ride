@@ -1,0 +1,26 @@
+{
+  "id": "game-20251004-005137-suite-1",
+  "version": 1,
+  "missions": [
+    {
+      "id": "intro-1",
+      "role": "intro",
+      "type": "statement",
+      "title": "Welcome",
+      "content": {
+        "text": "Welcome to the game!",
+        "styleEnabled": false
+      }
+    },
+    {
+      "id": "final-1",
+      "role": "final",
+      "type": "statement",
+      "title": "Finish",
+      "content": {
+        "text": "Great job!",
+        "styleEnabled": false
+      }
+    }
+  ]
+}
