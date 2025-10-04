@@ -4,7 +4,7 @@
     "mode": "single"
   },
   "game": {
-    "title": "bricks",
+    "title": "SLug BUG!",
     "type": "Mystery"
   },
   "forms": {
@@ -15,37 +15,5 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "powerups": [
-    {
-      "id": "p01",
-      "title": "smoke",
-      "type": "smoke",
-      "lat": 44.9778,
-      "lng": -93.265,
-      "pickupRadius": 960,
-      "durationSec": 60,
-      "respawnSec": 300,
-      "stock": 1
-    }
-  ],
-  "theme": {
-    "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#100f10",
-      "align": "left",
-      "backgroundColor": "#e6eaf9",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    },
-    "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#ffffff",
-      "align": "center",
-      "backgroundColor": "#0b0c10",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    }
-  }
+  "powerups": []
 }
