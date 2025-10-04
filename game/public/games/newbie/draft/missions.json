@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.26",
+  "version": "0.6.27",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -30,8 +30,8 @@
       },
       "appearance": {
         "enabled": true,
-        "fontBg": "#f3ecec",
-        "screenBg": "#595d6e"
+        "fontBg": "#e20303",
+        "screenBg": "#0631ef"
       }
     }
   ]
