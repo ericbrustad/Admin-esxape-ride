@@ -1,0 +1,18 @@
+{
+  "id": "suite",
+  "version": 1,
+  "missions": [
+    {
+      "id": "m4kln",
+      "type": "short_answer",
+      "title": "New Mission",
+      "content": {}
+    },
+    {
+      "id": "mg1cx",
+      "type": "short_answer",
+      "title": "New Mission",
+      "content": {}
+    }
+  ]
+}
