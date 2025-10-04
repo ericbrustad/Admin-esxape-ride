@@ -1,70 +1,119 @@
-// Monorepo-aware GitHub Contents API helpers (ESM)
+// apps/admin/lib/github.js
+// Monorepo-aware GitHub helpers with single-commit support
+
 const API = process.env.GITHUB_API || 'https://api.github.com';
 
 export function joinPath(...parts) {
   return parts.filter(Boolean).join('/').replace(/\/+/g, '/').replace(/^\/|\/$/g, '');
 }
 
-function getEnv(strict = true) {
-  const OWNER = process.env.REPO_OWNER || '';
-  const REPO = process.env.REPO_NAME || '';
-  const TOKEN = process.env.GITHUB_TOKEN || '';
+function required(name) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
+export function env() {
+  const OWNER = required('REPO_OWNER');
+  const REPO = required('REPO_NAME');
+  const TOKEN = required('GITHUB_TOKEN');
   const BRANCH = process.env.GITHUB_BRANCH || 'main';
-  const BASE_DIR = (process.env.GITHUB_BASE_DIR || '').replace(/^\/+|\/+$/g, ''); // e.g. 'apps/admin'
-  if (strict) {
-    const missing = [];
-    if (!OWNER) missing.push('REPO_OWNER');
-    if (!REPO) missing.push('REPO_NAME');
-    if (!TOKEN) missing.push('GITHUB_TOKEN');
-    if (missing.length) throw new Error(`Missing env: ${missing.join(', ')}`);
-  }
+  const BASE_DIR = (process.env.GITHUB_BASE_DIR || '').replace(/^\/+|\/+$/g, ''); // e.g., apps/admin
   return { OWNER, REPO, TOKEN, BRANCH, BASE_DIR };
 }
 
-function authHeaders(token) {
+function headers() {
+  const { TOKEN } = env();
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${TOKEN}`,
     'User-Agent': 'esxape-admin',
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
   };
 }
 
-export async function ghGet(relPath) {
-  const { OWNER, REPO, TOKEN, BRANCH, BASE_DIR } = getEnv(true);
-  const path = joinPath(BASE_DIR, relPath);
-  const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURI(path)}?ref=${encodeURIComponent(BRANCH)}`;
-  const r = await fetch(url, { headers: authHeaders(TOKEN), cache: 'no-store' });
-  if (r.status === 404) return { status: 404, data: null };
-  if (!r.ok) throw new Error(`GitHub GET ${path} failed: ${r.status} ${await r.text()}`);
-  return { status: 200, data: await r.json() };
-}
-
-export async function ghPut(relPath, content, message, sha) {
-  const { OWNER, REPO, TOKEN, BRANCH, BASE_DIR } = getEnv(true);
-  const path = joinPath(BASE_DIR, relPath);
-  const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURI(path)}`;
-  const b64 = Buffer.isBuffer(content) ? content.toString('base64') : Buffer.from(String(content), 'utf8').toString('base64');
-  const body = { message: message || `Update ${path}`, content: b64, branch: BRANCH, ...(sha ? { sha } : {}) };
-  const r = await fetch(url, { method: 'PUT', headers: { ...authHeaders(TOKEN), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`GitHub PUT ${path} failed: ${r.status} ${await r.text()}`);
-  return r.json();
-}
-
-export async function upsertJson(relPath, json, message) {
-  const pretty = JSON.stringify(json, null, 2) + '\n';
-  const existing = await ghGet(relPath);               // 404 ⇒ create
-  const sha = existing.status === 200 && existing.data?.sha ? existing.data.sha : undefined;
-  return ghPut(relPath, pretty, message, sha);
-}
-
+/** List directory names under `relPath` (GitHub Contents API). */
 export async function listDirs(relPath) {
-  const res = await ghGet(relPath);
-  if (res.status !== 200 || !Array.isArray(res.data)) return [];
-  return res.data.filter(x => x.type === 'dir').map(x => x.name);
+  const { OWNER, REPO, BRANCH, BASE_DIR } = env();
+  const path = joinPath(BASE_DIR, relPath);
+  const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(BRANCH)}`;
+  const r = await fetch(url, { headers: headers(), cache: 'no-store' });
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(`GitHub list ${path} failed: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  return Array.isArray(data) ? data.filter(d => d.type === 'dir').map(d => d.name) : [];
 }
 
-export function getEnvSnapshot() {
-  const { OWNER, REPO, TOKEN, BRANCH, BASE_DIR } = getEnv(false);
-  return { OWNER: !!OWNER, REPO: !!REPO, TOKEN: !!TOKEN, BRANCH, BASE_DIR };
+/** Read JSON file from GitHub Contents API. Returns null if missing. */
+export async function readJson(relPath) {
+  const { OWNER, REPO, BRANCH, BASE_DIR } = env();
+  const path = joinPath(BASE_DIR, relPath);
+  const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(BRANCH)}`;
+  const r = await fetch(url, { headers: headers(), cache: 'no-store' });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`GitHub GET ${path} failed: ${r.status} ${await r.text()}`);
+  const data = await r.json();
+  const buf = Buffer.from(data.content || '', 'base64');
+  try { return JSON.parse(buf.toString('utf8')); } catch { return null; }
+}
+
+/**
+ * Commit multiple files in ONE commit (Git data API).
+ * files: [{ path: 'public/games/slug/config.json', content: 'string' }]
+ * Returns { sha, htmlUrl, files }
+ */
+export async function bulkCommit(files, message) {
+  const { OWNER, REPO, BRANCH, BASE_DIR } = env();
+
+  // 1) get current commit + tree
+  const refUrl = `${API}/repos/${OWNER}/${REPO}/git/refs/heads/${encodeURIComponent(BRANCH)}`;
+  const refRes = await fetch(refUrl, { headers: headers() });
+  if (!refRes.ok) throw new Error(`GET ref failed: ${refRes.status} ${await refRes.text()}`);
+  const ref = await refRes.json();
+  const baseCommitSha = ref.object.sha;
+
+  const commitUrl = `${API}/repos/${OWNER}/${REPO}/git/commits/${baseCommitSha}`;
+  const commitRes = await fetch(commitUrl, { headers: headers() });
+  if (!commitRes.ok) throw new Error(`GET commit failed: ${commitRes.status} ${await commitRes.text()}`);
+  const baseCommit = await commitRes.json();
+  const baseTreeSha = baseCommit.tree.sha;
+
+  // 2) create new tree with all files
+  const tree = files.map(f => ({
+    path: joinPath(BASE_DIR, f.path),
+    mode: '100644',
+    type: 'blob',
+    content: f.content, // utf-8 string
+  }));
+
+  const treeRes = await fetch(`${API}/repos/${OWNER}/${REPO}/git/trees`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_tree: baseTreeSha, tree }),
+  });
+  if (!treeRes.ok) throw new Error(`POST tree failed: ${treeRes.status} ${await treeRes.text()}`);
+  const newTree = await treeRes.json();
+
+  // 3) create commit
+  const newCommitRes = await fetch(`${API}/repos/${OWNER}/${REPO}/git/commits`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: message || 'Update', tree: newTree.sha, parents: [baseCommitSha] }),
+  });
+  if (!newCommitRes.ok) throw new Error(`POST commit failed: ${newCommitRes.status} ${await newCommitRes.text()}`);
+  const newCommit = await newCommitRes.json();
+
+  // 4) update ref to point to new commit
+  const updateRes = await fetch(refUrl, {
+    method: 'PATCH',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sha: newCommit.sha, force: false }),
+  });
+  if (!updateRes.ok) throw new Error(`PATCH ref failed: ${updateRes.status} ${await updateRes.text()}`);
+
+  return {
+    sha: newCommit.sha,
+    htmlUrl: `https://github.com/${OWNER}/${REPO}/commit/${newCommit.sha}`,
+    files: files.map(f => f.path),
+  };
 }
