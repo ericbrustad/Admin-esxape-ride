@@ -36,6 +36,17 @@ function toDirectMediaURL(u) {
     return u;
   }
 }
+function ensureGoogleFontLoaded(gf) {
+  if (!gf) return;
+  if (typeof document === 'undefined') return;
+  const id = `gf-${gf}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
 
 /* ========================== Schemas ========================== */
 const TYPE_FIELDS = {
@@ -104,7 +115,7 @@ const POWERUP_TYPES = [
   { value: 'jammer', label: 'Signal Jammer (blackout radius)' },
 ];
 
-// Font choices (+ Google Fonts family token)
+// Global font choices (val = CSS stack; gf = Google Fonts key)
 const FONT_CHOICES = [
   { label: 'System', val: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif', gf: null },
   { label: 'Inter', val: '"Inter",sans-serif', gf: 'Inter' },
@@ -116,18 +127,6 @@ const FONT_CHOICES = [
   { label: 'Merriweather', val: '"Merriweather",serif', gf: 'Merriweather' },
   { label: 'Bebas Neue', val: '"Bebas Neue",cursive', gf: 'Bebas+Neue' },
 ];
-
-function ensureGoogleFontLoaded(gf) {
-  if (!gf) return;
-  const id = `gf-${gf}`;
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
-  document.head.appendChild(link);
-}
 
 /* ========================== Root ========================== */
 export default function Admin() {
@@ -210,6 +209,7 @@ export default function Admin() {
           ...c,
           powerups: Array.isArray(c.powerups) ? c.powerups : [],
           timer: { ...(defaultConfig().timer), ...(c.timer || {}) },
+          theme: { ...(defaultConfig().theme), ...(c.theme || {}) },
         });
         setSelected(null);
         setEditing(null);
@@ -229,7 +229,15 @@ export default function Admin() {
       timer: { durationMinutes: 0, alertMinutes: 10 },
       textRules: [],
       powerups: [],
-      theme: { fontFamily: FONT_CHOICES[0].val, fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '#0b0c10', screenImg: '' },
+      theme: {
+        fontFamily: FONT_CHOICES[0].val,
+        fontGF: null,           // Google Fonts key (optional)
+        fontSize: 18,
+        fontColor: '#ffffff',
+        fontBg: '#00000080',
+        screenBg: '#0b0c10',
+        screenImg: '',
+      },
     };
   }
 
@@ -267,12 +275,31 @@ export default function Admin() {
     if (!activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     try {
       setStatus('Publishing…');
-      const res = await fetch(`/api/game/${encodeURIComponent(activeSlug)}?channel=published`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'publish' }) });
+      const res = await fetch(`/api/game/${encodeURIComponent(activeSlug)}?channel=published`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'publish' }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Publish failed');
       setStatus(`✅ Published v${data?.version || ''}`);
     } catch (e) {
       setStatus('❌ Publish failed: ' + (e?.message || e));
+    }
+  }
+
+  async function handleSavePublish() {
+    if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
+    setStatus('Saving & Publishing…');
+    const qs = `?slug=${encodeURIComponent(activeSlug)}`;
+    const r = await fetch('/api/save-publish' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ missions: suite, config }),
+    });
+    const t = await r.text();
+    if (!r.ok) setStatus('❌ Save & Publish failed:\n' + t);
+    else {
+      try { const j = JSON.parse(t); setStatus(`✅ Saved & Published v${j?.version || ''}`); }
+      catch { setStatus('✅ Saved & Published'); }
     }
   }
 
@@ -297,7 +324,7 @@ export default function Admin() {
       type: 'multiple_choice',
       rewards: { points: 25, items: [] },
       completion: { message: 'Mission complete!', mediaUrl: '', mediaType: 'audio' },
-      appearance: { enabled: false, fontFamily: '', fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '', screenImg: '' },
+      appearance: { enabled: false, fontFamily: '', fontGF: null, fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '', screenImg: '' },
       content: defaultContentForType('multiple_choice'),
     };
     setEditing(draft);
@@ -317,15 +344,12 @@ export default function Admin() {
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
-
-    // basic validates for non-number fields
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number') continue;
       const v = editing.content?.[f.key];
       if (f.key !== 'mediaUrl' && (v === undefined || v === null || v === '')) return setStatus('❌ Missing: ' + f.label);
     }
-
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex((m) => m.id === editing.id);
     if (i >= 0) missions[i] = editing;
@@ -400,6 +424,7 @@ export default function Admin() {
             {/* Save + quick links */}
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
+            <button onClick={handleSavePublish} style={{ ...S.button, background:'#15315c', border:'1px solid #2d5ca3' }}>Save &amp; Publish</button>
             <a href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
@@ -498,7 +523,10 @@ export default function Admin() {
                               const val = e.target.value;
                               const choice = FONT_CHOICES.find(f => f.val === val);
                               if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
-                              setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontFamily: val } });
+                              setEditing({
+                                ...editing,
+                                appearance: { ...(editing.appearance||{}), fontFamily: val, fontGF: choice?.gf || null },
+                              });
                               setDirty(true);
                             }}
                           >
@@ -847,6 +875,81 @@ export default function Admin() {
             </Field>
           </div>
 
+          {/* Global Appearance (Theme) */}
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Global Appearance (Theme)</h3>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+              <Field label="Font family">
+                <select
+                  style={S.input}
+                  value={config.theme?.fontFamily || FONT_CHOICES[0].val}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const choice = FONT_CHOICES.find(f => f.val === val);
+                    if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
+                    setConfig({ ...config, theme: { ...(config.theme||{}), fontFamily: val, fontGF: choice?.gf || null } });
+                  }}
+                >
+                  {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Font size (px)">
+                <input type="number" min={10} max={64} style={S.input}
+                  value={config.theme?.fontSize ?? 18}
+                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontSize: Math.max(10, Number(e.target.value||18)) } })}
+                />
+              </Field>
+              <Field label="Font color">
+                <input type="color" style={S.input}
+                  value={config.theme?.fontColor || '#ffffff'}
+                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontColor: e.target.value } })}
+                />
+              </Field>
+              <Field label="Font background color">
+                <input type="color" style={S.input}
+                  value={config.theme?.fontBg || '#00000080'}
+                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontBg: e.target.value } })}
+                />
+              </Field>
+              <Field label="Screen background color">
+                <input type="color" style={S.input}
+                  value={config.theme?.screenBg || '#0b0c10'}
+                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), screenBg: e.target.value } })}
+                />
+              </Field>
+              <Field label="Screen background image (URL)">
+                <input style={S.input} placeholder="https://…/image.jpg (optional)"
+                  value={config.theme?.screenImg || ''}
+                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), screenImg: e.target.value } })}
+                />
+              </Field>
+            </div>
+
+            {/* live preview */}
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              border: '1px dashed #2a323b',
+              borderRadius: 10,
+              background: config.theme?.screenImg
+                ? `url(${config.theme.screenImg}) center/cover no-repeat`
+                : (config.theme?.screenBg || '#0b0c10')
+            }}>
+              <div style={{
+                fontFamily: config.theme?.fontFamily || 'inherit',
+                fontSize: (config.theme?.fontSize ?? 18) + 'px',
+                color: config.theme?.fontColor || '#fff',
+                background: config.theme?.fontBg || 'transparent',
+                display: 'inline-block',
+                padding: '6px 10px',
+                borderRadius: 8
+              }}>
+                Global theme preview — Aa Bb 123
+              </div>
+            </div>
+          </div>
+
+          {/* Security */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Security</h3>
             <p style={{ color: '#9fb0bf' }}>Change the Basic Auth login used for this admin. Requires current password.</p>
