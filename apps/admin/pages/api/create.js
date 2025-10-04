@@ -1,27 +1,33 @@
-// apps/admin/pages/api/create.js
-import { upsertJson, joinPath } from '../../lib/github.js';
+import { upsertJson, listDirs, joinPath } from '../../lib/github.js';
 
-function sanitizeSlug(s) {
-  return String(s || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
+function slugify(s) {
+  return String(s || '').trim().toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+function genSlug() {
+  const d = new Date(); const pad = n => String(n).padStart(2, '0');
+  return `game-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function toTitle(slug) {
+  return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (!['POST','GET'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const raw = (req.body?.slug ?? req.query?.slug ?? '').toString();
-    const slug = sanitizeSlug(raw);
-    if (!slug) return res.status(400).json({ error: 'Missing or invalid slug' });
+    const rawSlug = (req.body?.slug ?? req.query?.slug ?? '').toString();
+    const slug = slugify(rawSlug) || genSlug();
+    const title = (req.body?.title ?? req.query?.title ?? toTitle(slug)).toString();
+
+    const existing = await listDirs('public/games');
+    const already = existing.includes(slug);
+
+    const basePub   = joinPath('public/games', slug);
+    const baseDraft = joinPath('public/games', slug, 'draft');
 
     const config = req.body?.config ?? {
-      game: { title: 'New Game', slug },
+      game: { title, slug },
       theme: { missionDefault: { fontFamily: 'Inter, system-ui, Arial', fontSize: 18, textColor: '#e9eef2', backgroundColor: '#0b0c10' } }
     };
 
@@ -34,18 +40,17 @@ export default async function handler(req, res) {
       ]
     };
 
-    const basePub   = joinPath('public/games', slug);
-    const baseDraft = joinPath('public/games', slug, 'draft');
-
     const results = [];
-    results.push(await upsertJson(joinPath(basePub,   'config.json'),   config,   `create(config): ${slug}`));
-    results.push(await upsertJson(joinPath(basePub,   'missions.json'), missions, `create(missions): ${slug}`));
-    results.push(await upsertJson(joinPath(baseDraft, 'config.json'),   config,   `create draft(config): ${slug}`));
-    results.push(await upsertJson(joinPath(baseDraft, 'missions.json'), missions, `create draft(missions): ${slug}`));
+    // published
+    results.push(await upsertJson(joinPath(basePub,   'config.json'),   config,   `${already ? 'update' : 'create'}(config): ${slug}`));
+    results.push(await upsertJson(joinPath(basePub,   'missions.json'), missions, `${already ? 'update' : 'create'}(missions): ${slug}`));
+    // draft
+    results.push(await upsertJson(joinPath(baseDraft, 'config.json'),   config,   `${already ? 'update draft' : 'create draft'}(config): ${slug}`));
+    results.push(await upsertJson(joinPath(baseDraft, 'missions.json'), missions, `${already ? 'update draft' : 'create draft'}(missions): ${slug}`));
 
-    return res.status(200).json({ ok: true, slug, created: results.length });
+    return res.status(200).json({ ok: true, slug, existed: already, results });
   } catch (err) {
     console.error('create error:', err);
-    return res.status(500).json({ error: String(err?.message || err) });
+    return res.status(500).json({ ok: false, error: String(err?.message || err) });
   }
 }
