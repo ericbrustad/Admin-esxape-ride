@@ -12,5 +12,12 @@
     "type": "Chase",
     "mode": "single",
     "createdAt": "2025-10-04T13:29:34.891Z"
+  },
+  {
+    "slug": "slug-bug",
+    "title": "SLug BUG!",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-04T15:33:53.069Z"
   }
 ]
