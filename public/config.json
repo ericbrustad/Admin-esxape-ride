@@ -1,0 +1,11 @@
+{
+  "gameOrigin": "",
+  "theme": {
+    "missionDefault": {
+      "fontFamily": "Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial",
+      "fontSize": 18,
+      "textColor": "#e9eef2",
+      "backgroundColor": "#0b0c10"
+    }
+  }
+}
