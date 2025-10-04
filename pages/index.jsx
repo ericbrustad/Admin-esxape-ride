@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
-/* =====================================================================
-   0) HELPERS
-   ===================================================================== */
+/* ========================== Helpers ========================== */
 async function fetchJsonSafe(url, fallback) {
   try {
     const r = await fetch(url, { cache: 'no-store' });
@@ -39,9 +37,7 @@ function toDirectMediaURL(u) {
   }
 }
 
-/* =====================================================================
-   1) SCHEMAS
-   ===================================================================== */
+/* ========================== Schemas ========================== */
 const TYPE_FIELDS = {
   multiple_choice: [
     { key: 'question', label: 'Question', type: 'text' },
@@ -94,8 +90,8 @@ const TYPE_OPTIONS = [
   { value: 'short_answer', label: 'Question (Short Answer)' },
   { value: 'statement', label: 'Statement' },
   { value: 'video', label: 'Video' },
-  { value: 'geofence_image', label: 'Geofence Image' },
-  { value: 'geofence_video', label: 'Geofence Video' },
+  { value: 'geofence_image', label: 'Geo Fence Image' },
+  { value: 'geofence_video', label: 'Geo Fence Video' },
   { value: 'ar_image', label: 'AR Image' },
   { value: 'ar_video', label: 'AR Video' },
 ];
@@ -108,9 +104,32 @@ const POWERUP_TYPES = [
   { value: 'jammer', label: 'Signal Jammer (blackout radius)' },
 ];
 
-/* =====================================================================
-   2) ROOT
-   ===================================================================== */
+// Font choices (+ Google Fonts family token)
+const FONT_CHOICES = [
+  { label: 'System', val: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif', gf: null },
+  { label: 'Inter', val: '"Inter",sans-serif', gf: 'Inter' },
+  { label: 'Roboto', val: '"Roboto",sans-serif', gf: 'Roboto' },
+  { label: 'Poppins', val: '"Poppins",sans-serif', gf: 'Poppins' },
+  { label: 'Montserrat', val: '"Montserrat",sans-serif', gf: 'Montserrat' },
+  { label: 'Oswald', val: '"Oswald",sans-serif', gf: 'Oswald' },
+  { label: 'Playfair Display', val: '"Playfair Display",serif', gf: 'Playfair+Display' },
+  { label: 'Merriweather', val: '"Merriweather",serif', gf: 'Merriweather' },
+  { label: 'Bebas Neue', val: '"Bebas Neue",cursive', gf: 'Bebas+Neue' },
+];
+
+function ensureGoogleFontLoaded(gf) {
+  if (!gf) return;
+  const id = `gf-${gf}`;
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
+
+/* ========================== Root ========================== */
 export default function Admin() {
   const [tab, setTab] = useState('missions');
 
@@ -121,8 +140,8 @@ export default function Admin() {
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
   const [newMode, setNewMode] = useState('single');
-  const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
-  const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
+  const [newDurationMin, setNewDurationMin] = useState(0);
+  const [newAlertMin, setNewAlertMin] = useState(10);
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
@@ -130,14 +149,6 @@ export default function Admin() {
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
-
-  // computed base for game preview (after config is declared)
-  const gameBase =
-    ((typeof window !== 'undefined'
-      ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
-      : process.env.NEXT_PUBLIC_GAME_ORIGIN) ||
-      (config?.gameOrigin)) ||
-    '';
 
   // mission edit
   const [selected, setSelected] = useState(null);
@@ -147,17 +158,15 @@ export default function Admin() {
   // text rules
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
 
-  // power-ups (new)
-  const [pu, setPu] = useState({
-    title: '',
-    type: 'smoke',
-    pickupRadius: 15,
-    effectSeconds: 60,
-    lat: 44.9778,
-    lng: -93.265,
-  });
+  // powerups
+  const [pu, setPu] = useState({ title: '', type: 'smoke', pickupRadius: 15, effectSeconds: 60, lat: 44.9778, lng: -93.265 });
 
-  // load games
+  const gameBase =
+    (typeof window !== 'undefined'
+      ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
+      : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
+
+  /* ---------- load games list ---------- */
   useEffect(() => {
     (async () => {
       try {
@@ -168,7 +177,7 @@ export default function Admin() {
     })();
   }, []);
 
-  // load suite/config per slug
+  /* ---------- load suite/config per slug ---------- */
   useEffect(() => {
     (async () => {
       try {
@@ -177,7 +186,6 @@ export default function Admin() {
         const missionUrls = activeSlug
           ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
           : [`/missions.json`];
-
         const configUrl = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
 
         const m = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
@@ -190,11 +198,7 @@ export default function Admin() {
               ? {
                   ...x,
                   type: 'multiple_choice',
-                  content: {
-                    question: x.content?.question || '',
-                    choices: x.content?.choices || [],
-                    answer: x.content?.answer || '',
-                  },
+                  content: { question: x.content?.question || '', choices: x.content?.choices || [], answer: x.content?.answer || '' },
                 }
               : x
           ),
@@ -205,7 +209,6 @@ export default function Admin() {
           ...defaultConfig(),
           ...c,
           powerups: Array.isArray(c.powerups) ? c.powerups : [],
-          // make sure timer exists even for old configs
           timer: { ...(defaultConfig().timer), ...(c.timer || {}) },
         });
         setSelected(null);
@@ -223,68 +226,48 @@ export default function Admin() {
       splash: { enabled: true, mode: 'single' },
       game: { title: 'Untitled Game', type: 'Mystery' },
       forms: { players: 1 },
-      timer: { durationMinutes: 0, alertMinutes: 10 }, // NEW
+      timer: { durationMinutes: 0, alertMinutes: 10 },
       textRules: [],
       powerups: [],
+      theme: { fontFamily: FONT_CHOICES[0].val, fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '#0b0c10', screenImg: '' },
     };
   }
 
   function defaultContentForType(t) {
     const baseGeo = { geofenceEnabled: false, lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30 };
     switch (t) {
-      case 'multiple_choice':
-        return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
-      case 'short_answer':
-        return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
-      case 'statement':
-        return { text: '', mediaUrl: '', ...baseGeo };
-      case 'video':
-        return { videoUrl: '', overlayText: '', ...baseGeo };
-      case 'geofence_image':
-        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
-      case 'geofence_video':
-        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
-      case 'ar_image':
-        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      case 'ar_video':
-        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      default:
-        return { ...baseGeo };
+      case 'multiple_choice': return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
+      case 'short_answer':    return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
+      case 'statement':       return { text: '', mediaUrl: '', ...baseGeo };
+      case 'video':           return { videoUrl: '', overlayText: '', ...baseGeo };
+      case 'geofence_image':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
+      case 'geofence_video':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
+      case 'ar_image':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      case 'ar_video':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      default:                return { ...baseGeo };
     }
   }
 
+  /* ---------- save/publish ---------- */
   async function saveAll() {
-    if (!suite || !config) return;
+    if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     setStatus('Saving…');
-    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
-    const [a, b] = await Promise.all([
-      fetch('/api/save' + qs, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missions: suite }),
-      }),
-      fetch('/api/save-config' + qs, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
-      }),
-    ]);
-    const ok = a.ok && b.ok;
-    if (!ok) {
-      setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
-    } else {
-      setStatus('✅ Saved (files committed)');
-    }
+    const qs = `?slug=${encodeURIComponent(activeSlug)}`;
+    const r = await fetch('/api/save' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ missions: suite, config }),
+    });
+    const t = await r.text();
+    if (!r.ok) setStatus('❌ Save failed:\n' + t);
+    else setStatus('✅ Saved (draft updated for admin + test preview)');
   }
 
   async function handlePublish() {
+    if (!activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     try {
       setStatus('Publishing…');
-      const res = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish' }),
-      });
+      const res = await fetch(`/api/game/${encodeURIComponent(activeSlug)}?channel=published`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'publish' }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Publish failed');
       setStatus(`✅ Published v${data?.version || ''}`);
@@ -293,7 +276,13 @@ export default function Admin() {
     }
   }
 
-  // missions helpers
+  /* ---------- missions helpers ---------- */
+  function bumpVersion(v) {
+    const p = String(v || '0.0.0').split('.').map((n) => parseInt(n || '0', 10));
+    while (p.length < 3) p.push(0);
+    p[2] += 1;
+    return p.join('.');
+  }
   function suggestId() {
     const base = 'm';
     let i = 1;
@@ -306,7 +295,9 @@ export default function Admin() {
       id: suggestId(),
       title: 'New Mission',
       type: 'multiple_choice',
-      rewards: { points: 25 },
+      rewards: { points: 25, items: [] },
+      completion: { message: 'Mission complete!', mediaUrl: '', mediaType: 'audio' },
+      appearance: { enabled: false, fontFamily: '', fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '', screenImg: '' },
       content: defaultContentForType('multiple_choice'),
     };
     setEditing(draft);
@@ -323,23 +314,18 @@ export default function Admin() {
     setSelected(null);
     setDirty(false);
   }
-  function bumpVersion(v) {
-    const p = String(v || '0.0.0')
-      .split('.')
-      .map((n) => parseInt(n || '0', 10));
-    while (p.length < 3) p.push(0);
-    p[2] += 1;
-    return p.join('.');
-  }
   function saveToList() {
     if (!editing || !suite) return;
-    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill ID, title, and type');
+    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+
+    // basic validates for non-number fields
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number') continue;
       const v = editing.content?.[f.key];
       if (f.key !== 'mediaUrl' && (v === undefined || v === null || v === '')) return setStatus('❌ Missing: ' + f.label);
     }
+
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex((m) => m.id === editing.id);
     if (i >= 0) missions[i] = editing;
@@ -348,26 +334,31 @@ export default function Admin() {
     setSelected(editing.id);
     setEditing(null);
     setDirty(false);
-    setStatus('✅ List updated (remember to Save All)');
+    setStatus('✅ List updated (remember Save All)');
   }
   function removeMission(id) {
     if (!suite) return;
     setSuite({ ...suite, missions: (suite.missions || []).filter((m) => m.id !== id) });
-    if (selected === id) {
-      setSelected(null);
-      setEditing(null);
-    }
+    if (selected === id) { setSelected(null); setEditing(null); }
+  }
+  function moveMission(idx, delta) {
+    if (!suite) return;
+    const arr = [...(suite.missions || [])];
+    const j = idx + delta;
+    if (j < 0 || j >= arr.length) return;
+    [arr[idx], arr[j]] = [arr[j], arr[idx]];
+    setSuite({ ...suite, missions: arr, version: bumpVersion(suite.version || '0.0.0') });
   }
 
-  // text rules
+  /* ---------- text rules ---------- */
   function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick a mission and enter a message');
+    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
     const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot is out of range');
+    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
     const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember to Save All)');
+    setStatus('✅ SMS rule added (remember Save All)');
   }
   function removeSmsRule(idx) {
     const rules = [...(config?.textRules || [])];
@@ -377,9 +368,7 @@ export default function Admin() {
 
   if (!suite || !config) return <main style={S.wrap}><div style={S.card}>Loading…</div></main>;
 
-  /* =====================================================================
-     3) UI
-     ===================================================================== */
+  /* ========================== UI ========================== */
   return (
     <div style={S.body}>
       <header style={S.header}>
@@ -395,40 +384,26 @@ export default function Admin() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
               <label style={{ color: '#9fb0bf', fontSize: 12 }}>Game:</label>
               <select value={activeSlug} onChange={(e) => setActiveSlug(e.target.value)} style={{ ...S.input, width: 280 }}>
-                <option value="">(legacy root)</option>
+                <option value="">(choose a slug)</option>
                 {games.map((g) => (
                   <option key={g.slug} value={g.slug}>
                     {g.title} — {g.slug} ({g.mode || 'single'})
                   </option>
                 ))}
               </select>
-              <button style={S.button} onClick={() => setShowNewGame(true)}>
-                + New Game
-              </button>
+              <button style={S.button} onClick={() => setShowNewGame(true)}>+ New Game</button>
             </div>
 
             {/* Always show New Mission */}
-            <button onClick={startNew} style={S.button}>
-              + New Mission
-            </button>
+            <button onClick={startNew} style={S.button}>+ New Mission</button>
 
             {/* Save + quick links */}
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
-            <a
-              href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...S.button }}
-            >
+            <a href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
-            <a
-              href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
-              target="_blank"
-              rel="noreferrer"
-              style={{ ...S.button }}
-            >
+            <a href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
           </div>
@@ -452,7 +427,7 @@ export default function Admin() {
               style={S.search}
             />
             <div>
-              {(suite.missions || []).map((m) => (
+              {(suite.missions || []).map((m, idx) => (
                 <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
@@ -461,9 +436,11 @@ export default function Admin() {
                         {m.type} — id: {m.id}
                       </div>
                     </div>
-                    <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
-                      Delete
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button title="Move up" style={{ ...S.button, padding: '6px 10px' }} onClick={() => moveMission(idx, -1)}>↑</button>
+                      <button title="Move down" style={{ ...S.button, padding: '6px 10px' }} onClick={() => moveMission(idx, +1)}>↓</button>
+                      <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>Delete</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -473,24 +450,16 @@ export default function Admin() {
           <section style={S.editor}>
             {!editing ? (
               <div style={S.card}>
-                <p style={{ marginTop: 0, color: '#9fb0bf' }}>
-                  Select a mission or click <em>New Mission</em>.
-                </p>
-                <button style={S.button} onClick={startNew}>
-                  + New Mission
-                </button>
+                <p style={{ marginTop: 0, color: '#9fb0bf' }}>Select a mission or click <em>New Mission</em>.</p>
+                <button style={S.button} onClick={startNew}>+ New Mission</button>
                 <p style={{ color: '#9fb0bf' }}>
                   Version: <code>{suite.version || '0.0.0'}</code> • Total: <code>{suite.missions?.length || 0}</code>
                 </p>
               </div>
             ) : (
               <div style={S.card}>
-                <Field label="ID">
-                  <input style={S.input} value={editing.id} onChange={(e) => { setEditing({ ...editing, id: e.target.value }); setDirty(true); }} />
-                </Field>
-                <Field label="Title">
-                  <input style={S.input} value={editing.title} onChange={(e) => { setEditing({ ...editing, title: e.target.value }); setDirty(true); }} />
-                </Field>
+                <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id: e.target.value }); setDirty(true); }} /></Field>
+                <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title: e.target.value }); setDirty(true); }} /></Field>
                 <Field label="Type">
                   <select
                     style={S.input}
@@ -501,16 +470,168 @@ export default function Admin() {
                       setDirty(true);
                     }}
                   >
-                    {TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
+                    {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </Field>
+
                 <hr style={S.hr} />
 
-                {/* MC custom editor */}
+                {/* Custom appearance */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={!!editing.appearance?.enabled}
+                      onChange={(e) => { setEditing({ ...editing, appearance: { ...(editing.appearance||{}), enabled: e.target.checked } }); setDirty(true); }}
+                    />
+                    Use custom appearance for this mission
+                  </label>
+
+                  {editing.appearance?.enabled && (
+                    <div style={{ marginTop: 8, border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
+                      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+                        <Field label="Font family">
+                          <select
+                            style={S.input}
+                            value={editing.appearance?.fontFamily || config.theme?.fontFamily || FONT_CHOICES[0].val}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const choice = FONT_CHOICES.find(f => f.val === val);
+                              if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
+                              setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontFamily: val } });
+                              setDirty(true);
+                            }}
+                          >
+                            {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
+                          </select>
+                        </Field>
+                        <Field label="Font size (px)">
+                          <input type="number" min={10} max={64}
+                            style={S.input}
+                            value={editing.appearance?.fontSize ?? 18}
+                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontSize: Math.max(10, Number(e.target.value||18)) } }); setDirty(true); }}
+                          />
+                        </Field>
+                        <Field label="Font color">
+                          <input type="color"
+                            style={S.input}
+                            value={editing.appearance?.fontColor || '#ffffff'}
+                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontColor: e.target.value } }); setDirty(true); }}
+                          />
+                        </Field>
+                        <Field label="Font background color">
+                          <input type="color"
+                            style={S.input}
+                            value={editing.appearance?.fontBg || '#00000080'}
+                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontBg: e.target.value } }); setDirty(true); }}
+                          />
+                        </Field>
+                        <Field label="Screen background color">
+                          <input type="color"
+                            style={S.input}
+                            value={editing.appearance?.screenBg || '#0b0c10'}
+                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), screenBg: e.target.value } }); setDirty(true); }}
+                          />
+                        </Field>
+                        <Field label="Screen background image (URL)">
+                          <input
+                            style={S.input}
+                            placeholder="https://…/image.jpg (optional)"
+                            value={editing.appearance?.screenImg || ''}
+                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), screenImg: e.target.value } }); setDirty(true); }}
+                          />
+                        </Field>
+                      </div>
+
+                      {/* live preview */}
+                      <div style={{
+                        marginTop: 12,
+                        padding: 12,
+                        border: '1px dashed #2a323b',
+                        borderRadius: 10,
+                        background: editing.appearance?.screenImg
+                          ? `url(${editing.appearance.screenImg}) center/cover no-repeat`
+                          : (editing.appearance?.screenBg || '#0b0c10')
+                      }}>
+                        <div style={{
+                          fontFamily: editing.appearance?.fontFamily || 'inherit',
+                          fontSize: (editing.appearance?.fontSize ?? 18) + 'px',
+                          color: editing.appearance?.fontColor || '#fff',
+                          background: editing.appearance?.fontBg || 'transparent',
+                          display: 'inline-block',
+                          padding: '6px 10px',
+                          borderRadius: 8
+                        }}>
+                          The quick brown fox — 123
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Completion */}
+                <div style={{ marginBottom: 12, border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Mission Complete</div>
+                  <Field label="Message">
+                    <input
+                      style={S.input}
+                      value={editing.completion?.message || ''}
+                      onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), message: e.target.value } }); setDirty(true); }}
+                    />
+                  </Field>
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 2fr' }}>
+                    <Field label="Media type">
+                      <select
+                        style={S.input}
+                        value={editing.completion?.mediaType || 'audio'}
+                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), mediaType: e.target.value } }); setDirty(true); }}
+                      >
+                        <option value="none">None</option>
+                        <option value="audio">Audio (.mp3/.ogg)</option>
+                        <option value="video">Video (.mp4/.webm/.mov)</option>
+                        <option value="image">Image (.jpg/.png/.webp)</option>
+                      </select>
+                    </Field>
+                    <Field label="Media URL">
+                      <input
+                        style={S.input}
+                        placeholder="https://…/file.mp3 or .mp4 or .jpg"
+                        value={editing.completion?.mediaUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), mediaUrl: e.target.value } }); setDirty(true); }}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Rewards */}
+                <Field label="Points (Reward)">
+                  <input
+                    type="number"
+                    style={S.input}
+                    value={editing.rewards?.points ?? 0}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? 0 : Number(e.target.value);
+                      setEditing({ ...editing, rewards: { ...(editing.rewards || {}), points: v } });
+                      setDirty(true);
+                    }}
+                  />
+                </Field>
+                <Field label="Reward Items (one per line)">
+                  <textarea
+                    style={{ ...S.input, height: 90, fontFamily: 'ui-monospace, Menlo' }}
+                    placeholder="e.g.\nSmoke Bomb\nGolden Key"
+                    value={(editing.rewards?.items || []).join('\n')}
+                    onChange={(e) => {
+                      const list = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                      setEditing({ ...editing, rewards: { ...(editing.rewards || {}), items: list } });
+                      setDirty(true);
+                    }}
+                  />
+                </Field>
+
+                <hr style={S.hr} />
+
+                {/* MC editor */}
                 {editing.type === 'multiple_choice' && (
                   <div style={{ marginBottom: 12 }}>
                     <MultipleChoiceEditor
@@ -524,10 +645,10 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* geofence types always map */}
+                {/* Geofence types */}
                 {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick a location & radius</div>
+                    <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
                     <MapPicker
                       lat={editing.content?.lat}
                       lng={editing.content?.lng}
@@ -540,7 +661,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* AR types geofence toggle + map */}
+                {/* AR types (optional geofence) */}
                 {(editing.type === 'ar_image' || editing.type === 'ar_video') && (
                   <div style={{ marginBottom: 12 }}>
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -570,10 +691,7 @@ export default function Admin() {
                         />
                         <Field label="Cooldown (sec)">
                           <input
-                            type="number"
-                            min={0}
-                            max={3600}
-                            style={S.input}
+                            type="number" min={0} max={3600} style={S.input}
                             value={editing.content?.cooldownSeconds ?? 30}
                             onChange={(e) => {
                               const v = Number(e.target.value || 0);
@@ -587,7 +705,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* universal geofence toggle for MC / Short / Statement / Video */}
+                {/* Universal geofence toggle */}
                 {(editing.type === 'multiple_choice' || editing.type === 'short_answer' || editing.type === 'statement' || editing.type === 'video') && (
                   <div style={{ marginBottom: 12 }}>
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -602,7 +720,7 @@ export default function Admin() {
                           setDirty(true);
                         }}
                       />
-                      Enable a geofence for this mission
+                      Enable geofence for this mission
                     </label>
                     {editing.content?.geofenceEnabled && (
                       <>
@@ -617,10 +735,7 @@ export default function Admin() {
                         />
                         <Field label="Cooldown (sec)">
                           <input
-                            type="number"
-                            min={0}
-                            max={3600}
-                            style={S.input}
+                            type="number" min={0} max={3600} style={S.input}
                             value={editing.content?.cooldownSeconds ?? 30}
                             onChange={(e) => {
                               const v = Number(e.target.value || 0);
@@ -642,22 +757,16 @@ export default function Admin() {
                         <input
                           style={S.input}
                           value={editing.content?.[f.key] || ''}
-                          onChange={(e) => {
-                            setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
-                            setDirty(true);
-                          }}
+                          onChange={(e) => { setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}
                         />
-                        {['mediaUrl', 'imageUrl', 'videoUrl', 'assetUrl', 'markerUrl'].includes(f.key) && (
+                        {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) && (
                           <MediaPreview url={editing.content?.[f.key]} kind={f.key} />
                         )}
                       </>
                     )}
                     {f.type === 'number' && (
                       <input
-                        type="number"
-                        min={f.min}
-                        max={f.max}
-                        style={S.input}
+                        type="number" min={f.min} max={f.max} style={S.input}
                         value={editing.content?.[f.key] ?? ''}
                         onChange={(e) => {
                           const v = e.target.value === '' ? '' : Number(e.target.value);
@@ -670,30 +779,14 @@ export default function Admin() {
                       <textarea
                         style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
                         value={editing.content?.[f.key] || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
-                          setDirty(true);
-                        }}
+                        onChange={(e) => { setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}
                       />
                     )}
                   </Field>
                 ))}
 
-                <Field label="Points (Reward)">
-                  <input
-                    type="number"
-                    style={S.input}
-                    value={editing.rewards?.points ?? 0}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? 0 : Number(e.target.value);
-                      setEditing({ ...editing, rewards: { ...(editing.rewards || {}), points: v } });
-                      setDirty(true);
-                    }}
-                  />
-                </Field>
-
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button style={S.button} onClick={saveToList}>Add/Update in list</button>
+                  <button style={S.button} onClick={saveToList}>Add/Update in List</button>
                   <button style={S.button} onClick={cancelEdit}>Cancel</button>
                 </div>
                 {dirty && <div style={{ marginTop: 6, color: '#ffd166' }}>Unsaved changes…</div>}
@@ -703,40 +796,26 @@ export default function Admin() {
         </main>
       )}
 
-      {/* SETTINGS (includes Security moved here) */}
+      {/* SETTINGS */}
       {tab === 'settings' && (
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Game Settings</h3>
             <Field label="Game Title">
-              <input
-                style={S.input}
-                value={config.game.title}
-                onChange={(e) => setConfig({ ...config, game: { ...config.game, title: e.target.value } })}
-              />
+              <input style={S.input} value={config.game.title} onChange={(e) => setConfig({ ...config, game: { ...config.game, title: e.target.value } })} />
             </Field>
             <Field label="Game Type">
-              <select
-                style={S.input}
-                value={config.game.type}
-                onChange={(e) => setConfig({ ...config, game: { ...config.game, type: e.target.value } })}
-              >
-                {GAME_TYPES.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
+              <select style={S.input} value={config.game.type} onChange={(e) => setConfig({ ...config, game: { ...config.game, type: e.target.value } })}>
+                {GAME_TYPES.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  checked={config.splash.enabled}
-                  onChange={(e) => setConfig({ ...config, splash: { ...config.splash, enabled: e.target.checked } })}
-                />
+                <input type="checkbox" checked={config.splash.enabled} onChange={(e) => setConfig({ ...config, splash: { ...config.splash, enabled: e.target.checked } })} />
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
-            <Field label="Mode (determines how many players are collected on the splash page)">
+            <Field label="Mode (affects how many players to collect on splash)">
               <select
                 style={S.input}
                 value={config.splash.mode}
@@ -747,57 +826,34 @@ export default function Admin() {
                 }}
               >
                 <option value="single">Single Player</option>
-                <option value="head2head">Head‑to‑Head (2)</option>
+                <option value="head2head">Head to Head (2)</option>
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
 
-            {/* NEW — Timer settings */}
             <hr style={S.hr} />
             <h4>Game Timer</h4>
-            <Field label="Duration (minutes — 0 = infinite; counts up)">
-              <input
-                type="number"
-                min={0}
-                max={24 * 60}
-                style={S.input}
+            <Field label="Duration (minutes — 0 = infinite; count UP)">
+              <input type="number" min={0} max={24*60} style={S.input}
                 value={config.timer?.durationMinutes ?? 0}
-                onChange={(e) => {
-                  const v = Math.max(0, Number(e.target.value || 0));
-                  setConfig({ ...config, timer: { ...(config.timer || {}), durationMinutes: v } });
-                }}
+                onChange={(e) => { const v = Math.max(0, Number(e.target.value||0)); setConfig({ ...config, timer: { ...(config.timer||{}), durationMinutes: v } }); }}
               />
             </Field>
             <Field label="Alert before end (minutes — chime + warning)">
-              <input
-                type="number"
-                min={1}
-                max={120}
-                style={S.input}
+              <input type="number" min={1} max={120} style={S.input}
                 value={config.timer?.alertMinutes ?? 10}
-                onChange={(e) => {
-                  const v = Math.max(1, Number(e.target.value || 1));
-                  setConfig({ ...config, timer: { ...(config.timer || {}), alertMinutes: v } });
-                }}
+                onChange={(e) => { const v = Math.max(1, Number(e.target.value||1)); setConfig({ ...config, timer: { ...(config.timer||{}), alertMinutes: v } }); }}
               />
             </Field>
-            <div style={{ color: '#9fb0bf' }}>
-              The game client shows the clock at the top right above the objective.
-              If the duration is 0, it counts up; otherwise it counts down, plays an alarm when{' '}
-              {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN.”</b> at 0.
-            </div>
           </div>
 
-          {/* Security moved here */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Security</h3>
-            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth credentials for this admin. Requires the current password.</p>
+            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth login used for this admin. Requires current password.</p>
             <ChangeAuth />
             <hr style={S.hr} />
             <h4>Twilio Credentials</h4>
-            <p style={{ color: '#ffd166' }}>
-              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never store secrets in code.
-            </p>
+            <p style={{ color: '#ffd166' }}>Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.</p>
             <ul>
               <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
               <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
@@ -812,15 +868,13 @@ export default function Admin() {
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-              <Field label="Mission (Geofence)">
+              <Field label="Mission (geofence)">
                 <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-                  <option value="">— Choose —</option>
-                  {(suite.missions || []).map((m) => (
-                    <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
-                  ))}
+                  <option value="">— choose —</option>
+                  {(suite.missions || []).map((m) => <option key={m.id} value={m.id}>{m.id} — {m.title}</option>)}
                 </select>
               </Field>
-              <Field label="Phone Slot">
+              <Field label="Phone slot">
                 <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
                   {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
                 </select>
@@ -850,37 +904,25 @@ export default function Admin() {
         </main>
       )}
 
-      {/* POWER-UPS */}
+      {/* POWERUPS */}
       {tab === 'powerups' && (
         <main style={S.wrap}>
           <div style={S.card}>
-            <h3 style={{ marginTop: 0 }}>Power‑ups</h3>
-
+            <h3 style={{ marginTop: 0 }}>Power-Ups</h3>
             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-              <Field label="Title">
-                <input style={S.input} value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })} />
-              </Field>
+              <Field label="Title"><input style={S.input} value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })} /></Field>
               <Field label="Type">
                 <select style={S.input} value={pu.type} onChange={(e) => setPu({ ...pu, type: e.target.value })}>
                   {POWERUP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </Field>
-              <Field label="Pickup Radius (m)">
-                <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/>
-              </Field>
-              <Field label="Effect Duration (sec)">
-                <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/>
-              </Field>
+              <Field label="Pickup radius (m)"><input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/></Field>
+              <Field label="Effect duration (sec)"><input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/></Field>
             </div>
 
-            <Field label="Pickup Location">
+            <Field label="Pickup location">
               <div style={{ marginBottom: 8 }}>
-                <MapPicker
-                  lat={pu.lat}
-                  lng={pu.lng}
-                  radius={pu.pickupRadius}
-                  onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })}
-                />
+                <MapPicker lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius} onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })} />
               </div>
             </Field>
 
@@ -891,16 +933,14 @@ export default function Admin() {
                   const item = { ...pu, id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0') };
                   const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
                   setConfig({ ...config, powerups: list });
-                  setStatus('✅ Power‑up added (remember to Save All)');
+                  setStatus('✅ Power-up added (remember Save All)');
                 }}
-              >
-                + Add Power‑up
-              </button>
+              >+ Add Power-Up</button>
             </div>
 
             <hr style={S.hr} />
-            <h4>Placed Power‑ups</h4>
-            {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power‑ups yet.</div>}
+            <h4>Placed Power-Ups</h4>
+            {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power-ups yet.</div>}
             <ul style={{ paddingLeft: 18 }}>
               {(config.powerups || []).map((x, i) => (
                 <li key={i} style={{ marginBottom: 8 }}>
@@ -912,9 +952,7 @@ export default function Admin() {
                       next.splice(i, 1);
                       setConfig({ ...config, powerups: next });
                     }}
-                  >
-                    Remove
-                  </button>
+                  >Remove</button>
                 </li>
               ))}
             </ul>
@@ -934,7 +972,7 @@ export default function Admin() {
               </label>
             </div>
             <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
-            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power‑ups for the selected game.</div>
+            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power-ups for the selected game.</div>
           </div>
         </main>
       )}
@@ -945,31 +983,21 @@ export default function Admin() {
           <div style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>Play Test</h3>
-
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <label>
-                  Channel:&nbsp;
-                  <select value={testChannel} onChange={(e) => setTestChannel(e.target.value)} style={S.input}>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <label>Channel:&nbsp;
+                  <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
                 </label>
-
-                {/* Launcher opens the game in a new window/tab (uses NEXT_PUBLIC_GAME_ORIGIN if set) */}
                 <TestLauncher slug={activeSlug || ''} channel={testChannel} preferPretty={true} popup={false} />
               </div>
             </div>
-
-            {!gameBase && (
-              <div style={{ color: '#9fb0bf', marginBottom: 8 }}>
-                Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable the embedded preview.
-              </div>
-            )}
-
+            {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.</div>}
             {gameBase && (
               <iframe
-                src={gameBase + '/?slug=' + (activeSlug || '') + '&channel=' + testChannel + '&preview=1'}
-                style={{ width: '100%', height: '70vh', border: '1px solid #22303c', borderRadius: 12 }}
+                src={`${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}&preview=1`}
+                style={{ width:'100%', height: '70vh', border:'1px solid #22303c', borderRadius: 12 }}
               />
             )}
           </div>
@@ -990,19 +1018,16 @@ export default function Admin() {
             <Field label="Mode">
               <select style={S.input} value={newMode} onChange={(e) => setNewMode(e.target.value)}>
                 <option value="single">Single Player</option>
-                <option value="head2head">Head‑to‑Head (2)</option>
+                <option value="head2head">Head to Head (2)</option>
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
-
-            {/* NEW — Timer defaults for a fresh game */}
-            <Field label="Duration (minutes — 0 = infinite; counts up)">
+            <Field label="Duration (minutes — 0 = infinite; count UP)">
               <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin} onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
             </Field>
             <Field label="Alert before end (minutes)">
               <input type="number" min={1} max={120} style={S.input} value={newAlertMin} onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))} />
             </Field>
-
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button style={S.button} onClick={() => setShowNewGame(false)}>Cancel</button>
               <button
@@ -1010,17 +1035,11 @@ export default function Admin() {
                 onClick={async () => {
                   if (!newTitle.trim()) return;
                   const r = await fetch('/api/games', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      title: newTitle.trim(),
-                      type: newType,
-                      mode: newMode,
-                      timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin }, // server may ignore; admin will still have defaults via merge
-                    }),
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newTitle.trim(), type: newType, mode: newMode, timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin } }),
                   });
                   const j = await r.json();
-                  if (!j.ok) { setStatus('❌ ' + (j.error || 'Create failed')); return; }
+                  if (!j.ok) { setStatus('❌ ' + (j.error || 'create failed')); return; }
                   const rr = await fetch('/api/games'); const jj = await rr.json();
                   if (jj.ok) setGames(jj.games || []);
                   setActiveSlug(j.slug);
@@ -1036,9 +1055,7 @@ export default function Admin() {
   );
 }
 
-/* =====================================================================
-   4) SMALL COMPONENTS
-   ===================================================================== */
+/* ========================== Small Components ========================== */
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -1051,31 +1068,24 @@ function Field({ label, children }) {
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
   const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
-
   useEffect(() => { setLocal(Array.isArray(value) ? value.slice(0, 5) : []); }, [value]);
   useEffect(() => { setCorrect(Number.isInteger(correctIndex) ? correctIndex : undefined); }, [correctIndex]);
-
   function sync(nextChoices, nextCorrect) {
     const trimmed = nextChoices.map((s) => (s || '').trim()).filter(Boolean).slice(0, 5);
     const ci = Number.isInteger(nextCorrect) && nextCorrect < trimmed.length ? nextCorrect : undefined;
     onChange({ choices: trimmed, correctIndex: ci });
   }
-
   return (
     <div style={{ border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
       <div style={{ fontWeight: 600, marginBottom: 8 }}>Choices (A–E)</div>
-      {[0, 1, 2, 3, 4].map((i) => (
+      {[0,1,2,3,4].map((i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <input type="radio" name="mcq-correct" checked={correct === i} onChange={() => { setCorrect(i); sync(local, i); }} title="Mark as correct" />
-          <input
-            placeholder={`Choice ${String.fromCharCode(65 + i)}`}
-            style={S.input}
-            value={local[i] || ''}
-            onChange={(e) => { const next = [...local]; next[i] = e.target.value; setLocal(next); sync(next, correct); }}
-          />
+          <input placeholder={`Choice ${String.fromCharCode(65 + i)}`} style={S.input}
+            value={local[i] || ''} onChange={(e) => { const next = [...local]; next[i] = e.target.value; setLocal(next); sync(next, correct); }} />
         </div>
       ))}
-      <div style={{ color: '#9fb0bf', fontSize: 12 }}>Mark exactly one choice as correct. Leave blanks for unused options.</div>
+      <div style={{ color: '#9fb0bf', fontSize: 12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
     </div>
   );
 }
@@ -1086,7 +1096,6 @@ function MediaPreview({ url, kind }) {
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
-
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ color: '#9fb0bf', fontSize: 12, marginBottom: 6 }}>Preview ({kind})</div>
@@ -1095,7 +1104,7 @@ function MediaPreview({ url, kind }) {
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 10, border: '1px solid #2a323b' }} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9fb0bf', textDecoration: 'underline' }}>Open Media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9fb0bf', textDecoration: 'underline' }}>Open media</a>
       )}
     </div>
   );
@@ -1116,42 +1125,27 @@ function MapPicker({ lat, lng, radius, onChange }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setReady(true); return; }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    s.async = true;
-    s.onload = () => setReady(true);
-    document.body.appendChild(s);
+    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setReady(true); document.body.appendChild(s);
   }, []);
 
   useEffect(() => {
     if (!ready || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
-
     if (!mapRef.current) {
       mapRef.current = L.map(divRef.current).setView(defaultPos, lat && lng ? 16 : 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapRef.current);
-
       markerRef.current = L.marker(defaultPos, { draggable: true }).addTo(mapRef.current);
       circleRef.current = L.circle(markerRef.current.getLatLng(), { radius: r || 25, color: '#33a8ff' }).addTo(mapRef.current);
-
       const sync = () => {
-        const p = markerRef.current.getLatLng();
-        circleRef.current.setLatLng(p);
-        circleRef.current.setRadius(Number(r || 25));
+        const p = markerRef.current.getLatLng(); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r || 25));
         onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
       };
       markerRef.current.on('dragend', sync);
       mapRef.current.on('click', (e) => { markerRef.current.setLatLng(e.latlng); sync(); });
       sync();
     } else {
-      const p = defaultPos;
-      markerRef.current.setLatLng(p);
-      circleRef.current.setLatLng(p);
-      circleRef.current.setRadius(Number(r || 25));
+      const p = defaultPos; markerRef.current.setLatLng(p); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r || 25));
     }
   }, [ready]);
 
@@ -1178,39 +1172,31 @@ function MapPicker({ lat, lng, radius, onChange }) {
       setSearching(false);
     }
   }
-
-  function gotoResult(result) {
+  function gotoResult(r) {
     if (!mapRef.current || !markerRef.current) return;
-    const latNum = Number(result.lat), lonNum = Number(result.lon);
-    const p = [latNum, lonNum];
-    markerRef.current.setLatLng(p);
-    circleRef.current.setLatLng(p);
-    mapRef.current.setView(p, 16);
-    onChange(Number(latNum.toFixed(6)), Number(lonNum.toFixed(6)), Number(r || 25));
+    const lat = Number(r.lat), lon = Number(r.lon); const p = [lat, lon];
+    markerRef.current.setLatLng(p); circleRef.current.setLatLng(p); mapRef.current.setView(p, 16);
+    onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
     setResults([]);
   }
-
   function useMyLocation() {
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const latNum = pos.coords.latitude, lonNum = pos.coords.longitude;
-      gotoResult({ lat: latNum, lon: lonNum });
-    });
+    navigator.geolocation.getCurrentPosition((pos) => { const lat = pos.coords.latitude, lon = pos.coords.longitude; gotoResult({ lat, lon }); });
   }
 
   return (
     <div>
       <form onSubmit={doSearch} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 8 }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search address or place…" style={S.input} />
-        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use My Location</button>
+        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use my location</button>
         <button disabled={searching} type="submit" style={S.button}>{searching ? 'Searching…' : 'Search'}</button>
       </form>
       {results.length > 0 && (
         <div style={{ background: '#0b0c10', border: '1px solid #2a323b', borderRadius: 10, padding: 8, marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
-          {results.map((res, i) => (
-            <div key={i} onClick={() => gotoResult(res)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
-              <div style={{ fontWeight: 600 }}>{res.display_name}</div>
-              <div style={{ color: '#9fb0bf', fontSize: 12 }}>Lat {Number(res.lat).toFixed(6)}, Lng {Number(res.lon).toFixed(6)}</div>
+          {results.map((r, i) => (
+            <div key={i} onClick={() => gotoResult(r)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
+              <div style={{ fontWeight: 600 }}>{r.display_name}</div>
+              <div style={{ color: '#9fb0bf', fontSize: 12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
             </div>
           ))}
         </div>
@@ -1237,7 +1223,7 @@ function TestSMS() {
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1…" style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
         <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
         <button style={S.button} onClick={send}>Send Test</button>
       </div>
@@ -1254,11 +1240,7 @@ function ChangeAuth() {
   const [status, setStatus] = useState('');
   async function submit() {
     setStatus('Updating…');
-    const res = await fetch('/api/change-auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ curUser, curPass, newUser, newPass }),
-    });
+    const res = await fetch('/api/change-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
     const t = await res.text();
     setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ ' + t);
   }
@@ -1280,9 +1262,7 @@ function ChangeAuth() {
   );
 }
 
-/* =====================================================================
-   5) STYLES
-   ===================================================================== */
+/* ========================== Styles ========================== */
 const S = {
   body: { background: '#0b0c10', color: '#e9eef2', minHeight: '100vh', fontFamily: 'system-ui, Arial, sans-serif' },
   header: { padding: 16, background: '#11161a', borderBottom: '1px solid #1d2329' },
@@ -1300,14 +1280,11 @@ const S = {
   hr: { border: '1px solid #1f262d', borderBottom: 'none' },
 };
 
-/* =====================================================================
-   MapOverview — Leaflet map overlaying all missions + power‑ups (robust)
-   ===================================================================== */
-function MapOverview({ missions = [], powerups = [], showRings = true }) {
+/* ========================== Map Overview ========================== */
+function MapOverview({ missions=[], powerups=[], showRings=true }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
-  // helper: safely read lat/lng from various shapes
   function getLL(src) {
     if (!src) return null;
     const c = src.content || src;
@@ -1320,47 +1297,31 @@ function MapOverview({ missions = [], powerups = [], showRings = true }) {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setLeafletReady(true); return; }
-    // add CSS
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    // add JS
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    s.async = true;
-    s.onload = () => setLeafletReady(true);
-    document.body.appendChild(s);
+    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setLeafletReady(true); document.body.appendChild(s);
   }, []);
 
   React.useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
 
-    // create or get map instance
     if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [44.9778, -93.2650], zoom: 12 });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(map);
+      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
       divRef.current._leaflet_map = map;
     }
     const map = divRef.current._leaflet_map;
 
-    // clear or create overlay layer
-    if (!map._overviewLayer) {
-      map._overviewLayer = L.layerGroup().addTo(map);
-    } else {
-      map._overviewLayer.clearLayers();
-    }
+    if (!map._overviewLayer) map._overviewLayer = L.layerGroup().addTo(map);
+    else map._overviewLayer.clearLayers();
+
     const layer = map._overviewLayer;
     const bounds = L.latLngBounds([]);
 
     const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
     const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
 
-    (missions || []).forEach((m) => {
+    (missions||[]).forEach((m) => {
       const pos = getLL(m);
       const c = (m && m.content) || {};
       const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
@@ -1369,18 +1330,18 @@ function MapOverview({ missions = [], powerups = [], showRings = true }) {
       const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
       const title = m.title || m.id || 'Mission';
       const t = m.type || '';
-      mk.bindPopup(`<b>${title}</b><br/>${t}${rad ? `<br/>radius: ${rad}m` : ''}`);
+      mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
       if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
-    (powerups || []).forEach((p) => {
+    (powerups||[]).forEach((p) => {
       const pos = getLL(p);
       if (!pos) return;
       const rad = Number(p.pickupRadius || p.radiusMeters || 0);
       const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
-      const title = p.title || p.type || 'Power‑up';
-      mk.bindPopup(`<b>${title}</b>${rad ? `<br/>pickup: ${rad}m` : ''}`);
+      const title = p.title || p.type || 'Power-up';
+      mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
       if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
@@ -1392,10 +1353,10 @@ function MapOverview({ missions = [], powerups = [], showRings = true }) {
     <div>
       {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
       <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
-      {((missions || []).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
-       ((powerups || []).length === 0) && (
+      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
+       ((powerups||[]).length === 0) && (
         <div style={{ color: '#9fb0bf', marginTop: 8 }}>
-          No geofenced missions or power‑ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power‑ups with lat/lng.
+          No geofenced missions or power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power-ups with lat/lng.
         </div>
       )}
     </div>
