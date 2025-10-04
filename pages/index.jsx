@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 
 /* =====================================================================
    0) HELPERS
@@ -124,10 +124,21 @@ export default function Admin() {
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
-  const gameBase = (typeof window !== 'undefined'
-    ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
-    : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
-
+  const [gameOriginOverride, setGameOriginOverride] = useState('');
+  // read persisted preview origin (so you can test without redeploying)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('game_origin') || '';
+      if (saved) setGameOriginOverride(saved);
+    }
+  }, []);
+  const gameBase = useMemo(() => {
+    const fromEnv = (typeof window !== 'undefined'
+      ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
+      : process.env.NEXT_PUBLIC_GAME_ORIGIN);
+    const fromConfig = (config && config.gameOrigin) || '';
+    return (gameOriginOverride || fromEnv || fromConfig || '').trim();
+  }, [gameOriginOverride, config]);
 
   // data
   const [suite, setSuite] = useState(null);
@@ -158,7 +169,11 @@ export default function Admin() {
       try {
         const r = await fetch('/api/games');
         const j = await r.json();
-        if (j.ok) setGames(j.games || []);
+        if (j.ok) {
+          const list = j.games || [];
+          setGames(list);
+          if (!activeSlug && list.length) setActiveSlug(list[0].slug);
+        }
       } catch {}
     })();
   }, []);
@@ -288,7 +303,22 @@ export default function Admin() {
     }
   }
 
-  // missions helpers
+  
+  function moveMission(id, dir) {
+    // dir: -1 up, +1 down
+    if (!suite || !Array.isArray(suite.missions)) return;
+    const arr = suite.missions.slice();
+    const i = arr.findIndex((m) => m.id === id);
+    if (i < 0) return;
+    const j = Math.max(0, Math.min(arr.length - 1, i + dir));
+    if (i === j) return;
+    const [it] = arr.splice(i, 1);
+    arr.splice(j, 0, it);
+    setSuite({ ...suite, missions: arr });
+    if (selected === id) setSelected(id);
+    setDirty(true);
+  }
+// missions helpers
   function suggestId() {
     const base = 'm';
     let i = 1;
@@ -456,9 +486,13 @@ export default function Admin() {
                         {m.type} — id: {m.id}
                       </div>
                     </div>
-                    <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
-                      Delete
-                    </button>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <button title="Move up" style={{ ...S.button, padding: '6px 8px' }} onClick={() => moveMission(m.id, -1)}>↑</button>
+                      <button title="Move down" style={{ ...S.button, padding: '6px 8px' }} onClick={() => moveMission(m.id, +1)}>↓</button>
+                      <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -625,6 +659,8 @@ export default function Admin() {
                           />
                         </Field>
                       </>
+                
+
                     )}
                   </div>
                 )}
@@ -687,7 +723,28 @@ export default function Admin() {
                   />
                 </Field>
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                
+                {/* Appearance */}
+                <div style={{ borderTop: '1px solid #1f262d', marginTop: 12, paddingTop: 12 }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!editing.content?.styleEnabled}
+                      onChange={(e) => {
+                        setEditing({ ...editing, content: { ...editing.content, styleEnabled: e.target.checked } });
+                        setDirty(true);
+                      }}
+                    />
+                    Use custom appearance for this mission
+                  </label>
+                  {editing.content?.styleEnabled && (
+                    <AppearanceEditor
+                      value={editing.content?.style || {}}
+                      onChange={(style) => { setEditing({ ...editing, content: { ...editing.content, style } }); setDirty(true); }}
+                    />
+                  )}
+                </div>
+<div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button style={S.button} onClick={saveToList}>Add/Update in List</button>
                   <button style={S.button} onClick={cancelEdit}>Cancel</button>
                 </div>
@@ -943,12 +1000,26 @@ export default function Admin() {
                     <option value="published">published</option>
                   </select>
                 </label>
+                <label>Game origin:&nbsp;
+                  <input
+                    style={{ ...S.input, width: 280 }}
+                    placeholder="https://esxaperide.com"
+                    value={gameOriginOverride}
+                    onChange={(e)=>setGameOriginOverride(e.target.value)}
+                    onBlur={() => { if (typeof window !== 'undefined') { window.localStorage.setItem('game_origin', gameOriginOverride || ''); window.__GAME_ORIGIN__ = gameOriginOverride || undefined; } }}
+                  />
+                </label>
                 <a href={(gameBase? `${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}` : '#')}
                    target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none' }}>Open full window</a>
               </div>
             </div>
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.</div>}
-            {gameBase && (
+            {gameBase && (typeof window !== 'undefined' && window.location.protocol === 'https:' && gameBase.startsWith('http:')) && (
+              <div style={{ color:'#f59e0b', marginBottom:8 }}>
+                Mixed content blocked: Your admin is HTTPS but the Game origin is HTTP ({gameBase}). Use an HTTPS Game URL (e.g. https://esxaperide.com) or set it above.
+              </div>
+            )}
+            {gameBase && !(typeof window !== 'undefined' && window.location.protocol === 'https:' && gameBase.startsWith('http:')) && (
               <iframe
                 src={`${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}&preview=1`}
                 style={{ width:'100%', height: '70vh', border:'1px solid #22303c', borderRadius: 12 }}
@@ -1022,6 +1093,60 @@ export default function Admin() {
   );
 }
 
+
+function AppearanceEditor({ value = {}, onChange }) {
+  const fonts = [
+    { label: 'System Sans', value: 'system-ui, Arial, sans-serif' },
+    { label: 'Inter', value: 'Inter, system-ui, Arial, sans-serif' },
+    { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+    { label: 'Segoe UI', value: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif' },
+    { label: 'Georgia', value: 'Georgia, serif' },
+    { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+    { label: 'Garamond', value: 'Garamond, serif' },
+    { label: 'Courier New', value: '"Courier New", Courier, monospace' },
+    { label: 'Consolas', value: 'Consolas, monaco, monospace' },
+    { label: 'Comic Sans MS', value: '"Comic Sans MS", cursive, sans-serif' }
+  ];
+  const palette = [
+    '#ffffff','#e9eef2','#f3f4f6','#0b0c10','#111827','#1f2937','#64748b',
+    '#22c55e','#10b981','#3b82f6','#60a5fa','#a78bfa','#ef4444','#f59e0b','#f97316','#fcd34d'
+  ];
+  const style = value || {};
+  const set = (k, v) => onChange({ ...style, [k]: v });
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+      <Field label="Font family">
+        <select style={S.input} value={style.fontFamily || ''} onChange={(e)=>set('fontFamily', e.target.value)}>
+          {fonts.map((f)=> <option key={f.value} value={f.value}>{f.label}</option>)}
+        </select>
+      </Field>
+      <Field label="Font size">
+        <select style={S.input} value={typeof style.fontSize==='number'? style.fontSize : 18} onChange={(e)=>set('fontSize', Number(e.target.value))}>
+          {[12,14,16,18,20,22,24,28,32,36,40].map(n=> <option key={n} value={n}>{n}px</option>)}
+        </select>
+      </Field>
+      <Field label="Text color">
+        <select style={S.input} value={style.textColor || ''} onChange={(e)=>set('textColor', e.target.value)}>
+          {palette.map((c)=> <option key={c} value={c}>{c}</option>)}
+        </select>
+      </Field>
+      <Field label="Background color">
+        <select style={S.input} value={style.backgroundColor || ''} onChange={(e)=>set('backgroundColor', e.target.value)}>
+          {palette.map((c)=> <option key={c} value={c}>{c}</option>)}
+        </select>
+      </Field>
+      <Field label="Background image URL">
+        <input style={S.input} value={style.backgroundImageUrl || ''} placeholder="https://…" onChange={(e)=>set('backgroundImageUrl', e.target.value)} />
+      </Field>
+      <Field label="Background size">
+        <select style={S.input} value={style.backgroundSize || 'cover'} onChange={(e)=>set('backgroundSize', e.target.value)}>
+          {['cover','contain','auto'].map((k)=> <option key={k} value={k}>{k}</option>)}
+        </select>
+      </Field>
+    </div>
+  );
+}
 /* =====================================================================
    4) SMALL COMPONENTS
    ===================================================================== */
