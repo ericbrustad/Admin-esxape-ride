@@ -1,14 +1,8 @@
-// apps/admin/lib/github.js
 // Monorepo-aware GitHub Contents API helpers (ESM)
-
 const API = process.env.GITHUB_API || 'https://api.github.com';
 
 export function joinPath(...parts) {
-  return parts
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/')
-    .replace(/^\/|\/$/g, '');
+  return parts.filter(Boolean).join('/').replace(/\/+/g, '/').replace(/^\/|\/$/g, '');
 }
 
 function getEnv(strict = true) {
@@ -42,52 +36,32 @@ export async function ghGet(relPath) {
   const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURI(path)}?ref=${encodeURIComponent(BRANCH)}`;
   const r = await fetch(url, { headers: authHeaders(TOKEN), cache: 'no-store' });
   if (r.status === 404) return { status: 404, data: null };
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(`GitHub GET ${path} failed: ${r.status} ${text}`);
-  }
-  const data = await r.json();
-  return { status: 200, data };
+  if (!r.ok) throw new Error(`GitHub GET ${path} failed: ${r.status} ${await r.text()}`);
+  return { status: 200, data: await r.json() };
 }
 
 export async function ghPut(relPath, content, message, sha) {
   const { OWNER, REPO, TOKEN, BRANCH, BASE_DIR } = getEnv(true);
   const path = joinPath(BASE_DIR, relPath);
   const url = `${API}/repos/${OWNER}/${REPO}/contents/${encodeURI(path)}`;
-  const contentBase64 = Buffer.isBuffer(content)
-    ? content.toString('base64')
-    : Buffer.from(String(content), 'utf8').toString('base64');
-
-  const body = {
-    message: message || `Update ${path}`,
-    content: contentBase64,
-    branch: BRANCH,
-    ...(sha ? { sha } : {}),
-  };
-
-  const r = await fetch(url, {
-    method: 'PUT',
-    headers: { ...authHeaders(TOKEN), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(`GitHub PUT ${path} failed: ${r.status} ${text}`);
-  }
+  const b64 = Buffer.isBuffer(content) ? content.toString('base64') : Buffer.from(String(content), 'utf8').toString('base64');
+  const body = { message: message || `Update ${path}`, content: b64, branch: BRANCH, ...(sha ? { sha } : {}) };
+  const r = await fetch(url, { method: 'PUT', headers: { ...authHeaders(TOKEN), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`GitHub PUT ${path} failed: ${r.status} ${await r.text()}`);
   return r.json();
 }
 
 export async function upsertJson(relPath, json, message) {
   const pretty = JSON.stringify(json, null, 2) + '\n';
-  const existing = await ghGet(relPath); // 404 = create
-  const sha = existing.status === 200 && existing.data && existing.data.sha ? existing.data.sha : undefined;
+  const existing = await ghGet(relPath);               // 404 ⇒ create
+  const sha = existing.status === 200 && existing.data?.sha ? existing.data.sha : undefined;
   return ghPut(relPath, pretty, message, sha);
 }
 
 export async function listDirs(relPath) {
   const res = await ghGet(relPath);
   if (res.status !== 200 || !Array.isArray(res.data)) return [];
-  return res.data.filter((x) => x.type === 'dir').map((x) => x.name);
+  return res.data.filter(x => x.type === 'dir').map(x => x.name);
 }
 
 export function getEnvSnapshot() {
