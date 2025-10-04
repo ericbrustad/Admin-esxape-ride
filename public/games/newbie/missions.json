@@ -1,15 +1,51 @@
 {
-  "version": "0.0.1",
+  "id": "msuite_esx",
+  "version": "0.6.25",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
   "missions": [
     {
       "id": "m01",
-      "title": "Welcome",
-      "type": "statement",
+      "title": "New Mission",
+      "type": "short_answer",
       "rewards": {
-        "points": 10
+        "points": 25
       },
       "content": {
-        "text": "Welcome to Newbie! Ready to play?"
+        "question": "hi",
+        "answer": "hello",
+        "acceptable": "yes",
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m02",
+      "title": "Suv",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "Which one does Eric have",
+        "choices": [
+          "Cadi",
+          "Suburb",
+          "Gmc"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
       }
     }
   ]
