@@ -5,10 +5,15 @@
   },
   "game": {
     "title": "Newbie",
-    "type": "Mystery"
+    "type": "Thriller"
   },
   "forms": {
     "players": 1
   },
-  "textRules": []
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "powerups": []
 }
