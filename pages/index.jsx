@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
-
 /* =====================================================================
    0) HELPERS
    ===================================================================== */
@@ -95,8 +94,8 @@ const TYPE_OPTIONS = [
   { value: 'short_answer', label: 'Question (Short Answer)' },
   { value: 'statement', label: 'Statement' },
   { value: 'video', label: 'Video' },
-  { value: 'geofence_image', label: 'Geo Fence Image' },
-  { value: 'geofence_video', label: 'Geo Fence Video' },
+  { value: 'geofence_image', label: 'Geofence Image' },
+  { value: 'geofence_video', label: 'Geofence Video' },
   { value: 'ar_image', label: 'AR Image' },
   { value: 'ar_video', label: 'AR Video' },
 ];
@@ -126,15 +125,19 @@ export default function Admin() {
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
-  const gameBase = (typeof window !== 'undefined'
-    ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
-    : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
-
 
   // data
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
+
+  // computed base for game preview (after config is declared)
+  const gameBase =
+    ((typeof window !== 'undefined'
+      ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
+      : process.env.NEXT_PUBLIC_GAME_ORIGIN) ||
+      (config?.gameOrigin)) ||
+    '';
 
   // mission edit
   const [selected, setSelected] = useState(null);
@@ -144,7 +147,7 @@ export default function Admin() {
   // text rules
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
 
-  // powerups (new)
+  // power-ups (new)
   const [pu, setPu] = useState({
     title: '',
     type: 'smoke',
@@ -220,7 +223,7 @@ export default function Admin() {
       splash: { enabled: true, mode: 'single' },
       game: { title: 'Untitled Game', type: 'Mystery' },
       forms: { players: 1 },
-      timer: { durationMinutes: 0, alertMinutes: 10 }, // <— NEW
+      timer: { durationMinutes: 0, alertMinutes: 10 }, // NEW
       textRules: [],
       powerups: [],
     };
@@ -330,7 +333,7 @@ export default function Admin() {
   }
   function saveToList() {
     if (!editing || !suite) return;
-    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill ID, title, and type');
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number') continue;
@@ -345,7 +348,7 @@ export default function Admin() {
     setSelected(editing.id);
     setEditing(null);
     setDirty(false);
-    setStatus('✅ List updated (remember Save All)');
+    setStatus('✅ List updated (remember to Save All)');
   }
   function removeMission(id) {
     if (!suite) return;
@@ -358,13 +361,13 @@ export default function Admin() {
 
   // text rules
   function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
+    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick a mission and enter a message');
     const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
+    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot is out of range');
     const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember Save All)');
+    setStatus('✅ SMS rule added (remember to Save All)');
   }
   function removeSmsRule(idx) {
     const rules = [...(config?.textRules || [])];
@@ -524,7 +527,7 @@ export default function Admin() {
                 {/* geofence types always map */}
                 {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
                   <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
+                    <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick a location & radius</div>
                     <MapPicker
                       lat={editing.content?.lat}
                       lng={editing.content?.lng}
@@ -599,7 +602,7 @@ export default function Admin() {
                           setDirty(true);
                         }}
                       />
-                      Enable geofence for this mission
+                      Enable a geofence for this mission
                     </label>
                     {editing.content?.geofenceEnabled && (
                       <>
@@ -690,7 +693,7 @@ export default function Admin() {
                 </Field>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button style={S.button} onClick={saveToList}>Add/Update in List</button>
+                  <button style={S.button} onClick={saveToList}>Add/Update in list</button>
                   <button style={S.button} onClick={cancelEdit}>Cancel</button>
                 </div>
                 {dirty && <div style={{ marginTop: 6, color: '#ffd166' }}>Unsaved changes…</div>}
@@ -700,7 +703,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* SETTINGS (includes SECURITY moved here) */}
+      {/* SETTINGS (includes Security moved here) */}
       {tab === 'settings' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -733,7 +736,7 @@ export default function Admin() {
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
-            <Field label="Mode (affects how many players to collect on splash)">
+            <Field label="Mode (determines how many players are collected on the splash page)">
               <select
                 style={S.input}
                 value={config.splash.mode}
@@ -744,7 +747,7 @@ export default function Admin() {
                 }}
               >
                 <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
+                <option value="head2head">Head‑to‑Head (2)</option>
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
@@ -752,7 +755,7 @@ export default function Admin() {
             {/* NEW — Timer settings */}
             <hr style={S.hr} />
             <h4>Game Timer</h4>
-            <Field label="Duration (minutes — 0 = infinite; count UP)">
+            <Field label="Duration (minutes — 0 = infinite; counts up)">
               <input
                 type="number"
                 min={0}
@@ -779,21 +782,21 @@ export default function Admin() {
               />
             </Field>
             <div style={{ color: '#9fb0bf' }}>
-              The game client should show the clock at the top-right above the objective.
-              If duration is 0 it counts up; otherwise it counts down, plays an alarm when{' '}
-              {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN”</b> at 0.
+              The game client shows the clock at the top right above the objective.
+              If the duration is 0, it counts up; otherwise it counts down, plays an alarm when{' '}
+              {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN.”</b> at 0.
             </div>
           </div>
 
           {/* Security moved here */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Security</h3>
-            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth login used for this admin. Requires current password.</p>
+            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth credentials for this admin. Requires the current password.</p>
             <ChangeAuth />
             <hr style={S.hr} />
             <h4>Twilio Credentials</h4>
             <p style={{ color: '#ffd166' }}>
-              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.
+              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never store secrets in code.
             </p>
             <ul>
               <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
@@ -809,15 +812,15 @@ export default function Admin() {
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-              <Field label="Mission (geofence)">
+              <Field label="Mission (Geofence)">
                 <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-                  <option value="">— choose —</option>
+                  <option value="">— Choose —</option>
                   {(suite.missions || []).map((m) => (
                     <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Phone slot">
+              <Field label="Phone Slot">
                 <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
                   {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
                 </select>
@@ -847,11 +850,11 @@ export default function Admin() {
         </main>
       )}
 
-      {/* POWERUPS */}
+      {/* POWER-UPS */}
       {tab === 'powerups' && (
         <main style={S.wrap}>
           <div style={S.card}>
-            <h3 style={{ marginTop: 0 }}>Power-Ups</h3>
+            <h3 style={{ marginTop: 0 }}>Power‑ups</h3>
 
             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
               <Field label="Title">
@@ -862,15 +865,15 @@ export default function Admin() {
                   {POWERUP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </Field>
-              <Field label="Pickup radius (m)">
+              <Field label="Pickup Radius (m)">
                 <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/>
               </Field>
-              <Field label="Effect duration (sec)">
+              <Field label="Effect Duration (sec)">
                 <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/>
               </Field>
             </div>
 
-            <Field label="Pickup location">
+            <Field label="Pickup Location">
               <div style={{ marginBottom: 8 }}>
                 <MapPicker
                   lat={pu.lat}
@@ -888,16 +891,16 @@ export default function Admin() {
                   const item = { ...pu, id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0') };
                   const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
                   setConfig({ ...config, powerups: list });
-                  setStatus('✅ Power-up added (remember Save All)');
+                  setStatus('✅ Power‑up added (remember to Save All)');
                 }}
               >
-                + Add Power-Up
+                + Add Power‑up
               </button>
             </div>
 
             <hr style={S.hr} />
-            <h4>Placed Power-Ups</h4>
-            {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power-ups yet.</div>}
+            <h4>Placed Power‑ups</h4>
+            {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power‑ups yet.</div>}
             <ul style={{ paddingLeft: 18 }}>
               {(config.powerups || []).map((x, i) => (
                 <li key={i} style={{ marginBottom: 8 }}>
@@ -914,7 +917,11 @@ export default function Admin() {
                   </button>
                 </li>
               ))}
-       
+            </ul>
+          </div>
+        </main>
+      )}
+
       {/* MAP */}
       {tab === 'map' && (
         <main style={S.wrap}>
@@ -927,47 +934,47 @@ export default function Admin() {
               </label>
             </div>
             <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
-            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power-ups for the selected game.</div>
+            <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power‑ups for the selected game.</div>
           </div>
         </main>
       )}
 
-     {/* TEST */}
-{tab === 'test' && (
-  <main style={S.wrap}>
-    <div style={S.card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <h3 style={{ margin: 0 }}>Play Test</h3>
+      {/* TEST */}
+      {tab === 'test' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <h3 style={{ margin: 0 }}>Play Test</h3>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label>
-            Channel:&nbsp;
-            <select value={testChannel} onChange={(e) => setTestChannel(e.target.value)} style={S.input}>
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-            </select>
-          </label>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label>
+                  Channel:&nbsp;
+                  <select value={testChannel} onChange={(e) => setTestChannel(e.target.value)} style={S.input}>
+                    <option value="draft">draft</option>
+                    <option value="published">published</option>
+                  </select>
+                </label>
 
-          {/* Launcher opens the game in a new window/tab (uses NEXT_PUBLIC_GAME_ORIGIN if set) */}
-          <TestLauncher slug={activeSlug || ''} channel={testChannel} preferPretty={true} popup={false} />
-        </div>
-      </div>
+                {/* Launcher opens the game in a new window/tab (uses NEXT_PUBLIC_GAME_ORIGIN if set) */}
+                <TestLauncher slug={activeSlug || ''} channel={testChannel} preferPretty={true} popup={false} />
+              </div>
+            </div>
 
-      {!gameBase && (
-        <div style={{ color: '#9fb0bf', marginBottom: 8 }}>
-          Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.
-        </div>
+            {!gameBase && (
+              <div style={{ color: '#9fb0bf', marginBottom: 8 }}>
+                Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable the embedded preview.
+              </div>
+            )}
+
+            {gameBase && (
+              <iframe
+                src={gameBase + '/?slug=' + (activeSlug || '') + '&channel=' + testChannel + '&preview=1'}
+                style={{ width: '100%', height: '70vh', border: '1px solid #22303c', borderRadius: 12 }}
+              />
+            )}
+          </div>
+        </main>
       )}
-
-      {gameBase && (
-        <iframe
-          src={gameBase + '/?slug=' + (activeSlug || '') + '&channel=' + testChannel + '&preview=1'}
-          style={{ width: '100%', height: '70vh', border: '1px solid #22303c', borderRadius: 12 }}
-        />
-      )}
-    </div>
-  </main>
-)}
 
       {/* New Game modal */}
       {showNewGame && (
@@ -983,13 +990,13 @@ export default function Admin() {
             <Field label="Mode">
               <select style={S.input} value={newMode} onChange={(e) => setNewMode(e.target.value)}>
                 <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
+                <option value="head2head">Head‑to‑Head (2)</option>
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
 
             {/* NEW — Timer defaults for a fresh game */}
-            <Field label="Duration (minutes — 0 = infinite; count UP)">
+            <Field label="Duration (minutes — 0 = infinite; counts up)">
               <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin} onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
             </Field>
             <Field label="Alert before end (minutes)">
@@ -1013,7 +1020,7 @@ export default function Admin() {
                     }),
                   });
                   const j = await r.json();
-                  if (!j.ok) { setStatus('❌ ' + (j.error || 'create failed')); return; }
+                  if (!j.ok) { setStatus('❌ ' + (j.error || 'Create failed')); return; }
                   const rr = await fetch('/api/games'); const jj = await rr.json();
                   if (jj.ok) setGames(jj.games || []);
                   setActiveSlug(j.slug);
@@ -1068,7 +1075,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
           />
         </div>
       ))}
-      <div style={{ color: '#9fb0bf', fontSize: 12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
+      <div style={{ color: '#9fb0bf', fontSize: 12 }}>Mark exactly one choice as correct. Leave blanks for unused options.</div>
     </div>
   );
 }
@@ -1088,7 +1095,7 @@ function MediaPreview({ url, kind }) {
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width: '100%', maxHeight: 260, objectFit: 'contain', borderRadius: 10, border: '1px solid #2a323b' }} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9fb0bf', textDecoration: 'underline' }}>Open media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9fb0bf', textDecoration: 'underline' }}>Open Media</a>
       )}
     </div>
   );
@@ -1172,22 +1179,22 @@ function MapPicker({ lat, lng, radius, onChange }) {
     }
   }
 
-  function gotoResult(r) {
+  function gotoResult(result) {
     if (!mapRef.current || !markerRef.current) return;
-    const lat = Number(r.lat), lon = Number(r.lon);
-    const p = [lat, lon];
+    const latNum = Number(result.lat), lonNum = Number(result.lon);
+    const p = [latNum, lonNum];
     markerRef.current.setLatLng(p);
     circleRef.current.setLatLng(p);
     mapRef.current.setView(p, 16);
-    onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
+    onChange(Number(latNum.toFixed(6)), Number(lonNum.toFixed(6)), Number(r || 25));
     setResults([]);
   }
 
   function useMyLocation() {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      gotoResult({ lat, lon });
+      const latNum = pos.coords.latitude, lonNum = pos.coords.longitude;
+      gotoResult({ lat: latNum, lon: lonNum });
     });
   }
 
@@ -1195,15 +1202,15 @@ function MapPicker({ lat, lng, radius, onChange }) {
     <div>
       <form onSubmit={doSearch} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 8 }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search address or place…" style={S.input} />
-        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use my location</button>
+        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use My Location</button>
         <button disabled={searching} type="submit" style={S.button}>{searching ? 'Searching…' : 'Search'}</button>
       </form>
       {results.length > 0 && (
         <div style={{ background: '#0b0c10', border: '1px solid #2a323b', borderRadius: 10, padding: 8, marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
-          {results.map((r, i) => (
-            <div key={i} onClick={() => gotoResult(r)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
-              <div style={{ fontWeight: 600 }}>{r.display_name}</div>
-              <div style={{ color: '#9fb0bf', fontSize: 12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+          {results.map((res, i) => (
+            <div key={i} onClick={() => gotoResult(res)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
+              <div style={{ fontWeight: 600 }}>{res.display_name}</div>
+              <div style={{ color: '#9fb0bf', fontSize: 12 }}>Lat {Number(res.lat).toFixed(6)}, Lng {Number(res.lon).toFixed(6)}</div>
             </div>
           ))}
         </div>
@@ -1230,7 +1237,7 @@ function TestSMS() {
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input placeholder="+1…" style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
         <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
         <button style={S.button} onClick={send}>Send Test</button>
       </div>
@@ -1293,12 +1300,10 @@ const S = {
   hr: { border: '1px solid #1f262d', borderBottom: 'none' },
 };
 
-
-
 /* =====================================================================
-   MapOverview — Leaflet map overlaying all missions + power-ups (robust)
+   MapOverview — Leaflet map overlaying all missions + power‑ups (robust)
    ===================================================================== */
-function MapOverview({ missions=[], powerups=[], showRings=true }) {
+function MapOverview({ missions = [], powerups = [], showRings = true }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
@@ -1334,7 +1339,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
 
     // create or get map instance
     if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
+      const map = L.map(divRef.current, { center: [44.9778, -93.2650], zoom: 12 });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
@@ -1355,7 +1360,7 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
     const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
 
-    (missions||[]).forEach((m) => {
+    (missions || []).forEach((m) => {
       const pos = getLL(m);
       const c = (m && m.content) || {};
       const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
@@ -1364,18 +1369,18 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
       const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
       const title = m.title || m.id || 'Mission';
       const t = m.type || '';
-      mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
+      mk.bindPopup(`<b>${title}</b><br/>${t}${rad ? `<br/>radius: ${rad}m` : ''}`);
       if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
-    (powerups||[]).forEach((p) => {
+    (powerups || []).forEach((p) => {
       const pos = getLL(p);
       if (!pos) return;
       const rad = Number(p.pickupRadius || p.radiusMeters || 0);
       const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
-      const title = p.title || p.type || 'Power-up';
-      mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
+      const title = p.title || p.type || 'Power‑up';
+      mk.bindPopup(`<b>${title}</b>${rad ? `<br/>pickup: ${rad}m` : ''}`);
       if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
       bounds.extend(pos);
     });
@@ -1387,10 +1392,10 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     <div>
       {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
       <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
-      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
-       ((powerups||[]).length === 0) && (
+      {((missions || []).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
+       ((powerups || []).length === 0) && (
         <div style={{ color: '#9fb0bf', marginTop: 8 }}>
-          No geofenced missions or power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power-ups with lat/lng.
+          No geofenced missions or power‑ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power‑ups with lat/lng.
         </div>
       )}
     </div>
