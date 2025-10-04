@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.25",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -14,7 +14,7 @@
         "points": 25
       },
       "content": {
-        "question": "Which one does Eric have",
+        "question": "Which one does Eric have?",
         "choices": [
           "Cadi",
           "Suburb",
@@ -27,6 +27,11 @@
         "lng": -93.265,
         "radiusMeters": 25,
         "cooldownSeconds": 30
+      },
+      "appearance": {
+        "enabled": true,
+        "fontBg": "#f3ecec",
+        "screenBg": "#595d6e"
       }
     }
   ]
