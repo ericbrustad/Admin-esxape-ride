@@ -1,16 +1,13 @@
-import { upsertJson, listDirs, joinPath } from '../../lib/github.js';
+import { bulkCommit, joinPath, listDirs } from '../../lib/github.js';
 
 function slugify(s) {
-  return String(s || '').trim().toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return String(s || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 function genSlug() {
-  const d = new Date(); const pad = n => String(n).padStart(2, '0');
-  return `game-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `game-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
-function toTitle(slug) {
-  return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
+const pretty = obj => JSON.stringify(obj, null, 2) + '\n';
 
 export default async function handler(req, res) {
   if (!['POST','GET'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
@@ -18,19 +15,14 @@ export default async function handler(req, res) {
   try {
     const rawSlug = (req.body?.slug ?? req.query?.slug ?? '').toString();
     const slug = slugify(rawSlug) || genSlug();
-    const title = (req.body?.title ?? req.query?.title ?? toTitle(slug)).toString();
 
-    const existing = await listDirs('public/games');
-    const already = existing.includes(slug);
-
-    const basePub   = joinPath('public/games', slug);
-    const baseDraft = joinPath('public/games', slug, 'draft');
+    // Do not block if it exists; this route is idempotent
+    await listDirs('public/games'); // sanity (throws if env bad)
 
     const config = req.body?.config ?? {
-      game: { title, slug },
+      game: { title: (req.body?.title ?? slug.replace(/[-_]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase())), slug },
       theme: { missionDefault: { fontFamily: 'Inter, system-ui, Arial', fontSize: 18, textColor: '#e9eef2', backgroundColor: '#0b0c10' } }
     };
-
     const missions = req.body?.missions ?? {
       id: `${slug}-suite-1`,
       version: 1,
@@ -40,15 +32,18 @@ export default async function handler(req, res) {
       ]
     };
 
-    const results = [];
-    // published
-    results.push(await upsertJson(joinPath(basePub,   'config.json'),   config,   `${already ? 'update' : 'create'}(config): ${slug}`));
-    results.push(await upsertJson(joinPath(basePub,   'missions.json'), missions, `${already ? 'update' : 'create'}(missions): ${slug}`));
-    // draft
-    results.push(await upsertJson(joinPath(baseDraft, 'config.json'),   config,   `${already ? 'update draft' : 'create draft'}(config): ${slug}`));
-    results.push(await upsertJson(joinPath(baseDraft, 'missions.json'), missions, `${already ? 'update draft' : 'create draft'}(missions): ${slug}`));
+    const pub   = joinPath('public/games', slug);
+    const draft = joinPath('public/games', slug, 'draft');
 
-    return res.status(200).json({ ok: true, slug, existed: already, results });
+    const files = [
+      { path: joinPath(pub,   'config.json'),   content: pretty(config) },
+      { path: joinPath(pub,   'missions.json'), content: pretty(missions) },
+      { path: joinPath(draft, 'config.json'),   content: pretty(config) },
+      { path: joinPath(draft, 'missions.json'), content: pretty(missions) },
+    ];
+
+    const commit = await bulkCommit(files, `create game: ${slug}`);
+    return res.status(200).json({ ok: true, slug, wrote: files.map(f => f.path), commitUrl: commit.htmlUrl });
   } catch (err) {
     console.error('create error:', err);
     return res.status(500).json({ ok: false, error: String(err?.message || err) });
