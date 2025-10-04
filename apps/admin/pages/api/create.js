@@ -5,8 +5,8 @@ function sanitizeSlug(s) {
   return String(s || '')
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')     // keep letters, numbers, hyphens
-    .replace(/^-+|-+$/g, '')          // trim hyphens
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 60);
 }
 
@@ -20,17 +20,9 @@ export default async function handler(req, res) {
     const slug = sanitizeSlug(raw);
     if (!slug) return res.status(400).json({ error: 'Missing or invalid slug' });
 
-    // Defaults (safe to customize)
     const config = req.body?.config ?? {
       game: { title: 'New Game', slug },
-      theme: {
-        missionDefault: {
-          fontFamily: 'Inter, system-ui, Arial',
-          fontSize: 18,
-          textColor: '#e9eef2',
-          backgroundColor: '#0b0c10'
-        }
-      }
+      theme: { missionDefault: { fontFamily: 'Inter, system-ui, Arial', fontSize: 18, textColor: '#e9eef2', backgroundColor: '#0b0c10' } }
     };
 
     const missions = req.body?.missions ?? {
@@ -46,10 +38,8 @@ export default async function handler(req, res) {
     const baseDraft = joinPath('public/games', slug, 'draft');
 
     const results = [];
-    // published
     results.push(await upsertJson(joinPath(basePub,   'config.json'),   config,   `create(config): ${slug}`));
     results.push(await upsertJson(joinPath(basePub,   'missions.json'), missions, `create(missions): ${slug}`));
-    // draft
     results.push(await upsertJson(joinPath(baseDraft, 'config.json'),   config,   `create draft(config): ${slug}`));
     results.push(await upsertJson(joinPath(baseDraft, 'missions.json'), missions, `create draft(missions): ${slug}`));
 
