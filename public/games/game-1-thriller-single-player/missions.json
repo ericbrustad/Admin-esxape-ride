@@ -7,22 +7,6 @@
   },
   "missions": [
     {
-      "id": "m02",
-      "title": "welcome",
-      "type": "geofence_image",
-      "rewards": {
-        "points": 25
-      },
-      "content": {
-        "lat": 44.975485,
-        "lng": -93.287487,
-        "radiusMeters": 25,
-        "cooldownSeconds": 30,
-        "imageUrl": "https://www.dropbox.com/scl/fi/g08lf6wyy2ta2j62xyens/2023-10-15-17.52.07.png?rlkey=axv5c4ka8je5gq1l1br48bz9b&st=3iuq8dmw&dl=0",
-        "overlayText": "the road"
-      }
-    },
-    {
       "id": "m01",
       "title": "you should know this",
       "type": "multiple_choice",
