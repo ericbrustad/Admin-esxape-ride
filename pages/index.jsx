@@ -930,7 +930,7 @@ export default function Admin() {
         </main>
       )}
 
-  {/* TEST */}
+      {/* TEST */}
       {tab === 'test' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -961,23 +961,6 @@ export default function Admin() {
           </div>
         </main>
       )}
-
-      {!gameBase && (
-        <div style={{ color: '#9fb0bf', marginBottom: 8 }}>
-          Set NEXT_PUBLIC_GAME_ORIGIN (or config.gameOrigin) to enable embedded preview.
-        </div>
-      )}
-
-      {gameBase && (
-        <iframe
-          src={`${gameBase}/?slug=${activeSlug || ''}&channel=${testChannel}&preview=1`}
-          style={{ width: '100%', height: '70vh', border: '1px solid #22303c', borderRadius: 12 }}
-        />
-      )}
-    </div>
-  </main>
-)}
-
 
       {/* New Game modal */}
       {showNewGame && (
