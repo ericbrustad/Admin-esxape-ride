@@ -1,73 +1,82 @@
 // pages/api/save-config.js
-// Single-commit save endpoint that uses bulkCommitMixed to avoid per-file SHA conflicts.
-// Mirrors saved content into game/public/games/<slug>/... so the Game app can preview drafts.
+export const config = { api: { bodyParser: true } };
 
-import { joinPath, bulkCommitMixed } from '../../lib/github.js';
+const {
+  REPO_OWNER,
+  REPO_NAME,
+  GITHUB_TOKEN,
+  GITHUB_BRANCH = 'main',
+  GITHUB_BASE_DIR = '',
+} = process.env;
 
-const pretty = obj => JSON.stringify(obj, null, 2) + '\n';
+const GH_ROOT = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
+function normBaseDir(s) { if (!s || s === '(empty)') return ''; return s.replace(/^\/+|\/+$/g, ''); }
+const BASE_DIR = normBaseDir(GITHUB_BASE_DIR);
+function joinPath(p) { const clean = p.replace(/^\/+/, ''); return BASE_DIR ? `${BASE_DIR}/${clean}` : clean; }
 
-// Helper to detect legacy "root" game slug behavior (if your admin has a legacy root game)
-function isLegacySlug(s) {
-  const slug = String(s || '').trim().toLowerCase();
-  return !slug || slug === '(legacy root)' || slug === 'legacy-root' || slug === 'root';
+async function getFileSha(path) {
+  const url = `${GH_ROOT}/${encodeURIComponent(path)}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
+  const r = await fetch(url, {
+    headers: { Authorization: `token ${GITHUB_TOKEN}`, 'User-Agent': 'esx-admin', Accept: 'application/vnd.github+json' },
+  });
+  if (r.status === 200) { const j = await r.json(); return j.sha || null; }
+  return null;
+}
+
+async function putFile(path, contentText, message) {
+  const sha = await getFileSha(path);
+  const body = {
+    message,
+    content: Buffer.from(contentText, 'utf8').toString('base64'),
+    branch: GITHUB_BRANCH,
+  };
+  if (sha) body.sha = sha;
+
+  const url = `${GH_ROOT}/${encodeURIComponent(path)}`;
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `token ${GITHUB_TOKEN}`,
+      'User-Agent': 'esx-admin',
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`GitHub PUT failed: ${r.status} ${txt}`);
+  }
+  return r.json();
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
-
   try {
-    const body = req.body || {};
-    const slugRaw = body.slug;
-    const channel = body.channel || 'draft'; // 'draft' or 'published'
-    const config = body.config;
-    const missions = body.missions;
+    if (req.method !== 'POST') return res.status(405).send('POST only');
 
-    // Validate
-    const legacy = isLegacySlug(slugRaw);
-    if (!legacy && (!slugRaw || typeof slugRaw !== 'string')) {
-      return res.status(400).json({ ok: false, error: 'Missing slug' });
-    }
-    const slug = legacy ? '' : String(slugRaw).trim();
+    const slug = String(req.query.slug || '').trim();
+    const configObj = req.body?.config;
+    if (!configObj) return res.status(400).json({ ok: false, error: 'Missing config payload' });
 
-    // Build target paths:
-    // Admin writes to public/games/<slug>[/draft]/...
-    // Mirror writes to game/public/games/<slug>[/draft]/...
-    let adminBase;
-    let gameBase;
-    if (legacy) {
-      // legacy root handling (if your app used a root public/draft)
-      adminBase = channel === 'draft' ? joinPath('public', 'draft') : 'public';
-      gameBase = null; // don't mirror legacy root into game/ by default
+    const text = typeof configObj === 'string' ? configObj : JSON.stringify(configObj, null, 2);
+    const wrote = [];
+
+    if (slug) {
+      const rootDraft = joinPath(`public/games/${slug}/draft/config.json`);
+      const gameDraft = joinPath(`game/public/games/${slug}/draft/config.json`);
+      await putFile(rootDraft, text, `save(draft config): ${slug}`);
+      await putFile(gameDraft, text, `save(game draft config): ${slug}`);
+      wrote.push(rootDraft, gameDraft);
     } else {
-      adminBase = channel === 'draft' ? joinPath('public/games', slug, 'draft') : joinPath('public/games', slug);
-      gameBase = joinPath('game/public/games', slug, channel === 'draft' ? 'draft' : '');
+      const root = joinPath(`public/config.json`);
+      const game = joinPath(`game/public/config.json`);
+      await putFile(root, text, `save(legacy config)`);
+      await putFile(game, text, `save(game legacy config)`);
+      wrote.push(root, game);
     }
 
-    // Build list of files to write in one commit
-    const files = [];
-    if (config) {
-      files.push({ path: joinPath(adminBase, 'config.json'), content: pretty(config) });
-      if (gameBase) files.push({ repoPath: joinPath(gameBase, 'config.json'), content: pretty(config) });
-    }
-    if (missions) {
-      files.push({ path: joinPath(adminBase, 'missions.json'), content: pretty(missions) });
-      if (gameBase) files.push({ repoPath: joinPath(gameBase, 'missions.json'), content: pretty(missions) });
-    }
-
-    if (files.length === 0) {
-      return res.status(400).json({ ok: false, error: 'Nothing to save' });
-    }
-
-    // Write a single commit with all files (admin + mirror)
-    const commit = await bulkCommitMixed(files, `save ${slug || 'root'} [${channel}]`);
-    return res.status(200).json({
-      ok: true,
-      slug: slug || '(root)',
-      wrote: files.map(f => f.repoPath || f.path),
-      commitUrl: commit.htmlUrl
-    });
-  } catch (err) {
-    console.error('save-config error:', err);
-    return res.status(500).json({ ok: false, error: String(err?.message || err) });
+    res.json({ ok: true, slug: slug || null, wrote });
+  } catch (e) {
+    res.status(500).send(String(e && e.message ? e.message : e));
   }
 }
