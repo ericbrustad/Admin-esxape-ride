@@ -26,5 +26,12 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-04T15:38:53.547Z"
+  },
+  {
+    "slug": "newbie",
+    "title": "Newbie",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-04T21:32:38.062Z"
   }
 ]
