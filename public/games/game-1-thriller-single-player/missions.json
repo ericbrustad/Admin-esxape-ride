@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.33",
+  "version": "0.6.34",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -142,6 +142,29 @@
         "lat": 44.9778,
         "lng": -93.265,
         "radiusMeters": 255,
+        "cooldownSeconds": 30
+      }
+    },
+    {
+      "id": "m08",
+      "title": "horses",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "how many?",
+        "choices": [
+          "1",
+          "2",
+          "3"
+        ],
+        "correctIndex": 1,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
         "cooldownSeconds": 30
       }
     }
