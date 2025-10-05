@@ -41,7 +41,23 @@
   ],
   "media": {},
   "icons": {
-    "missions": [],
+    "missions": [
+      {
+        "key": "missions-1",
+        "name": "smoke bomb",
+        "url": "/media/icons/1759676645297-SMOKE_BOMB.png"
+      },
+      {
+        "key": "missions-2",
+        "name": "Signal Jammer",
+        "url": "/media/icons/1759676664220-sIGNAL_jAMMER_small.png"
+      },
+      {
+        "key": "missions-3",
+        "name": "Clone",
+        "url": "/media/icons/1759676689548-ROBOT1small.png"
+      }
+    ],
     "devices": [],
     "rewards": []
   },
