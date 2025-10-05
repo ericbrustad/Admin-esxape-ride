@@ -21,7 +21,7 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 5,
+      "pickupRadius": 610,
       "effectSeconds": 96,
       "lat": 44.950126,
       "lng": -93.268489
@@ -35,6 +35,36 @@
       "effectSeconds": 120,
       "lat": 44.968698,
       "lng": -93.290638
+    },
+    {
+      "id": "d03",
+      "title": "ddd",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.975717,
+      "lng": -93.272608
+    },
+    {
+      "id": "d04",
+      "title": "nah",
+      "type": "clone",
+      "iconKey": "devices-1",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9678,
+      "lng": -93.276213
+    },
+    {
+      "id": "d05",
+      "title": "fff",
+      "type": "smoke",
+      "iconKey": "devices-2",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.973703,
+      "lng": -93.28497
     }
   ],
   "powerups": [
@@ -43,7 +73,7 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 5,
+      "pickupRadius": 610,
       "effectSeconds": 96,
       "lat": 44.950126,
       "lng": -93.268489
@@ -57,6 +87,36 @@
       "effectSeconds": 120,
       "lat": 44.968698,
       "lng": -93.290638
+    },
+    {
+      "id": "d03",
+      "title": "ddd",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.975717,
+      "lng": -93.272608
+    },
+    {
+      "id": "d04",
+      "title": "nah",
+      "type": "clone",
+      "iconKey": "devices-1",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9678,
+      "lng": -93.276213
+    },
+    {
+      "id": "d05",
+      "title": "fff",
+      "type": "smoke",
+      "iconKey": "devices-2",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.973703,
+      "lng": -93.28497
     }
   ],
   "media": {},
@@ -78,7 +138,18 @@
         "url": "/media/icons/1759676689548-ROBOT1small.png"
       }
     ],
-    "devices": [],
+    "devices": [
+      {
+        "key": "devices-3",
+        "name": "nah",
+        "url": "/media/icons/1759680188878-Cipher_Wheel.jpg"
+      },
+      {
+        "key": "devices-2",
+        "name": "wheel",
+        "url": "/media/icons/1759680357102-casper.jpg"
+      }
+    ],
     "rewards": []
   },
   "appearance": {
