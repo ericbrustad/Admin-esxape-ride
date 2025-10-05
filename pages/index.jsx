@@ -101,17 +101,25 @@ const TYPE_FIELDS = {
     { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
   ],
+  // NEW mission type
+  stored_statement: [
+    { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
+  ],
 };
-const TYPE_OPTIONS = [
-  { value:'multiple_choice', label:'Multiple Choice' },
-  { value:'short_answer',    label:'Question (Short Answer)' },
-  { value:'statement',       label:'Statement' },
-  { value:'video',           label:'Video' },
-  { value:'geofence_image',  label:'Geo Fence Image' },
-  { value:'geofence_video',  label:'Geo Fence Video' },
-  { value:'ar_image',        label:'AR Image' },
-  { value:'ar_video',        label:'AR Video' },
-];
+
+// Labels for type <select>
+const TYPE_LABELS = {
+  multiple_choice:  'Multiple Choice',
+  short_answer:     'Question (Short Answer)',
+  statement:        'Statement',
+  video:            'Video',
+  geofence_image:   'Geo Fence Image',
+  geofence_video:   'Geo Fence Video',
+  ar_image:         'AR Image',
+  ar_video:         'AR Video',
+  stored_statement: 'Stored Statement',
+};
+
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
@@ -168,6 +176,7 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
+  // inline device placement
   const [placingDev, setPlacingDev] = useState(false);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
@@ -256,6 +265,7 @@ export default function Admin() {
       case 'geofence_video':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
+      case 'stored_statement':return { template:'' };
       default:                return { ...base };
     }
   }
@@ -490,7 +500,7 @@ export default function Admin() {
                       <div style={{ fontWeight:600 }}>
                         <span style={{ opacity:.65, marginRight:6 }}>#{idx+1}</span>{m.title||m.id}
                       </div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>{m.type} — id: {m.id}</div>
+                      <div style={{ color:'#9fb0bf', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
                     </div>
                     <div style={{ display:'flex', gap:6 }}>
                       <button title="Move up"   style={{ ...S.button, padding:'6px 10px' }} onClick={()=>moveMission(idx,-1)}>▲</button>
@@ -576,14 +586,16 @@ export default function Admin() {
             {/* Overlay mission editor */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(780px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
+                <div style={{ ...S.card, width:'min(820px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
                   <h3 style={{ marginTop:0 }}>Edit Mission</h3>
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {TYPE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+                      {Object.keys(TYPE_FIELDS).map(k=>(
+                        <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
+                      ))}
                     </select>
                   </Field>
                   <Field label="Icon">
@@ -595,6 +607,7 @@ export default function Admin() {
 
                   <hr style={S.hr}/>
 
+                  {/* MC editor */}
                   {editing.type==='multiple_choice' && (
                     <div style={{ marginBottom:12 }}>
                       <MultipleChoiceEditor
@@ -607,6 +620,51 @@ export default function Admin() {
                     </div>
                   )}
 
+                  {/* Stored Statement composer */}
+                  {editing.type === 'stored_statement' && (
+                    <div style={{ marginBottom: 12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+                      <div style={{ fontWeight:600, marginBottom:8 }}>Compose stored statement</div>
+
+                      <Field label="Template (click IDs below to insert a tag like #m03# where your cursor is)">
+                        <textarea
+                          style={{ ...S.input, height: 130, fontFamily:'ui-monospace, Menlo' }}
+                          value={editing.content?.template || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), template:e.target.value } }); setDirty(true); }}
+                          ref={(el)=>{ if (el) editing.__tplRef = el; }}
+                        />
+                      </Field>
+
+                      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Click an ID to insert:</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                        {(suite.missions || []).map((mm) => (
+                          <button
+                            key={mm.id}
+                            type="button"
+                            style={{ ...S.button, padding:'6px 10px' }}
+                            onClick={()=>{
+                              const tag = `#${String(mm.id).toLowerCase()}#`; // e.g. #m03#
+                              const ta = editing.__tplRef;
+                              if (ta) {
+                                const s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+                                const v = editing.content?.template || '';
+                                const next = v.slice(0, s) + tag + v.slice(e);
+                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: next } });
+                                setDirty(true);
+                                requestAnimationFrame(()=>{ ta.focus(); ta.selectionStart = ta.selectionEnd = s + tag.length; });
+                              } else {
+                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: (editing.content?.template || '') + tag } });
+                                setDirty(true);
+                              }
+                            }}
+                          >
+                            {`#${mm.id}#`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
@@ -617,7 +675,8 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video') && (
+                  {/* Optional geofence for others */}
+                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
@@ -996,7 +1055,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1d2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
