@@ -21,10 +21,10 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 100,
+      "pickupRadius": 5,
       "effectSeconds": 96,
-      "lat": 44.94952,
-      "lng": -93.267991
+      "lat": 44.949224,
+      "lng": -93.268597
     }
   ],
   "powerups": [
@@ -33,10 +33,10 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 100,
+      "pickupRadius": 5,
       "effectSeconds": 96,
-      "lat": 44.94952,
-      "lng": -93.267991
+      "lat": 44.949224,
+      "lng": -93.268597
     }
   ],
   "media": {},
