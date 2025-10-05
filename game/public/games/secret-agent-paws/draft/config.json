@@ -17,12 +17,30 @@
   "textRules": [],
   "devices": [],
   "powerups": [],
-  "media": {},
-  "icons": {
-    "missions": [],
-    "devices": [],
-    "rewards": []
+  "media": {
+    "pool": [],
+    "gameMedia": [
+      {
+        "name": "SMOKE_BOMB.png",
+        "url": "/media/games/secret-agent-paws/1759647680397-SMOKE_BOMB.png",
+        "thumb": "/media/games/secret-agent-paws/1759647680397-SMOKE_BOMB.png"
+      },
+      {
+        "name": "sIGNAL_jAMMER.jpg",
+        "url": "/media/games/secret-agent-paws/1759647690696-sIGNAL_jAMMER.jpg",
+        "thumb": "/media/games/secret-agent-paws/1759647690696-sIGNAL_jAMMER.jpg"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": ""
+      }
+    ]
   },
+  "icons": {},
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
     "fontSizePx": 22,
