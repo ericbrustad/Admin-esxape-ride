@@ -1,5 +1,6 @@
 // pages/api/runs/[slug].js
-// Store a completed run with answers & score. CORS-enabled for Game origin.
+// Stores a run record. If body.session is present => partial save to runs/sessions/<session>.json
+// If no session => final run to runs/<timestamp>.json (also mirrored to game/ for production reads)
 
 export const config = { api: { bodyParser: true } };
 
@@ -9,7 +10,7 @@ const {
   GITHUB_TOKEN,
   GITHUB_BRANCH = 'main',
   GITHUB_BASE_DIR = '',
-  NEXT_PUBLIC_GAME_ORIGIN, // for CORS
+  NEXT_PUBLIC_GAME_ORIGIN, // for CORS (optional)
 } = process.env;
 
 const GH_ROOT = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
@@ -27,9 +28,7 @@ function cors(res) {
 
 async function getFileSha(path) {
   const url = `${GH_ROOT}/${encodeURIComponent(path)}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
-  const r = await fetch(url, {
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'esx-admin' },
-  });
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept:'application/vnd.github+json', 'User-Agent':'esx-admin' } });
   if (r.ok) { const j = await r.json(); return j.sha || null; }
   return null;
 }
@@ -63,37 +62,43 @@ export default async function handler(req, res) {
     const slug = String(req.query.slug || '').trim();
     if (!slug) return res.status(400).json({ ok:false, error:'Missing slug' });
 
-    const { answers, score, player, meta } = req.body || {};
+    const { answers, score, player, meta, session } = req.body || {};
     if (!answers) return res.status(400).json({ ok:false, error:'Missing answers map' });
 
-    // Build the run record
     const ts = new Date();
-    const stamp = ts.toISOString().replace(/[-:.TZ]/g,'').slice(0,14); // YYYYMMDDHHMMSS
+    const iso = ts.toISOString();
+    const stamp = iso.replace(/[-:.TZ]/g,'').slice(0,14); // YYYYMMDDHHMMSS
+
     const run = {
       slug,
       score: Number(score || 0),
-      answers,        // { "m01": "lucy", "m02": "A", ... }
-      player: player || {}, // { email, phone, name, ... }
-      meta:   meta   || {}, // any client-side info you want
-      savedAt: ts.toISOString(),
-      savedBy: 'admin-esxaperide',
+      answers,         // { m01: "...", m02: "..." }
+      player: player || {},
+      meta:   meta   || {},
+      savedAt: iso,
       version: 1,
+      status: session ? 'partial' : 'complete',
+      session: session || undefined,
     };
     const text = JSON.stringify(run, null, 2);
 
-    const rootPath = joinPath(`public/games/${slug}/runs/${stamp}.json`);
-    const gamePath = joinPath(`game/public/games/${slug}/runs/${stamp}.json`);
-
     const wrote = [];
-    await putFile(rootPath, text, `run(${slug}): ${stamp}`); wrote.push(rootPath);
-    await putFile(gamePath, text, `run(${slug} game): ${stamp}`); wrote.push(gamePath);
 
-    // OPTIONAL: trigger SMS/email here if you want (Twilio / provider)
-    // Example (pseudo):
-    // if (process.env.TWILIO_ACCOUNT_SID && player?.phone) { ...send SMS... }
-    // if (process.env.RESEND_API_KEY && player?.email) { ...send email... }
+    if (session) {
+      // Partial: write to runs/sessions/<session>.json (mirrored to game/)
+      const rootPath = joinPath(`public/games/${slug}/runs/sessions/${session}.json`);
+      const gamePath = joinPath(`game/public/games/${slug}/runs/sessions/${session}.json`);
+      await putFile(rootPath, text, `run(partial ${slug}): ${session}`); wrote.push(rootPath);
+      await putFile(gamePath, text, `run(partial ${slug} game): ${session}`); wrote.push(gamePath);
+    } else {
+      // Final: write to runs/<timestamp>.json (mirrored to game/)
+      const rootPath = joinPath(`public/games/${slug}/runs/${stamp}.json`);
+      const gamePath = joinPath(`game/public/games/${slug}/runs/${stamp}.json`);
+      await putFile(rootPath, text, `run(${slug}): ${stamp}`); wrote.push(rootPath);
+      await putFile(gamePath, text, `run(${slug} game): ${stamp}`); wrote.push(gamePath);
+    }
 
-    return res.json({ ok:true, slug, wrote, id: stamp });
+    return res.json({ ok:true, slug, wrote, id: session || stamp });
   } catch (e) {
     return res.status(500).json({ ok:false, error: String(e?.message || e) });
   }
