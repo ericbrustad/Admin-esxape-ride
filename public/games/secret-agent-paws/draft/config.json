@@ -15,162 +15,38 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 610,
-      "effectSeconds": 96,
-      "lat": 44.950126,
-      "lng": -93.268489
-    },
-    {
-      "id": "d02",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.968698,
-      "lng": -93.290638
-    },
-    {
-      "id": "d03",
-      "title": "ddd",
-      "type": "clone",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.975569,
-      "lng": -93.272951
-    },
-    {
-      "id": "d04",
-      "title": "nah",
-      "type": "clone",
-      "iconKey": "devices-1",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.9678,
-      "lng": -93.276213
-    },
-    {
-      "id": "d05",
-      "title": "fff",
-      "type": "smoke",
-      "iconKey": "devices-2",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.973703,
-      "lng": -93.28497
-    },
-    {
-      "id": "d06",
-      "title": "bb",
-      "type": "jammer",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.968285,
-      "lng": -93.263165
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 610,
-      "effectSeconds": 96,
-      "lat": 44.950126,
-      "lng": -93.268489
-    },
-    {
-      "id": "d02",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.968698,
-      "lng": -93.290638
-    },
-    {
-      "id": "d03",
-      "title": "ddd",
-      "type": "clone",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.975569,
-      "lng": -93.272951
-    },
-    {
-      "id": "d04",
-      "title": "nah",
-      "type": "clone",
-      "iconKey": "devices-1",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.9678,
-      "lng": -93.276213
-    },
-    {
-      "id": "d05",
-      "title": "fff",
-      "type": "smoke",
-      "iconKey": "devices-2",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.973703,
-      "lng": -93.28497
-    },
-    {
-      "id": "d06",
-      "title": "bb",
-      "type": "jammer",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.968285,
-      "lng": -93.263165
-    }
-  ],
-  "media": {},
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "library": [
+      {
+        "url": "/media/uploads/1759695550282-arrow.jfif",
+        "name": "arrow.jfif"
+      }
+    ]
+  },
   "icons": {
     "missions": [
       {
-        "key": "m01",
-        "name": "smoke bomb",
-        "url": "/media/icons/1759676645297-SMOKE_BOMB.png"
-      },
-      {
-        "key": "missions-2",
-        "name": "Signal Jammer",
-        "url": "/media/icons/1759676664220-sIGNAL_jAMMER_small.png"
-      },
-      {
-        "key": "missions-3",
-        "name": "Clone",
-        "url": "/media/icons/1759676689548-ROBOT1small.png"
+        "key": "missions-1",
+        "name": "",
+        "url": ""
       }
     ],
     "devices": [
       {
-        "key": "",
-        "name": "briefcase",
-        "url": "/media/icons/1759680697488-briefcase.jfif"
-      },
-      {
-        "key": "",
-        "name": "wheel",
-        "url": "/media/icons/1759680357102-casper.jpg"
+        "key": "devices-1",
+        "name": "",
+        "url": "/media/icons/1759695642527-panda_intel_intro_image.jpg"
       }
     ],
-    "rewards": []
+    "rewards": [
+      {
+        "key": "rewards-1",
+        "name": "",
+        "url": ""
+      }
+    ]
   },
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
