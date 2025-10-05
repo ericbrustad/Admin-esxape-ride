@@ -1174,9 +1174,12 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus }) {
     const path = `public/media/${subfolder}/${Date.now()}-${file.name}`; // avoid collisions
     setUploadStatus('Uploading…');
     const res = await fetch('/api/upload', {
-      method:'POST', headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${file.name}` }),
-    });
+  method:'POST',
+  headers:{ 'Content-Type':'application/json' },
+  credentials: 'include',           // <— ensure auth header is sent
+  body: JSON.stringify({ path, contentBase64: base64, message:`upload ${file.name}` }),
+});
+
     const j = await res.json();
     setUploadStatus(res.ok ? `✅ Uploaded: ${j?.html_url || path}` : `❌ ${j?.error || 'upload failed'}`);
     if (res.ok) return `/${path.replace(/^public\//,'')}`; // serve from /media/...
