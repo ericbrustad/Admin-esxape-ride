@@ -316,26 +316,31 @@ export default function Admin() {
 
   /* ── Save / Publish ── */
   async function saveAll() {
-    if (!suite || !config) return;
-    setStatus('Saving…');
-    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
-    const [a, b] = await Promise.all([
-      fetch('/api/save' + qs, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ missions: suite }),
-      }),
-      fetch('/api/save-config' + qs, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config }),
-      }),
-    ]);
-    const ok = a.ok && b.ok;
-    if (!ok) {
-      setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
-    } else {
-      setStatus('✅ Saved (files committed)');
-    }
+  if (!suite || !config) return;
+  setStatus('Saving…');
+  const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+  const [a, b] = await Promise.all([
+    fetch('/api/save' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',                // <-- keep auth header
+      body: JSON.stringify({ missions: suite }),
+    }),
+    fetch('/api/save-config' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',                // <-- keep auth header
+      body: JSON.stringify({ config }),
+    }),
+  ]);
+  const ok = a.ok && b.ok;
+  if (!ok) {
+    setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
+  } else {
+    setStatus('✅ Saved (files committed)');
   }
+}
+
   async function handlePublish() {
     try {
       setStatus('Publishing…');
