@@ -9,24 +9,11 @@
         "points": 10
       },
       "content": {
-        "text": "Welcome to test! Ready to play?"
-      }
-    },
-    {
-      "id": "m02",
-      "title": "New Mission",
-      "type": "video",
-      "rewards": {
-        "points": 25
-      },
-      "content": {
-        "videoUrl": "https://youtu.be/MgXf-9l6X3w?si=E_ear5415iO_RDZN",
-        "overlayText": "hiiiiffff",
+        "text": "Welcome to test! Ready to play?",
         "geofenceEnabled": true,
         "lat": 44.9778,
         "lng": -93.265,
-        "radiusMeters": 380,
-        "cooldownSeconds": 30
+        "radiusMeters": 25
       },
       "appearanceOverrideEnabled": false
     }
