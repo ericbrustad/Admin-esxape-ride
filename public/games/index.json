@@ -40,5 +40,12 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-05T04:19:08.691Z"
+  },
+  {
+    "slug": "test-2",
+    "title": "test",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-05T06:38:09.535Z"
   }
 ]
