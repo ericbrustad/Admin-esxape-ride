@@ -21,7 +21,7 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 5,
+      "pickupRadius": 610,
       "effectSeconds": 96,
       "lat": 44.950126,
       "lng": -93.268489
@@ -35,6 +35,16 @@
       "effectSeconds": 120,
       "lat": 44.968698,
       "lng": -93.290638
+    },
+    {
+      "id": "d03",
+      "title": "ddd",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.975275,
+      "lng": -93.270464
     }
   ],
   "powerups": [
@@ -43,7 +53,7 @@
       "title": "smoke",
       "type": "smoke",
       "iconKey": "",
-      "pickupRadius": 5,
+      "pickupRadius": 610,
       "effectSeconds": 96,
       "lat": 44.950126,
       "lng": -93.268489
@@ -57,6 +67,16 @@
       "effectSeconds": 120,
       "lat": 44.968698,
       "lng": -93.290638
+    },
+    {
+      "id": "d03",
+      "title": "ddd",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.975275,
+      "lng": -93.270464
     }
   ],
   "media": {},
@@ -78,7 +98,18 @@
         "url": "/media/icons/1759676689548-ROBOT1small.png"
       }
     ],
-    "devices": [],
+    "devices": [
+      {
+        "key": "devices-1",
+        "name": "nah",
+        "url": ""
+      },
+      {
+        "key": "devices-2",
+        "name": "",
+        "url": ""
+      }
+    ],
     "rewards": []
   },
   "appearance": {
