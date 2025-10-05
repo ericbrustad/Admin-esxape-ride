@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 96,
+      "lat": 44.94952,
+      "lng": -93.267991
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 96,
+      "lat": 44.94952,
+      "lng": -93.267991
+    }
+  ],
   "media": {},
   "icons": {
     "missions": [],
