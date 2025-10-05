@@ -24,6 +24,28 @@
         "radiusMeters": 25,
         "cooldownSeconds": 30
       },
+      "onCorrect": {
+        "enabled": false,
+        "message": "",
+        "mediaUrl": "",
+        "audioUrl": "",
+        "rewardKey": "",
+        "punishmentKey": "",
+        "deviceKey": "",
+        "clueText": "",
+        "delaySec": 0
+      },
+      "onWrong": {
+        "enabled": false,
+        "message": "",
+        "mediaUrl": "",
+        "audioUrl": "",
+        "rewardKey": "",
+        "punishmentKey": "",
+        "deviceKey": "",
+        "clueText": "",
+        "delaySec": 0
+      },
       "appearanceOverrideEnabled": false,
       "appearance": {
         "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
