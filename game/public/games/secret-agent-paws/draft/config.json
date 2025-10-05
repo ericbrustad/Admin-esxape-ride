@@ -43,8 +43,28 @@
       "iconKey": "",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.975275,
-      "lng": -93.270464
+      "lat": 44.975717,
+      "lng": -93.272608
+    },
+    {
+      "id": "d04",
+      "title": "nah",
+      "type": "clone",
+      "iconKey": "devices-1",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9678,
+      "lng": -93.276213
+    },
+    {
+      "id": "d05",
+      "title": "fff",
+      "type": "smoke",
+      "iconKey": "devices-2",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.973703,
+      "lng": -93.28497
     }
   ],
   "powerups": [
@@ -75,8 +95,28 @@
       "iconKey": "",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.975275,
-      "lng": -93.270464
+      "lat": 44.975717,
+      "lng": -93.272608
+    },
+    {
+      "id": "d04",
+      "title": "nah",
+      "type": "clone",
+      "iconKey": "devices-1",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9678,
+      "lng": -93.276213
+    },
+    {
+      "id": "d05",
+      "title": "fff",
+      "type": "smoke",
+      "iconKey": "devices-2",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.973703,
+      "lng": -93.28497
     }
   ],
   "media": {},
@@ -100,14 +140,14 @@
     ],
     "devices": [
       {
-        "key": "devices-1",
+        "key": "devices-3",
         "name": "nah",
-        "url": ""
+        "url": "/media/icons/1759680188878-Cipher_Wheel.jpg"
       },
       {
         "key": "devices-2",
-        "name": "",
-        "url": ""
+        "name": "wheel",
+        "url": "/media/icons/1759680357102-casper.jpg"
       }
     ],
     "rewards": []
