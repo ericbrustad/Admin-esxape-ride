@@ -15,15 +15,37 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "SMOKE",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.802576,
+      "lng": -93.363619
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "SMOKE",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.802576,
+      "lng": -93.363619
+    }
+  ],
   "media": {},
   "icons": {
     "missions": [
       {
         "key": "missions-1",
         "name": "",
-        "url": "/media/icons/1759642918386-SMOKE BOMB.png"
+        "url": "/media/icons/1759643917568-SMOKE_BOMB.png"
       }
     ],
     "devices": [],
