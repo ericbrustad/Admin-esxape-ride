@@ -15,31 +15,11 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "JAMMER",
-      "type": "jammer",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.975544,
-      "lng": -93.248401
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "JAMMER",
-      "type": "jammer",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.975544,
-      "lng": -93.248401
-    }
-  ],
-  "media": {},
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "pool": []
+  },
   "icons": {
     "missions": [],
     "devices": [],
