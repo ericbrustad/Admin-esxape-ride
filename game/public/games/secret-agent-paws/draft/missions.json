@@ -1,5 +1,5 @@
 {
-  "version": "0.0.4",
+  "version": "0.0.6",
   "missions": [
     {
       "id": "m01",
@@ -15,13 +15,14 @@
         "lng": -93.269508,
         "radiusMeters": 25
       },
-      "appearanceOverrideEnabled": false
+      "appearanceOverrideEnabled": false,
+      "iconKey": "missions-2"
     },
     {
       "id": "m02",
       "title": "teo",
       "type": "multiple_choice",
-      "iconKey": "",
+      "iconKey": "m01",
       "rewards": {
         "points": 25
       },
