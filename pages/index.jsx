@@ -101,13 +101,10 @@ const TYPE_FIELDS = {
     { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
   ],
-  // NEW mission type
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
 };
-
-// Labels for type <select>
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
   short_answer:     'Question (Short Answer)',
@@ -176,8 +173,12 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // inline device placement
+  // Device manager (right by the map)
+  const [devSearchQ, setDevSearchQ] = useState('');
+  const [devSearching, setDevSearching] = useState(false);
+  const [devResults, setDevResults] = useState([]);
   const [placingDev, setPlacingDev] = useState(false);
+  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
   const [uploadStatus, setUploadStatus] = useState('');
@@ -368,59 +369,105 @@ export default function Admin() {
     setStatus('✅ Duplicated (remember Save All)');
   }
 
-  /* Devices */
-  function beginPlaceDevice() {
+  /* Devices (Map-Side Manager) */
+  const devices = getDevices();
+  function addDevice() {
+    // enter placing mode with a fresh draft
     setPlacingDev(true);
+    setSelectedDevIdx(null);
     setDevDraft({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
   }
-  function confirmPlaceDevice() {
-    const d = devDraft;
-    if (d.lat == null || d.lng == null) { setStatus('❌ Click the map to place the device'); return; }
-    const list = getDevices();
+  function saveDraftDevice() {
+    if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
     const item = {
-      id:'d'+String(list.length+1).padStart(2,'0'),
-      title: d.title || (d.type.charAt(0).toUpperCase()+d.type.slice(1)),
-      type: d.type, iconKey: d.iconKey || '',
-      pickupRadius: clamp(Number(d.pickupRadius||0),1,2000),
-      effectSeconds: clamp(Number(d.effectSeconds||0),5,3600),
-      lat: Number(d.lat.toFixed(6)), lng: Number(d.lng.toFixed(6))
+      id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
+      title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
+      type: devDraft.type,
+      iconKey: devDraft.iconKey || '',
+      pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
+      effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
+      lat: Number(devDraft.lat.toFixed(6)),
+      lng: Number(devDraft.lng.toFixed(6)),
     };
-    setDevices([...(list||[]), item]);
+    setDevices([...(devices || []), item]);
     setPlacingDev(false);
+    setSelectedDevIdx((devices?.length || 0));
     setStatus('✅ Device added (remember Save All)');
   }
+  function deleteSelectedDevice() {
+    if (selectedDevIdx == null) return;
+    const list = [...devices];
+    list.splice(selectedDevIdx, 1);
+    setDevices(list);
+    setSelectedDevIdx(null);
+  }
+  function duplicateSelectedDevice() {
+    if (selectedDevIdx == null) return;
+    const src = devices[selectedDevIdx]; if (!src) return;
+    const copy = { ...JSON.parse(JSON.stringify(src)) };
+    copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
+    setDevices([...(devices || []), copy]);
+    setSelectedDevIdx((devices?.length || 0)); // new index
+  }
+  function moveSelectedDevice(lat, lng) {
+    if (selectedDevIdx == null) return;
+    const list = [...devices];
+    list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+    setDevices(list);
+  }
+  function setSelectedDeviceRadius(r) {
+    if (selectedDevIdx == null) return;
+    const list = [...devices];
+    list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
+    setDevices(list);
+  }
 
-  function onMoveNearest(kind, index, lat, lng) {
-    // single-click move (nearest mission/device)
-    if (kind === 'mission') {
-      const list = [...(suite?.missions || [])];
-      const m = list[index]; if (!m) return;
-      const c = { ...(m.content || {}) };
-      c.lat = Number(lat.toFixed(6)); c.lng = Number(lng.toFixed(6));
-      c.geofenceEnabled = true; c.radiusMeters = Number(c.radiusMeters || 25);
-      list[index] = { ...m, content: c };
-      setSuite({ ...suite, missions: list });
-      setStatus(`Moved mission #${index+1}`);
+  // Address search (by the map) — Nominatim
+  async function devSearch(e) {
+    e?.preventDefault();
+    const q = devSearchQ.trim();
+    if (!q) return;
+    setDevSearching(true); setDevResults([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const j = await r.json();
+      setDevResults(Array.isArray(j) ? j : []);
+    } catch { setDevResults([]); }
+    setDevSearching(false);
+  }
+  function applySearchResult(r) {
+    const lat = Number(r.lat), lon = Number(r.lon);
+    if (placingDev) {
+      setDevDraft(d => ({ ...d, lat, lng: lon }));
+    } else if (selectedDevIdx != null) {
+      moveSelectedDevice(lat, lon);
     } else {
-      const list = [...getDevices()];
-      const d = list[index]; if (!d) return;
-      d.lat = Number(lat.toFixed(6)); d.lng = Number(lng.toFixed(6));
-      setDevices(list);
-      setStatus(`Moved device D${index+1}`);
+      // no selection → select nearest after click? For simplicity set a draft
+      setPlacingDev(true);
+      setDevDraft(d => ({ ...d, lat, lng: lon }));
     }
+    setDevResults([]);
+  }
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      applySearchResult({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+    });
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
-    const path   = `public/media/${subfolder}/${Date.now()}-${file.name}`;
-    setUploadStatus('Uploading…');
+    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
+    setUploadStatus(`Uploading ${safeName}…`);
     const res = await fetch('/api/upload', {
       method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${file.name}` }),
+      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
-    const j = await res.json();
-    setUploadStatus(res.ok ? '✅ Uploaded' : `❌ ${j?.error || 'upload failed'}`);
+    const j = await res.json().catch(()=>({}));
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -434,8 +481,6 @@ export default function Admin() {
       </main>
     );
   }
-
-  const devices = getDevices();
 
   return (
     <div style={S.body}>
@@ -459,7 +504,6 @@ export default function Admin() {
             </div>
 
             <button onClick={startNew} style={S.button}>+ New Mission</button>
-            <button onClick={()=>setPlacingDev(true)} style={S.button}>+ Add Device</button>
 
             <button onClick={saveAll} style={S.button}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
@@ -475,7 +519,7 @@ export default function Admin() {
         </div>
       </header>
 
-      {/* MISSIONS */}
+      {/* MISSIONS (left list) + MAP (right) with Device Manager */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
           {/* Left list */}
@@ -513,15 +557,15 @@ export default function Admin() {
             </div>
           </aside>
 
-          {/* Right map + inline device placement; editor overlays here */}
+          {/* Right side: Device Manager + Overview Map; mission editor overlays here */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8 }}>
                 <div>
                   <h3 style={{ margin:0 }}>Overview Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Click to place devices (when “Add Device” is active). Click to move the nearest pin otherwise.
-                    Pins are numbered to match the list order.
+                    Click to place a device (when “Add Device” is active). If a device is selected, click to move it.
+                    If none selected, click moves the nearest pin.
                   </div>
                 </div>
                 <label style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -529,57 +573,138 @@ export default function Admin() {
                 </label>
               </div>
 
-              {/* Inline device panel */}
+              {/* Device Manager controls row */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
+                {/* Address bar + search */}
+                <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+                  <input
+                    placeholder="Search address or place for device…"
+                    style={S.input}
+                    value={devSearchQ}
+                    onChange={(e)=>setDevSearchQ(e.target.value)}
+                  />
+                  <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
+                  <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
+                </form>
+
+                {/* Quick actions */}
+                <div style={{ display:'flex', gap:8 }}>
+                  <button style={S.button} onClick={addDevice}>+ Add Device</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
+                </div>
+
+                {/* Radius slider for selected or draft */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <input
+                    type="range" min={5} max={2000} step={5}
+                    value={selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
+                    onChange={(e)=>{
+                      const r = Number(e.target.value);
+                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                      else setDevDraft(d=>({ ...d, pickupRadius: r }));
+                    }}
+                  />
+                  <code style={{ color:'#9fb0bf' }}>
+                    {(selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
+                  </code>
+                </div>
+              </div>
+
+              {/* Search results */}
+              {devResults.length>0 && (
+                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginBottom:8, maxHeight:160, overflow:'auto' }}>
+                  {devResults.map((r,i)=>(
+                    <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Compact list of devices to select */}
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                {(devices||[]).map((d,i)=>(
+                  <button
+                    key={d.id||i}
+                    style={{
+                      ...S.button, padding:'6px 10px',
+                      background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
+                      borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b'
+                    }}
+                    onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
+                    title={`${d.title||d.type} (#${i+1})`}
+                  >
+                    D{i+1} {d.title ? `— ${d.title}` : ''}
+                  </button>
+                ))}
+                {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
+              </div>
+
+              {/* If placing, show a small draft panel */}
               {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12, marginBottom:10 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
-                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft({ ...devDraft, title:e.target.value })}/></Field>
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                     <Field label="Type">
-                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft({ ...devDraft, type:e.target.value })}>
+                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
                         {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </Field>
                     <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft({ ...devDraft, iconKey:e.target.value })}>
+                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
                         <option value="">(default)</option>
                         {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
                       </select>
                     </Field>
-                    <Field label="Pickup radius (m)">
-                      <input type="number" min={1} max={2000} style={S.input} value={devDraft.pickupRadius}
-                        onChange={(e)=>setDevDraft({ ...devDraft, pickupRadius:clamp(Number(e.target.value||0),1,2000) })}/>
-                    </Field>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                    <Field label="Effect duration (sec)">
+                    <Field label="Effect (sec)">
                       <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
-                        onChange={(e)=>setDevDraft({ ...devDraft, effectSeconds:clamp(Number(e.target.value||0),5,3600) })}/>
+                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
                     </Field>
-                    <div style={{ display:'flex', alignItems:'flex-end', gap:8, justifyContent:'flex-end' }}>
-                      <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
-                      <button style={S.button} onClick={confirmPlaceDevice}>Save Device</button>
+                  </div>
+                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
+                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
+                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
+                    <div style={{ color:'#9fb0bf' }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
+                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, marginTop:8, alignItems:'center' }}>
-                    <input type="range" min={5} max={2000} step={5} value={devDraft.pickupRadius}
-                      onChange={(e)=>setDevDraft({ ...devDraft, pickupRadius:Number(e.target.value) })}/>
-                    <code style={{ color:'#9fb0bf' }}>{devDraft.pickupRadius} m</code>
-                  </div>
-                  <div style={{ color:'#9fb0bf', fontSize:12, marginTop:6 }}>
-                    {devDraft.lat==null ? 'Click the map to place the device.' : `lat ${Number(devDraft.lat).toFixed(6)}, lng ${Number(devDraft.lng).toFixed(6)}`}
                   </div>
                 </div>
               )}
 
+              {/* Map */}
               <MapOverview
                 missions={(suite?.missions)||[]}
-                devices={devices}
+                devices={(config?.devices)||[]}
                 icons={config.icons || DEFAULT_ICONS}
                 showRings={showRings}
+                // mode logic: place vs move selected vs move nearest (computed inside)
                 interactive={placingDev}
                 draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
-                onDraftChange={(lat,lng)=>setDevDraft({ ...devDraft, lat, lng })}
-                onAltMoveNearest={(kind, idx, lat, lng)=>onMoveNearest(kind, idx, lat, lng)}
+                selectedDevIdx={selectedDevIdx}
+                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
+                onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
+                onMoveNearest={(kind, idx, lat, lng)=>{
+                  // fallback if nothing selected: nearest behavior
+                  if (kind==='mission') {
+                    const list=[...(suite?.missions||[])];
+                    const m=list[idx]; if (!m) return;
+                    const c={ ...(m.content||{}) };
+                    c.lat=Number(lat.toFixed(6)); c.lng=Number(lng.toFixed(6));
+                    c.geofenceEnabled=true; c.radiusMeters=Number(c.radiusMeters||25);
+                    list[idx]={ ...m, content:c };
+                    setSuite({ ...suite, missions:list });
+                    setStatus(`Moved mission #${idx+1}`);
+                  } else {
+                    const list=[...(getDevices()||[])];
+                    const d=list[idx]; if (!d) return;
+                    d.lat=Number(lat.toFixed(6)); d.lng=Number(lng.toFixed(6));
+                    setDevices(list);
+                    setStatus(`Moved device D${idx+1}`);
+                  }
+                }}
               />
             </div>
 
@@ -793,15 +918,15 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT */}
+      {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
-      {/* DEVICES */}
+      {/* DEVICES tab (simple list) */}
       {tab==='devices' && (
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Devices</h3>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “+ Add Device” on the Missions tab.</div>}
+            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” on the Missions tab or map-side manager.</div>}
             <ul style={{ paddingLeft:18 }}>
               {(devices||[]).map((x,i)=>(
                 <li key={x.id||i} style={{ marginBottom:8 }}>
@@ -817,7 +942,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MAP */}
+      {/* MAP (read-only large) */}
       {tab==='map' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -836,9 +961,7 @@ export default function Admin() {
       {tab==='media' && (
         <MediaTab config={config} setConfig={setConfig} uploadStatus={uploadStatus} setUploadStatus={setUploadStatus}
           uploadToRepo={async (file, folder)=> {
-            const url = await (async ()=>{
-              try { return await uploadToRepo(file, folder); } catch { return ''; }
-            })();
+            const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
           }}
         />
@@ -1070,10 +1193,11 @@ const S = {
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
 };
 
-/* MapOverview — single-click place/move */
+/* MapOverview — shows missions + devices, supports: placing draft, moving selected, moving nearest */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
-  interactive = false, draftDevice = null, onDraftChange = null, onAltMoveNearest = null
+  interactive = false, draftDevice = null, selectedDevIdx = null,
+  onDraftChange = null, onMoveSelected = null, onMoveNearest = null,
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
@@ -1082,11 +1206,15 @@ function MapOverview({
     if(!isFinite(lat)||!isFinite(lng))return null; if(!(c.geofenceEnabled||Number(c.radiusMeters)>0))return null; return [lat,lng]; }
   function getDevicePos(d){ const lat=Number(d?.lat),lng=Number(d?.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?toDirectMediaURL(it.url||''):''; }
-  function makeNumberedIcon(number, imgUrl, color='#60a5fa'){
+  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false){
     const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid white;box-shadow:0 0 0 2px #1f2937"/>`
-      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>`;
-    return window.L.divIcon({ className:'num-pin', html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`, iconSize:[24,28], iconAnchor:[12,12] });
+      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
+      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
+    return window.L.divIcon({
+      className:'num-pin',
+      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
+      iconSize:[24,28], iconAnchor:[12,12]
+    });
   }
 
   useEffect(()=>{ if(typeof window==='undefined')return;
@@ -1114,7 +1242,7 @@ function MapOverview({
     (missions||[]).forEach((m,idx)=>{
       const pos=getMissionPos(m); if(!pos) return;
       const url=iconUrl('missions', m.iconKey);
-      L.marker(pos,{icon:makeNumberedIcon(idx+1,url,'#60a5fa')}).addTo(layer);
+      L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',false)}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
       if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
@@ -1123,7 +1251,8 @@ function MapOverview({
     (devices||[]).forEach((d,idx)=>{
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
-      L.marker(pos,{icon:makeNumberedIcon(`D${idx+1}`,url,'#f59e0b')}).addTo(layer);
+      const hl = (selectedDevIdx===idx);
+      L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
       if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
@@ -1131,7 +1260,7 @@ function MapOverview({
 
     if(draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:makeNumberedIcon('D+','', '#34d399'), draggable:true }).addTo(layer);
+      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true), draggable:true }).addTo(layer);
       if(showRings && Number(draftDevice.radius)>0){
         const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
         mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
@@ -1140,13 +1269,15 @@ function MapOverview({
       bounds.extend(pos);
     }
 
-    // CLICK: single-click places draft (if placing) or moves nearest pin
+    // CLICK: place draft / move selected / move nearest
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
       const lat=e.latlng.lat, lng=e.latlng.lng;
       if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (!onAltMoveNearest) return;
+      if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
 
+      // move nearest
+      if (!onMoveNearest) return;
       const candidates=[];
       (missions||[]).forEach((m,idx)=>{ const p=getMissionPos(m); if(p) candidates.push({ kind:'mission', idx, lat:p[0], lng:p[1] }); });
       (devices||[]).forEach((d,idx)=>{ const p=getDevicePos(d); if(p) candidates.push({ kind:'device', idx, lat:p[0], lng:p[1] }); });
@@ -1154,12 +1285,12 @@ function MapOverview({
 
       let best=null, bestDist=Infinity;
       candidates.forEach(c=>{ const d=map.distance([c.lat,c.lng], e.latlng); if(d<bestDist){bestDist=d; best=c;} });
-      if(best) onAltMoveNearest(best.kind, best.idx, lat, lng);
+      if(best) onMoveNearest(best.kind, best.idx, lat, lng);
     };
     map.on('click', map._clickHandler);
 
     if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-  },[leafletReady, missions, devices, icons, showRings, interactive, draftDevice, onDraftChange, onAltMoveNearest]);
+  },[leafletReady, missions, devices, icons, showRings, interactive, draftDevice, selectedDevIdx, onDraftChange, onMoveSelected, onMoveNearest]);
 
   return (
     <div>
@@ -1169,72 +1300,54 @@ function MapOverview({
   );
 }
 
-/* Sub-tabs */
-function TextTab({ suite, config, setConfig, setStatus }) {
-  const [smsRule, setSmsRule] = useState({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId:'', phoneSlot:1, message:'', delaySec:30 });
-    setStatus('✅ SMS rule added (remember Save All)');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])]; rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Text Message Rules</h3>
-        <div style={{ display:'grid', gap:12, gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))' }}>
-          <Field label="Mission (geofence)">
-            <select style={S.input} value={smsRule.missionId} onChange={(e)=>setSmsRule({ ...smsRule, missionId:e.target.value })}>
-              <option value="">— choose —</option>
-              {(suite.missions||[]).map(m=><option key={m.id} value={m.id}>{m.id} — {m.title}</option>)}
-            </select>
-          </Field>
-          <Field label="Phone slot">
-            <select style={S.input} value={smsRule.phoneSlot} onChange={(e)=>setSmsRule({ ...smsRule, phoneSlot:Number(e.target.value) })}>
-              {[1,2,3,4].map(n=><option key={n} value={n}>{'Player '+n}</option>)}
-            </select>
-          </Field>
-          <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e)=>setSmsRule({ ...smsRule, delaySec:e.target.value })}/>
-          </Field>
-          <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e)=>setSmsRule({ ...smsRule, message:e.target.value })}/>
-          </Field>
-        </div>
-        <div style={{ marginTop:12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr}/>
-        <ul style={{ paddingLeft:18 }}>
-          {(config.textRules||[]).map((r,i)=>(
-            <li key={i} style={{ marginBottom:8 }}>
-              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-              <button style={{ ...S.button, marginLeft:8, padding:'6px 10px' }} onClick={()=>removeSmsRule(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </main>
-  );
-}
+/* MEDIA tab with DnD + file chooser + Icons editors */
 function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo }) {
   const [hover, setHover] = useState(false);
+
+  async function handleDrop(e) {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    let files = [];
+    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
+      for (let i=0;i<e.dataTransfer.items.length;i++) {
+        const it = e.dataTransfer.items[i];
+        if (it.kind==='file') {
+          const f = it.getAsFile(); if (f) files.push(f);
+        }
+      }
+    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
+      files = Array.from(e.dataTransfer.files);
+    }
+    for (const f of files) { await uploadToRepo(f, 'uploads'); }
+  }
+
+  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
+    return (
+      <label style={{ ...S.button, textAlign:'center' }}>
+        {label}
+        <input type="file" multiple style={{ display:'none' }}
+          onChange={async (e)=>{
+            const files = Array.from(e.target.files || []);
+            for (const f of files) {
+              const url = await uploadToRepo(f, folder);
+              if (url && typeof onUploaded==='function') onUploaded(url);
+            }
+            e.target.value = '';
+          }}/>
+      </label>
+    );
+  }
+
   return (
     <main style={S.wrap}>
       <div style={S.card}
-           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-           onDragLeave={(e)=>{ setHover(false); }}
-           onDrop={async (e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false);
-              const files=[...e.dataTransfer.files]; for (const f of files) await uploadToRepo(f,'uploads'); }}>
+           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
+           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
+           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
+           onDrop={handleDrop}>
         <h3 style={{ marginTop:0 }}>Media</h3>
-        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:12, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files here or use “Choose File”. Files are committed to <code>public/media/…</code>.
-          <div style={{ float:'right' }}>{uploadStatus}</div>
+        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
+          Drag & drop files here or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
+          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
         </div>
 
         <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
@@ -1247,6 +1360,7 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
 function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
   const list = config.icons?.[kind] || [];
   const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
+
   return (
     <div style={{ marginTop:16 }}>
       <h4 style={{ marginTop:0 }}>{label}</h4>
