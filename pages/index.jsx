@@ -458,8 +458,7 @@ export default function Admin() {
   // ... (same device/search/upload helpers as your current build)
   // (I’ve left them intact in the actual code block below.)
 
-  // Address search (by the map) — Nominatim
-  const [placingDev, setPlacingDevState] = [placingDev, setPlacingDev]; // to keep code below identical
+ 
 
   async function devSearch(e) {
     e?.preventDefault();
