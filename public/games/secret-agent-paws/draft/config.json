@@ -19,7 +19,18 @@
   "powerups": [],
   "media": {},
   "icons": {
-    "missions": [],
+    "missions": [
+      {
+        "key": "missions-1",
+        "name": "",
+        "url": ""
+      },
+      {
+        "key": "missions-2",
+        "name": "",
+        "url": ""
+      }
+    ],
     "devices": [],
     "rewards": []
   },
