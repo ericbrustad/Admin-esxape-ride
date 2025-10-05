@@ -37,27 +37,6 @@
       }
     },
     {
-      "id": "m02",
-      "title": "We need your handler info...",
-      "type": "short_answer",
-      "iconKey": "",
-      "rewards": {
-        "points": 25
-      },
-      "content": {
-        "question": "First, We need to know your name. What is your name?",
-        "answer": "x",
-        "acceptable": "x",
-        "mediaUrl": "",
-        "geofenceEnabled": true,
-        "lat": 44.80249,
-        "lng": -93.363148,
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false
-    },
-    {
       "id": "m03",
       "title": "We need your Dogs name also... Agent Paws First Name?",
       "type": "short_answer",
@@ -73,6 +52,27 @@
         "geofenceEnabled": true,
         "lat": 44.80277,
         "lng": -93.363223,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false
+    },
+    {
+      "id": "m02",
+      "title": "We need your handler info...",
+      "type": "short_answer",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "First, We need to know your name. What is your name?",
+        "answer": "x",
+        "acceptable": "x",
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.80249,
+        "lng": -93.363148,
         "radiusMeters": 25,
         "cooldownSeconds": 30
       },
