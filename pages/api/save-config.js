@@ -1,5 +1,6 @@
 // pages/api/save-config.js
-// Save draft config to Admin root + mirror to Game draft (for TEST channel)
+// Save draft config to Admin root + mirror to Game draft (for TEST channel).
+// No extra Basic-Auth check — middleware already protects everything.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'POST only' });
