@@ -4,8 +4,8 @@
     "mode": "single"
   },
   "game": {
-    "title": "mike",
-    "type": "Chase"
+    "title": "DEFAULT",
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
@@ -15,5 +15,69 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "powerups": []
+  "devices": [
+    {
+      "id": "d01",
+      "title": "dddv",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978055,
+      "lng": -93.265671
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "dddv",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978055,
+      "lng": -93.265671
+    }
+  ],
+  "media": {
+    "pool": []
+  },
+  "icons": {
+    "missions": [],
+    "devices": [],
+    "rewards": []
+  },
+  "appearance": {
+    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    "fontSizePx": 22,
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top"
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#100f10",
+      "align": "left",
+      "backgroundColor": "#e6eaf9",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#ffffff",
+      "align": "center",
+      "backgroundColor": "#0b0c10",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
 }
