@@ -43,8 +43,8 @@
       "iconKey": "",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.975717,
-      "lng": -93.272608
+      "lat": 44.975569,
+      "lng": -93.272951
     },
     {
       "id": "d04",
@@ -65,6 +65,16 @@
       "effectSeconds": 120,
       "lat": 44.973703,
       "lng": -93.28497
+    },
+    {
+      "id": "d06",
+      "title": "bb",
+      "type": "jammer",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.968285,
+      "lng": -93.263165
     }
   ],
   "powerups": [
@@ -95,8 +105,8 @@
       "iconKey": "",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.975717,
-      "lng": -93.272608
+      "lat": 44.975569,
+      "lng": -93.272951
     },
     {
       "id": "d04",
@@ -117,6 +127,16 @@
       "effectSeconds": 120,
       "lat": 44.973703,
       "lng": -93.28497
+    },
+    {
+      "id": "d06",
+      "title": "bb",
+      "type": "jammer",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.968285,
+      "lng": -93.263165
     }
   ],
   "media": {},
@@ -140,12 +160,12 @@
     ],
     "devices": [
       {
-        "key": "devices-3",
-        "name": "nah",
-        "url": "/media/icons/1759680188878-Cipher_Wheel.jpg"
+        "key": "",
+        "name": "briefcase",
+        "url": "/media/icons/1759680697488-briefcase.jfif"
       },
       {
-        "key": "devices-2",
+        "key": "",
         "name": "wheel",
         "url": "/media/icons/1759680357102-casper.jpg"
       }
