@@ -246,4 +246,185 @@ export default function Game() {
     textAlign: ap.textAlign || 'center',
   };
   const dockStyle = (ap.textVertical === 'center'
-    ? { position:'fixed', top:'50%', left:'
+    ? { position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex: 9, pointerEvents:'none' }
+    : { position:'fixed', top:54+12, left:12, right:12, zIndex: 9, pointerEvents:'none' });
+
+  return (
+    <main style={styles.main}>
+      <div style={{ ...styles.app, ...appStyle }}>
+        {/* topbar */}
+        <div style={styles.topbar}>
+          <div style={styles.title}>{config?.game?.title || 'Game'}</div>
+          <div style={styles.score}>⭐ {points}</div>
+          <button style={styles.mediaBtn} onClick={()=>{ const p=document.getElementById('backpack'); p.style.display = (p.style.display==='block')?'none':'block'; }}>🎒 Backpack</button>
+        </div>
+
+        {/* map */}
+        <div ref={mapDiv} style={styles.map} />
+
+        {/* mission */}
+        <div style={dockStyle}>
+          <div style={{ ...styles.card, pointerEvents:'auto' }}>
+            {!m ? (
+              <div style={{ color:'#9fb0bf' }}>No missions in this game.</div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 6, fontWeight: 700 }}>{m.title || m.id}</div>
+                <div style={textWrap}>
+                  {m.type === 'multiple_choice' && (
+                    <div>
+                      <div style={{ marginBottom: 8 }}>{expandText(m.content?.question || '', answers)}</div>
+                      <div style={{ display:'grid', gap:6 }}>
+                        {(m.content?.choices || []).map((c, i) => (
+                          <button key={i} style={styles.choice} onClick={() => completeMission(m, c)}>
+                            {expandText(c, answers)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {m.type === 'short_answer' && (
+                    <ShortAnswer
+                      prompt={expandText(m.content?.question || '', answers)}
+                      onSubmit={(val) => completeMission(m, val)}
+                    />
+                  )}
+                  {m.type === 'statement' && (
+                    <div>{expandText(m.content?.text || '', answers)}</div>
+                  )}
+                  {m.type === 'stored_statement' && (
+                    <div>{expandText(m.content?.template || '', answers)}</div>
+                  )}
+                  {m.type === 'video' && (
+                    <div style={{ display:'grid', gap:8 }}>
+                      {m.content?.videoUrl && <video src={m.content.videoUrl} controls style={{ width:'100%', borderRadius:10 }} />}
+                      {m.content?.overlayText && <div>{expandText(m.content.overlayText, answers)}</div>}
+                      <button style={styles.primaryBtn} onClick={()=>completeMission(m, '')}>Continue</button>
+                    </div>
+                  )}
+                </div>
+
+                {m?.content?.geofenceEnabled && (
+                  <div style={{ marginTop: 10, fontSize: 12, color:'#9fb0bf' }}>
+                    Reach the marked area to unlock / complete.
+                    {preview && <button style={{ ...styles.smallBtn, marginLeft: 8 }} onClick={()=>completeMission(m, '')}>Simulate reach</button>}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* backpack */}
+        <div id="backpack" style={styles.backpackPanel}>
+          <Backpack items={items} onUse={useUtility} />
+        </div>
+
+        {/* overlay viewer */}
+        {overlay && (
+          <div style={styles.overlay}>
+            <div style={styles.overlayCard}>
+              <div style={{ marginBottom:8, fontWeight:700 }}>{overlay.title || overlay.message || 'Mission complete!'}</div>
+              {overlay.kind === 'video' && <video src={overlay.url} controls autoPlay style={{ width:'100%', borderRadius:10 }} />}
+              {overlay.kind === 'audio' && <audio src={overlay.url} controls autoPlay style={{ width:'100%' }} />}
+              {overlay.kind === 'image' && <img src={overlay.url} alt="" style={{ width:'100%', borderRadius:10 }} />}
+              {overlay.kind === 'message' && <div style={{ ...textWrap }}>{overlay.message}</div>}
+              <button style={{ ...styles.primaryBtn, marginTop:10 }} onClick={()=>setOverlay(null)}>OK</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function ShortAnswer({ prompt, onSubmit }) {
+  const [v, setV] = React.useState('');
+  return (
+    <div>
+      <div style={{ marginBottom: 8 }}>{prompt}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+        <input value={v} onChange={e=>setV(e.target.value)} placeholder="Type your answer…"
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' }} />
+        <button style={{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2' }}
+          onClick={()=>onSubmit(v)}>Submit</button>
+      </div>
+    </div>
+  );
+}
+
+function Backpack({ items, onUse }) {
+  const tabs = [
+    { key:'video',     label:'Video' },
+    { key:'audio',     label:'Audio' },
+    { key:'rewards',   label:'Rewards' },
+    { key:'utilities', label:'Utilities' },
+  ];
+  const [tab, setTab] = React.useState('video');
+  return (
+    <div>
+      <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+        {tabs.map(t => (
+          <button key={t.key} onClick={()=>setTab(t.key)}
+            style={{ padding:'6px 10px', borderRadius:8, border:'1px solid #2a323b', background: tab===t.key ? '#1a2027' : '#0f1418', color:'#e9eef2' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div>
+        {tab === 'video'     && <PocketGrid items={items.video} kind="video" />}
+        {tab === 'audio'     && <PocketGrid items={items.audio} kind="audio" />}
+        {tab === 'rewards'   && <PocketGrid items={items.rewards} kind="rewards" />}
+        {tab === 'utilities' && <PocketGrid items={items.utilities} kind="utilities" onUse={onUse} />}
+      </div>
+    </div>
+  );
+}
+function PocketGrid({ items, kind, onUse }) {
+  if (!items || items.length === 0) return <div style={{ color:'#9fb0bf' }}>Nothing here yet.</div>;
+  return (
+    <div style={styles.grid}>
+      {items.map((it, i) => (
+        <div key={i} style={styles.tile}>
+          <div style={styles.thumbWrap}>
+            {it.thumb
+              ? <img src={it.thumb} alt="" style={styles.thumbImg} />
+              : <div style={styles.thumbFallback}>{kind === 'video' ? '🎥' : kind === 'audio' ? '🎵' : kind === 'utilities' ? '🧰' : '💎'}</div>
+            }
+          </div>
+          <div style={styles.tileTitle}>{it.title || it.name || '(untitled)'}</div>
+          <div style={styles.tileActions}>
+            {it.url && <a href={it.url} target="_blank" rel="noreferrer"><button style={styles.smallBtn}>Open</button></a>}
+            {it.imageUrl && <a href={it.imageUrl} target="_blank" rel="noreferrer"><button style={styles.smallBtn}>View</button></a>}
+            {onUse && kind==='utilities' && <button style={styles.smallBtn} onClick={()=>onUse(it.name)}>Use</button>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* styles */
+const TOPBAR_H = 54;
+const styles = {
+  main: { minHeight:'100vh', background:'#0b0c10', color:'#e9eef2' },
+  app:  { minHeight:'100vh', position:'relative' },
+  topbar: { position:'fixed', top:0, left:0, right:0, height:TOPBAR_H, display:'flex', alignItems:'center', gap:12,
+            padding:'0 12px', background:'#0b0c10cc', backdropFilter:'blur(8px)', borderBottom:'1px solid #1d2329', zIndex:10 },
+  title: { fontWeight:800, flex:1 },
+  score: { fontWeight:600 },
+  mediaBtn: { padding:'8px 10px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
+  map:   { position:'fixed', top:TOPBAR_H, left:0, right:0, bottom: 0, background:'#0b1116' },
+  card:  { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, maxWidth:720, width:'calc(100vw - 24px)' },
+  grid: { display:'grid', gap:8, gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))' },
+  tile: { border:'1px solid #1f262d', borderRadius:10, padding:8, background:'#0f1418' },
+  thumbWrap: { width:'100%', aspectRatio:'4/3', background:'#0b0c10', border:'1px solid #1f262d', borderRadius:8, display:'grid', placeItems:'center', overflow:'hidden' },
+  thumbImg: { width:'100%', height:'100%', objectFit:'cover' },
+  thumbFallback: { fontSize: 28, opacity: 0.8 },
+  tileTitle: { marginTop:6, fontSize: 13, fontWeight: 600 },
+  tileActions: { marginTop:6, display:'flex', gap:6, flexWrap:'wrap' },
+  smallBtn: { padding:'6px 10px', borderRadius:8, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
+  primaryBtn: { padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#103217', color:'#e9eef2', cursor:'pointer' },
+  overlay: { position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex: 100 },
+  overlayCard: { width:'min(560px, 92vw)', background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12 },
+};
