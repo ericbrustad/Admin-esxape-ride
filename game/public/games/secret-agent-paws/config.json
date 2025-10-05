@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.990283,
+      "lng": -93.272183
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.990283,
+      "lng": -93.272183
+    }
+  ],
   "media": {
     "images": [
       {
@@ -30,7 +52,13 @@
     ]
   },
   "icons": {
-    "missions": [],
+    "missions": [
+      {
+        "key": "missions-1",
+        "name": "",
+        "url": "/media/icons/1759674089958-sIGNAL_jAMMER.jpg"
+      }
+    ],
     "devices": [],
     "rewards": []
   },
