@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
 /* =====================================================================
-   Helpers
+   0) HELPERS
    ===================================================================== */
 async function fetchJsonSafe(url, fallback) {
   try {
@@ -22,17 +22,38 @@ async function fetchFirstJson(urls, fallback) {
   }
   return fallback;
 }
+
+// Convert common share links to direct-view links for previews
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
     const url = new URL(u);
     const host = url.host.toLowerCase();
+
+    // Dropbox
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
-      if (url.searchParams.has('dl')) url.searchParams.delete('dl');
+      url.searchParams.delete('dl');
       if (!url.searchParams.has('raw')) url.searchParams.set('raw', '1');
       return url.toString();
     }
+
+    // Google Drive
+    // 1) https://drive.google.com/open?id=FILE_ID
+    // 2) https://drive.google.com/file/d/FILE_ID/view?usp=...
+    // -> https://drive.google.com/uc?export=view&id=FILE_ID
+    if (host.endsWith('drive.google.com')) {
+      let id = '';
+      if (url.pathname.startsWith('/file/d/')) {
+        const parts = url.pathname.split('/');
+        // ['', 'file', 'd', 'FILE_ID', 'view']
+        id = parts[3] || '';
+      } else if (url.pathname === '/open') {
+        id = url.searchParams.get('id') || '';
+      }
+      if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
+    }
+
     return u;
   } catch {
     return u;
@@ -40,7 +61,7 @@ function toDirectMediaURL(u) {
 }
 
 /* =====================================================================
-   Schemas & constants
+   1) SCHEMAS
    ===================================================================== */
 const TYPE_FIELDS = {
   multiple_choice: [
@@ -88,6 +109,7 @@ const TYPE_FIELDS = {
     { key: 'overlayText', label: 'Overlay Text (optional)', type: 'text' },
   ],
 };
+
 const TYPE_OPTIONS = [
   { value: 'multiple_choice', label: 'Multiple Choice' },
   { value: 'short_answer', label: 'Question (Short Answer)' },
@@ -98,37 +120,32 @@ const TYPE_OPTIONS = [
   { value: 'ar_image', label: 'AR Image' },
   { value: 'ar_video', label: 'AR Video' },
 ];
+
 const GAME_TYPES = ['Mystery', 'Chase', 'Race', 'Thriller', 'Hunt'];
+
 const POWERUP_TYPES = [
   { value: 'smoke', label: 'Smoke (hide on GPS)' },
   { value: 'clone', label: 'Clone (decoy location)' },
   { value: 'jammer', label: 'Signal Jammer (blackout radius)' },
 ];
 
-// (val = CSS stack; gf = Google Fonts key)
-const FONT_CHOICES = [
-  { label: 'System', val: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif', gf: null },
-  { label: 'Inter', val: '"Inter",sans-serif', gf: 'Inter' },
-  { label: 'Roboto', val: '"Roboto",sans-serif', gf: 'Roboto' },
-  { label: 'Poppins', val: '"Poppins",sans-serif', gf: 'Poppins' },
-  { label: 'Montserrat', val: '"Montserrat",sans-serif', gf: 'Montserrat' },
-  { label: 'Oswald', val: '"Oswald",sans-serif', gf: 'Oswald' },
-  { label: 'Playfair Display', val: '"Playfair Display",serif', gf: 'Playfair+Display' },
-  { label: 'Merriweather', val: '"Merriweather",serif', gf: 'Merriweather' },
-  { label: 'Bebas Neue', val: '"Bebas Neue",cursive', gf: 'Bebas+Neue' },
+/* Thumbnails the client should use by type/name (MEDIA tab) */
+const DEFAULT_UTILITY_THUMBS = {
+  smoke: 'https://drive.google.com/open?id=1icvwZ3Bow3HGrmVve1LUUv_6b2Gkwq7h&usp=drive_fs',
+  jammer: 'https://drive.google.com/open?id=1TSzo_lMmVGYyvlZMQXLyltG4pRi2yIRY&usp=drive_fs',
+  clone: 'https://drive.google.com/open?id=1RE5VPX5HAajvkT1zkO9J_5sOkKgwRFOv&usp=drive_fs',
+};
+const DEFAULT_REWARDS = [
+  {
+    key: 'gold-coin',
+    name: 'Gold Coin',
+    ability: 'Adds a coin to your wallet.',
+    thumbUrl: 'https://drive.google.com/open?id=1TicLeS2LLwY8nVk-7Oc6ESxk_SyvxZGw&usp=drive_fs',
+  },
 ];
-function ensureGoogleFontLoaded(gf) {
-  if (!gf || typeof document === 'undefined') return;
-  const id = `gf-${gf}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id; link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
-  document.head.appendChild(link);
-}
 
 /* =====================================================================
-   Root
+   2) ROOT
    ===================================================================== */
 export default function Admin() {
   const [tab, setTab] = useState('missions');
@@ -140,10 +157,11 @@ export default function Admin() {
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
   const [newMode, setNewMode] = useState('single');
-  const [newDurationMin, setNewDurationMin] = useState(0);
-  const [newAlertMin, setNewAlertMin] = useState(10);
+  const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
+  const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
+  const [showQuickPowerup, setShowQuickPowerup] = useState(false);
 
   // data
   const [suite, setSuite] = useState(null);
@@ -158,15 +176,22 @@ export default function Admin() {
   // text rules
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
 
-  // powerups
-  const [pu, setPu] = useState({ title: '', type: 'smoke', pickupRadius: 15, effectSeconds: 60, lat: 44.9778, lng: -93.265 });
+  // powerups (quick add)
+  const [pu, setPu] = useState({
+    title: '',
+    type: 'smoke',
+    pickupRadius: 100,
+    effectSeconds: 120,
+    lat: 44.9778,
+    lng: -93.265,
+  });
 
   const gameBase =
-    (typeof window !== 'undefined'
+    ((typeof window !== 'undefined'
       ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
-      : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
+      : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '');
 
-  /* load games list */
+  // load games
   useEffect(() => {
     (async () => {
       try {
@@ -177,39 +202,85 @@ export default function Admin() {
     })();
   }, []);
 
-  /* load suite/config per slug */
+  // load suite/config per slug
   useEffect(() => {
     (async () => {
       try {
         setStatus('Loading…');
+
         const missionUrls = activeSlug
           ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
           : [`/missions.json`];
+
         const configUrl = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
+
         const m = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
-        const c = await fetchJsonSafe(configUrl, defaultConfig());
+        const c0 = await fetchJsonSafe(configUrl, defaultConfig());
+
+        // Normalize legacy mission types
         const normalized = {
           ...m,
           missions: (m.missions || []).map((x) =>
             x.type === 'quiz'
-              ? { ...x, type: 'multiple_choice', content: { question: x.content?.question || '', choices: x.content?.choices || [], answer: x.content?.answer || '' } }
+              ? {
+                  ...x,
+                  type: 'multiple_choice',
+                  content: {
+                    question: x.content?.question || '',
+                    choices: x.content?.choices || [],
+                    correctIndex: Number.isInteger(x.content?.correctIndex)
+                      ? x.content.correctIndex
+                      : undefined,
+                    mediaUrl: x.content?.mediaUrl || '',
+                    geofenceEnabled: !!x.content?.geofenceEnabled,
+                    lat: x.content?.lat ?? '',
+                    lng: x.content?.lng ?? '',
+                    radiusMeters: x.content?.radiusMeters ?? 25,
+                    cooldownSeconds: x.content?.cooldownSeconds ?? 30,
+                  },
+                }
               : x
           ),
         };
+
+        // Merge config defaults (MEDIA + timer + powerups)
+        const dc = defaultConfig();
+        const merged = {
+          ...dc,
+          ...c0,
+          timer: { ...dc.timer, ...(c0.timer || {}) },
+          powerups: Array.isArray(c0.powerups) ? c0.powerups : [],
+          media: {
+            utilityThumbs: {
+              ...DEFAULT_UTILITY_THUMBS,
+              ...(c0.media?.utilityThumbs || {}),
+            },
+            rewards: Array.isArray(c0.media?.rewards) && c0.media.rewards.length > 0
+              ? c0.media.rewards
+              : DEFAULT_REWARDS,
+          },
+        };
+
+        // If there are no stored power-ups yet, seed the 3 defaults (no lat/lng set)
+        if (!merged.powerups || merged.powerups.length === 0) {
+          merged.powerups = [
+            { id: 'p01', title: 'Smoke', type: 'smoke', pickupRadius: 100, effectSeconds: 120 },
+            { id: 'p02', title: 'Jammer', type: 'jammer', pickupRadius: 100, effectSeconds: 120 },
+            { id: 'p03', title: 'Clone', type: 'clone', pickupRadius: 100, effectSeconds: 120 },
+          ];
+        }
+
         setSuite(normalized);
-        setConfig({
-          ...defaultConfig(),
-          ...c,
-          powerups: Array.isArray(c.powerups) ? c.powerups : [],
-          timer: { ...(defaultConfig().timer), ...(c.timer || {}) },
-          theme: { ...(defaultConfig().theme), ...(c.theme || {}) },
-          media: { ...(defaultConfig().media), ...(c.media || {}) },
-        });
-        setSelected(null); setEditing(null); setDirty(false); setStatus('');
+        setConfig(merged);
+        setSelected(null);
+        setEditing(null);
+        setDirty(false);
+        setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlug]);
 
   function defaultConfig() {
@@ -220,23 +291,9 @@ export default function Admin() {
       timer: { durationMinutes: 0, alertMinutes: 10 },
       textRules: [],
       powerups: [],
-      theme: {
-        fontFamily: FONT_CHOICES[0].val,
-        fontGF: null,
-        fontSize: 18,
-        fontColor: '#ffffff',
-        fontColorOpacity: 1,
-        fontBg: '#000000',
-        fontBgOpacity: 0.5,
-        screenBg: '#0b0c10',
-        screenBgOpacity: 1,
-        screenImg: '',
-        screenImgOpacity: 1,
-        textAlignV: 'top', // 'top' | 'center'
-      },
       media: {
-        // Admin-managed thumbs for rewards & utilities
-        thumbs: { rewards: {}, utilities: {} },
+        utilityThumbs: { ...DEFAULT_UTILITY_THUMBS },
+        rewards: [...DEFAULT_REWARDS],
       },
     };
   }
@@ -244,38 +301,58 @@ export default function Admin() {
   function defaultContentForType(t) {
     const baseGeo = { geofenceEnabled: false, lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30 };
     switch (t) {
-      case 'multiple_choice': return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
-      case 'short_answer':    return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
-      case 'statement':       return { text: '', mediaUrl: '', ...baseGeo };
-      case 'video':           return { videoUrl: '', overlayText: '', ...baseGeo };
-      case 'geofence_image':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
-      case 'geofence_video':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
-      case 'ar_image':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      case 'ar_video':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      default:                return { ...baseGeo };
+      case 'multiple_choice':
+        return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
+      case 'short_answer':
+        return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
+      case 'statement':
+        return { text: '', mediaUrl: '', ...baseGeo };
+      case 'video':
+        return { videoUrl: '', overlayText: '', ...baseGeo };
+      case 'geofence_image':
+        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
+      case 'geofence_video':
+        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
+      case 'ar_image':
+        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      case 'ar_video':
+        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      default:
+        return { ...baseGeo };
     }
   }
 
-  /* Save / Publish */
   async function saveAll() {
-    if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
+    if (!suite || !config) return;
     setStatus('Saving…');
-    const qs = `?slug=${encodeURIComponent(activeSlug)}`;
-    const r = await fetch('/api/save' + qs, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ missions: suite, config }),
-    });
-    const t = await r.text();
-    if (!r.ok) setStatus('❌ Save failed:\n' + t);
-    else setStatus('✅ Saved (draft updated for admin + test preview)');
+    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+    const [a, b] = await Promise.all([
+      fetch('/api/save' + qs, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ missions: suite }),
+      }),
+      fetch('/api/save-config' + qs, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config }),
+      }),
+    ]);
+    const ok = a.ok && b.ok;
+    if (!ok) {
+      setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
+    } else {
+      setStatus('✅ Saved (files committed)');
+    }
   }
+
   async function handlePublish() {
-    if (!activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     try {
       setStatus('Publishing…');
-      const res = await fetch(`/api/game/${encodeURIComponent(activeSlug)}?channel=published`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'publish' }),
+      const res = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'publish' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Publish failed');
@@ -284,30 +361,8 @@ export default function Admin() {
       setStatus('❌ Publish failed: ' + (e?.message || e));
     }
   }
-  async function handleSavePublish() {
-    if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
-    setStatus('Saving & Publishing…');
-    const qs = `?slug=${encodeURIComponent(activeSlug)}`;
-    const r = await fetch('/api/save-publish' + qs, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ missions: suite, config }),
-    });
-    const t = await r.text();
-    if (!r.ok) setStatus('❌ Save & Publish failed:\n' + t);
-    else {
-      try { const j = JSON.parse(t); setStatus(`✅ Saved & Published v${j?.version || ''}`); }
-      catch { setStatus('✅ Saved & Published'); }
-    }
-  }
 
-  /* Mission helpers */
-  function bumpVersion(v) {
-    const p = String(v || '0.0.0').split('.').map((n) => parseInt(n || '0', 10));
-    while (p.length < 3) p.push(0);
-    p[2] += 1;
-    return p.join('.');
-  }
+  // missions helpers
   function suggestId() {
     const base = 'm';
     let i = 1;
@@ -320,38 +375,31 @@ export default function Admin() {
       id: suggestId(),
       title: 'New Mission',
       type: 'multiple_choice',
-      rewards: { points: 25, items: [] },
-      completion: {
-        message: 'Mission complete!',
-        mediaUrl: '',
-        mediaType: 'audio',  // none | audio | video | image
-        title: '',           // optional media title (for Backpack)
-        thumbUrl: '',        // optional media thumb (fallback to Admin MEDIA map if set)
-      },
-      appearance: {
-        enabled: false,
-        fontFamily: '',
-        fontGF: null,
-        fontSize: 18,
-        fontColor: '#ffffff',
-        fontColorOpacity: 1,
-        fontBg: '#000000',
-        fontBgOpacity: 0.5,
-        screenBg: '#0b0c10',
-        screenBgOpacity: 1,
-        screenImg: '',
-        screenImgOpacity: 1,
-        textAlignV: 'top',
-      },
+      rewards: { points: 25 },
       content: defaultContentForType('multiple_choice'),
     };
-    setEditing(draft); setSelected(null); setDirty(true);
+    setEditing(draft);
+    setSelected(null);
+    setDirty(true);
   }
   function editExisting(m) {
     setEditing(JSON.parse(JSON.stringify(m)));
-    setSelected(m.id); setDirty(false);
+    setSelected(m.id);
+    setDirty(false);
   }
-  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
+  function cancelEdit() {
+    setEditing(null);
+    setSelected(null);
+    setDirty(false);
+  }
+  function bumpVersion(v) {
+    const p = String(v || '0.0.0')
+      .split('.')
+      .map((n) => parseInt(n || '0', 10));
+    while (p.length < 3) p.push(0);
+    p[2] += 1;
+    return p.join('.'); // x.y.(z+1)
+  }
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
@@ -366,27 +414,46 @@ export default function Admin() {
     if (i >= 0) missions[i] = editing;
     else missions.push(editing);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id); setEditing(null); setDirty(false);
+    setSelected(editing.id);
+    setEditing(null);
+    setDirty(false);
     setStatus('✅ List updated (remember Save All)');
   }
   function removeMission(id) {
     if (!suite) return;
     setSuite({ ...suite, missions: (suite.missions || []).filter((m) => m.id !== id) });
-    if (selected === id) { setSelected(null); setEditing(null); }
-  }
-  function moveMission(idx, delta) {
-    if (!suite) return;
-    const arr = [...(suite.missions || [])];
-    const j = idx + delta;
-    if (j < 0 || j >= arr.length) return;
-    [arr[idx], arr[j]] = [arr[j], arr[idx]];
-    setSuite({ ...suite, missions: arr, version: bumpVersion(suite.version || '0.0.0') });
+    if (selected === id) {
+      setSelected(null);
+      setEditing(null);
+    }
   }
 
-  if (!suite || !config) return <main style={S.wrap}><div style={S.card}>Loading…</div></main>;
+  // text rules
+  function addSmsRule() {
+    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
+    const maxPlayers = config?.forms?.players || 1;
+    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
+    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }]; // ensure number
+    setConfig({ ...config, textRules: rules });
+    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
+    setStatus('✅ SMS rule added (remember Save All)');
+  }
+  function removeSmsRule(idx) {
+    const rules = [...(config?.textRules || [])];
+    rules.splice(idx, 1);
+    setConfig({ ...config, textRules: rules });
+  }
+
+  if (!suite || !config) {
+    return (
+      <main style={S.wrap}>
+        <div style={S.card}>Loading…</div>
+      </main>
+    );
+  }
 
   /* =====================================================================
-     UI
+     3) UI
      ===================================================================== */
   return (
     <div style={S.body}>
@@ -403,7 +470,7 @@ export default function Admin() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
               <label style={{ color: '#9fb0bf', fontSize: 12 }}>Game:</label>
               <select value={activeSlug} onChange={(e) => setActiveSlug(e.target.value)} style={{ ...S.input, width: 280 }}>
-                <option value="">(choose a slug)</option>
+                <option value="">(legacy root)</option>
                 {games.map((g) => (
                   <option key={g.slug} value={g.slug}>
                     {g.title} — {g.slug} ({g.mode || 'single'})
@@ -413,17 +480,23 @@ export default function Admin() {
               <button style={S.button} onClick={() => setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Always show New Mission */}
+            {/* Always show New Mission + Add Power-Up quick */}
             <button onClick={startNew} style={S.button}>+ New Mission</button>
+            <button onClick={() => setShowQuickPowerup(true)} style={S.button}>+ Add Power‑Up</button>
 
             {/* Save + quick links */}
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
-            <button onClick={handleSavePublish} style={{ ...S.button, background:'#15315c', border:'1px solid #2d5ca3' }}>Save &amp; Publish</button>
-            <a href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={activeSlug ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}
+            >
               View missions.json
             </a>
-            <a href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/config.json'}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}
+            >
               View config.json
             </a>
           </div>
@@ -433,353 +506,317 @@ export default function Admin() {
 
       {/* MISSIONS */}
       {tab === 'missions' && (
-        <main style={S.wrapGrid}>
-          <aside style={S.sidebar}>
-            <input
-              placeholder="Search…"
-              onChange={(e) => {
-                const q = e.target.value.toLowerCase();
-                document.querySelectorAll('[data-m-title]').forEach((it) => {
-                  const t = (it.getAttribute('data-m-title') || '').toLowerCase();
-                  it.style.display = t.includes(q) ? '' : 'none';
-                });
-              }}
-              style={S.search}
-            />
-            <div>
-              {(suite.missions || []).map((m, idx) => (
-                <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
-                      <div style={{ fontWeight: 600 }}>{m.title || m.id}</div>
-                      <div style={{ color: '#9fb0bf', fontSize: 12 }}>
-                        {m.type} — id: {m.id}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button title="Move up" style={{ ...S.button, padding: '6px 10px' }} onClick={() => moveMission(idx, -1)}>↑</button>
-                      <button title="Move down" style={{ ...S.button, padding: '6px 10px' }} onClick={() => moveMission(idx, +1)}>↓</button>
-                      <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>Delete</button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          <section style={S.editor}>
-            {!editing ? (
-              <div style={S.card}>
-                <p style={{ marginTop: 0, color: '#9fb0bf' }}>Select a mission or click <em>New Mission</em>.</p>
-                <button style={S.button} onClick={startNew}>+ New Mission</button>
-                <p style={{ color: '#9fb0bf' }}>
-                  Version: <code>{suite.version || '0.0.0'}</code> • Total: <code>{suite.missions?.length || 0}</code>
-                </p>
-              </div>
-            ) : (
-              <div style={S.card}>
-                <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id: e.target.value }); setDirty(true); }} /></Field>
-                <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title: e.target.value }); setDirty(true); }} /></Field>
-                <Field label="Type">
-                  <select
-                    style={S.input}
-                    value={editing.type}
-                    onChange={(e) => {
-                      const t = e.target.value;
-                      setEditing({ ...editing, type: t, content: defaultContentForType(t) });
-                      setDirty(true);
-                    }}
-                  >
-                    {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </Field>
-
-                <hr style={S.hr} />
-
-                {/* Custom appearance (with opacity + alignment) */}
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!editing.appearance?.enabled}
-                    onChange={(e) => { setEditing({ ...editing, appearance: { ...(editing.appearance||{}), enabled: e.target.checked } }); setDirty(true); }}
-                  />
-                  Use custom appearance for this mission
+        <>
+          {/* Map area of current missions + powerups, directly under the buttons */}
+          <main style={S.wrap}>
+            <div style={S.card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <h3 style={{ margin: 0 }}>Overview Map</h3>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)} />
+                  Show radius rings (admin only)
                 </label>
-                {editing.appearance?.enabled && (
-                  <AppearanceControls
-                    value={editing.appearance}
-                    onChange={(ap) => { setEditing({ ...editing, appearance: ap }); setDirty(true); }}
-                    allowAlign
-                  />
-                )}
+              </div>
+              <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
+            </div>
+          </main>
 
-                {/* Mission Complete uses same appearance center-aligned */}
-                <div style={{ margin: '12px 0', padding: 12, borderRadius: 10, border: '1px solid #2a323b' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Mission Complete</div>
-                  <Field label="Message">
-                    <input
-                      style={S.input}
-                      value={editing.completion?.message || ''}
-                      onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), message: e.target.value } }); setDirty(true); }}
-                    />
-                  </Field>
-                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 2fr' }}>
-                    <Field label="Media type">
-                      <select
-                        style={S.input}
-                        value={editing.completion?.mediaType || 'audio'}
-                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), mediaType: e.target.value } }); setDirty(true); }}
-                      >
-                        <option value="none">None</option>
-                        <option value="audio">Audio (.mp3/.ogg)</option>
-                        <option value="video">Video (.mp4/.webm/.mov)</option>
-                        <option value="image">Image (.jpg/.png/.webp)</option>
-                      </select>
-                    </Field>
-                    <Field label="Media URL">
-                      <input
-                        style={S.input}
-                        placeholder="https://…/file.mp3 or .mp4 or .jpg"
-                        value={editing.completion?.mediaUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), mediaUrl: e.target.value } }); setDirty(true); }}
-                      />
-                    </Field>
+          <main style={S.wrapGrid}>
+            <aside style={S.sidebar}>
+              <input
+                placeholder="Search…"
+                onChange={(e) => {
+                  const q = e.target.value.toLowerCase();
+                  document.querySelectorAll('[data-m-title]').forEach((it) => {
+                    const t = (it.getAttribute('data-m-title') || '').toLowerCase();
+                    it.style.display = t.includes(q) ? '' : 'none';
+                  });
+                }}
+                style={S.search}
+              />
+              <div>
+                {(suite.missions || []).map((m) => (
+                  <div key={m.id} data-m-title={(m.title || '') + ' ' + m.id + ' ' + m.type} style={S.missionItem}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                      <div onClick={() => editExisting(m)} style={{ cursor: 'pointer' }}>
+                        <div style={{ fontWeight: 600 }}>{m.title || m.id}</div>
+                        <div style={{ color: '#9fb0bf', fontSize: 12 }}>
+                          {m.type} — id: {m.id}
+                        </div>
+                      </div>
+                      <button style={{ ...S.button, padding: '6px 10px' }} onClick={() => removeMission(m.id)}>
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 2fr' }}>
-                    <Field label="Title (for Backpack)">
-                      <input
-                        style={S.input}
-                        placeholder="e.g., Evidence Video 1"
-                        value={editing.completion?.title || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), title: e.target.value } }); setDirty(true); }}
-                      />
-                    </Field>
-                    <Field label="Thumbnail URL (optional)">
-                      <input
-                        style={S.input}
-                        placeholder="https://…/thumb.jpg"
-                        value={editing.completion?.thumbUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), thumbUrl: e.target.value } }); setDirty(true); }}
-                      />
-                    </Field>
-                  </div>
+                ))}
+              </div>
+            </aside>
+
+            <section style={S.editor}>
+              {!editing ? (
+                <div style={S.card}>
+                  <p style={{ marginTop: 0, color: '#9fb0bf' }}>
+                    Select a mission or click <em>New Mission</em>.
+                  </p>
+                  <button style={S.button} onClick={startNew}>
+                    + New Mission
+                  </button>
+                  <p style={{ color: '#9fb0bf' }}>
+                    Version: <code>{suite.version || '0.0.0'}</code> • Total: <code>{suite.missions?.length || 0}</code>
+                  </p>
                 </div>
-
-                {/* Rewards */}
-                <Field label="Points (Reward)">
-                  <input
-                    type="number"
-                    style={S.input}
-                    value={editing.rewards?.points ?? 0}
-                    onChange={(e) => {
-                      const v = e.target.value === '' ? 0 : Number(e.target.value);
-                      setEditing({ ...editing, rewards: { ...(editing.rewards || {}), points: v } });
-                      setDirty(true);
-                    }}
-                  />
-                </Field>
-                <Field label="Reward Items (one per line)">
-                  <textarea
-                    style={{ ...S.input, height: 90, fontFamily: 'ui-monospace, Menlo' }}
-                    placeholder="e.g.\nSmoke Bomb\nGolden Key"
-                    value={(editing.rewards?.items || []).join('\n')}
-                    onChange={(e) => {
-                      const list = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
-                      setEditing({ ...editing, rewards: { ...(editing.rewards || {}), items: list } });
-                      setDirty(true);
-                    }}
-                  />
-                </Field>
-
-                <hr style={S.hr} />
-
-                {/* MC editor */}
-                {editing.type === 'multiple_choice' && (
-                  <div style={{ marginBottom: 12 }}>
-                    <MultipleChoiceEditor
-                      value={Array.isArray(editing.content?.choices) ? editing.content.choices : []}
-                      correctIndex={editing.content?.correctIndex}
-                      onChange={({ choices, correctIndex }) => {
-                        setEditing({ ...editing, content: { ...editing.content, choices, correctIndex } });
+              ) : (
+                <div style={S.card}>
+                  <Field label="ID">
+                    <input style={S.input} value={editing.id} onChange={(e) => { setEditing({ ...editing, id: e.target.value }); setDirty(true); }} />
+                  </Field>
+                  <Field label="Title">
+                    <input style={S.input} value={editing.title} onChange={(e) => { setEditing({ ...editing, title: e.target.value }); setDirty(true); }} />
+                  </Field>
+                  <Field label="Type">
+                    <select
+                      style={S.input}
+                      value={editing.type}
+                      onChange={(e) => {
+                        const t = e.target.value;
+                        setEditing({ ...editing, type: t, content: defaultContentForType(t) });
                         setDirty(true);
                       }}
-                    />
-                  </div>
-                )}
+                    >
+                      {TYPE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <hr style={S.hr} />
 
-                {/* Geofence */}
-                {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
-                    <MapPicker
-                      lat={editing.content?.lat}
-                      lng={editing.content?.lng}
-                      radius={editing.content?.radiusMeters ?? 25}
-                      onChange={(lat, lng, rad) => {
-                        setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
-                        setDirty(true);
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* AR types (optional geofence) */}
-                {(editing.type === 'ar_image' || editing.type === 'ar_video') && (
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editing.content?.geofenceEnabled}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          const next = { ...editing.content, geofenceEnabled: on };
-                          if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
-                          setEditing({ ...editing, content: next }); setDirty(true);
+                  {/* MC editor */}
+                  {editing.type === 'multiple_choice' && (
+                    <div style={{ marginBottom: 12 }}>
+                      <MultipleChoiceEditor
+                        value={Array.isArray(editing.content?.choices) ? editing.content.choices : []}
+                        correctIndex={editing.content?.correctIndex}
+                        onChange={({ choices, correctIndex }) => {
+                          setEditing({ ...editing, content: { ...editing.content, choices, correctIndex } });
+                          setDirty(true);
                         }}
                       />
-                      Enable geofence for this AR mission
-                    </label>
-                    {editing.content?.geofenceEnabled && (
-                      <>
-                        <MapPicker
-                          lat={editing.content?.lat}
-                          lng={editing.content?.lng}
-                          radius={editing.content?.radiusMeters ?? 25}
-                          onChange={(lat, lng, rad) => {
-                            setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
-                            setDirty(true);
-                          }}
-                        />
-                        <Field label="Cooldown (sec)">
-                          <input
-                            type="number" min={0} max={3600} style={S.input}
-                            value={editing.content?.cooldownSeconds ?? 30}
-                            onChange={(e) => {
-                              const v = Number(e.target.value || 0);
-                              setEditing({ ...editing, content: { ...editing.content, cooldownSeconds: v } });
-                              setDirty(true);
-                            }}
-                          />
-                        </Field>
-                      </>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {/* Universal geofence toggle */}
-                {(editing.type === 'multiple_choice' || editing.type === 'short_answer' || editing.type === 'statement' || editing.type === 'video') && (
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!editing.content?.geofenceEnabled}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          const next = { ...editing.content, geofenceEnabled: on };
-                          if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
-                          setEditing({ ...editing, content: next }); setDirty(true);
+                  {/* geofence types map */}
+                  {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
+                      <MapPicker
+                        lat={editing.content?.lat}
+                        lng={editing.content?.lng}
+                        radius={editing.content?.radiusMeters ?? 25}
+                        onChange={(lat, lng, rad) => {
+                          setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
+                          setDirty(true);
                         }}
                       />
-                      Enable geofence for this mission
-                    </label>
-                    {editing.content?.geofenceEnabled && (
-                      <>
-                        <MapPicker
-                          lat={editing.content?.lat}
-                          lng={editing.content?.lng}
-                          radius={editing.content?.radiusMeters ?? 25}
-                          onChange={(lat, lng, rad) => {
-                            setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
-                            setDirty(true);
-                          }}
-                        />
-                        <Field label="Cooldown (sec)">
-                          <input
-                            type="number" min={0} max={3600} style={S.input}
-                            value={editing.content?.cooldownSeconds ?? 30}
-                            onChange={(e) => {
-                              const v = Number(e.target.value || 0);
-                              setEditing({ ...editing, content: { ...editing.content, cooldownSeconds: v } });
-                              setDirty(true);
-                            }}
-                          />
-                        </Field>
-                      </>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                {/* generic renderer */}
-                {(TYPE_FIELDS[editing.type] || []).map((f) => (
-                  <Field key={f.key} label={f.label}>
-                    {f.type === 'text' && (
-                      <>
+                  {/* AR w/ optional geofence */}
+                  {(editing.type === 'ar_image' || editing.type === 'ar_video') && (
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                         <input
+                          type="checkbox"
+                          checked={!!editing.content?.geofenceEnabled}
+                          onChange={(e) => {
+                            const on = e.target.checked;
+                            const next = { ...editing.content, geofenceEnabled: on };
+                            if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
+                            setEditing({ ...editing, content: next });
+                            setDirty(true);
+                          }}
+                        />
+                        Enable geofence for this AR mission
+                      </label>
+                      {editing.content?.geofenceEnabled && (
+                        <>
+                          <MapPicker
+                            lat={editing.content?.lat}
+                            lng={editing.content?.lng}
+                            radius={editing.content?.radiusMeters ?? 25}
+                            onChange={(lat, lng, rad) => {
+                              setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
+                              setDirty(true);
+                            }}
+                          />
+                          <Field label="Cooldown (sec)">
+                            <input
+                              type="number"
+                              min={0}
+                              max={3600}
+                              style={S.input}
+                              value={editing.content?.cooldownSeconds ?? 30}
+                              onChange={(e) => {
+                                const v = Number(e.target.value || 0);
+                                setEditing({ ...editing, content: { ...editing.content, cooldownSeconds: v } });
+                                setDirty(true);
+                              }}
+                            />
+                          </Field>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* generic geofence toggle (MC/Short/Statement/Video) */}
+                  {(editing.type === 'multiple_choice' || editing.type === 'short_answer' || editing.type === 'statement' || editing.type === 'video') && (
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={!!editing.content?.geofenceEnabled}
+                          onChange={(e) => {
+                            const on = e.target.checked;
+                            const next = { ...editing.content, geofenceEnabled: on };
+                            if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
+                            setEditing({ ...editing, content: next });
+                            setDirty(true);
+                          }}
+                        />
+                        Enable geofence for this mission
+                      </label>
+                      {editing.content?.geofenceEnabled && (
+                        <>
+                          <MapPicker
+                            lat={editing.content?.lat}
+                            lng={editing.content?.lng}
+                            radius={editing.content?.radiusMeters ?? 25}
+                            onChange={(lat, lng, rad) => {
+                              setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
+                              setDirty(true);
+                            }}
+                          />
+                          <Field label="Cooldown (sec)">
+                            <input
+                              type="number"
+                              min={0}
+                              max={3600}
+                              style={S.input}
+                              value={editing.content?.cooldownSeconds ?? 30}
+                              onChange={(e) => {
+                                const v = Number(e.target.value || 0);
+                                setEditing({ ...editing, content: { ...editing.content, cooldownSeconds: v } });
+                                setDirty(true);
+                              }}
+                            />
+                          </Field>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* generic field renderer + media previews */}
+                  {(TYPE_FIELDS[editing.type] || []).map((f) => (
+                    <Field key={f.key} label={f.label}>
+                      {f.type === 'text' && (
+                        <>
+                          <input
+                            style={S.input}
+                            value={editing.content?.[f.key] || ''}
+                            onChange={(e) => {
+                              setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
+                              setDirty(true);
+                            }}
+                          />
+                          {['mediaUrl', 'imageUrl', 'videoUrl', 'assetUrl', 'markerUrl'].includes(f.key) && (
+                            <MediaPreview url={editing.content?.[f.key]} kind={f.key} />
+                          )}
+                        </>
+                      )}
+                      {f.type === 'number' && (
+                        <input
+                          type="number"
+                          min={f.min}
+                          max={f.max}
                           style={S.input}
+                          value={editing.content?.[f.key] ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value === '' ? '' : Number(e.target.value);
+                            setEditing({ ...editing, content: { ...editing.content, [f.key]: v } });
+                            setDirty(true);
+                          }}
+                        />
+                      )}
+                      {f.type === 'multiline' && (
+                        <textarea
+                          style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
                           value={editing.content?.[f.key] || ''}
                           onChange={(e) => {
                             setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
                             setDirty(true);
                           }}
                         />
-                        {['mediaUrl', 'imageUrl', 'videoUrl', 'assetUrl', 'markerUrl'].includes(f.key) && (
-                          <MediaPreview url={editing.content?.[f.key]} kind={f.key} />
-                        )}
-                      </>
-                    )}
-                    {f.type === 'number' && (
-                      <input
-                        type="number"
-                        min={f.min} max={f.max}
-                        style={S.input}
-                        value={editing.content?.[f.key] ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value === '' ? '' : Number(e.target.value);
-                          setEditing({ ...editing, content: { ...editing.content, [f.key]: v } });
-                          setDirty(true);
-                        }}
-                      />
-                    )}
-                    {f.type === 'multiline' && (
-                      <textarea
-                        style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
-                        value={editing.content?.[f.key] || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
-                          setDirty(true);
-                        }}
-                      />
-                    )}
-                  </Field>
-                ))}
+                      )}
+                    </Field>
+                  ))}
 
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button style={S.button} onClick={saveToList}>Add/Update in List</button>
-                  <button style={S.button} onClick={cancelEdit}>Cancel</button>
+                  <Field label="Points (Reward)">
+                    <input
+                      type="number"
+                      style={S.input}
+                      value={editing.rewards?.points ?? 0}
+                      onChange={(e) => {
+                        const v = e.target.value === '' ? 0 : Number(e.target.value);
+                        setEditing({ ...editing, rewards: { ...(editing.rewards || {}), points: v } });
+                        setDirty(true);
+                      }}
+                    />
+                  </Field>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button style={S.button} onClick={saveToList}>Add/Update in List</button>
+                    <button style={S.button} onClick={cancelEdit}>Cancel</button>
+                  </div>
+                  {dirty && <div style={{ marginTop: 6, color: '#ffd166' }}>Unsaved changes…</div>}
                 </div>
-                {dirty && <div style={{ marginTop: 6, color: '#ffd166' }}>Unsaved changes…</div>}
-              </div>
-            )}
-          </section>
-        </main>
+              )}
+            </section>
+          </main>
+        </>
       )}
 
-      {/* SETTINGS */}
+      {/* SETTINGS (security + timer etc) */}
       {tab === 'settings' && (
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Game Settings</h3>
             <Field label="Game Title">
-              <input style={S.input} value={config.game.title} onChange={(e) => setConfig({ ...config, game: { ...config.game, title: e.target.value } })} />
+              <input
+                style={S.input}
+                value={config.game.title}
+                onChange={(e) => setConfig({ ...config, game: { ...config.game, title: e.target.value } })}
+              />
             </Field>
             <Field label="Game Type">
-              <select style={S.input} value={config.game.type} onChange={(e) => setConfig({ ...config, game: { ...config.game, type: e.target.value } })}>
-                {GAME_TYPES.map((g) => <option key={g} value={g}>{g}</option>)}
+              <select
+                style={S.input}
+                value={config.game.type}
+                onChange={(e) => setConfig({ ...config, game: { ...config.game, type: e.target.value } })}
+              >
+                {GAME_TYPES.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
               </select>
             </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="checkbox" checked={config.splash.enabled} onChange={(e) => setConfig({ ...config, splash: { ...config.splash, enabled: e.target.checked } })} />
+                <input
+                  type="checkbox"
+                  checked={config.splash.enabled}
+                  onChange={(e) => setConfig({ ...config, splash: { ...config.splash, enabled: e.target.checked } })}
+                />
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
@@ -802,27 +839,36 @@ export default function Admin() {
             <hr style={S.hr} />
             <h4>Game Timer</h4>
             <Field label="Duration (minutes — 0 = infinite; count UP)">
-              <input type="number" min={0} max={24*60} style={S.input}
+              <input
+                type="number"
+                min={0}
+                max={24 * 60}
+                style={S.input}
                 value={config.timer?.durationMinutes ?? 0}
-                onChange={(e) => { const v = Math.max(0, Number(e.target.value||0)); setConfig({ ...config, timer: { ...(config.timer||{}), durationMinutes: v } }); }}
+                onChange={(e) => {
+                  const v = Math.max(0, Number(e.target.value || 0));
+                  setConfig({ ...config, timer: { ...(config.timer || {}), durationMinutes: v } });
+                }}
               />
             </Field>
             <Field label="Alert before end (minutes — chime + warning)">
-              <input type="number" min={1} max={120} style={S.input}
+              <input
+                type="number"
+                min={1}
+                max={120}
+                style={S.input}
                 value={config.timer?.alertMinutes ?? 10}
-                onChange={(e) => { const v = Math.max(1, Number(e.target.value||1)); setConfig({ ...config, timer: { ...(config.timer||{}), alertMinutes: v } }); }}
+                onChange={(e) => {
+                  const v = Math.max(1, Number(e.target.value || 1));
+                  setConfig({ ...config, timer: { ...(config.timer || {}), alertMinutes: v } });
+                }}
               />
             </Field>
-          </div>
-
-          {/* GLOBAL THEME */}
-          <div style={{ ...S.card, marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Global Appearance (Theme)</h3>
-            <AppearanceControls
-              value={config.theme}
-              onChange={(t) => setConfig({ ...config, theme: t })}
-              allowAlign
-            />
+            <div style={{ color: '#9fb0bf' }}>
+              The game client should show the clock at the top-right above the objective.
+              If duration is 0 it counts up; otherwise it counts down, plays an alarm when{' '}
+              {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN”</b> at 0.
+            </div>
           </div>
 
           {/* Security */}
@@ -832,22 +878,13 @@ export default function Admin() {
             <ChangeAuth />
             <hr style={S.hr} />
             <h4>Twilio Credentials</h4>
-            <p style={{ color: '#ffd166' }}>Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.</p>
+            <p style={{ color: '#ffd166' }}>
+              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.
+            </p>
             <ul>
               <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
               <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
             </ul>
-          </div>
-        </main>
-      )}
-
-      {/* MEDIA (thumb assignments) */}
-      {tab === 'media' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop: 0 }}>Media Thumbnails</h3>
-            <p style={{ color:'#9fb0bf' }}>Assign thumbnail images for Rewards and Utilities (power-ups). These appear in players’ Backpacks.</p>
-            <MediaTab suite={suite} config={config} setConfig={setConfig} />
           </div>
         </main>
       )}
@@ -861,7 +898,9 @@ export default function Admin() {
               <Field label="Mission (geofence)">
                 <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
                   <option value="">— choose —</option>
-                  {(suite.missions || []).map((m) => <option key={m.id} value={m.id}>{m.id} — {m.title}</option>)}
+                  {(suite.missions || []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
+                  ))}
                 </select>
               </Field>
               <Field label="Phone slot">
@@ -899,20 +938,30 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Power-Ups</h3>
+
             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-              <Field label="Title"><input style={S.input} value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })} /></Field>
+              <Field label="Title">
+                <input style={S.input} value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })} />
+              </Field>
               <Field label="Type">
                 <select style={S.input} value={pu.type} onChange={(e) => setPu({ ...pu, type: e.target.value })}>
                   {POWERUP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </Field>
-              <Field label="Pickup radius (m)"><input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/></Field>
-              <Field label="Effect duration (sec)"><input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/></Field>
+              <Field label="Pickup radius (m)">
+                <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/>
+              </Field>
+              <Field label="Effect duration (sec)">
+                <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/>
+              </Field>
             </div>
 
             <Field label="Pickup location">
               <div style={{ marginBottom: 8 }}>
-                <MapPicker lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius} onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })} />
+                <MapPicker
+                  lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius}
+                  onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })}
+                />
               </div>
             </Field>
 
@@ -920,21 +969,27 @@ export default function Admin() {
               <button
                 style={S.button}
                 onClick={() => {
-                  const item = { ...pu, id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0') };
+                  const item = {
+                    ...pu,
+                    id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0')
+                  };
                   const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
                   setConfig({ ...config, powerups: list });
                   setStatus('✅ Power-up added (remember Save All)');
                 }}
-              >+ Add Power-Up</button>
+              >
+                + Add Power-Up
+              </button>
             </div>
 
             <hr style={S.hr} />
-            <h4>Placed Power-Ups</h4>
+            <h4>Stored Power-Ups</h4>
             {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power-ups yet.</div>}
             <ul style={{ paddingLeft: 18 }}>
               {(config.powerups || []).map((x, i) => (
                 <li key={i} style={{ marginBottom: 8 }}>
-                  <code>{x.id}</code> — {x.title||'(untitled)'} • {x.type} • radius {x.pickupRadius}m • effect {x.effectSeconds}s • lat {x.lat}, lng {x.lng}
+                  <code>{x.id}</code> — {x.title||'(untitled)'} • {x.type} • radius {x.pickupRadius}m • effect {x.effectSeconds}s
+                  {typeof x.lat === 'number' && typeof x.lng === 'number' ? <> • lat {x.lat}, lng {x.lng}</> : ' • (not placed)'}
                   <button
                     style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }}
                     onClick={() => {
@@ -942,7 +997,9 @@ export default function Admin() {
                       next.splice(i, 1);
                       setConfig({ ...config, powerups: next });
                     }}
-                  >Remove</button>
+                  >
+                    Remove
+                  </button>
                 </li>
               ))}
             </ul>
@@ -950,7 +1007,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MAP */}
+      {/* MAP (full) */}
       {tab === 'map' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -963,6 +1020,156 @@ export default function Admin() {
             </div>
             <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
             <div style={{ color: '#9fb0bf', marginTop: 8 }}>Shows all geofenced missions and power-ups for the selected game.</div>
+          </div>
+        </main>
+      )}
+
+      {/* MEDIA (new) */}
+      {tab === 'media' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{ marginTop: 0 }}>Media</h3>
+
+            {/* Utilities thumbnails */}
+            <h4 style={{ marginTop: 0 }}>Utilities (Power‑ups) Thumbnails</h4>
+            {['smoke','jammer','clone'].map((k) => {
+              const url = config.media?.utilityThumbs?.[k] || '';
+              const set = (val) => setConfig({
+                ...config,
+                media: {
+                  ...(config.media || {}),
+                  utilityThumbs: { ...(config.media?.utilityThumbs || {}), [k]: val }
+                }
+              });
+              return (
+                <div key={k} style={{ display:'grid', gridTemplateColumns:'180px 1fr 180px', gap:12, alignItems:'center', marginBottom:8 }}>
+                  <div style={{ color:'#9fb0bf' }}>{k.toUpperCase()}</div>
+                  <input style={S.input} value={url} onChange={(e)=>set(e.target.value)} placeholder="Image URL (png/jpg/webp)" />
+                  <div>
+                    {url ? <img src={toDirectMediaURL(url)} alt={k} style={{ width:'100%', maxHeight:70, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} /> : <div style={{ color:'#9fb0bf' }}>No image</div>}
+                  </div>
+                </div>
+              );
+            })}
+
+            <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <button
+                style={S.button}
+                onClick={() => {
+                  // Reapply defaults quickly
+                  setConfig({
+                    ...config,
+                    media: {
+                      ...(config.media || {}),
+                      utilityThumbs: { ...DEFAULT_UTILITY_THUMBS }
+                    },
+                    powerups: (config.powerups && config.powerups.length > 0)
+                      ? config.powerups
+                      : [
+                          { id:'p01', title:'Smoke', type:'smoke', pickupRadius:100, effectSeconds:120 },
+                          { id:'p02', title:'Jammer', type:'jammer', pickupRadius:100, effectSeconds:120 },
+                          { id:'p03', title:'Clone', type:'clone', pickupRadius:100, effectSeconds:120 },
+                        ]
+                  });
+                  setStatus('✅ Seeded default utilities & power-ups (remember Save All)');
+                }}
+              >
+                Seed default 3 utilities (thumbs + stored power-ups)
+              </button>
+            </div>
+
+            <hr style={{ ...S.hr, margin:'16px 0' }} />
+
+            {/* Rewards Library */}
+            <h4>Rewards Library</h4>
+            <p style={{ color:'#9fb0bf', marginTop:0 }}>Thumbnails + “Special ability” text. These appear in the Backpack (Rewards pocket) when awarded by missions.</p>
+
+            <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+              <div>Thumbnail</div>
+              <div>Name</div>
+              <div>Special ability</div>
+              <div>Actions</div>
+            </div>
+
+            {(config.media?.rewards || []).map((row, idx) => (
+              <div key={row.key || idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+                <div>
+                  <input
+                    style={S.input}
+                    value={row.thumbUrl || ''}
+                    onChange={(e) => {
+                      const list = [...(config.media?.rewards || [])];
+                      list[idx] = { ...(list[idx] || {}), thumbUrl: e.target.value };
+                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                    }}
+                    placeholder="Thumbnail URL"
+                  />
+                  {row.thumbUrl && (
+                    <img src={toDirectMediaURL(row.thumbUrl)} alt="thumb" style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} />
+                  )}
+                </div>
+                <div>
+                  <input
+                    style={S.input}
+                    value={row.name || ''}
+                    onChange={(e) => {
+                      const list = [...(config.media?.rewards || [])];
+                      list[idx] = { ...(list[idx] || {}), name: e.target.value };
+                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                    }}
+                    placeholder="Name (e.g., Gold Coin)"
+                  />
+                </div>
+                <div>
+                  <input
+                    style={S.input}
+                    value={row.ability || ''}
+                    onChange={(e) => {
+                      const list = [...(config.media?.rewards || [])];
+                      list[idx] = { ...(list[idx] || {}), ability: e.target.value };
+                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                    }}
+                    placeholder="Special ability (short text)"
+                  />
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button
+                    style={S.button}
+                    onClick={() => {
+                      const list = [...(config.media?.rewards || [])];
+                      list.splice(idx, 1);
+                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                    }}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    style={S.button}
+                    onClick={() => {
+                      const list = [...(config.media?.rewards || [])];
+                      const copy = { ...(list[idx] || {}), key: (row.key || `rw${idx}`) + '-copy' };
+                      list.splice(idx + 1, 0, copy);
+                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                    }}
+                  >
+                    Duplicate
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div style={{ marginTop:8 }}>
+              <button
+                style={S.button}
+                onClick={() => {
+                  const list = Array.isArray(config.media?.rewards) ? [...config.media.rewards] : [];
+                  list.push({ key: `rw${list.length+1}`, name:'', ability:'', thumbUrl:'' });
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+              >
+                + Add Reward Row
+              </button>
+            </div>
           </div>
         </main>
       )}
@@ -994,6 +1201,53 @@ export default function Admin() {
         </main>
       )}
 
+      {/* Quick Add Power‑Up modal */}
+      {showQuickPowerup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
+          <div style={{ ...S.card, width: 520 }}>
+            <h3 style={{ marginTop: 0 }}>Quick Add Power‑Up</h3>
+
+            <div style={{ display:'grid', gap:12, gridTemplateColumns:'1fr 1fr' }}>
+              <Field label="Title">
+                <input style={S.input} value={pu.title} onChange={(e)=>setPu({ ...pu, title: e.target.value })} />
+              </Field>
+              <Field label="Type">
+                <select style={S.input} value={pu.type} onChange={(e)=>setPu({ ...pu, type: e.target.value })}>
+                  {POWERUP_TYPES.map((t)=><option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Pickup radius (m)">
+                <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e)=>setPu({ ...pu, pickupRadius: Number(e.target.value||0) })} />
+              </Field>
+              <Field label="Effect duration (sec)">
+                <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e)=>setPu({ ...pu, effectSeconds: Number(e.target.value||0) })} />
+              </Field>
+            </div>
+
+            <Field label="Pickup location">
+              <MapPicker
+                lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius}
+                onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })}
+              />
+            </Field>
+
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button style={S.button} onClick={()=>setShowQuickPowerup(false)}>Cancel</button>
+              <button
+                style={S.button}
+                onClick={()=>{
+                  const item = { ...pu, id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0') };
+                  const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
+                  setConfig({ ...config, powerups: list });
+                  setShowQuickPowerup(false);
+                  setStatus('✅ Power‑up added (remember Save All)');
+                }}
+              >Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* New Game modal */}
       {showNewGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
@@ -1012,12 +1266,15 @@ export default function Admin() {
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
+
+            {/* Timer defaults */}
             <Field label="Duration (minutes — 0 = infinite; count UP)">
               <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin} onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
             </Field>
             <Field label="Alert before end (minutes)">
               <input type="number" min={1} max={120} style={S.input} value={newAlertMin} onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))} />
             </Field>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button style={S.button} onClick={() => setShowNewGame(false)}>Cancel</button>
               <button
@@ -1025,8 +1282,14 @@ export default function Admin() {
                 onClick={async () => {
                   if (!newTitle.trim()) return;
                   const r = await fetch('/api/games', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: newTitle.trim(), type: newType, mode: newMode, timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin } }),
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      title: newTitle.trim(),
+                      type: newType,
+                      mode: newMode,
+                      timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+                    }),
                   });
                   const j = await r.json();
                   if (!j.ok) { setStatus('❌ ' + (j.error || 'create failed')); return; }
@@ -1046,7 +1309,7 @@ export default function Admin() {
 }
 
 /* =====================================================================
-   Components
+   4) SMALL COMPONENTS
    ===================================================================== */
 function Field({ label, children }) {
   return (
@@ -1060,21 +1323,28 @@ function Field({ label, children }) {
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
   const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
+
   useEffect(() => { setLocal(Array.isArray(value) ? value.slice(0, 5) : []); }, [value]);
   useEffect(() => { setCorrect(Number.isInteger(correctIndex) ? correctIndex : undefined); }, [correctIndex]);
+
   function sync(nextChoices, nextCorrect) {
     const trimmed = nextChoices.map((s) => (s || '').trim()).filter(Boolean).slice(0, 5);
     const ci = Number.isInteger(nextCorrect) && nextCorrect < trimmed.length ? nextCorrect : undefined;
     onChange({ choices: trimmed, correctIndex: ci });
   }
+
   return (
     <div style={{ border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
       <div style={{ fontWeight: 600, marginBottom: 8 }}>Choices (A–E)</div>
-      {[0,1,2,3,4].map((i) => (
+      {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '24px 1fr', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <input type="radio" name="mcq-correct" checked={correct === i} onChange={() => { setCorrect(i); sync(local, i); }} title="Mark as correct" />
-          <input placeholder={`Choice ${String.fromCharCode(65 + i)}`} style={S.input}
-            value={local[i] || ''} onChange={(e) => { const next = [...local]; next[i] = e.target.value; setLocal(next); sync(next, correct); }} />
+          <input
+            placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+            style={S.input}
+            value={local[i] || ''}
+            onChange={(e) => { const next = [...local]; next[i] = e.target.value; setLocal(next); sync(next, correct); }}
+          />
         </div>
       ))}
       <div style={{ color: '#9fb0bf', fontSize: 12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
@@ -1087,7 +1357,8 @@ function MediaPreview({ url, kind }) {
   const u = toDirectMediaURL(String(url).trim());
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
-  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower);
+  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
+
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ color: '#9fb0bf', fontSize: 12, marginBottom: 6 }}>Preview ({kind})</div>
@@ -1102,297 +1373,6 @@ function MediaPreview({ url, kind }) {
   );
 }
 
-/* ---------- Appearance controls (with opacity + alignment) ---------- */
-function AppearanceControls({ value, onChange, allowAlign }) {
-  const v = value || {};
-  const [local, setLocal] = useState({
-    fontFamily: v.fontFamily || FONT_CHOICES[0].val,
-    fontGF: v.fontGF || null,
-    fontSize: v.fontSize ?? 18,
-    fontColor: v.fontColor || '#ffffff',
-    fontColorOpacity: v.fontColorOpacity ?? 1,
-    fontBg: v.fontBg || '#000000',
-    fontBgOpacity: v.fontBgOpacity ?? 0.5,
-    screenBg: v.screenBg || '#0b0c10',
-    screenBgOpacity: v.screenBgOpacity ?? 1,
-    screenImg: v.screenImg || '',
-    screenImgOpacity: v.screenImgOpacity ?? 1,
-    textAlignV: v.textAlignV || 'top',
-  });
-  useEffect(() => { onChange({ ...local }); /* propagate */ }, [local]); // eslint-disable-line
-
-  function setPatch(p) { setLocal((s) => ({ ...s, ...p })); }
-
-  return (
-    <div style={{ border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
-      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-        <Field label="Font family">
-          <select
-            style={S.input}
-            value={local.fontFamily}
-            onChange={(e) => {
-              const val = e.target.value;
-              const choice = FONT_CHOICES.find(f => f.val === val);
-              if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
-              setPatch({ fontFamily: val, fontGF: choice?.gf || null });
-            }}
-          >
-            {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Font size (px)">
-          <input type="number" min={10} max={64} style={S.input}
-            value={local.fontSize}
-            onChange={(e)=>setPatch({ fontSize: Math.max(10, Number(e.target.value||18)) })}
-          />
-        </Field>
-
-        <Field label={`Font color (opacity ${Math.round((local.fontColorOpacity||0)*100)}%)`}>
-          <input type="color" style={S.input}
-            value={local.fontColor}
-            onChange={(e)=>setPatch({ fontColor: e.target.value })}
-          />
-          <input type="range" min={0} max={1} step={0.01}
-            value={local.fontColorOpacity}
-            onChange={(e)=>setPatch({ fontColorOpacity: Number(e.target.value) })}
-          />
-        </Field>
-
-        <Field label={`Font background color (opacity ${Math.round((local.fontBgOpacity||0)*100)}%)`}>
-          <input type="color" style={S.input}
-            value={local.fontBg}
-            onChange={(e)=>setPatch({ fontBg: e.target.value })}
-          />
-          <input type="range" min={0} max={1} step={0.01}
-            value={local.fontBgOpacity}
-            onChange={(e)=>setPatch({ fontBgOpacity: Number(e.target.value) })}
-          />
-        </Field>
-
-        <Field label={`Screen background color (opacity ${Math.round((local.screenBgOpacity||0)*100)}%)`}>
-          <input type="color" style={S.input}
-            value={local.screenBg}
-            onChange={(e)=>setPatch({ screenBg: e.target.value })}
-          />
-          <input type="range" min={0} max={1} step={0.01}
-            value={local.screenBgOpacity}
-            onChange={(e)=>setPatch({ screenBgOpacity: Number(e.target.value) })}
-          />
-        </Field>
-
-        <Field label={`Screen background image (opacity ${Math.round((local.screenImgOpacity||0)*100)}%)`}>
-          <input style={S.input} placeholder="https://…/image.jpg (optional)"
-            value={local.screenImg}
-            onChange={(e)=>setPatch({ screenImg: e.target.value })}
-          />
-          <input type="range" min={0} max={1} step={0.01}
-            value={local.screenImgOpacity}
-            onChange={(e)=>setPatch({ screenImgOpacity: Number(e.target.value) })}
-          />
-        </Field>
-
-        {allowAlign && (
-          <Field label="Text vertical alignment">
-            <select
-              style={S.input}
-              value={local.textAlignV}
-              onChange={(e)=>setPatch({ textAlignV: e.target.value })}
-            >
-              <option value="top">Top (default)</option>
-              <option value="center">Center</option>
-            </select>
-          </Field>
-        )}
-      </div>
-
-      {/* live preview */}
-      <div style={{ marginTop: 12, padding: 12, border: '1px dashed #2a323b', borderRadius: 10,
-        background: local.screenImg
-          ? 'transparent' : local.screenBg }}>
-        {local.screenImg && (
-          <div style={{ backgroundImage: `url(${local.screenImg})`, backgroundSize: 'cover', backgroundPosition: 'center',
-            opacity: local.screenImgOpacity, width: '100%', height: 140, borderRadius: 8, marginBottom: 12 }} />
-        )}
-        <div style={{
-          fontFamily: local.fontFamily,
-          fontSize: local.fontSize,
-          color: applyOpacity(local.fontColor, local.fontColorOpacity),
-          background: applyOpacity(local.fontBg, local.fontBgOpacity),
-          display: 'inline-block', padding: '6px 10px', borderRadius: 8
-        }}>
-          Aa Bb 123 — preview
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MediaTab({ suite, config, setConfig }) {
-  const rewardsSet = new Set();
-  (suite?.missions || []).forEach(m => (m.rewards?.items || []).forEach(x => rewardsSet.add(x)));
-  const utilSet = new Set((config?.powerups || []).map(p => p.type).filter(Boolean));
-
-  const thumbs = config?.media?.thumbs || { rewards: {}, utilities: {} };
-
-  function patchThumb(kind, key, url) {
-    const next = {
-      ...config,
-      media: {
-        ...(config.media || {}),
-        thumbs: {
-          rewards: { ...(thumbs.rewards || {}), ...(kind==='rewards'? { [key]: url } : {}) },
-          utilities: { ...(thumbs.utilities || {}), ...(kind==='utilities'? { [key]: url } : {}) },
-        }
-      }
-    };
-    setConfig(next);
-  }
-
-  return (
-    <div>
-      <h4 style={{ marginTop: 0 }}>Rewards</h4>
-      {rewardsSet.size === 0 && <div style={{ color:'#9fb0bf' }}>No reward items found in missions yet.</div>}
-      {[...rewardsSet].map(name => (
-        <div key={name} style={{ display:'grid', gridTemplateColumns:'220px 1fr', gap: 8, alignItems:'center', marginBottom: 8 }}>
-          <div><code>{name}</code></div>
-          <input
-            style={S.input}
-            placeholder="https://…/thumb.jpg"
-            value={thumbs.rewards?.[name] || ''}
-            onChange={(e)=>patchThumb('rewards', name, e.target.value)}
-          />
-        </div>
-      ))}
-
-      <hr style={S.hr} />
-      <h4>Utilities (Power-Ups)</h4>
-      {utilSet.size === 0 && <div style={{ color:'#9fb0bf' }}>No utilities placed yet.</div>}
-      {[...utilSet].map(name => (
-        <div key={name} style={{ display:'grid', gridTemplateColumns:'220px 1fr', gap: 8, alignItems:'center', marginBottom: 8 }}>
-          <div><code>{name}</code></div>
-          <input
-            style={S.input}
-            placeholder="https://…/thumb.jpg"
-            value={thumbs.utilities?.[name] || ''}
-            onChange={(e)=>patchThumb('utilities', name, e.target.value)}
-          />
-        </div>
-      ))}
-      <div style={{ color:'#9fb0bf', marginTop: 8 }}>
-        Save/Publish to apply. Game uses these thumbnails in Backpack pockets.
-      </div>
-    </div>
-  );
-}
-
-/* =====================================================================
-   Styles
-   ===================================================================== */
-const S = {
-  body: { background: '#0b0c10', color: '#e9eef2', minHeight: '100vh', fontFamily: 'system-ui, Arial, sans-serif' },
-  header: { padding: 16, background: '#11161a', borderBottom: '1px solid #1d2329' },
-  wrap: { maxWidth: 1100, margin: '0 auto', padding: 16 },
-  wrapGrid: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16, alignItems: 'start', maxWidth: 1200, margin: '0 auto', padding: 16 },
-  sidebar: { background: '#12181d', border: '1px solid #1f262d', borderRadius: 14, padding: 12, position: 'sticky', top: 12, height: 'calc(100vh - 120px)', overflow: 'auto' },
-  editor: { minHeight: '60vh' },
-  card: { background: '#12181d', border: '1px solid #1f262d', borderRadius: 14, padding: 16 },
-  missionItem: { borderBottom: '1px solid #1f262d', padding: '10px 4px' },
-  input: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2' },
-  button: { padding: '10px 14px', borderRadius: 10, border: '1px solid #2a323b', background: '#1a2027', color: '#e9eef2', cursor: 'pointer' },
-  tab: { padding: '8px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0f1418', color: '#e9eef2', cursor: 'pointer' },
-  tabActive: { background: '#1a2027' },
-  search: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2', marginBottom: 10 },
-  hr: { border: '1px solid #1f262d', borderBottom: 'none' },
-};
-
-/* =====================================================================
-   MapOverview
-   ===================================================================== */
-function MapOverview({ missions=[], powerups=[], showRings=true }) {
-  const divRef = React.useRef(null);
-  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
-
-  function getLL(src) {
-    if (!src) return null;
-    const c = src.content || src;
-    const lat = Number(c.lat ?? c.latitude ?? (c.center && c.center.lat));
-    const lng = Number(c.lng ?? c.longitude ?? (c.center && c.center.lng));
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    return [lat, lng];
-  }
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.L) { setLeafletReady(true); return; }
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setLeafletReady(true); document.body.appendChild(s);
-  }, []);
-
-  React.useEffect(() => {
-    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
-    const L = window.L; if (!L) return;
-
-    if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
-      divRef.current._leaflet_map = map;
-    }
-    const map = divRef.current._leaflet_map;
-
-    if (!map._overviewLayer) map._overviewLayer = L.layerGroup().addTo(map);
-    else map._overviewLayer.clearLayers();
-
-    const layer = map._overviewLayer;
-    const bounds = L.latLngBounds([]);
-
-    const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
-    const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
-
-    (missions||[]).forEach((m) => {
-      const pos = getLL(m);
-      const c = (m && m.content) || {};
-      const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
-      if (!pos || !isFence) return;
-      const rad = Number(c.radiusMeters || 0);
-      const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
-      const title = m.title || m.id || 'Mission';
-      const t = m.type || '';
-      mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
-      bounds.extend(pos);
-    });
-
-    (powerups||[]).forEach((p) => {
-      const pos = getLL(p);
-      if (!pos) return;
-      const rad = Number(p.pickupRadius || p.radiusMeters || 0);
-      const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
-      const title = p.title || p.type || 'Power-up';
-      mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
-      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
-      bounds.extend(pos);
-    });
-
-    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-  }, [leafletReady, missions, powerups, showRings]);
-
-  return (
-    <div>
-      {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
-      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
-       ((powerups||[]).length === 0) && (
-        <div style={{ color: '#9fb0bf', marginTop: 8 }}>
-          No geofenced missions or power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add power-ups with lat/lng.
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* =====================================================================
-   Map picker (mission editor)
-   ===================================================================== */
 function MapPicker({ lat, lng, radius, onChange }) {
   const divRef = useRef(null);
   const mapRef = useRef(null);
@@ -1403,13 +1383,20 @@ function MapPicker({ lat, lng, radius, onChange }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const defaultPos = [lat || 44.9778, lng || -93.265];
+  const defaultPos = [typeof lat === 'number' ? lat : 44.9778, typeof lng === 'number' ? lng : -93.265];
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setReady(true); return; }
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setReady(true); document.body.appendChild(s);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async = true;
+    s.onload = () => setReady(true);
+    document.body.appendChild(s);
   }, []);
 
   useEffect(() => {
@@ -1417,7 +1404,7 @@ function MapPicker({ lat, lng, radius, onChange }) {
     const L = window.L; if (!L) return;
 
     if (!mapRef.current) {
-      mapRef.current = L.map(divRef.current).setView(defaultPos, lat && lng ? 16 : 12);
+      mapRef.current = L.map(divRef.current).setView(defaultPos, (typeof lat === 'number' && typeof lng === 'number') ? 16 : 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapRef.current);
 
       markerRef.current = L.marker(defaultPos, { draggable: true }).addTo(mapRef.current);
@@ -1438,7 +1425,7 @@ function MapPicker({ lat, lng, radius, onChange }) {
       circleRef.current.setLatLng(p);
       circleRef.current.setRadius(Number(r || 25));
     }
-  }, [ready]);
+  }, [ready]); // eslint-disable-line
 
   useEffect(() => {
     if (circleRef.current && markerRef.current) {
@@ -1446,7 +1433,7 @@ function MapPicker({ lat, lng, radius, onChange }) {
       const p = markerRef.current.getLatLng();
       onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
     }
-  }, [r]);
+  }, [r]); // eslint-disable-line
 
   async function doSearch(e) {
     e?.preventDefault();
@@ -1463,6 +1450,7 @@ function MapPicker({ lat, lng, radius, onChange }) {
       setSearching(false);
     }
   }
+
   function gotoResult(r) {
     if (!mapRef.current || !markerRef.current) return;
     const lat = Number(r.lat), lon = Number(r.lon);
@@ -1473,6 +1461,7 @@ function MapPicker({ lat, lng, radius, onChange }) {
     onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
     setResults([]);
   }
+
   function useMyLocation() {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -1537,7 +1526,11 @@ function ChangeAuth() {
   const [status, setStatus] = useState('');
   async function submit() {
     setStatus('Updating…');
-    const res = await fetch('/api/change-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
+    const res = await fetch('/api/change-auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ curUser, curPass, newUser, newPass }),
+    });
     const t = await res.text();
     setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ ' + t);
   }
@@ -1560,18 +1553,118 @@ function ChangeAuth() {
 }
 
 /* =====================================================================
-   Tiny util
+   5) STYLES
    ===================================================================== */
-function applyOpacity(hex, alpha=1) {
-  // hex: #RRGGBB / #RGB; returns rgba(r,g,b,a)
-  if (!hex) return `rgba(0,0,0,${alpha})`;
-  const h = hex.replace('#', '');
-  let r,g,b;
-  if (h.length === 3) {
-    r = parseInt(h[0]+h[0],16); g = parseInt(h[1]+h[1],16); b = parseInt(h[2]+h[2],16);
-  } else {
-    r = parseInt(h.slice(0,2),16); g = parseInt(h.slice(2,4),16); b = parseInt(h.slice(4,6),16);
+const S = {
+  body: { background: '#0b0c10', color: '#e9eef2', minHeight: '100vh', fontFamily: 'system-ui, Arial, sans-serif' },
+  header: { padding: 16, background: '#11161a', borderBottom: '1px solid #1d2329' },
+  wrap: { maxWidth: 1100, margin: '0 auto', padding: 16 },
+  wrapGrid: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16, alignItems: 'start', maxWidth: 1200, margin: '0 auto', padding: 16 },
+  sidebar: { background: '#12181d', border: '1px solid #1f262d', borderRadius: 14, padding: 12, position: 'sticky', top: 12, height: 'calc(100vh - 120px)', overflow: 'auto' },
+  editor: { minHeight: '60vh' },
+  card: { background: '#12181d', border: '1px solid #1f262d', borderRadius: 14, padding: 16 },
+  missionItem: { borderBottom: '1px solid #1f262d', padding: '10px 4px' },
+  input: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2' },
+  button: { padding: '10px 14px', borderRadius: 10, border: '1px solid #2a323b', background: '#1a2027', color: '#e9eef2', cursor: 'pointer' },
+  tab: { padding: '8px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0f1418', color: '#e9eef2', cursor: 'pointer' },
+  tabActive: { background: '#1a2027' },
+  search: { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #2a323b', background: '#0b0c10', color: '#e9eef2', marginBottom: 10 },
+  hr: { border: '1px solid #1f262d', borderBottom: 'none' },
+};
+
+/* =====================================================================
+   MapOverview — Leaflet map overlaying all missions + power-ups
+   ===================================================================== */
+function MapOverview({ missions=[], powerups=[], showRings=true }) {
+  const divRef = React.useRef(null);
+  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
+
+  function getLL(src) {
+    if (!src) return null;
+    const c = src.content || src;
+    const lat = Number(c.lat ?? c.latitude ?? (c.center && c.center.lat) ?? src.lat);
+    const lng = Number(c.lng ?? c.longitude ?? (c.center && c.center.lng) ?? src.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return [lat, lng];
   }
-  const a = Math.max(0, Math.min(1, alpha));
-  return `rgba(${r},${g},${b},${a})`;
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setLeafletReady(true); return; }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async = true;
+    s.onload = () => setLeafletReady(true);
+    document.body.appendChild(s);
+  }, []);
+
+  React.useEffect(() => {
+    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    if (!divRef.current._leaflet_map) {
+      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 12 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      divRef.current._leaflet_map = map;
+    }
+    const map = divRef.current._leaflet_map;
+
+    if (!map._overviewLayer) {
+      map._overviewLayer = L.layerGroup().addTo(map);
+    } else {
+      map._overviewLayer.clearLayers();
+    }
+    const layer = map._overviewLayer;
+    const bounds = L.latLngBounds([]);
+
+    const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+
+    (missions||[]).forEach((m) => {
+      const pos = getLL(m);
+      const c = (m && m.content) || {};
+      const isFence = !!(c.geofenceEnabled || Number(c.radiusMeters) > 0);
+      if (!pos || !isFence) return;
+      const rad = Number(c.radiusMeters || 0);
+      const mk = L.marker(pos, { icon: missionIcon }).addTo(layer);
+      const title = m.title || m.id || 'Mission';
+      const t = m.type || '';
+      mk.bindPopup(`<b>${title}</b><br/>${t}${rad? `<br/>radius: ${rad}m` : ''}`);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#60a5fa', fillOpacity: 0.08 }).addTo(layer);
+      bounds.extend(pos);
+    });
+
+    (powerups||[]).forEach((p) => {
+      const pos = getLL(p);
+      if (!pos) return;
+      const rad = Number(p.pickupRadius || p.radiusMeters || 0);
+      const mk = L.marker(pos, { icon: powerIcon }).addTo(layer);
+      const title = p.title || p.type || 'Power-up';
+      mk.bindPopup(`<b>${title}</b>${rad? `<br/>pickup: ${rad}m` : ''}`);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color: '#f59e0b', fillOpacity: 0.08 }).addTo(layer);
+      bounds.extend(pos);
+    });
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+  }, [leafletReady, missions, powerups, showRings]);
+
+  return (
+    <div>
+      {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
+      {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
+       ((powerups||[]).filter(p => typeof p.lat==='number' && typeof p.lng==='number').length === 0) && (
+        <div style={{ color: '#9fb0bf', marginTop: 8 }}>
+          No geofenced missions or placed power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add/position power-ups.
+        </div>
+      )}
+    </div>
+  );
 }
