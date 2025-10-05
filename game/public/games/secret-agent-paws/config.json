@@ -15,50 +15,11 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.990283,
-      "lng": -93.272183
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.990283,
-      "lng": -93.272183
-    }
-  ],
-  "media": {
-    "images": [
-      {
-        "url": "/media/uploads/1759673692749-SMOKE_BOMB.png",
-        "name": "SMOKE_BOMB.png"
-      },
-      {
-        "url": "/media/uploads/1759673697863-sIGNAL_jAMMER.jpg",
-        "name": "sIGNAL_jAMMER.jpg"
-      }
-    ]
-  },
+  "devices": [],
+  "powerups": [],
+  "media": {},
   "icons": {
-    "missions": [
-      {
-        "key": "missions-1",
-        "name": "",
-        "url": "/media/icons/1759674089958-sIGNAL_jAMMER.jpg"
-      }
-    ],
+    "missions": [],
     "devices": [],
     "rewards": []
   },
