@@ -43,7 +43,9 @@
   "media": {
     "thumbs": {
       "rewards": {},
-      "utilities": {}
+      "utilities": {
+        "smoke": "https://drive.google.com/open?id=1icvwZ3Bow3HGrmVve1LUUv_6b2Gkwq7h&usp=drive_fs"
+      }
     }
   }
 }
