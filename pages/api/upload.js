@@ -1,5 +1,6 @@
 // pages/api/upload.js
-// Minimal JSON upload: { path: "public/media/uploads/...", contentBase64: "...", message?: "commit msg" }
+// JSON body: { path: "public/media/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
+// Writes into your GitHub repo via Contents API. Creates folders as needed.
 
 export default async function handler(req, res) {
   try {
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
       sha = j.sha;
     }
 
-    // Put file
+    // PUT the file
     const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}`;
     const put = await fetch(putUrl, {
       method:'PUT',
