@@ -17,7 +17,18 @@
   "textRules": [],
   "devices": [],
   "powerups": [],
-  "media": {},
+  "media": {
+    "images": [
+      {
+        "url": "/media/uploads/1759673692749-SMOKE_BOMB.png",
+        "name": "SMOKE_BOMB.png"
+      },
+      {
+        "url": "/media/uploads/1759673697863-sIGNAL_jAMMER.jpg",
+        "name": "sIGNAL_jAMMER.jpg"
+      }
+    ]
+  },
   "icons": {
     "missions": [],
     "devices": [],
