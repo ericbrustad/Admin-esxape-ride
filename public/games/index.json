@@ -33,5 +33,12 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-04T21:32:38.062Z"
+  },
+  {
+    "slug": "secret-agent-paws",
+    "title": "Secret Agent PAWS",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-05T04:19:08.691Z"
   }
 ]
