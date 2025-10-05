@@ -312,24 +312,37 @@ export default function Admin() {
     return base + String(i).padStart(2,'0');
   }
   function startNew() {
-    const draft = {
-      id: suggestId(),
-      title: 'New Mission',
-      type: 'multiple_choice',
-      iconKey: '',
-      rewards: { points: 25 },
-      content: defaultContentForType('multiple_choice'),
-      appearanceOverrideEnabled: false,
-      appearance: defaultAppearance(),
-    };
-    setEditing(draft); setSelected(null); setDirty(true);
-  }
-  function editExisting(m) {
-    const e = JSON.parse(JSON.stringify(m));
-    e.appearanceOverrideEnabled = !!e.appearanceOverrideEnabled;
-    e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
-    setEditing(e); setSelected(m.id); setDirty(false);
-  }
+  const t = 'multiple_choice';
+  const draft = {
+    id: suggestId(),
+    title: 'New Mission',
+    type: t,
+    iconKey: '',
+    rewards: { points: 25 },
+    content: defaultContentForType(t) || {},
+    appearanceOverrideEnabled: false,
+    appearance: defaultAppearance(),
+  };
+  setEditing(draft);
+  setSelected(null);
+  setDirty(true);
+}
+
+function editExisting(m) {
+  // Normalize a possibly incomplete mission
+  const t = m?.type || 'multiple_choice';
+  const safe = {
+    ...m,
+    type: t,
+    content: { ...(defaultContentForType(t) || {}), ...(m?.content || {}) },
+    appearanceOverrideEnabled: !!m?.appearanceOverrideEnabled,
+    appearance: { ...defaultAppearance(), ...(m?.appearance || {}) },
+  };
+  setEditing(JSON.parse(JSON.stringify(safe)));
+  setSelected(safe.id || null);
+  setDirty(false);
+}
+
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
   function bumpVersion(v) {
     const p = String(v || '0.0.0').split('.').map(n=>parseInt(n||'0',10)); while (p.length<3) p.push(0); p[2]+=1; return p.join('.');
