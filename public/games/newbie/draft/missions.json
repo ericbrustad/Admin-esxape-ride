@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.27",
+  "version": "0.6.28",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -32,6 +32,45 @@
         "enabled": true,
         "fontBg": "#e20303",
         "screenBg": "#0631ef"
+      }
+    },
+    {
+      "id": "m01",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25,
+        "items": []
+      },
+      "completion": {
+        "message": "Mission complete!",
+        "mediaUrl": "",
+        "mediaType": "audio"
+      },
+      "appearance": {
+        "enabled": false,
+        "fontFamily": "",
+        "fontGF": null,
+        "fontSize": 18,
+        "fontColor": "#ffffff",
+        "fontBg": "#00000080",
+        "screenBg": "",
+        "screenImg": ""
+      },
+      "content": {
+        "question": "dd",
+        "choices": [
+          "d",
+          "df",
+          "d"
+        ],
+        "correctIndex": 1,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
       }
     }
   ]
