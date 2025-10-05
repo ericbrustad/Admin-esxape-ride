@@ -1,5 +1,5 @@
 {
-  "version": "0.0.4",
+  "version": "0.0.1",
   "missions": [
     {
       "id": "m01",
@@ -9,34 +9,13 @@
         "points": 10
       },
       "content": {
-        "text": "Welcome to test! Ready to play?",
-        "geofenceEnabled": true,
-        "lat": 44.9778,
-        "lng": -93.265,
-        "radiusMeters": 25
+        "text": "Welcome to test! Ready to play?"
       },
-      "appearanceOverrideEnabled": false
-    },
-    {
-      "id": "m02",
-      "title": "New Mission",
-      "type": "stored_statement",
-      "iconKey": "missions-1",
-      "rewards": {
-        "points": 25
-      },
-      "content": {
-        "template": "HELLO #m01# WELCOME BACK#m02#",
-        "geofenceEnabled": true,
-        "lat": 44.9778,
-        "lng": -93.265,
-        "radiusMeters": 25
-      },
-      "appearanceOverrideEnabled": true,
+      "appearanceOverrideEnabled": false,
       "appearance": {
-        "fontFamily": "Courier New, Courier, monospace",
-        "fontSizePx": 30,
-        "fontColor": "#c70f0f",
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
         "textBgColor": "#000000",
         "textBgOpacity": 0,
         "screenBgColor": "#000000",
@@ -44,13 +23,6 @@
         "screenBgImage": "",
         "textAlign": "center",
         "textVertical": "top"
-      },
-      "__tplRef": {
-        "_wrapperState": {
-          "initialValue": "HELLO #m01# WELCOME BACK"
-        },
-        "value": "HELLO #m01# WELCOME BACK#m02#",
-        "_valueTracker": {}
       }
     }
   ]
