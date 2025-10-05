@@ -19,8 +19,8 @@
         "acceptable": "yes",
         "mediaUrl": "",
         "geofenceEnabled": true,
-        "lat": 39.148167,
-        "lng": -95.511007,
+        "lat": 39.147904,
+        "lng": -95.510221,
         "radiusMeters": 25,
         "cooldownSeconds": 30
       },
