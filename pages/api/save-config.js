@@ -1,4 +1,6 @@
 // pages/api/save-config.js
+// Save draft config to Admin root + mirror to Game draft (for TEST channel)
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'POST only' });
   try {
@@ -13,23 +15,23 @@ export default async function handler(req, res) {
     const baseDir = (process.env.GITHUB_BASE_DIR || '').replace(/^\/+|\/+$/g, '');
     if (!owner || !repo || !token) return res.status(500).json({ ok:false, error:'Missing GitHub env' });
 
-    const bases = slug
+    const targets = slug
       ? [`public/games/${slug}/draft/config.json`, `game/public/games/${slug}/draft/config.json`]
       : [`public/draft/config.json`];
 
     const content = Buffer.from(JSON.stringify(config, null, 2)).toString('base64');
     const wrote = [];
 
-    for (const rel of bases) {
+    for (const rel of targets) {
       const path = baseDir ? `${baseDir}/${rel}` : rel;
 
-      // get SHA (if exists)
+      // Get SHA if exists
       const headUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
       let sha;
       const head = await fetch(headUrl, { headers:{ Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json' } });
       if (head.ok) { const j = await head.json(); sha = j.sha; }
 
-      // put
+      // PUT
       const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
       const put = await fetch(putUrl, {
         method:'PUT',
