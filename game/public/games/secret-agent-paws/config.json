@@ -23,8 +23,18 @@
       "iconKey": "",
       "pickupRadius": 5,
       "effectSeconds": 96,
-      "lat": 44.949224,
-      "lng": -93.268597
+      "lat": 44.950126,
+      "lng": -93.268489
+    },
+    {
+      "id": "d02",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.968698,
+      "lng": -93.290638
     }
   ],
   "powerups": [
@@ -35,13 +45,39 @@
       "iconKey": "",
       "pickupRadius": 5,
       "effectSeconds": 96,
-      "lat": 44.949224,
-      "lng": -93.268597
+      "lat": 44.950126,
+      "lng": -93.268489
+    },
+    {
+      "id": "d02",
+      "title": "smoke",
+      "type": "smoke",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.968698,
+      "lng": -93.290638
     }
   ],
   "media": {},
   "icons": {
-    "missions": [],
+    "missions": [
+      {
+        "key": "m01",
+        "name": "smoke bomb",
+        "url": "/media/icons/1759676645297-SMOKE_BOMB.png"
+      },
+      {
+        "key": "missions-2",
+        "name": "Signal Jammer",
+        "url": "/media/icons/1759676664220-sIGNAL_jAMMER_small.png"
+      },
+      {
+        "key": "missions-3",
+        "name": "Clone",
+        "url": "/media/icons/1759676689548-ROBOT1small.png"
+      }
+    ],
     "devices": [],
     "rewards": []
   },
