@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
-/* ========================== Helpers ========================== */
+/* =====================================================================
+   Helpers
+   ===================================================================== */
 async function fetchJsonSafe(url, fallback) {
   try {
     const r = await fetch(url, { cache: 'no-store' });
@@ -36,19 +38,10 @@ function toDirectMediaURL(u) {
     return u;
   }
 }
-function ensureGoogleFontLoaded(gf) {
-  if (!gf) return;
-  if (typeof document === 'undefined') return;
-  const id = `gf-${gf}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
-  document.head.appendChild(link);
-}
 
-/* ========================== Schemas ========================== */
+/* =====================================================================
+   Schemas & constants
+   ===================================================================== */
 const TYPE_FIELDS = {
   multiple_choice: [
     { key: 'question', label: 'Question', type: 'text' },
@@ -95,7 +88,6 @@ const TYPE_FIELDS = {
     { key: 'overlayText', label: 'Overlay Text (optional)', type: 'text' },
   ],
 };
-
 const TYPE_OPTIONS = [
   { value: 'multiple_choice', label: 'Multiple Choice' },
   { value: 'short_answer', label: 'Question (Short Answer)' },
@@ -106,16 +98,14 @@ const TYPE_OPTIONS = [
   { value: 'ar_image', label: 'AR Image' },
   { value: 'ar_video', label: 'AR Video' },
 ];
-
 const GAME_TYPES = ['Mystery', 'Chase', 'Race', 'Thriller', 'Hunt'];
-
 const POWERUP_TYPES = [
   { value: 'smoke', label: 'Smoke (hide on GPS)' },
   { value: 'clone', label: 'Clone (decoy location)' },
   { value: 'jammer', label: 'Signal Jammer (blackout radius)' },
 ];
 
-// Global font choices (val = CSS stack; gf = Google Fonts key)
+// (val = CSS stack; gf = Google Fonts key)
 const FONT_CHOICES = [
   { label: 'System', val: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif', gf: null },
   { label: 'Inter', val: '"Inter",sans-serif', gf: 'Inter' },
@@ -127,8 +117,19 @@ const FONT_CHOICES = [
   { label: 'Merriweather', val: '"Merriweather",serif', gf: 'Merriweather' },
   { label: 'Bebas Neue', val: '"Bebas Neue",cursive', gf: 'Bebas+Neue' },
 ];
+function ensureGoogleFontLoaded(gf) {
+  if (!gf || typeof document === 'undefined') return;
+  const id = `gf-${gf}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id; link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${gf}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
 
-/* ========================== Root ========================== */
+/* =====================================================================
+   Root
+   ===================================================================== */
 export default function Admin() {
   const [tab, setTab] = useState('missions');
 
@@ -165,7 +166,7 @@ export default function Admin() {
       ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
       : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '';
 
-  /* ---------- load games list ---------- */
+  /* load games list */
   useEffect(() => {
     (async () => {
       try {
@@ -176,33 +177,25 @@ export default function Admin() {
     })();
   }, []);
 
-  /* ---------- load suite/config per slug ---------- */
+  /* load suite/config per slug */
   useEffect(() => {
     (async () => {
       try {
         setStatus('Loading…');
-
         const missionUrls = activeSlug
           ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
           : [`/missions.json`];
         const configUrl = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
-
         const m = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
         const c = await fetchJsonSafe(configUrl, defaultConfig());
-
         const normalized = {
           ...m,
           missions: (m.missions || []).map((x) =>
             x.type === 'quiz'
-              ? {
-                  ...x,
-                  type: 'multiple_choice',
-                  content: { question: x.content?.question || '', choices: x.content?.choices || [], answer: x.content?.answer || '' },
-                }
+              ? { ...x, type: 'multiple_choice', content: { question: x.content?.question || '', choices: x.content?.choices || [], answer: x.content?.answer || '' } }
               : x
           ),
         };
-
         setSuite(normalized);
         setConfig({
           ...defaultConfig(),
@@ -210,11 +203,9 @@ export default function Admin() {
           powerups: Array.isArray(c.powerups) ? c.powerups : [],
           timer: { ...(defaultConfig().timer), ...(c.timer || {}) },
           theme: { ...(defaultConfig().theme), ...(c.theme || {}) },
+          media: { ...(defaultConfig().media), ...(c.media || {}) },
         });
-        setSelected(null);
-        setEditing(null);
-        setDirty(false);
-        setStatus('');
+        setSelected(null); setEditing(null); setDirty(false); setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
@@ -231,12 +222,21 @@ export default function Admin() {
       powerups: [],
       theme: {
         fontFamily: FONT_CHOICES[0].val,
-        fontGF: null,           // Google Fonts key (optional)
+        fontGF: null,
         fontSize: 18,
         fontColor: '#ffffff',
-        fontBg: '#00000080',
+        fontColorOpacity: 1,
+        fontBg: '#000000',
+        fontBgOpacity: 0.5,
         screenBg: '#0b0c10',
+        screenBgOpacity: 1,
         screenImg: '',
+        screenImgOpacity: 1,
+        textAlignV: 'top', // 'top' | 'center'
+      },
+      media: {
+        // Admin-managed thumbs for rewards & utilities
+        thumbs: { rewards: {}, utilities: {} },
       },
     };
   }
@@ -256,7 +256,7 @@ export default function Admin() {
     }
   }
 
-  /* ---------- save/publish ---------- */
+  /* Save / Publish */
   async function saveAll() {
     if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     setStatus('Saving…');
@@ -270,7 +270,6 @@ export default function Admin() {
     if (!r.ok) setStatus('❌ Save failed:\n' + t);
     else setStatus('✅ Saved (draft updated for admin + test preview)');
   }
-
   async function handlePublish() {
     if (!activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     try {
@@ -285,7 +284,6 @@ export default function Admin() {
       setStatus('❌ Publish failed: ' + (e?.message || e));
     }
   }
-
   async function handleSavePublish() {
     if (!suite || !config || !activeSlug) { setStatus('❌ Pick a game first (slug).'); return; }
     setStatus('Saving & Publishing…');
@@ -303,7 +301,7 @@ export default function Admin() {
     }
   }
 
-  /* ---------- missions helpers ---------- */
+  /* Mission helpers */
   function bumpVersion(v) {
     const p = String(v || '0.0.0').split('.').map((n) => parseInt(n || '0', 10));
     while (p.length < 3) p.push(0);
@@ -323,24 +321,37 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       rewards: { points: 25, items: [] },
-      completion: { message: 'Mission complete!', mediaUrl: '', mediaType: 'audio' },
-      appearance: { enabled: false, fontFamily: '', fontGF: null, fontSize: 18, fontColor: '#ffffff', fontBg: '#00000080', screenBg: '', screenImg: '' },
+      completion: {
+        message: 'Mission complete!',
+        mediaUrl: '',
+        mediaType: 'audio',  // none | audio | video | image
+        title: '',           // optional media title (for Backpack)
+        thumbUrl: '',        // optional media thumb (fallback to Admin MEDIA map if set)
+      },
+      appearance: {
+        enabled: false,
+        fontFamily: '',
+        fontGF: null,
+        fontSize: 18,
+        fontColor: '#ffffff',
+        fontColorOpacity: 1,
+        fontBg: '#000000',
+        fontBgOpacity: 0.5,
+        screenBg: '#0b0c10',
+        screenBgOpacity: 1,
+        screenImg: '',
+        screenImgOpacity: 1,
+        textAlignV: 'top',
+      },
       content: defaultContentForType('multiple_choice'),
     };
-    setEditing(draft);
-    setSelected(null);
-    setDirty(true);
+    setEditing(draft); setSelected(null); setDirty(true);
   }
   function editExisting(m) {
     setEditing(JSON.parse(JSON.stringify(m)));
-    setSelected(m.id);
-    setDirty(false);
+    setSelected(m.id); setDirty(false);
   }
-  function cancelEdit() {
-    setEditing(null);
-    setSelected(null);
-    setDirty(false);
-  }
+  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
@@ -355,9 +366,7 @@ export default function Admin() {
     if (i >= 0) missions[i] = editing;
     else missions.push(editing);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id);
-    setEditing(null);
-    setDirty(false);
+    setSelected(editing.id); setEditing(null); setDirty(false);
     setStatus('✅ List updated (remember Save All)');
   }
   function removeMission(id) {
@@ -374,31 +383,17 @@ export default function Admin() {
     setSuite({ ...suite, missions: arr, version: bumpVersion(suite.version || '0.0.0') });
   }
 
-  /* ---------- text rules ---------- */
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember Save All)');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])];
-    rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
-
   if (!suite || !config) return <main style={S.wrap}><div style={S.card}>Loading…</div></main>;
 
-  /* ========================== UI ========================== */
+  /* =====================================================================
+     UI
+     ===================================================================== */
   return (
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {['settings', 'missions', 'text', 'powerups', 'map', 'test'].map((t) => (
+            {['settings', 'missions', 'text', 'powerups', 'map', 'media', 'test'].map((t) => (
               <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
                 {t.toUpperCase()}
               </button>
@@ -501,104 +496,25 @@ export default function Admin() {
 
                 <hr style={S.hr} />
 
-                {/* Custom appearance */}
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={!!editing.appearance?.enabled}
-                      onChange={(e) => { setEditing({ ...editing, appearance: { ...(editing.appearance||{}), enabled: e.target.checked } }); setDirty(true); }}
-                    />
-                    Use custom appearance for this mission
-                  </label>
+                {/* Custom appearance (with opacity + alignment) */}
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editing.appearance?.enabled}
+                    onChange={(e) => { setEditing({ ...editing, appearance: { ...(editing.appearance||{}), enabled: e.target.checked } }); setDirty(true); }}
+                  />
+                  Use custom appearance for this mission
+                </label>
+                {editing.appearance?.enabled && (
+                  <AppearanceControls
+                    value={editing.appearance}
+                    onChange={(ap) => { setEditing({ ...editing, appearance: ap }); setDirty(true); }}
+                    allowAlign
+                  />
+                )}
 
-                  {editing.appearance?.enabled && (
-                    <div style={{ marginTop: 8, border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
-                      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-                        <Field label="Font family">
-                          <select
-                            style={S.input}
-                            value={editing.appearance?.fontFamily || config.theme?.fontFamily || FONT_CHOICES[0].val}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const choice = FONT_CHOICES.find(f => f.val === val);
-                              if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
-                              setEditing({
-                                ...editing,
-                                appearance: { ...(editing.appearance||{}), fontFamily: val, fontGF: choice?.gf || null },
-                              });
-                              setDirty(true);
-                            }}
-                          >
-                            {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
-                          </select>
-                        </Field>
-                        <Field label="Font size (px)">
-                          <input type="number" min={10} max={64}
-                            style={S.input}
-                            value={editing.appearance?.fontSize ?? 18}
-                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontSize: Math.max(10, Number(e.target.value||18)) } }); setDirty(true); }}
-                          />
-                        </Field>
-                        <Field label="Font color">
-                          <input type="color"
-                            style={S.input}
-                            value={editing.appearance?.fontColor || '#ffffff'}
-                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontColor: e.target.value } }); setDirty(true); }}
-                          />
-                        </Field>
-                        <Field label="Font background color">
-                          <input type="color"
-                            style={S.input}
-                            value={editing.appearance?.fontBg || '#00000080'}
-                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), fontBg: e.target.value } }); setDirty(true); }}
-                          />
-                        </Field>
-                        <Field label="Screen background color">
-                          <input type="color"
-                            style={S.input}
-                            value={editing.appearance?.screenBg || '#0b0c10'}
-                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), screenBg: e.target.value } }); setDirty(true); }}
-                          />
-                        </Field>
-                        <Field label="Screen background image (URL)">
-                          <input
-                            style={S.input}
-                            placeholder="https://…/image.jpg (optional)"
-                            value={editing.appearance?.screenImg || ''}
-                            onChange={(e)=>{ setEditing({ ...editing, appearance: { ...(editing.appearance||{}), screenImg: e.target.value } }); setDirty(true); }}
-                          />
-                        </Field>
-                      </div>
-
-                      {/* live preview */}
-                      <div style={{
-                        marginTop: 12,
-                        padding: 12,
-                        border: '1px dashed #2a323b',
-                        borderRadius: 10,
-                        background: editing.appearance?.screenImg
-                          ? `url(${editing.appearance.screenImg}) center/cover no-repeat`
-                          : (editing.appearance?.screenBg || '#0b0c10')
-                      }}>
-                        <div style={{
-                          fontFamily: editing.appearance?.fontFamily || 'inherit',
-                          fontSize: (editing.appearance?.fontSize ?? 18) + 'px',
-                          color: editing.appearance?.fontColor || '#fff',
-                          background: editing.appearance?.fontBg || 'transparent',
-                          display: 'inline-block',
-                          padding: '6px 10px',
-                          borderRadius: 8
-                        }}>
-                          The quick brown fox — 123
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Completion */}
-                <div style={{ marginBottom: 12, border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
+                {/* Mission Complete uses same appearance center-aligned */}
+                <div style={{ margin: '12px 0', padding: 12, borderRadius: 10, border: '1px solid #2a323b' }}>
                   <div style={{ fontWeight: 600, marginBottom: 8 }}>Mission Complete</div>
                   <Field label="Message">
                     <input
@@ -626,6 +542,24 @@ export default function Admin() {
                         placeholder="https://…/file.mp3 or .mp4 or .jpg"
                         value={editing.completion?.mediaUrl || ''}
                         onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), mediaUrl: e.target.value } }); setDirty(true); }}
+                      />
+                    </Field>
+                  </div>
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 2fr' }}>
+                    <Field label="Title (for Backpack)">
+                      <input
+                        style={S.input}
+                        placeholder="e.g., Evidence Video 1"
+                        value={editing.completion?.title || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), title: e.target.value } }); setDirty(true); }}
+                      />
+                    </Field>
+                    <Field label="Thumbnail URL (optional)">
+                      <input
+                        style={S.input}
+                        placeholder="https://…/thumb.jpg"
+                        value={editing.completion?.thumbUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, completion: { ...(editing.completion||{}), thumbUrl: e.target.value } }); setDirty(true); }}
                       />
                     </Field>
                   </div>
@@ -673,7 +607,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* Geofence types */}
+                {/* Geofence */}
                 {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
@@ -700,8 +634,7 @@ export default function Admin() {
                           const on = e.target.checked;
                           const next = { ...editing.content, geofenceEnabled: on };
                           if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
-                          setEditing({ ...editing, content: next });
-                          setDirty(true);
+                          setEditing({ ...editing, content: next }); setDirty(true);
                         }}
                       />
                       Enable geofence for this AR mission
@@ -744,8 +677,7 @@ export default function Admin() {
                           const on = e.target.checked;
                           const next = { ...editing.content, geofenceEnabled: on };
                           if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
-                          setEditing({ ...editing, content: next });
-                          setDirty(true);
+                          setEditing({ ...editing, content: next }); setDirty(true);
                         }}
                       />
                       Enable geofence for this mission
@@ -777,7 +709,7 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* generic field renderer + media previews */}
+                {/* generic renderer */}
                 {(TYPE_FIELDS[editing.type] || []).map((f) => (
                   <Field key={f.key} label={f.label}>
                     {f.type === 'text' && (
@@ -785,16 +717,21 @@ export default function Admin() {
                         <input
                           style={S.input}
                           value={editing.content?.[f.key] || ''}
-                          onChange={(e) => { setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}
+                          onChange={(e) => {
+                            setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
+                            setDirty(true);
+                          }}
                         />
-                        {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) && (
+                        {['mediaUrl', 'imageUrl', 'videoUrl', 'assetUrl', 'markerUrl'].includes(f.key) && (
                           <MediaPreview url={editing.content?.[f.key]} kind={f.key} />
                         )}
                       </>
                     )}
                     {f.type === 'number' && (
                       <input
-                        type="number" min={f.min} max={f.max} style={S.input}
+                        type="number"
+                        min={f.min} max={f.max}
+                        style={S.input}
                         value={editing.content?.[f.key] ?? ''}
                         onChange={(e) => {
                           const v = e.target.value === '' ? '' : Number(e.target.value);
@@ -807,7 +744,10 @@ export default function Admin() {
                       <textarea
                         style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
                         value={editing.content?.[f.key] || ''}
-                        onChange={(e) => { setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}
+                        onChange={(e) => {
+                          setEditing({ ...editing, content: { ...editing.content, [f.key]: e.target.value } });
+                          setDirty(true);
+                        }}
                       />
                     )}
                   </Field>
@@ -875,78 +815,14 @@ export default function Admin() {
             </Field>
           </div>
 
-          {/* Global Appearance (Theme) */}
+          {/* GLOBAL THEME */}
           <div style={{ ...S.card, marginTop: 16 }}>
             <h3 style={{ marginTop: 0 }}>Global Appearance (Theme)</h3>
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-              <Field label="Font family">
-                <select
-                  style={S.input}
-                  value={config.theme?.fontFamily || FONT_CHOICES[0].val}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const choice = FONT_CHOICES.find(f => f.val === val);
-                    if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
-                    setConfig({ ...config, theme: { ...(config.theme||{}), fontFamily: val, fontGF: choice?.gf || null } });
-                  }}
-                >
-                  {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Font size (px)">
-                <input type="number" min={10} max={64} style={S.input}
-                  value={config.theme?.fontSize ?? 18}
-                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontSize: Math.max(10, Number(e.target.value||18)) } })}
-                />
-              </Field>
-              <Field label="Font color">
-                <input type="color" style={S.input}
-                  value={config.theme?.fontColor || '#ffffff'}
-                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontColor: e.target.value } })}
-                />
-              </Field>
-              <Field label="Font background color">
-                <input type="color" style={S.input}
-                  value={config.theme?.fontBg || '#00000080'}
-                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), fontBg: e.target.value } })}
-                />
-              </Field>
-              <Field label="Screen background color">
-                <input type="color" style={S.input}
-                  value={config.theme?.screenBg || '#0b0c10'}
-                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), screenBg: e.target.value } })}
-                />
-              </Field>
-              <Field label="Screen background image (URL)">
-                <input style={S.input} placeholder="https://…/image.jpg (optional)"
-                  value={config.theme?.screenImg || ''}
-                  onChange={(e)=>setConfig({ ...config, theme: { ...(config.theme||{}), screenImg: e.target.value } })}
-                />
-              </Field>
-            </div>
-
-            {/* live preview */}
-            <div style={{
-              marginTop: 12,
-              padding: 12,
-              border: '1px dashed #2a323b',
-              borderRadius: 10,
-              background: config.theme?.screenImg
-                ? `url(${config.theme.screenImg}) center/cover no-repeat`
-                : (config.theme?.screenBg || '#0b0c10')
-            }}>
-              <div style={{
-                fontFamily: config.theme?.fontFamily || 'inherit',
-                fontSize: (config.theme?.fontSize ?? 18) + 'px',
-                color: config.theme?.fontColor || '#fff',
-                background: config.theme?.fontBg || 'transparent',
-                display: 'inline-block',
-                padding: '6px 10px',
-                borderRadius: 8
-              }}>
-                Global theme preview — Aa Bb 123
-              </div>
-            </div>
+            <AppearanceControls
+              value={config.theme}
+              onChange={(t) => setConfig({ ...config, theme: t })}
+              allowAlign
+            />
           </div>
 
           {/* Security */}
@@ -961,6 +837,17 @@ export default function Admin() {
               <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
               <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
             </ul>
+          </div>
+        </main>
+      )}
+
+      {/* MEDIA (thumb assignments) */}
+      {tab === 'media' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{ marginTop: 0 }}>Media Thumbnails</h3>
+            <p style={{ color:'#9fb0bf' }}>Assign thumbnail images for Rewards and Utilities (power-ups). These appear in players’ Backpacks.</p>
+            <MediaTab suite={suite} config={config} setConfig={setConfig} />
           </div>
         </main>
       )}
@@ -1158,7 +1045,9 @@ export default function Admin() {
   );
 }
 
-/* ========================== Small Components ========================== */
+/* =====================================================================
+   Components
+   ===================================================================== */
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -1213,159 +1102,192 @@ function MediaPreview({ url, kind }) {
   );
 }
 
-function MapPicker({ lat, lng, radius, onChange }) {
-  const divRef = useRef(null);
-  const mapRef = useRef(null);
-  const circleRef = useRef(null);
-  const markerRef = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [r, setR] = useState(radius || 25);
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const defaultPos = [lat || 44.9778, lng || -93.265];
+/* ---------- Appearance controls (with opacity + alignment) ---------- */
+function AppearanceControls({ value, onChange, allowAlign }) {
+  const v = value || {};
+  const [local, setLocal] = useState({
+    fontFamily: v.fontFamily || FONT_CHOICES[0].val,
+    fontGF: v.fontGF || null,
+    fontSize: v.fontSize ?? 18,
+    fontColor: v.fontColor || '#ffffff',
+    fontColorOpacity: v.fontColorOpacity ?? 1,
+    fontBg: v.fontBg || '#000000',
+    fontBgOpacity: v.fontBgOpacity ?? 0.5,
+    screenBg: v.screenBg || '#0b0c10',
+    screenBgOpacity: v.screenBgOpacity ?? 1,
+    screenImg: v.screenImg || '',
+    screenImgOpacity: v.screenImgOpacity ?? 1,
+    textAlignV: v.textAlignV || 'top',
+  });
+  useEffect(() => { onChange({ ...local }); /* propagate */ }, [local]); // eslint-disable-line
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.L) { setReady(true); return; }
-    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setReady(true); document.body.appendChild(s);
-  }, []);
+  function setPatch(p) { setLocal((s) => ({ ...s, ...p })); }
 
-  useEffect(() => {
-    if (!ready || !divRef.current || typeof window === 'undefined') return;
-    const L = window.L; if (!L) return;
-    if (!mapRef.current) {
-      mapRef.current = L.map(divRef.current).setView(defaultPos, lat && lng ? 16 : 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapRef.current);
-      markerRef.current = L.marker(defaultPos, { draggable: true }).addTo(mapRef.current);
-      circleRef.current = L.circle(markerRef.current.getLatLng(), { radius: r || 25, color: '#33a8ff' }).addTo(mapRef.current);
-      const sync = () => {
-        const p = markerRef.current.getLatLng(); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r || 25));
-        onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
-      };
-      markerRef.current.on('dragend', sync);
-      mapRef.current.on('click', (e) => { markerRef.current.setLatLng(e.latlng); sync(); });
-      sync();
-    } else {
-      const p = defaultPos; markerRef.current.setLatLng(p); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r || 25));
-    }
-  }, [ready]);
+  return (
+    <div style={{ border: '1px solid #2a323b', borderRadius: 10, padding: 12 }}>
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+        <Field label="Font family">
+          <select
+            style={S.input}
+            value={local.fontFamily}
+            onChange={(e) => {
+              const val = e.target.value;
+              const choice = FONT_CHOICES.find(f => f.val === val);
+              if (choice?.gf) ensureGoogleFontLoaded(choice.gf);
+              setPatch({ fontFamily: val, fontGF: choice?.gf || null });
+            }}
+          >
+            {FONT_CHOICES.map(f => <option key={f.val} value={f.val}>{f.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Font size (px)">
+          <input type="number" min={10} max={64} style={S.input}
+            value={local.fontSize}
+            onChange={(e)=>setPatch({ fontSize: Math.max(10, Number(e.target.value||18)) })}
+          />
+        </Field>
 
-  useEffect(() => {
-    if (circleRef.current && markerRef.current) {
-      circleRef.current.setRadius(Number(r || 25));
-      const p = markerRef.current.getLatLng();
-      onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
-    }
-  }, [r]);
+        <Field label={`Font color (opacity ${Math.round((local.fontColorOpacity||0)*100)}%)`}>
+          <input type="color" style={S.input}
+            value={local.fontColor}
+            onChange={(e)=>setPatch({ fontColor: e.target.value })}
+          />
+          <input type="range" min={0} max={1} step={0.01}
+            value={local.fontColorOpacity}
+            onChange={(e)=>setPatch({ fontColorOpacity: Number(e.target.value) })}
+          />
+        </Field>
 
-  async function doSearch(e) {
-    e?.preventDefault();
-    if (!q.trim()) return;
-    setSearching(true); setResults([]);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      const data = await res.json();
-      setResults(Array.isArray(data) ? data : []);
-    } catch {
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }
-  function gotoResult(r) {
-    if (!mapRef.current || !markerRef.current) return;
-    const lat = Number(r.lat), lon = Number(r.lon); const p = [lat, lon];
-    markerRef.current.setLatLng(p); circleRef.current.setLatLng(p); mapRef.current.setView(p, 16);
-    onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
-    setResults([]);
-  }
-  function useMyLocation() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => { const lat = pos.coords.latitude, lon = pos.coords.longitude; gotoResult({ lat, lon }); });
+        <Field label={`Font background color (opacity ${Math.round((local.fontBgOpacity||0)*100)}%)`}>
+          <input type="color" style={S.input}
+            value={local.fontBg}
+            onChange={(e)=>setPatch({ fontBg: e.target.value })}
+          />
+          <input type="range" min={0} max={1} step={0.01}
+            value={local.fontBgOpacity}
+            onChange={(e)=>setPatch({ fontBgOpacity: Number(e.target.value) })}
+          />
+        </Field>
+
+        <Field label={`Screen background color (opacity ${Math.round((local.screenBgOpacity||0)*100)}%)`}>
+          <input type="color" style={S.input}
+            value={local.screenBg}
+            onChange={(e)=>setPatch({ screenBg: e.target.value })}
+          />
+          <input type="range" min={0} max={1} step={0.01}
+            value={local.screenBgOpacity}
+            onChange={(e)=>setPatch({ screenBgOpacity: Number(e.target.value) })}
+          />
+        </Field>
+
+        <Field label={`Screen background image (opacity ${Math.round((local.screenImgOpacity||0)*100)}%)`}>
+          <input style={S.input} placeholder="https://…/image.jpg (optional)"
+            value={local.screenImg}
+            onChange={(e)=>setPatch({ screenImg: e.target.value })}
+          />
+          <input type="range" min={0} max={1} step={0.01}
+            value={local.screenImgOpacity}
+            onChange={(e)=>setPatch({ screenImgOpacity: Number(e.target.value) })}
+          />
+        </Field>
+
+        {allowAlign && (
+          <Field label="Text vertical alignment">
+            <select
+              style={S.input}
+              value={local.textAlignV}
+              onChange={(e)=>setPatch({ textAlignV: e.target.value })}
+            >
+              <option value="top">Top (default)</option>
+              <option value="center">Center</option>
+            </select>
+          </Field>
+        )}
+      </div>
+
+      {/* live preview */}
+      <div style={{ marginTop: 12, padding: 12, border: '1px dashed #2a323b', borderRadius: 10,
+        background: local.screenImg
+          ? 'transparent' : local.screenBg }}>
+        {local.screenImg && (
+          <div style={{ backgroundImage: `url(${local.screenImg})`, backgroundSize: 'cover', backgroundPosition: 'center',
+            opacity: local.screenImgOpacity, width: '100%', height: 140, borderRadius: 8, marginBottom: 12 }} />
+        )}
+        <div style={{
+          fontFamily: local.fontFamily,
+          fontSize: local.fontSize,
+          color: applyOpacity(local.fontColor, local.fontColorOpacity),
+          background: applyOpacity(local.fontBg, local.fontBgOpacity),
+          display: 'inline-block', padding: '6px 10px', borderRadius: 8
+        }}>
+          Aa Bb 123 — preview
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MediaTab({ suite, config, setConfig }) {
+  const rewardsSet = new Set();
+  (suite?.missions || []).forEach(m => (m.rewards?.items || []).forEach(x => rewardsSet.add(x)));
+  const utilSet = new Set((config?.powerups || []).map(p => p.type).filter(Boolean));
+
+  const thumbs = config?.media?.thumbs || { rewards: {}, utilities: {} };
+
+  function patchThumb(kind, key, url) {
+    const next = {
+      ...config,
+      media: {
+        ...(config.media || {}),
+        thumbs: {
+          rewards: { ...(thumbs.rewards || {}), ...(kind==='rewards'? { [key]: url } : {}) },
+          utilities: { ...(thumbs.utilities || {}), ...(kind==='utilities'? { [key]: url } : {}) },
+        }
+      }
+    };
+    setConfig(next);
   }
 
   return (
     <div>
-      <form onSubmit={doSearch} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 8 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search address or place…" style={S.input} />
-        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use my location</button>
-        <button disabled={searching} type="submit" style={S.button}>{searching ? 'Searching…' : 'Search'}</button>
-      </form>
-      {results.length > 0 && (
-        <div style={{ background: '#0b0c10', border: '1px solid #2a323b', borderRadius: 10, padding: 8, marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
-          {results.map((r, i) => (
-            <div key={i} onClick={() => gotoResult(r)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
-              <div style={{ fontWeight: 600 }}>{r.display_name}</div>
-              <div style={{ color: '#9fb0bf', fontSize: 12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-            </div>
-          ))}
+      <h4 style={{ marginTop: 0 }}>Rewards</h4>
+      {rewardsSet.size === 0 && <div style={{ color:'#9fb0bf' }}>No reward items found in missions yet.</div>}
+      {[...rewardsSet].map(name => (
+        <div key={name} style={{ display:'grid', gridTemplateColumns:'220px 1fr', gap: 8, alignItems:'center', marginBottom: 8 }}>
+          <div><code>{name}</code></div>
+          <input
+            style={S.input}
+            placeholder="https://…/thumb.jpg"
+            value={thumbs.rewards?.[name] || ''}
+            onChange={(e)=>patchThumb('rewards', name, e.target.value)}
+          />
         </div>
-      )}
-      <div ref={divRef} style={{ width: '100%', height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #2a323b', marginBottom: 8 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
-        <input type="range" min={5} max={2000} step={5} value={r} onChange={(e) => setR(Number(e.target.value))} />
-        <code style={{ color: '#9fb0bf' }}>{r} m</code>
+      ))}
+
+      <hr style={S.hr} />
+      <h4>Utilities (Power-Ups)</h4>
+      {utilSet.size === 0 && <div style={{ color:'#9fb0bf' }}>No utilities placed yet.</div>}
+      {[...utilSet].map(name => (
+        <div key={name} style={{ display:'grid', gridTemplateColumns:'220px 1fr', gap: 8, alignItems:'center', marginBottom: 8 }}>
+          <div><code>{name}</code></div>
+          <input
+            style={S.input}
+            placeholder="https://…/thumb.jpg"
+            value={thumbs.utilities?.[name] || ''}
+            onChange={(e)=>patchThumb('utilities', name, e.target.value)}
+          />
+        </div>
+      ))}
+      <div style={{ color:'#9fb0bf', marginTop: 8 }}>
+        Save/Publish to apply. Game uses these thumbnails in Backpack pockets.
       </div>
     </div>
   );
 }
 
-function TestSMS() {
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState('Test message from admin');
-  const [status, setStatus] = useState('');
-  async function send() {
-    setStatus('Sending…');
-    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-    const text = await res.text();
-    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
-  }
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-        <button style={S.button} onClick={send}>Send Test</button>
-      </div>
-      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
-    </div>
-  );
-}
-
-function ChangeAuth() {
-  const [curUser, setCurUser] = useState('');
-  const [curPass, setCurPass] = useState('');
-  const [newUser, setNewUser] = useState('');
-  const [newPass, setNewPass] = useState('');
-  const [status, setStatus] = useState('');
-  async function submit() {
-    setStatus('Updating…');
-    const res = await fetch('/api/change-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
-    const t = await res.text();
-    setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ ' + t);
-  }
-  return (
-    <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
-      <div>
-        <Field label="Current Username"><input style={S.input} value={curUser} onChange={(e) => setCurUser(e.target.value)} /></Field>
-        <Field label="Current Password"><input type="password" style={S.input} value={curPass} onChange={(e) => setCurPass(e.target.value)} /></Field>
-      </div>
-      <div>
-        <Field label="New Username"><input style={S.input} value={newUser} onChange={(e) => setNewUser(e.target.value)} /></Field>
-        <Field label="New Password"><input type="password" style={S.input} value={newPass} onChange={(e) => setNewPass(e.target.value)} /></Field>
-      </div>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <button style={S.button} onClick={submit}>Change Credentials</button>
-        <div style={{ color: '#9fb0bf', marginTop: 6 }}>{status}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ========================== Styles ========================== */
+/* =====================================================================
+   Styles
+   ===================================================================== */
 const S = {
   body: { background: '#0b0c10', color: '#e9eef2', minHeight: '100vh', fontFamily: 'system-ui, Arial, sans-serif' },
   header: { padding: 16, background: '#11161a', borderBottom: '1px solid #1d2329' },
@@ -1383,7 +1305,9 @@ const S = {
   hr: { border: '1px solid #1f262d', borderBottom: 'none' },
 };
 
-/* ========================== Map Overview ========================== */
+/* =====================================================================
+   MapOverview
+   ===================================================================== */
 function MapOverview({ missions=[], powerups=[], showRings=true }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
@@ -1464,4 +1388,190 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
       )}
     </div>
   );
+}
+
+/* =====================================================================
+   Map picker (mission editor)
+   ===================================================================== */
+function MapPicker({ lat, lng, radius, onChange }) {
+  const divRef = useRef(null);
+  const mapRef = useRef(null);
+  const circleRef = useRef(null);
+  const markerRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [r, setR] = useState(radius || 25);
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const defaultPos = [lat || 44.9778, lng || -93.265];
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setReady(true); return; }
+    const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    const s = document.createElement('script'); s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async = true; s.onload = () => setReady(true); document.body.appendChild(s);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    if (!mapRef.current) {
+      mapRef.current = L.map(divRef.current).setView(defaultPos, lat && lng ? 16 : 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapRef.current);
+
+      markerRef.current = L.marker(defaultPos, { draggable: true }).addTo(mapRef.current);
+      circleRef.current = L.circle(markerRef.current.getLatLng(), { radius: r || 25, color: '#33a8ff' }).addTo(mapRef.current);
+
+      const sync = () => {
+        const p = markerRef.current.getLatLng();
+        circleRef.current.setLatLng(p);
+        circleRef.current.setRadius(Number(r || 25));
+        onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
+      };
+      markerRef.current.on('dragend', sync);
+      mapRef.current.on('click', (e) => { markerRef.current.setLatLng(e.latlng); sync(); });
+      sync();
+    } else {
+      const p = defaultPos;
+      markerRef.current.setLatLng(p);
+      circleRef.current.setLatLng(p);
+      circleRef.current.setRadius(Number(r || 25));
+    }
+  }, [ready]);
+
+  useEffect(() => {
+    if (circleRef.current && markerRef.current) {
+      circleRef.current.setRadius(Number(r || 25));
+      const p = markerRef.current.getLatLng();
+      onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
+    }
+  }, [r]);
+
+  async function doSearch(e) {
+    e?.preventDefault();
+    if (!q.trim()) return;
+    setSearching(true); setResults([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`;
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const data = await res.json();
+      setResults(Array.isArray(data) ? data : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+  function gotoResult(r) {
+    if (!mapRef.current || !markerRef.current) return;
+    const lat = Number(r.lat), lon = Number(r.lon);
+    const p = [lat, lon];
+    markerRef.current.setLatLng(p);
+    circleRef.current.setLatLng(p);
+    mapRef.current.setView(p, 16);
+    onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
+    setResults([]);
+  }
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      gotoResult({ lat, lon });
+    });
+  }
+
+  return (
+    <div>
+      <form onSubmit={doSearch} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 8 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search address or place…" style={S.input} />
+        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use my location</button>
+        <button disabled={searching} type="submit" style={S.button}>{searching ? 'Searching…' : 'Search'}</button>
+      </form>
+      {results.length > 0 && (
+        <div style={{ background: '#0b0c10', border: '1px solid #2a323b', borderRadius: 10, padding: 8, marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
+          {results.map((r, i) => (
+            <div key={i} onClick={() => gotoResult(r)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
+              <div style={{ fontWeight: 600 }}>{r.display_name}</div>
+              <div style={{ color: '#9fb0bf', fontSize: 12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div ref={divRef} style={{ width: '100%', height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #2a323b', marginBottom: 8 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+        <input type="range" min={5} max={2000} step={5} value={r} onChange={(e) => setR(Number(e.target.value))} />
+        <code style={{ color: '#9fb0bf' }}>{r} m</code>
+      </div>
+    </div>
+  );
+}
+
+function TestSMS() {
+  const [to, setTo] = useState('');
+  const [msg, setMsg] = useState('Test message from admin');
+  const [status, setStatus] = useState('');
+  async function send() {
+    setStatus('Sending…');
+    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
+    const text = await res.text();
+    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
+        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
+        <button style={S.button} onClick={send}>Send Test</button>
+      </div>
+      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
+    </div>
+  );
+}
+
+function ChangeAuth() {
+  const [curUser, setCurUser] = useState('');
+  const [curPass, setCurPass] = useState('');
+  const [newUser, setNewUser] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [status, setStatus] = useState('');
+  async function submit() {
+    setStatus('Updating…');
+    const res = await fetch('/api/change-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ curUser, curPass, newUser, newPass }) });
+    const t = await res.text();
+    setStatus(res.ok ? '✅ Updated. Redeploying… refresh soon.' : '❌ ' + t);
+  }
+  return (
+    <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
+      <div>
+        <Field label="Current Username"><input style={S.input} value={curUser} onChange={(e) => setCurUser(e.target.value)} /></Field>
+        <Field label="Current Password"><input type="password" style={S.input} value={curPass} onChange={(e) => setCurPass(e.target.value)} /></Field>
+      </div>
+      <div>
+        <Field label="New Username"><input style={S.input} value={newUser} onChange={(e) => setNewUser(e.target.value)} /></Field>
+        <Field label="New Password"><input type="password" style={S.input} value={newPass} onChange={(e) => setNewPass(e.target.value)} /></Field>
+      </div>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <button style={S.button} onClick={submit}>Change Credentials</button>
+        <div style={{ color: '#9fb0bf', marginTop: 6 }}>{status}</div>
+      </div>
+    </div>
+  );
+}
+
+/* =====================================================================
+   Tiny util
+   ===================================================================== */
+function applyOpacity(hex, alpha=1) {
+  // hex: #RRGGBB / #RGB; returns rgba(r,g,b,a)
+  if (!hex) return `rgba(0,0,0,${alpha})`;
+  const h = hex.replace('#', '');
+  let r,g,b;
+  if (h.length === 3) {
+    r = parseInt(h[0]+h[0],16); g = parseInt(h[1]+h[1],16); b = parseInt(h[2]+h[2],16);
+  } else {
+    r = parseInt(h.slice(0,2),16); g = parseInt(h.slice(2,4),16); b = parseInt(h.slice(4,6),16);
+  }
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r},${g},${b},${a})`;
 }
