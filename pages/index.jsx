@@ -23,7 +23,7 @@ async function fetchFirstJson(urls, fallback) {
   return fallback;
 }
 
-// Convert common share links to direct-view links for previews
+// Convert Dropbox & Google Drive share links to direct-view links
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
@@ -60,8 +60,12 @@ function toDirectMediaURL(u) {
   }
 }
 
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
 /* =====================================================================
-   1) SCHEMAS
+   1) SCHEMAS & DEFAULTS
    ===================================================================== */
 const TYPE_FIELDS = {
   multiple_choice: [
@@ -129,7 +133,7 @@ const POWERUP_TYPES = [
   { value: 'jammer', label: 'Signal Jammer (blackout radius)' },
 ];
 
-/* Thumbnails the client should use by type/name (MEDIA tab) */
+/* MEDIA defaults */
 const DEFAULT_UTILITY_THUMBS = {
   smoke: 'https://drive.google.com/open?id=1icvwZ3Bow3HGrmVve1LUUv_6b2Gkwq7h&usp=drive_fs',
   jammer: 'https://drive.google.com/open?id=1TSzo_lMmVGYyvlZMQXLyltG4pRi2yIRY&usp=drive_fs',
@@ -143,6 +147,30 @@ const DEFAULT_REWARDS = [
     thumbUrl: 'https://drive.google.com/open?id=1TicLeS2LLwY8nVk-7Oc6ESxk_SyvxZGw&usp=drive_fs',
   },
 ];
+
+/* Appearance defaults */
+const FONT_FAMILIES = [
+  { v: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', label: 'System' },
+  { v: 'Georgia, serif', label: 'Georgia' },
+  { v: 'Times New Roman, Times, serif', label: 'Times New Roman' },
+  { v: 'Arial, Helvetica, sans-serif', label: 'Arial' },
+  { v: 'Courier New, Courier, monospace', label: 'Courier New' },
+];
+
+function defaultAppearance() {
+  return {
+    fontFamily: FONT_FAMILIES[0].v,
+    fontSizePx: 22,
+    fontColor: '#ffffff',
+    textBgColor: '#000000',
+    textBgOpacity: 0.0,       // backdrop behind text
+    screenBgColor: '#000000',
+    screenBgOpacity: 0.0,     // overlay on bg image/color
+    screenBgImage: '',
+    textAlign: 'center',      // left|center|right
+    textVertical: 'top',      // top|center (default top so backpack is clear)
+  };
+}
 
 /* =====================================================================
    2) ROOT
@@ -159,9 +187,10 @@ export default function Admin() {
   const [newMode, setNewMode] = useState('single');
   const [newDurationMin, setNewDurationMin] = useState(0);   // minutes; 0 = infinite
   const [newAlertMin, setNewAlertMin] = useState(10);        // minutes before end
+
+  // map view options
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
-  const [showQuickPowerup, setShowQuickPowerup] = useState(false);
 
   // data
   const [suite, setSuite] = useState(null);
@@ -176,16 +205,18 @@ export default function Admin() {
   // text rules
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
 
-  // powerups (quick add)
-  const [pu, setPu] = useState({
+  // inline Add Power‑Up on the same map
+  const [placingPu, setPlacingPu] = useState(false);
+  const [puDraft, setPuDraft] = useState({
     title: '',
     type: 'smoke',
     pickupRadius: 100,
     effectSeconds: 120,
-    lat: 44.9778,
-    lng: -93.265,
+    lat: null,
+    lng: null,
   });
 
+  // compute game base AFTER config state exists (avoid TDZ)
   const gameBase =
     ((typeof window !== 'undefined'
       ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
@@ -243,7 +274,6 @@ export default function Admin() {
           ),
         };
 
-        // Merge config defaults (MEDIA + timer + powerups)
         const dc = defaultConfig();
         const merged = {
           ...dc,
@@ -251,17 +281,14 @@ export default function Admin() {
           timer: { ...dc.timer, ...(c0.timer || {}) },
           powerups: Array.isArray(c0.powerups) ? c0.powerups : [],
           media: {
-            utilityThumbs: {
-              ...DEFAULT_UTILITY_THUMBS,
-              ...(c0.media?.utilityThumbs || {}),
-            },
+            utilityThumbs: { ...DEFAULT_UTILITY_THUMBS, ...(c0.media?.utilityThumbs || {}) },
             rewards: Array.isArray(c0.media?.rewards) && c0.media.rewards.length > 0
-              ? c0.media.rewards
-              : DEFAULT_REWARDS,
+              ? c0.media.rewards : DEFAULT_REWARDS,
           },
+          appearance: { ...dc.appearance, ...(c0.appearance || {}) },
         };
 
-        // If there are no stored power-ups yet, seed the 3 defaults (no lat/lng set)
+        // Seed defaults if no powerups saved
         if (!merged.powerups || merged.powerups.length === 0) {
           merged.powerups = [
             { id: 'p01', title: 'Smoke', type: 'smoke', pickupRadius: 100, effectSeconds: 120 },
@@ -291,37 +318,27 @@ export default function Admin() {
       timer: { durationMinutes: 0, alertMinutes: 10 },
       textRules: [],
       powerups: [],
-      media: {
-        utilityThumbs: { ...DEFAULT_UTILITY_THUMBS },
-        rewards: [...DEFAULT_REWARDS],
-      },
+      media: { utilityThumbs: { ...DEFAULT_UTILITY_THUMBS }, rewards: [...DEFAULT_REWARDS] },
+      appearance: defaultAppearance(),
     };
   }
 
   function defaultContentForType(t) {
     const baseGeo = { geofenceEnabled: false, lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30 };
     switch (t) {
-      case 'multiple_choice':
-        return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
-      case 'short_answer':
-        return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
-      case 'statement':
-        return { text: '', mediaUrl: '', ...baseGeo };
-      case 'video':
-        return { videoUrl: '', overlayText: '', ...baseGeo };
-      case 'geofence_image':
-        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
-      case 'geofence_video':
-        return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
-      case 'ar_image':
-        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      case 'ar_video':
-        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
-      default:
-        return { ...baseGeo };
+      case 'multiple_choice': return { question: '', choices: [], correctIndex: undefined, mediaUrl: '', ...baseGeo };
+      case 'short_answer':    return { question: '', answer: '', acceptable: '', mediaUrl: '', ...baseGeo };
+      case 'statement':       return { text: '', mediaUrl: '', ...baseGeo };
+      case 'video':           return { videoUrl: '', overlayText: '', ...baseGeo };
+      case 'geofence_image':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, imageUrl: '', overlayText: '' };
+      case 'geofence_video':  return { lat: '', lng: '', radiusMeters: 25, cooldownSeconds: 30, videoUrl: '', overlayText: '' };
+      case 'ar_image':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      case 'ar_video':        return { markerUrl: '', assetUrl: '', overlayText: '', ...baseGeo };
+      default:                return { ...baseGeo };
     }
   }
 
+  /* ========================== SAVE / PUBLISH ========================== */
   async function saveAll() {
     if (!suite || !config) return;
     setStatus('Saving…');
@@ -362,7 +379,7 @@ export default function Admin() {
     }
   }
 
-  // missions helpers
+  /* ========================== MISSIONS CRUD =========================== */
   function suggestId() {
     const base = 'm';
     let i = 1;
@@ -377,13 +394,20 @@ export default function Admin() {
       type: 'multiple_choice',
       rewards: { points: 25 },
       content: defaultContentForType('multiple_choice'),
+      // per-mission appearance override (off by default)
+      appearanceOverrideEnabled: false,
+      appearance: defaultAppearance(),
     };
     setEditing(draft);
     setSelected(null);
     setDirty(true);
   }
   function editExisting(m) {
-    setEditing(JSON.parse(JSON.stringify(m)));
+    const withAppearance = {
+      appearanceOverrideEnabled: !!m.appearanceOverrideEnabled,
+      appearance: { ...defaultAppearance(), ...(m.appearance || {}) },
+    };
+    setEditing({ ...JSON.parse(JSON.stringify(m)), ...withAppearance });
     setSelected(m.id);
     setDirty(false);
   }
@@ -393,12 +417,10 @@ export default function Admin() {
     setDirty(false);
   }
   function bumpVersion(v) {
-    const p = String(v || '0.0.0')
-      .split('.')
-      .map((n) => parseInt(n || '0', 10));
+    const p = String(v || '0.0.0').split('.').map((n) => parseInt(n || '0', 10));
     while (p.length < 3) p.push(0);
     p[2] += 1;
-    return p.join('.'); // x.y.(z+1)
+    return p.join('.');
   }
   function saveToList() {
     if (!editing || !suite) return;
@@ -411,8 +433,13 @@ export default function Admin() {
     }
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex((m) => m.id === editing.id);
-    if (i >= 0) missions[i] = editing;
-    else missions.push(editing);
+    const toSave = { ...editing };
+    // remove appearance object if override disabled (saves space)
+    if (!toSave.appearanceOverrideEnabled) {
+      delete toSave.appearance;
+    }
+    if (i >= 0) missions[i] = toSave;
+    else missions.push(toSave);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id);
     setEditing(null);
@@ -428,12 +455,12 @@ export default function Admin() {
     }
   }
 
-  // text rules
+  /* ========================== TEXT RULES ============================== */
   function addSmsRule() {
     if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
     const maxPlayers = config?.forms?.players || 1;
     if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }]; // ensure number
+    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
     setStatus('✅ SMS rule added (remember Save All)');
@@ -442,6 +469,39 @@ export default function Admin() {
     const rules = [...(config?.textRules || [])];
     rules.splice(idx, 1);
     setConfig({ ...config, textRules: rules });
+  }
+
+  /* =================== INLINE POWER-UP PLACEMENT ====================== */
+  function beginPlacePowerup() {
+    setPlacingPu(true);
+    setPuDraft({
+      title: '',
+      type: 'smoke',
+      pickupRadius: 100,
+      effectSeconds: 120,
+      lat: null,
+      lng: null,
+    });
+  }
+  function cancelPlacePowerup() {
+    setPlacingPu(false);
+  }
+  function confirmPlacePowerup() {
+    const { title, type, pickupRadius, effectSeconds, lat, lng } = puDraft;
+    if (lat == null || lng == null) { setStatus('❌ Click on the map to place the power‑up'); return; }
+    const item = {
+      id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0'),
+      title: title || (type.charAt(0).toUpperCase() + type.slice(1)),
+      type,
+      pickupRadius: clamp(Number(pickupRadius || 0), 1, 2000),
+      effectSeconds: clamp(Number(effectSeconds || 0), 5, 3600),
+      lat: Number(lat.toFixed(6)),
+      lng: Number(lng.toFixed(6)),
+    };
+    const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
+    setConfig({ ...config, powerups: list });
+    setPlacingPu(false);
+    setStatus('✅ Power‑up added (remember Save All)');
   }
 
   if (!suite || !config) {
@@ -480,11 +540,11 @@ export default function Admin() {
               <button style={S.button} onClick={() => setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Always show New Mission + Add Power-Up quick */}
+            {/* New Mission + inline Add Power‑Up */}
             <button onClick={startNew} style={S.button}>+ New Mission</button>
-            <button onClick={() => setShowQuickPowerup(true)} style={S.button}>+ Add Power‑Up</button>
+            <button onClick={beginPlacePowerup} style={S.button}>+ Add Power‑Up</button>
 
-            {/* Save + quick links */}
+            {/* Save + links */}
             <button onClick={saveAll} style={{ ...S.button }}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
             <a
@@ -507,21 +567,77 @@ export default function Admin() {
       {/* MISSIONS */}
       {tab === 'missions' && (
         <>
-          {/* Map area of current missions + powerups, directly under the buttons */}
+          {/* Overview Map (shared for missions & inline power‑up create) */}
           <main style={S.wrap}>
             <div style={S.card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <h3 style={{ margin: 0 }}>Overview Map</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, marginBottom: 8 }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Overview Map</h3>
+                  <div style={{ color:'#9fb0bf', fontSize:12 }}>Click to place power‑ups (when placing mode is active). Drag the pin; use the slider to adjust radius.</div>
+                </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)} />
                   Show radius rings (admin only)
                 </label>
               </div>
-              <MapOverview missions={(suite?.missions)||[]} powerups={(config?.powerups)||[]} showRings={showRings} />
+
+              {placingPu && (
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12, marginBottom:10 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
+                    <Field label="Title">
+                      <input style={S.input} value={puDraft.title} onChange={(e)=>setPuDraft({ ...puDraft, title: e.target.value })} />
+                    </Field>
+                    <Field label="Type">
+                      <select style={S.input} value={puDraft.type} onChange={(e)=>setPuDraft({ ...puDraft, type: e.target.value })}>
+                        {POWERUP_TYPES.map((t)=><option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Pickup radius (m)">
+                      <input type="number" min={1} max={2000} style={S.input}
+                        value={puDraft.pickupRadius}
+                        onChange={(e)=>setPuDraft({ ...puDraft, pickupRadius: clamp(Number(e.target.value||0),1,2000) })}
+                      />
+                    </Field>
+                    <Field label="Effect duration (sec)">
+                      <input type="number" min={5} max={3600} style={S.input}
+                        value={puDraft.effectSeconds}
+                        onChange={(e)=>setPuDraft({ ...puDraft, effectSeconds: clamp(Number(e.target.value||0),5,3600) })}
+                      />
+                    </Field>
+                  </div>
+                  <div style={{ display:'flex', gap:8, marginTop:8, alignItems:'center' }}>
+                    <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                      {puDraft.lat==null ? 'Click on the map to place the power‑up.' :
+                        `lat ${Number(puDraft.lat).toFixed(6)}, lng ${Number(puDraft.lng).toFixed(6)}`}
+                    </div>
+                    <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+                      <button style={S.button} onClick={cancelPlacePowerup}>Cancel</button>
+                      <button style={S.button} onClick={confirmPlacePowerup}>Save Power‑Up</button>
+                    </div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, marginTop:8, alignItems:'center' }}>
+                    <input type="range" min={5} max={2000} step={5}
+                      value={puDraft.pickupRadius}
+                      onChange={(e)=>setPuDraft({ ...puDraft, pickupRadius: Number(e.target.value) })}
+                    />
+                    <code style={{ color:'#9fb0bf' }}>{puDraft.pickupRadius} m</code>
+                  </div>
+                </div>
+              )}
+
+              <MapOverview
+                missions={(suite?.missions)||[]}
+                powerups={(config?.powerups)||[]}
+                showRings={showRings}
+                interactive={placingPu}
+                draftPowerup={placingPu ? { lat: puDraft.lat, lng: puDraft.lng, radius: puDraft.pickupRadius } : null}
+                onDraftChange={(lat, lng) => setPuDraft({ ...puDraft, lat, lng })}
+              />
             </div>
           </main>
 
           <main style={S.wrapGrid}>
+            {/* LEFT: mission list (kept) */}
             <aside style={S.sidebar}>
               <input
                 placeholder="Search…"
@@ -553,20 +669,9 @@ export default function Admin() {
               </div>
             </aside>
 
+            {/* RIGHT: editor only when editing (placeholder removed) */}
             <section style={S.editor}>
-              {!editing ? (
-                <div style={S.card}>
-                  <p style={{ marginTop: 0, color: '#9fb0bf' }}>
-                    Select a mission or click <em>New Mission</em>.
-                  </p>
-                  <button style={S.button} onClick={startNew}>
-                    + New Mission
-                  </button>
-                  <p style={{ color: '#9fb0bf' }}>
-                    Version: <code>{suite.version || '0.0.0'}</code> • Total: <code>{suite.missions?.length || 0}</code>
-                  </p>
-                </div>
-              ) : (
+              {!editing ? null : (
                 <div style={S.card}>
                   <Field label="ID">
                     <input style={S.input} value={editing.id} onChange={(e) => { setEditing({ ...editing, id: e.target.value }); setDirty(true); }} />
@@ -591,6 +696,7 @@ export default function Admin() {
                       ))}
                     </select>
                   </Field>
+
                   <hr style={S.hr} />
 
                   {/* MC editor */}
@@ -607,7 +713,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* geofence types map */}
+                  {/* Geofence map for types that require it */}
                   {(editing.type === 'geofence_image' || editing.type === 'geofence_video') && (
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Pick location & radius</div>
@@ -623,54 +729,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* AR w/ optional geofence */}
-                  {(editing.type === 'ar_image' || editing.type === 'ar_video') && (
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                        <input
-                          type="checkbox"
-                          checked={!!editing.content?.geofenceEnabled}
-                          onChange={(e) => {
-                            const on = e.target.checked;
-                            const next = { ...editing.content, geofenceEnabled: on };
-                            if (on && (!next.lat || !next.lng)) { next.lat = 44.9778; next.lng = -93.265; }
-                            setEditing({ ...editing, content: next });
-                            setDirty(true);
-                          }}
-                        />
-                        Enable geofence for this AR mission
-                      </label>
-                      {editing.content?.geofenceEnabled && (
-                        <>
-                          <MapPicker
-                            lat={editing.content?.lat}
-                            lng={editing.content?.lng}
-                            radius={editing.content?.radiusMeters ?? 25}
-                            onChange={(lat, lng, rad) => {
-                              setEditing({ ...editing, content: { ...editing.content, lat, lng, radiusMeters: rad } });
-                              setDirty(true);
-                            }}
-                          />
-                          <Field label="Cooldown (sec)">
-                            <input
-                              type="number"
-                              min={0}
-                              max={3600}
-                              style={S.input}
-                              value={editing.content?.cooldownSeconds ?? 30}
-                              onChange={(e) => {
-                                const v = Number(e.target.value || 0);
-                                setEditing({ ...editing, content: { ...editing.content, cooldownSeconds: v } });
-                                setDirty(true);
-                              }}
-                            />
-                          </Field>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* generic geofence toggle (MC/Short/Statement/Video) */}
+                  {/* Optional geofence for other types */}
                   {(editing.type === 'multiple_choice' || editing.type === 'short_answer' || editing.type === 'statement' || editing.type === 'video') && (
                     <div style={{ marginBottom: 12 }}>
                       <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
@@ -717,7 +776,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* generic field renderer + media previews */}
+                  {/* Generic field renderer + media previews */}
                   {(TYPE_FIELDS[editing.type] || []).map((f) => (
                     <Field key={f.key} label={f.label}>
                       {f.type === 'text' && (
@@ -762,6 +821,7 @@ export default function Admin() {
                     </Field>
                   ))}
 
+                  {/* Points */}
                   <Field label="Points (Reward)">
                     <input
                       type="number"
@@ -775,6 +835,24 @@ export default function Admin() {
                     />
                   </Field>
 
+                  <hr style={S.hr} />
+
+                  {/* Appearance override */}
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!editing.appearanceOverrideEnabled}
+                      onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled: e.target.checked }); setDirty(true); }}
+                    />
+                    Use custom appearance for this mission
+                  </label>
+                  {editing.appearanceOverrideEnabled && (
+                    <AppearanceEditor
+                      value={editing.appearance || defaultAppearance()}
+                      onChange={(next)=>{ setEditing({ ...editing, appearance: next }); setDirty(true); }}
+                    />
+                  )}
+
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <button style={S.button} onClick={saveToList}>Add/Update in List</button>
                     <button style={S.button} onClick={cancelEdit}>Cancel</button>
@@ -787,7 +865,7 @@ export default function Admin() {
         </>
       )}
 
-      {/* SETTINGS (security + timer etc) */}
+      {/* SETTINGS (Game + Global Appearance + Security + Timer) */}
       {tab === 'settings' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -835,9 +913,39 @@ export default function Admin() {
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
+          </div>
 
+          {/* Global Appearance */}
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Appearance (Global)</h3>
+            <AppearanceEditor
+              value={config.appearance || defaultAppearance()}
+              onChange={(next)=>setConfig({ ...config, appearance: next })}
+            />
+            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+              Tip: Keep vertical alignment on <b>Top</b> so text won’t cover the backpack (lower left) in gameplay.
+            </div>
+          </div>
+
+          {/* Security */}
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Security</h3>
+            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth login used for this admin. Requires current password.</p>
+            <ChangeAuth />
             <hr style={S.hr} />
-            <h4>Game Timer</h4>
+            <h4>Twilio Credentials</h4>
+            <p style={{ color: '#ffd166' }}>
+              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.
+            </p>
+            <ul>
+              <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
+              <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
+            </ul>
+          </div>
+
+          {/* Timer */}
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <h4 style={{ marginTop: 0 }}>Game Timer</h4>
             <Field label="Duration (minutes — 0 = infinite; count UP)">
               <input
                 type="number"
@@ -869,22 +977,6 @@ export default function Admin() {
               If duration is 0 it counts up; otherwise it counts down, plays an alarm when{' '}
               {config.timer?.alertMinutes ?? 10} minutes remain, and shows <b>“TIME IS UP! GAME OVER. TRY AGAIN”</b> at 0.
             </div>
-          </div>
-
-          {/* Security */}
-          <div style={{ ...S.card, marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Security</h3>
-            <p style={{ color: '#9fb0bf' }}>Change the Basic Auth login used for this admin. Requires current password.</p>
-            <ChangeAuth />
-            <hr style={S.hr} />
-            <h4>Twilio Credentials</h4>
-            <p style={{ color: '#ffd166' }}>
-              Store <b>Twilio</b> and <b>Vercel</b> credentials only as environment variables. Never in code.
-            </p>
-            <ul>
-              <li><code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code> (or API Key SID/SECRET)</li>
-              <li><code>TWILIO_FROM</code> (phone or Messaging Service SID)</li>
-            </ul>
           </div>
         </main>
       )}
@@ -933,57 +1025,11 @@ export default function Admin() {
         </main>
       )}
 
-      {/* POWERUPS */}
+      {/* POWERUPS (list management still available) */}
       {tab === 'powerups' && (
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop: 0 }}>Power-Ups</h3>
-
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-              <Field label="Title">
-                <input style={S.input} value={pu.title} onChange={(e) => setPu({ ...pu, title: e.target.value })} />
-              </Field>
-              <Field label="Type">
-                <select style={S.input} value={pu.type} onChange={(e) => setPu({ ...pu, type: e.target.value })}>
-                  {POWERUP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Pickup radius (m)">
-                <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e) => setPu({ ...pu, pickupRadius: Number(e.target.value||0) })}/>
-              </Field>
-              <Field label="Effect duration (sec)">
-                <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e) => setPu({ ...pu, effectSeconds: Number(e.target.value||0) })}/>
-              </Field>
-            </div>
-
-            <Field label="Pickup location">
-              <div style={{ marginBottom: 8 }}>
-                <MapPicker
-                  lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius}
-                  onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })}
-                />
-              </div>
-            </Field>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                style={S.button}
-                onClick={() => {
-                  const item = {
-                    ...pu,
-                    id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0')
-                  };
-                  const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
-                  setConfig({ ...config, powerups: list });
-                  setStatus('✅ Power-up added (remember Save All)');
-                }}
-              >
-                + Add Power-Up
-              </button>
-            </div>
-
-            <hr style={S.hr} />
-            <h4>Stored Power-Ups</h4>
             {(config.powerups || []).length === 0 && <div style={{ color: '#9fb0bf' }}>No power-ups yet.</div>}
             <ul style={{ paddingLeft: 18 }}>
               {(config.powerups || []).map((x, i) => (
@@ -1007,7 +1053,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MAP (full) */}
+      {/* MAP (full-screen read-only) */}
       {tab === 'map' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -1024,154 +1070,9 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MEDIA (new) */}
+      {/* MEDIA (unchanged from your previous working version) */}
       {tab === 'media' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop: 0 }}>Media</h3>
-
-            {/* Utilities thumbnails */}
-            <h4 style={{ marginTop: 0 }}>Utilities (Power‑ups) Thumbnails</h4>
-            {['smoke','jammer','clone'].map((k) => {
-              const url = config.media?.utilityThumbs?.[k] || '';
-              const set = (val) => setConfig({
-                ...config,
-                media: {
-                  ...(config.media || {}),
-                  utilityThumbs: { ...(config.media?.utilityThumbs || {}), [k]: val }
-                }
-              });
-              return (
-                <div key={k} style={{ display:'grid', gridTemplateColumns:'180px 1fr 180px', gap:12, alignItems:'center', marginBottom:8 }}>
-                  <div style={{ color:'#9fb0bf' }}>{k.toUpperCase()}</div>
-                  <input style={S.input} value={url} onChange={(e)=>set(e.target.value)} placeholder="Image URL (png/jpg/webp)" />
-                  <div>
-                    {url ? <img src={toDirectMediaURL(url)} alt={k} style={{ width:'100%', maxHeight:70, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} /> : <div style={{ color:'#9fb0bf' }}>No image</div>}
-                  </div>
-                </div>
-              );
-            })}
-
-            <div style={{ display:'flex', gap:8, marginTop:8 }}>
-              <button
-                style={S.button}
-                onClick={() => {
-                  // Reapply defaults quickly
-                  setConfig({
-                    ...config,
-                    media: {
-                      ...(config.media || {}),
-                      utilityThumbs: { ...DEFAULT_UTILITY_THUMBS }
-                    },
-                    powerups: (config.powerups && config.powerups.length > 0)
-                      ? config.powerups
-                      : [
-                          { id:'p01', title:'Smoke', type:'smoke', pickupRadius:100, effectSeconds:120 },
-                          { id:'p02', title:'Jammer', type:'jammer', pickupRadius:100, effectSeconds:120 },
-                          { id:'p03', title:'Clone', type:'clone', pickupRadius:100, effectSeconds:120 },
-                        ]
-                  });
-                  setStatus('✅ Seeded default utilities & power-ups (remember Save All)');
-                }}
-              >
-                Seed default 3 utilities (thumbs + stored power-ups)
-              </button>
-            </div>
-
-            <hr style={{ ...S.hr, margin:'16px 0' }} />
-
-            {/* Rewards Library */}
-            <h4>Rewards Library</h4>
-            <p style={{ color:'#9fb0bf', marginTop:0 }}>Thumbnails + “Special ability” text. These appear in the Backpack (Rewards pocket) when awarded by missions.</p>
-
-            <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-              <div>Thumbnail</div>
-              <div>Name</div>
-              <div>Special ability</div>
-              <div>Actions</div>
-            </div>
-
-            {(config.media?.rewards || []).map((row, idx) => (
-              <div key={row.key || idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-                <div>
-                  <input
-                    style={S.input}
-                    value={row.thumbUrl || ''}
-                    onChange={(e) => {
-                      const list = [...(config.media?.rewards || [])];
-                      list[idx] = { ...(list[idx] || {}), thumbUrl: e.target.value };
-                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                    }}
-                    placeholder="Thumbnail URL"
-                  />
-                  {row.thumbUrl && (
-                    <img src={toDirectMediaURL(row.thumbUrl)} alt="thumb" style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} />
-                  )}
-                </div>
-                <div>
-                  <input
-                    style={S.input}
-                    value={row.name || ''}
-                    onChange={(e) => {
-                      const list = [...(config.media?.rewards || [])];
-                      list[idx] = { ...(list[idx] || {}), name: e.target.value };
-                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                    }}
-                    placeholder="Name (e.g., Gold Coin)"
-                  />
-                </div>
-                <div>
-                  <input
-                    style={S.input}
-                    value={row.ability || ''}
-                    onChange={(e) => {
-                      const list = [...(config.media?.rewards || [])];
-                      list[idx] = { ...(list[idx] || {}), ability: e.target.value };
-                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                    }}
-                    placeholder="Special ability (short text)"
-                  />
-                </div>
-                <div style={{ display:'flex', gap:6 }}>
-                  <button
-                    style={S.button}
-                    onClick={() => {
-                      const list = [...(config.media?.rewards || [])];
-                      list.splice(idx, 1);
-                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                    }}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    style={S.button}
-                    onClick={() => {
-                      const list = [...(config.media?.rewards || [])];
-                      const copy = { ...(list[idx] || {}), key: (row.key || `rw${idx}`) + '-copy' };
-                      list.splice(idx + 1, 0, copy);
-                      setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                    }}
-                  >
-                    Duplicate
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <div style={{ marginTop:8 }}>
-              <button
-                style={S.button}
-                onClick={() => {
-                  const list = Array.isArray(config.media?.rewards) ? [...config.media.rewards] : [];
-                  list.push({ key: `rw${list.length+1}`, name:'', ability:'', thumbUrl:'' });
-                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
-                }}
-              >
-                + Add Reward Row
-              </button>
-            </div>
-          </div>
-        </main>
+        <MediaTab config={config} setConfig={setConfig} setStatus={setStatus} />
       )}
 
       {/* TEST */}
@@ -1201,53 +1102,6 @@ export default function Admin() {
         </main>
       )}
 
-      {/* Quick Add Power‑Up modal */}
-      {showQuickPowerup && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
-          <div style={{ ...S.card, width: 520 }}>
-            <h3 style={{ marginTop: 0 }}>Quick Add Power‑Up</h3>
-
-            <div style={{ display:'grid', gap:12, gridTemplateColumns:'1fr 1fr' }}>
-              <Field label="Title">
-                <input style={S.input} value={pu.title} onChange={(e)=>setPu({ ...pu, title: e.target.value })} />
-              </Field>
-              <Field label="Type">
-                <select style={S.input} value={pu.type} onChange={(e)=>setPu({ ...pu, type: e.target.value })}>
-                  {POWERUP_TYPES.map((t)=><option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Pickup radius (m)">
-                <input type="number" min={1} max={2000} style={S.input} value={pu.pickupRadius} onChange={(e)=>setPu({ ...pu, pickupRadius: Number(e.target.value||0) })} />
-              </Field>
-              <Field label="Effect duration (sec)">
-                <input type="number" min={5} max={3600} style={S.input} value={pu.effectSeconds} onChange={(e)=>setPu({ ...pu, effectSeconds: Number(e.target.value||0) })} />
-              </Field>
-            </div>
-
-            <Field label="Pickup location">
-              <MapPicker
-                lat={pu.lat} lng={pu.lng} radius={pu.pickupRadius}
-                onChange={(lat, lng, rad) => setPu({ ...pu, lat, lng, pickupRadius: rad })}
-              />
-            </Field>
-
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button style={S.button} onClick={()=>setShowQuickPowerup(false)}>Cancel</button>
-              <button
-                style={S.button}
-                onClick={()=>{
-                  const item = { ...pu, id: 'p' + String((config.powerups?.length || 0) + 1).padStart(2, '0') };
-                  const list = Array.isArray(config.powerups) ? [...config.powerups, item] : [item];
-                  setConfig({ ...config, powerups: list });
-                  setShowQuickPowerup(false);
-                  setStatus('✅ Power‑up added (remember Save All)');
-                }}
-              >Add</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* New Game modal */}
       {showNewGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center', zIndex: 1000 }}>
@@ -1266,8 +1120,6 @@ export default function Admin() {
                 <option value="multi">Multiple (4)</option>
               </select>
             </Field>
-
-            {/* Timer defaults */}
             <Field label="Duration (minutes — 0 = infinite; count UP)">
               <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin} onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))} />
             </Field>
@@ -1320,6 +1172,125 @@ function Field({ label, children }) {
   );
 }
 
+function ColorField({ label, value, onChange }) {
+  return (
+    <Field label={label}>
+      <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, alignItems:'center' }}>
+        <input type="color" value={value} onChange={(e)=>onChange(e.target.value)} />
+        <input style={S.input} value={value} onChange={(e)=>onChange(e.target.value)} />
+      </div>
+    </Field>
+  );
+}
+
+function AppearanceEditor({ value, onChange }) {
+  const a = value || defaultAppearance();
+  return (
+    <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+        <Field label="Font family">
+          <select
+            style={S.input}
+            value={a.fontFamily}
+            onChange={(e)=>onChange({ ...a, fontFamily: e.target.value })}
+          >
+            {FONT_FAMILIES.map(f => <option key={f.v} value={f.v}>{f.label}</option>)}
+          </select>
+          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
+            Aa — preview text with this font
+          </div>
+        </Field>
+        <Field label="Font size (px)">
+          <input
+            type="number"
+            min={10} max={72}
+            style={S.input}
+            value={a.fontSizePx}
+            onChange={(e)=>onChange({ ...a, fontSizePx: clamp(Number(e.target.value||0), 10, 72) })}
+          />
+        </Field>
+        <ColorField label="Text color" value={a.fontColor} onChange={(v)=>onChange({ ...a, fontColor: v })} />
+        <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>onChange({ ...a, textBgColor: v })} />
+        <Field label="Text background opacity">
+          <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
+            onChange={(e)=>onChange({ ...a, textBgOpacity: Number(e.target.value) })} />
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+        </Field>
+        <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor: v })} />
+        <Field label="Screen background opacity">
+          <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
+            onChange={(e)=>onChange({ ...a, screenBgOpacity: Number(e.target.value) })} />
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+        </Field>
+        <Field label="Screen background image (URL)">
+          <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage: e.target.value })} />
+          {a.screenBgImage && (
+            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg" style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }} />
+          )}
+        </Field>
+        <Field label="Text alignment (horizontal)">
+          <select style={S.input} value={a.textAlign} onChange={(e)=>onChange({ ...a, textAlign: e.target.value })}>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+        </Field>
+        <Field label="Text position (vertical)">
+          <select style={S.input} value={a.textVertical} onChange={(e)=>onChange({ ...a, textVertical: e.target.value })}>
+            <option value="top">Top</option>
+            <option value="center">Center</option>
+          </select>
+        </Field>
+      </div>
+
+      {/* Tiny preview using these settings */}
+      <div
+        style={{
+          marginTop:12,
+          border:'1px dashed #2a323b',
+          borderRadius:10,
+          overflow:'hidden',
+          background:a.screenBgImage
+            ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
+            : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
+          padding: 12,
+          height: 120,
+          display:'grid',
+          placeItems: a.textVertical === 'center' ? 'center' : 'start',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '100%',
+            background: `rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
+            padding: '6px 10px',
+            borderRadius: 8,
+            color: a.fontColor,
+            fontFamily: a.fontFamily,
+            fontSize: a.fontSizePx,
+            textAlign: a.textAlign,
+            width: 'fit-content',
+            justifySelf: a.textAlign === 'left' ? 'start' : a.textAlign === 'right' ? 'end' : 'center',
+          }}
+        >
+          Preview text
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function hexToRgb(hex) {
+  try {
+    const h = hex.replace('#','');
+    const b = h.length === 3 ? h.split('').map(ch=>ch+ch).join('') : h;
+    const r = parseInt(b.slice(0,2),16);
+    const g = parseInt(b.slice(2,4),16);
+    const bl = parseInt(b.slice(4,6),16);
+    return `${r}, ${g}, ${bl}`;
+  } catch { return '0,0,0'; }
+}
+
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
   const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
@@ -1358,7 +1329,6 @@ function MediaPreview({ url, kind }) {
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
-
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ color: '#9fb0bf', fontSize: 12, marginBottom: 6 }}>Preview ({kind})</div>
@@ -1373,6 +1343,7 @@ function MediaPreview({ url, kind }) {
   );
 }
 
+/* Inline picker (Leaflet) used in mission editor only */
 function MapPicker({ lat, lng, radius, onChange }) {
   const divRef = useRef(null);
   const mapRef = useRef(null);
@@ -1380,9 +1351,6 @@ function MapPicker({ lat, lng, radius, onChange }) {
   const markerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [r, setR] = useState(radius || 25);
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
   const defaultPos = [typeof lat === 'number' ? lat : 44.9778, typeof lng === 'number' ? lng : -93.265];
 
   useEffect(() => {
@@ -1428,6 +1396,10 @@ function MapPicker({ lat, lng, radius, onChange }) {
   }, [ready]); // eslint-disable-line
 
   useEffect(() => {
+    setR(radius || 25);
+  }, [radius]);
+
+  useEffect(() => {
     if (circleRef.current && markerRef.current) {
       circleRef.current.setRadius(Number(r || 25));
       const p = markerRef.current.getLatLng();
@@ -1435,64 +1407,162 @@ function MapPicker({ lat, lng, radius, onChange }) {
     }
   }, [r]); // eslint-disable-line
 
-  async function doSearch(e) {
-    e?.preventDefault();
-    if (!q.trim()) return;
-    setSearching(true); setResults([]);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      const data = await res.json();
-      setResults(Array.isArray(data) ? data : []);
-    } catch {
-      setResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }
-
-  function gotoResult(r) {
-    if (!mapRef.current || !markerRef.current) return;
-    const lat = Number(r.lat), lon = Number(r.lon);
-    const p = [lat, lon];
-    markerRef.current.setLatLng(p);
-    circleRef.current.setLatLng(p);
-    mapRef.current.setView(p, 16);
-    onChange(Number(lat.toFixed(6)), Number(lon.toFixed(6)), Number(r || 25));
-    setResults([]);
-  }
-
-  function useMyLocation() {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      gotoResult({ lat, lon });
-    });
-  }
-
   return (
     <div>
-      <form onSubmit={doSearch} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, marginBottom: 8 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search address or place…" style={S.input} />
-        <button type="button" onClick={useMyLocation} style={S.button}>📍 Use my location</button>
-        <button disabled={searching} type="submit" style={S.button}>{searching ? 'Searching…' : 'Search'}</button>
-      </form>
-      {results.length > 0 && (
-        <div style={{ background: '#0b0c10', border: '1px solid #2a323b', borderRadius: 10, padding: 8, marginBottom: 8, maxHeight: 160, overflow: 'auto' }}>
-          {results.map((r, i) => (
-            <div key={i} onClick={() => gotoResult(r)} style={{ padding: '6px 8px', cursor: 'pointer', borderBottom: '1px solid #1f262d' }}>
-              <div style={{ fontWeight: 600 }}>{r.display_name}</div>
-              <div style={{ color: '#9fb0bf', fontSize: 12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-            </div>
-          ))}
-        </div>
-      )}
       <div ref={divRef} style={{ width: '100%', height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #2a323b', marginBottom: 8 }} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
         <input type="range" min={5} max={2000} step={5} value={r} onChange={(e) => setR(Number(e.target.value))} />
         <code style={{ color: '#9fb0bf' }}>{r} m</code>
       </div>
     </div>
+  );
+}
+
+/* MEDIA tab block */
+function MediaTab({ config, setConfig, setStatus }) {
+  return (
+    <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop: 0 }}>Media</h3>
+
+        {/* Utilities thumbnails */}
+        <h4 style={{ marginTop: 0 }}>Utilities (Power‑ups) Thumbnails</h4>
+        {['smoke','jammer','clone'].map((k) => {
+          const url = config.media?.utilityThumbs?.[k] || '';
+          const set = (val) => setConfig({
+            ...config,
+            media: {
+              ...(config.media || {}),
+              utilityThumbs: { ...(config.media?.utilityThumbs || {}), [k]: val }
+            }
+          });
+          return (
+            <div key={k} style={{ display:'grid', gridTemplateColumns:'180px 1fr 180px', gap:12, alignItems:'center', marginBottom:8 }}>
+              <div style={{ color:'#9fb0bf' }}>{k.toUpperCase()}</div>
+              <input style={S.input} value={url} onChange={(e)=>set(e.target.value)} placeholder="Image URL (png/jpg/webp)" />
+              <div>
+                {url ? <img src={toDirectMediaURL(url)} alt={k} style={{ width:'100%', maxHeight:70, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} /> : <div style={{ color:'#9fb0bf' }}>No image</div>}
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+          <button
+            style={S.button}
+            onClick={() => {
+              setConfig({
+                ...config,
+                media: { ...(config.media || {}), utilityThumbs: { ...DEFAULT_UTILITY_THUMBS } },
+                powerups: (config.powerups && config.powerups.length > 0)
+                  ? config.powerups
+                  : [
+                      { id:'p01', title:'Smoke', type:'smoke', pickupRadius:100, effectSeconds:120 },
+                      { id:'p02', title:'Jammer', type:'jammer', pickupRadius:100, effectSeconds:120 },
+                      { id:'p03', title:'Clone', type:'clone', pickupRadius:100, effectSeconds:120 },
+                    ],
+              });
+              setStatus('✅ Seeded default utilities & power-ups (remember Save All)');
+            }}
+          >
+            Seed default 3 utilities (thumbs + stored power-ups)
+          </button>
+        </div>
+
+        <hr style={{ ...S.hr, margin:'16px 0' }} />
+
+        {/* Rewards Library */}
+        <h4>Rewards Library</h4>
+        <p style={{ color:'#9fb0bf', marginTop:0 }}>Thumbnails + “Special ability” text. These appear in the Backpack (Rewards pocket) when awarded by missions.</p>
+
+        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+          <div>Thumbnail</div>
+          <div>Name</div>
+          <div>Special ability</div>
+          <div>Actions</div>
+        </div>
+
+        {(config.media?.rewards || []).map((row, idx) => (
+          <div key={row.key || idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+            <div>
+              <input
+                style={S.input}
+                value={row.thumbUrl || ''}
+                onChange={(e) => {
+                  const list = [...(config.media?.rewards || [])];
+                  list[idx] = { ...(list[idx] || {}), thumbUrl: e.target.value };
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+                placeholder="Thumbnail URL"
+              />
+              {row.thumbUrl && (
+                <img src={toDirectMediaURL(row.thumbUrl)} alt="thumb" style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }} />
+              )}
+            </div>
+            <div>
+              <input
+                style={S.input}
+                value={row.name || ''}
+                onChange={(e) => {
+                  const list = [...(config.media?.rewards || [])];
+                  list[idx] = { ...(list[idx] || {}), name: e.target.value };
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+                placeholder="Name (e.g., Gold Coin)"
+              />
+            </div>
+            <div>
+              <input
+                style={S.input}
+                value={row.ability || ''}
+                onChange={(e) => {
+                  const list = [...(config.media?.rewards || [])];
+                  list[idx] = { ...(list[idx] || {}), ability: e.target.value };
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+                placeholder="Special ability (short text)"
+              />
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button
+                style={S.button}
+                onClick={() => {
+                  const list = [...(config.media?.rewards || [])];
+                  list.splice(idx, 1);
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+              >
+                Delete
+              </button>
+              <button
+                style={S.button}
+                onClick={() => {
+                  const list = [...(config.media?.rewards || [])];
+                  const copy = { ...(list[idx] || {}), key: (row.key || `rw${idx}`) + '-copy' };
+                  list.splice(idx + 1, 0, copy);
+                  setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+                }}
+              >
+                Duplicate
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <div style={{ marginTop:8 }}>
+          <button
+            style={S.button}
+            onClick={() => {
+              const list = Array.isArray(config.media?.rewards) ? [...config.media.rewards] : [];
+              list.push({ key: `rw${list.length+1}`, name:'', ability:'', thumbUrl:'' });
+              setConfig({ ...config, media: { ...(config.media || {}), rewards: list } });
+            }}
+          >
+            + Add Reward Row
+          </button>
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -1574,8 +1644,9 @@ const S = {
 
 /* =====================================================================
    MapOverview — Leaflet map overlaying all missions + power-ups
+   Add interactive draft marker for inline power‑up placement
    ===================================================================== */
-function MapOverview({ missions=[], powerups=[], showRings=true }) {
+function MapOverview({ missions=[], powerups=[], showRings=true, interactive=false, draftPowerup=null, onDraftChange=null }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
@@ -1616,16 +1687,15 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
     }
     const map = divRef.current._leaflet_map;
 
-    if (!map._overviewLayer) {
-      map._overviewLayer = L.layerGroup().addTo(map);
-    } else {
-      map._overviewLayer.clearLayers();
-    }
+    // reset overlay layers
+    if (!map._overviewLayer) map._overviewLayer = L.layerGroup().addTo(map);
+    map._overviewLayer.clearLayers();
     const layer = map._overviewLayer;
     const bounds = L.latLngBounds([]);
 
     const missionIcon = L.divIcon({ className: 'mission-icon', html: '<div style="width:18px;height:18px;border-radius:50%;background:#60a5fa;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
     const powerIcon   = L.divIcon({ className: 'power-icon', html: '<div style="width:18px;height:18px;border-radius:4px;background:#f59e0b;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
+    const draftIcon   = L.divIcon({ className: 'draft-icon', html: '<div style="width:20px;height:20px;border-radius:50%;background:#34d399;border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>' });
 
     (missions||[]).forEach((m) => {
       const pos = getLL(m);
@@ -1652,15 +1722,47 @@ function MapOverview({ missions=[], powerups=[], showRings=true }) {
       bounds.extend(pos);
     });
 
+    // Draft, draggable
+    if (draftPowerup && typeof draftPowerup.lat === 'number' && typeof draftPowerup.lng === 'number') {
+      const pos = [draftPowerup.lat, draftPowerup.lng];
+      const mk = L.marker(pos, { icon: draftIcon, draggable: true }).addTo(layer);
+      mk.on('dragend', () => {
+        const p = mk.getLatLng();
+        onDraftChange && onDraftChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)));
+      });
+      if (showRings && Number(draftPowerup.radius) > 0) {
+        const c = L.circle(pos, { radius: Number(draftPowerup.radius), color: '#34d399', fillOpacity: 0.08 }).addTo(layer);
+        mk.on('drag', () => {
+          const p = mk.getLatLng();
+          c.setLatLng(p);
+        });
+      }
+      bounds.extend(pos);
+    }
+
+    if (interactive) {
+      if (!map._clickHandlerAttached) {
+        map.on('click', (e) => {
+          onDraftChange && onDraftChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)));
+        });
+        map._clickHandlerAttached = true;
+      }
+    } else {
+      if (map._clickHandlerAttached) {
+        map.off('click');
+        map._clickHandlerAttached = false;
+      }
+    }
+
     if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-  }, [leafletReady, missions, powerups, showRings]);
+  }, [leafletReady, missions, powerups, showRings, interactive, draftPowerup, onDraftChange]);
 
   return (
     <div>
       {!leafletReady && <div style={{ color: '#9fb0bf', marginBottom: 8 }}>Loading map…</div>}
       <div ref={divRef} style={{ height: 520, borderRadius: 12, border: '1px solid #22303c', background: '#0b1116' }} />
       {((missions||[]).filter(m => (m.content?.geofenceEnabled || Number(m.content?.radiusMeters) > 0)).length === 0) &&
-       ((powerups||[]).filter(p => typeof p.lat==='number' && typeof p.lng==='number').length === 0) && (
+       ((powerups||[]).filter(p => typeof p.lat==='number' && typeof p.lng==='number').length === 0) && !draftPowerup && (
         <div style={{ color: '#9fb0bf', marginTop: 8 }}>
           No geofenced missions or placed power-ups found. Enable a mission’s geofence (lat/lng &amp; radius) or add/position power-ups.
         </div>
