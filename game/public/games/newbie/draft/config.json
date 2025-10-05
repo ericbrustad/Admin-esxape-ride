@@ -33,6 +33,15 @@
       "lat": 44.9778,
       "lng": -93.265,
       "id": "p02"
+    },
+    {
+      "title": "ROBOT",
+      "type": "clone",
+      "pickupRadius": 55,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265,
+      "id": "p03"
     }
   ],
   "theme": {
