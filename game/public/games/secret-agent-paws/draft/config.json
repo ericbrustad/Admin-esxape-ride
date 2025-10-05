@@ -15,8 +15,24 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "type": "jammer",
+      "title": "jam",
+      "iconKey": "devices-1",
+      "lat": 44.989797,
+      "lng": -93.286518
+    }
+  ],
+  "powerups": [
+    {
+      "type": "jammer",
+      "title": "jam",
+      "iconKey": "devices-1",
+      "lat": 44.989797,
+      "lng": -93.286518
+    }
+  ],
   "media": {
     "library": [
       {
