@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Secret Agent PAWS",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
