@@ -1432,13 +1432,158 @@ function MapOverview({
   devices = [],
   icons = DEFAULT_ICONS,
   showRings = true,
-  interactive = false,
-  draftDevice = null,
-  onDraftChange = null,
-  onAltMoveNearest = null,
+  interactive = false,           // true while placing a device
+  draftDevice = null,            // {lat,lng,radius}
+  onDraftChange = null,          // (lat, lng) when placing
+  onAltMoveNearest = null,       // (kind, idx, lat, lng) — kept name for compatibility
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
+
+  function getMissionPos(m) {
+    const c = m?.content || {};
+    const lat = Number(c.lat), lng = Number(c.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    if (!(c.geofenceEnabled || Number(c.radiusMeters) > 0)) return null;
+    return [lat, lng];
+  }
+  function getDevicePos(d) {
+    const lat = Number(d?.lat), lng = Number(d?.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return [lat, lng];
+  }
+  function toDirect(u) { return toDirectMediaURL(u); }
+  function findIconUrl(kind, key) {
+    if (!key) return '';
+    const list = icons?.[kind] || [];
+    const it = list.find(x => x.key === key);
+    return it ? toDirect(it.url || '') : '';
+  }
+  function makeNumberedIcon(number, imgUrl, color='#60a5fa') {
+    const img = imgUrl
+      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid white;box-shadow:0 0 0 2px #1f2937"/>`
+      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 0 0 2px #1f2937"></div>`;
+    return window.L.divIcon({
+      className:'num-pin',
+      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
+      iconSize:[24,28],
+      iconAnchor:[12,12],
+    });
+  }
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setLeafletReady(true); return; }
+    const link = document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const s = document.createElement('script');
+    s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async=true;
+    s.onload=()=>setLeafletReady(true);
+    document.body.appendChild(s);
+  }, []);
+
+  React.useEffect(() => {
+    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    // init map
+    if (!divRef.current._leaflet_map) {
+      const map = L.map(divRef.current, { center: [44.9778,-93.2650], zoom: 13 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19, attribution:'© OpenStreetMap contributors'
+      }).addTo(map);
+      divRef.current._leaflet_map = map;
+    }
+    const map = divRef.current._leaflet_map;
+
+    // clear layer
+    if (!map._layerGroup) map._layerGroup = L.layerGroup().addTo(map);
+    map._layerGroup.clearLayers();
+    const layer = map._layerGroup;
+    const bounds = L.latLngBounds([]);
+
+    // missions → 1..N
+    (missions||[]).forEach((m, idx) => {
+      const pos = getMissionPos(m);
+      if (!pos) return;
+      const url = findIconUrl('missions', m.iconKey);
+      const mk = L.marker(pos, { icon: makeNumberedIcon(idx+1, url, '#60a5fa') }).addTo(layer);
+      const rad = Number(m.content?.radiusMeters || 0);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
+      bounds.extend(pos);
+    });
+
+    // devices → D1..Dn
+    (devices||[]).forEach((d, idx) => {
+      const pos = getDevicePos(d);
+      if (!pos) return;
+      const url = findIconUrl('devices', d.iconKey);
+      const mk = L.marker(pos, { icon: makeNumberedIcon(`D${idx+1}`, url, '#f59e0b') }).addTo(layer);
+      const rad = Number(d.pickupRadius || 0);
+      if (showRings && rad > 0) L.circle(pos, { radius: rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
+      bounds.extend(pos);
+    });
+
+    // draft device
+    if (draftDevice && typeof draftDevice.lat === 'number' && typeof draftDevice.lng === 'number') {
+      const pos = [draftDevice.lat, draftDevice.lng];
+      const mk = L.marker(pos, { icon: makeNumberedIcon('D+', '', '#34d399'), draggable:true }).addTo(layer);
+      if (showRings && Number(draftDevice.radius) > 0) {
+        const c = L.circle(pos, { radius: Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
+        mk.on('drag', () => c.setLatLng(mk.getLatLng()));
+      }
+      mk.on('dragend', () => {
+        const p = mk.getLatLng();
+        onDraftChange && onDraftChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)));
+      });
+      bounds.extend(pos);
+    }
+
+    // CLICK behavior (replaces the old Option/Alt click):
+    // - If interactive (placing device) → set draft pin at click
+    // - Else → move nearest (mission/device) to click
+    if (map._clickHandler) { map.off('click', map._clickHandler); }
+    map._clickHandler = (e) => {
+      const lat = e.latlng.lat, lng = e.latlng.lng;
+      if (interactive && onDraftChange) {
+        onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6)));
+        return;
+      }
+      // move nearest
+      if (!onAltMoveNearest) return;
+      const candidates = [];
+      (missions||[]).forEach((m, idx) => {
+        const pos = getMissionPos(m);
+        if (pos) candidates.push({ kind:'mission', idx, lat:pos[0], lng:pos[1] });
+      });
+      (devices||[]).forEach((d, idx) => {
+        const pos = getDevicePos(d);
+        if (pos) candidates.push({ kind:'device', idx, lat:pos[0], lng:pos[1] });
+      });
+      if (candidates.length === 0) return;
+      let best = null, bestDist = Infinity;
+      candidates.forEach(c => {
+        const d = map.distance([c.lat, c.lng], e.latlng);
+        if (d < bestDist) { bestDist = d; best = c; }
+      });
+      if (best) onAltMoveNearest(best.kind, best.idx, lat, lng);
+    };
+    map.on('click', map._clickHandler);
+
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+  }, [leafletReady, missions, devices, icons, showRings, interactive, draftDevice, onDraftChange, onAltMoveNearest]);
+
+  return (
+    <div>
+      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height: 560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
+    </div>
+  );
+}
+
 
   function getMissionPos(m) {
     const c = m?.content || {};
