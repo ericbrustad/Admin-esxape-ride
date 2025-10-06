@@ -23,8 +23,18 @@
       "iconKey": "",
       "pickupRadius": 475,
       "effectSeconds": 120,
-      "lat": 44.90517,
-      "lng": -93.323748
+      "lat": 44.911765,
+      "lng": -93.3252
+    },
+    {
+      "id": "d02",
+      "title": "ggg",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.925911,
+      "lng": -93.325199
     }
   ],
   "powerups": [
@@ -35,8 +45,18 @@
       "iconKey": "",
       "pickupRadius": 475,
       "effectSeconds": 120,
-      "lat": 44.90517,
-      "lng": -93.323748
+      "lat": 44.911765,
+      "lng": -93.3252
+    },
+    {
+      "id": "d02",
+      "title": "ggg",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.925911,
+      "lng": -93.325199
     }
   ],
   "media": {
