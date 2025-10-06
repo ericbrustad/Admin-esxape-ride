@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.25",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -86,6 +86,37 @@
       "wrong": {
         "mode": "none"
       },
+      "showContinue": true
+    },
+    {
+      "id": "m03",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "fff",
+        "choices": [
+          "f",
+          "f"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
