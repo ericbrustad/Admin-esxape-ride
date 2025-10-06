@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 45.007991,
+      "lng": -93.227417
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 45.007991,
+      "lng": -93.227417
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -32,21 +54,6 @@
         "key": "trivia-2",
         "name": "Trivia 2",
         "url": "/media/bundles/trivia%20yellow.png"
-      },
-      {
-        "key": "missions-3",
-        "name": "",
-        "url": "/media/icons/1759751997852-Breaking_newsc.jpg"
-      },
-      {
-        "key": "missions-4",
-        "name": "",
-        "url": "/media/uploads/1759747497723-chicken.png"
-      },
-      {
-        "key": "missions-5",
-        "name": "",
-        "url": "/media/uploads/1759747492479-bra_icon.png"
       }
     ],
     "devices": [
@@ -90,5 +97,13 @@
     "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top"
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  },
+  "geofence": {
+    "mode": "test"
   }
 }
