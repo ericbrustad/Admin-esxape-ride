@@ -1,5 +1,16 @@
 // pages/api/debug/github.js
-import { ghEnv, resolveBranch, ghHeaders } from '../api/_gh-helpers';
+// ✅ correct
+import {
+  ghEnv,
+  ghHeaders,
+  resolveBranch,
+  getFileJSON,
+  putFile,
+  deleteFile,
+} from '../_gh-helpers';
+
+// (Optional but recommended for Buffer/fetch on Node runtime)
+export const runtime = 'nodejs';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
