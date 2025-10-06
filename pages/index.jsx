@@ -23,17 +23,15 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
-    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+    const url = new URL(u);
     const host = url.host.toLowerCase();
 
-    // Dropbox → direct
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
       url.searchParams.delete('dl');
       if (!url.searchParams.has('raw')) url.searchParams.set('raw', '1');
       return url.toString();
     }
-    // Google Drive (file/open/id or open?id=)
     if (host.endsWith('drive.google.com')) {
       let id = '';
       if (url.pathname.startsWith('/file/d/')) {
@@ -73,9 +71,6 @@ const TYPE_FIELDS = {
     { key:'text',     label:'Statement Text', type:'multiline' },
     { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' },
   ],
-  stored_statement: [
-    { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
-  ],
   video: [
     { key:'videoUrl',   label:'Video URL (https)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
@@ -106,23 +101,20 @@ const TYPE_FIELDS = {
     { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
   ],
-  photo_opportunity: [
-    { key:'text',       label:'Statement / Prompt', type:'multiline' },
-    { key:'overlayKey', label:'Overlay (choose from library)', type:'text' },
-    { key:'overlayUrl', label:'Overlay URL (optional override)', type:'text' },
+  stored_statement: [
+    { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
 };
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
   short_answer:     'Question (Short Answer)',
   statement:        'Statement',
-  stored_statement: 'Stored Statement',
   video:            'Video',
   geofence_image:   'Geo Fence Image',
   geofence_video:   'Geo Fence Video',
   ar_image:         'AR Image',
   ar_video:         'AR Video',
-  photo_opportunity:'Photo Opportunity',
+  stored_statement: 'Stored Statement',
 };
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
@@ -153,9 +145,74 @@ function defaultAppearance() {
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
-const DEFAULT_REWARDS = [
-  { key:'gold-coin', name:'Gold Coin', ability:'Adds a coin to your wallet.', thumbUrl:'/media/bundles/gold-coin.png' },
+
+/* ───────────────── Default examples & pool seeding (non‑destructive) ───────────────── */
+const DEFAULT_ASSET_BASES = [
+  '/games/lib/media/bundles',
+  '/lib/media/bundles',
+  '/media/bundles',
 ];
+const urlFromBases = (file) => DEFAULT_ASSET_BASES.map((b)=>`${b}/${encodeURIComponent(file)}`);
+const firstUrl = (candidates) => candidates[0];
+
+const U = {
+  robot:   firstUrl(urlFromBases('ROBOT1small.png')),
+  smoke:   firstUrl(urlFromBases('SMOKE BOMB.png')),
+  evid:    firstUrl(urlFromBases('evidence 2.png')),
+  clue:    firstUrl(urlFromBases('CLUEgreen.png')),
+  coin:    firstUrl(urlFromBases('GOLDEN COIN.png')),
+  trivia:  firstUrl(urlFromBases('trivia icon.png')),
+  trivia2: firstUrl(urlFromBases('trivia yellow.png')),
+};
+
+const DEFAULT_DEVICE_ICONS = [
+  { key: 'dev-clone', name: 'Roaming Robot', url: U.robot },
+  { key: 'dev-smoke', name: 'Smoke Shield',  url: U.smoke },
+];
+const DEFAULT_MISSION_ICONS = [
+  { key: 'trivia',   name: 'Trivia',   url: U.trivia },
+  { key: 'trivia-2', name: 'Trivia 2', url: U.trivia2 },
+];
+const DEFAULT_REWARD_ICONS = [
+  { key: 'evidence',  name: 'Evidence',  url: U.evid },
+  { key: 'clue',      name: 'Clue',      url: U.clue },
+  { key: 'gold-coin', name: 'Gold Coin', url: U.coin },
+];
+const DEFAULT_REWARDS_SEEDED = [
+  { key: 'gold-coin', name: 'Gold Coin', ability: 'Adds a coin to your wallet.', thumbUrl: U.coin },
+];
+const DEFAULT_MEDIA_POOL = [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2];
+
+function seedDefaults(cfg) {
+  const next = {
+    ...cfg,
+    icons: { ...(cfg.icons || {}) },
+    media: { ...(cfg.media || {}) },
+  };
+  const ensure = (kind, seeds) => {
+    const list = Array.isArray(next.icons[kind]) ? [...next.icons[kind]] : [];
+    const have = new Set(list.map((x) => (x.key || '').toLowerCase()));
+    seeds.forEach((s) => {
+      if (s.url && !have.has((s.key || '').toLowerCase())) list.push(s);
+    });
+    next.icons[kind] = list;
+  };
+  ensure('devices',  DEFAULT_DEVICE_ICONS);
+  ensure('missions', DEFAULT_MISSION_ICONS);
+  ensure('rewards',  DEFAULT_REWARD_ICONS);
+
+  if (!Array.isArray(next.media.rewards) || next.media.rewards.length === 0) {
+    next.media.rewards = DEFAULT_REWARDS_SEEDED;
+  }
+
+  const pool = Array.isArray(next.media.pool) ? next.media.pool.slice() : [];
+  DEFAULT_MEDIA_POOL.forEach((u) => { if (u && !pool.includes(u)) pool.push(u); });
+  ['devices','missions','rewards'].forEach(k => {
+    (next.icons[k] || []).forEach(it => { if (it.url && !pool.includes(it.url)) pool.push(it.url); });
+  });
+  next.media.pool = pool;
+  return next;
+}
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
@@ -177,26 +234,19 @@ export default function Admin() {
   const [config, setConfig] = useState(null); // devices + media + icons + appearance
   const [status, setStatus] = useState('');
 
-  const [saving, setSaving] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // Device manager (map side)
+  // Device manager (right by the map)
+  const [devSearchQ, setDevSearchQ] = useState('');
+  const [devSearching, setDevSearching] = useState(false);
+  const [devResults, setDevResults] = useState([]);
   const [placingDev, setPlacingDev] = useState(false);
   const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
-  const [devSearchQ, setDevSearchQ] = useState('');
-  const [devSearching, setDevSearching] = useState(false);
-  const [devResults, setDevResults] = useState([]);
-
   const [uploadStatus, setUploadStatus] = useState('');
-
-  // Global media library (not game-specific)
-  const [library, setLibrary] = useState({ overlays: [], bundles: [] });
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -248,136 +298,15 @@ export default function Admin() {
         };
 
         setSuite(normalized);
-        setConfig(merged);
+        setConfig(seedDefaults(merged)); // ensure defaults & pool exist
         setSelected(null); setEditing(null); setDirty(false);
         setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlug]);
-
-  /* load global media library (bundles & overlays) */
-  useEffect(() => {
-    (async () => {
-      const overlayCandidates = [
-        '/games/lib/media/overlays/index.json',
-        '/lib/media/overlays/index.json',
-        '/media/overlays/index.json',
-        '/api/media/overlays', // optional API
-      ];
-      const bundleCandidates = [
-        '/games/lib/media/bundles/index.json',
-        '/lib/media/bundles/index.json',
-        '/media/bundles/index.json',
-        '/api/media/bundles', // optional API
-      ];
-
-      const ovRaw = await fetchFirstJson(overlayCandidates, { overlays: [] });
-      const bnRaw = await fetchFirstJson(bundleCandidates, { bundles: [] });
-
-      const overlays = Array.isArray(ovRaw) ? ovRaw
-                      : Array.isArray(ovRaw?.overlays) ? ovRaw.overlays : [];
-      const bundles  = Array.isArray(bnRaw) ? bnRaw
-                      : Array.isArray(bnRaw?.bundles) ? bnRaw.bundles : [];
-
-      setLibrary({
-        overlays: (overlays || []).map((x, i) => ({
-          key: x.key || `overlay-${i+1}`,
-          url: x.url || '',
-          name: x.name || x.key || `Overlay ${i+1}`,
-        })),
-        bundles: (bundles || []).map((x, i) => ({
-          key: x.key || `bundle-${i+1}`,
-          url: x.url || '',
-          name: x.name || x.key || `Bundle ${i+1}`,
-          items: Array.isArray(x.items) ? x.items : [],
-        })),
-      });
-    })();
-  }, []);
-/* ───────────────────────── Default image seeding (examples) ───────────────────────── */
-
-const DEFAULT_ASSET_BASES = [
-  '/games/lib/media/bundles',
-  '/lib/media/bundles',
-  '/media/bundles',
-];
-
-const urlFromBases = (file) =>
-  DEFAULT_ASSET_BASES.map((b) => `${b}/${encodeURIComponent(file)}`);
-const firstUrl = (candidates) => candidates[0]; // keep it simple
-
-// Files you dropped in /games/lib/media/bundles
-const U = {
-  robot:   firstUrl(urlFromBases('ROBOT1small.png')),   // Roaming Robot — clone device icon
-  smoke:   firstUrl(urlFromBases('SMOKE BOMB.png')),    // Smoke Shield — smoke device icon
-  evid:    firstUrl(urlFromBases('evidence 2.png')),    // Evidence — reward icon
-  clue:    firstUrl(urlFromBases('CLUEgreen.png')),     // Clue — reward icon
-  coin:    firstUrl(urlFromBases('GOLDEN COIN.png')),   // Gold Coin — reward icon
-  trivia:  firstUrl(urlFromBases('trivia icon.png')),   // Trivia — mission icon
-  trivia2: firstUrl(urlFromBases('trivia yellow.png')), // Trivia 2 — mission icon
-};
-
-const DEFAULT_DEVICE_ICONS = [
-  { key: 'dev-clone', name: 'Roaming Robot', url: U.robot }, // Clone device
-  { key: 'dev-smoke', name: 'Smoke Shield',  url: U.smoke }, // Smoke device
-];
-
-const DEFAULT_MISSION_ICONS = [
-  { key: 'trivia',   name: 'Trivia',   url: U.trivia },
-  { key: 'trivia-2', name: 'Trivia 2', url: U.trivia2 },
-];
-
-const DEFAULT_REWARD_ICONS = [
-  { key: 'evidence',  name: 'Evidence',  url: U.evid },
-  { key: 'clue',      name: 'Clue',      url: U.clue },
-  { key: 'gold-coin', name: 'Gold Coin', url: U.coin },
-];
-
-const DEFAULT_REWARDS_SEEDED = [
-  { key: 'gold-coin', name: 'Gold Coin', ability: 'Adds a coin to your wallet.', thumbUrl: U.coin },
-];
-
-// So “Pick from Media” is never empty
-const DEFAULT_MEDIA_POOL = [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2];
-
-/** Returns a new config with defaults seeded iff missing (non‑destructive). */
-function seedDefaults(cfg) {
-  const next = {
-    ...cfg,
-    icons: { ...(cfg.icons || {}) },
-    media: { ...(cfg.media || {}) },
-  };
-
-  const ensure = (kind, seeds) => {
-    const list = Array.isArray(next.icons[kind]) ? [...next.icons[kind]] : [];
-    const have = new Set(list.map((x) => (x.key || '').toLowerCase()));
-    seeds.forEach((s) => {
-      if (s.url && !have.has((s.key || '').toLowerCase())) list.push(s);
-    });
-    next.icons[kind] = list;
-  };
-
-  ensure('devices',  DEFAULT_DEVICE_ICONS);
-  ensure('missions', DEFAULT_MISSION_ICONS);
-  ensure('rewards',  DEFAULT_REWARD_ICONS);
-
-  if (!Array.isArray(next.media.rewards) || next.media.rewards.length === 0) {
-    next.media.rewards = DEFAULT_REWARDS_SEEDED;
-  }
-
-  // Build / extend the global pool
-  const pool = Array.isArray(next.media.pool) ? next.media.pool.slice() : [];
-  DEFAULT_MEDIA_POOL.forEach((u) => { if (u && !pool.includes(u)) pool.push(u); });
-  // Also add all icon URLs to the pool (handy!)
-  ['devices','missions','rewards'].forEach(k => {
-    (next.icons[k] || []).forEach(it => { if (it.url && !pool.includes(it.url)) pool.push(it.url); });
-  });
-  next.media.pool = pool;
-
-  return next;
-}
 
   function defaultConfig() {
     return {
@@ -387,8 +316,7 @@ function seedDefaults(cfg) {
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
       devices: [], powerups: [],
-      media: { pool: [], overlays: [], bundles: [], rewards: [] },
-      icons: DEFAULT_ICONS,
+      media: {}, icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
     };
   }
@@ -398,20 +326,18 @@ function seedDefaults(cfg) {
       case 'multiple_choice': return { question:'', choices:[], correctIndex:undefined, mediaUrl:'', ...base };
       case 'short_answer':    return { question:'', answer:'', acceptable:'', mediaUrl:'', ...base };
       case 'statement':       return { text:'', mediaUrl:'', ...base };
-      case 'stored_statement':return { template:'' };
       case 'video':           return { videoUrl:'', overlayText:'', ...base };
       case 'geofence_image':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
       case 'geofence_video':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
-      case 'photo_opportunity': return { text:'', overlayKey:'', overlayUrl:'', ...base };
+      case 'stored_statement':return { template:'' };
       default:                return { ...base };
     }
   }
 
   async function saveAll() {
-    if (!suite || !config || saving) return;
-    setSaving(true);
+    if (!suite || !config) return;
     setStatus('Saving… (this may trigger a redeploy)');
     const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
     const [a,b] = await Promise.all([
@@ -419,18 +345,11 @@ function seedDefaults(cfg) {
       fetch('/api/save-config' + qs, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ config }) }),
     ]);
     const ok = a.ok && b.ok;
-    if (!ok) {
-      setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
-    } else {
-      setStatus('✅ Saved (files committed). Vercel will redeploy the Game project if /game files changed.');
-    }
-    // gentle cooldown to avoid rapid re-clicks during redeploy
-    setTimeout(() => setSaving(false), 6000);
+    if (!ok) setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
+    else     setStatus('✅ Saved (files committed). Vercel will redeploy the Game project if /game files changed.');
   }
   async function handlePublish() {
-    if (publishing) return;
     try {
-      setPublishing(true);
       setStatus('Publishing…');
       const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
         method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
@@ -440,8 +359,6 @@ function seedDefaults(cfg) {
       setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
     } catch (e) {
       setStatus('❌ Publish failed: ' + (e?.message || e));
-    } finally {
-      setTimeout(()=>setPublishing(false), 5000);
     }
   }
 
@@ -462,11 +379,6 @@ function seedDefaults(cfg) {
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
-      // feedback slots (correct/wrong) — references to media/messages
-      feedback: {
-        correct: { type:'none', message:'', mediaUrl:'', audioUrl:'', rewardKey:'', clueText:'', device:'none', timePenaltySec:0 },
-        wrong:   { type:'none', message:'', mediaUrl:'', audioUrl:'', punishment:'none', timePenaltySec:0 },
-      }
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -474,12 +386,6 @@ function seedDefaults(cfg) {
     const e = JSON.parse(JSON.stringify(m));
     e.appearanceOverrideEnabled = !!e.appearanceOverrideEnabled;
     e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
-    if (!e.feedback) {
-      e.feedback = {
-        correct: { type:'none', message:'', mediaUrl:'', audioUrl:'', rewardKey:'', clueText:'', device:'none', timePenaltySec:0 },
-        wrong:   { type:'none', message:'', mediaUrl:'', audioUrl:'', punishment:'none', timePenaltySec:0 },
-      };
-    }
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
@@ -528,7 +434,7 @@ function seedDefaults(cfg) {
     setStatus('✅ Duplicated (remember Save All)');
   }
 
-  /* Devices (map manager) */
+  /* Devices (Map-Side Manager) */
   const devices = getDevices();
   function addDevice() {
     setPlacingDev(true);
@@ -580,23 +486,19 @@ function seedDefaults(cfg) {
     setDevices(list);
   }
 
-  /* ── Address search (by the map) — Nominatim ─────────────────────────── */
+  // Address search (by the map) — Nominatim
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
     if (!q) return;
-    setDevSearching(true);
-    setDevResults([]);
+    setDevSearching(true); setDevResults([]);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
-      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
       const j = await r.json();
       setDevResults(Array.isArray(j) ? j : []);
-    } catch {
-      setDevResults([]);
-    } finally {
-      setDevSearching(false);
-    }
+    } catch { setDevResults([]); }
+    setDevSearching(false);
   }
   function applySearchResult(r) {
     const lat = Number(r.lat), lon = Number(r.lon);
@@ -605,7 +507,6 @@ function seedDefaults(cfg) {
     } else if (selectedDevIdx != null) {
       moveSelectedDevice(lat, lon);
     } else {
-      // no selection → start placing a new device at the searched point
       setPlacingDev(true);
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     }
@@ -618,6 +519,7 @@ function seedDefaults(cfg) {
     });
   }
 
+  // upload helper: add to /public/media/... and add to media pool
   async function uploadToRepo(file, subfolder='uploads') {
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
@@ -629,16 +531,28 @@ function seedDefaults(cfg) {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
-    const url = res.ok ? `/${path.replace(/^public\//,'')}` : '';
-    if (url) {
-      // track in per-game pool for convenient picking later
-      const pool = Array.isArray(config?.media?.pool) ? config.media.pool.slice() : [];
-      if (!pool.includes(url)) {
-        setConfig({ ...config, media: { ...(config.media || {}), pool: [...pool, url] } });
-      }
+    const url = `/${path.replace(/^public\//,'')}`;
+    if (res.ok) {
+      setUploadStatus(`✅ Uploaded ${safeName}`);
+      // add to media pool for picker
+      setConfig(prev => {
+        const pool = Array.isArray(prev?.media?.pool) ? [...prev.media.pool] : [];
+        if (!pool.includes(url)) pool.push(url);
+        return { ...prev, media: { ...(prev.media||{}), pool } };
+      });
+      return url;
+    } else {
+      setUploadStatus(`❌ ${j?.error || 'upload failed'}`);
+      return '';
     }
-    return url;
+  }
+
+  // small helper for device icon URL
+  function getDeviceIconUrl(cfg, key) {
+    if (!key) return '';
+    const list = cfg?.icons?.devices || [];
+    const it = list.find((x) => (x.key || '') === key);
+    return it?.url ? toDirectMediaURL(it.url) : '';
   }
 
   /* Avoid SSR crash if loading */
@@ -651,13 +565,6 @@ function seedDefaults(cfg) {
       </main>
     );
   }
-
-  const selectedInBounds =
-    selectedDevIdx != null &&
-    selectedDevIdx >= 0 &&
-    selectedDevIdx < (devices?.length || 0)
-      ? selectedDevIdx
-      : null;
 
   return (
     <div style={S.body}>
@@ -682,8 +589,8 @@ function seedDefaults(cfg) {
 
             <button onClick={startNew} style={S.button}>+ New Mission</button>
 
-            <button onClick={saveAll} disabled={saving} style={{ ...S.button, opacity: saving?0.6:1 }}>💾 {saving ? 'Saving…' : 'Save All'}</button>
-            <button onClick={handlePublish} disabled={publishing} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: publishing?0.6:1 }}>Publish</button>
+            <button onClick={saveAll} style={S.button}>💾 Save All</button>
+            <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
 
             <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
@@ -742,7 +649,7 @@ function seedDefaults(cfg) {
                   <h3 style={{ margin:0 }}>Overview Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
                     Click to place a device (when “Add Device” is active). If a device is selected, click to move it.
-                    If none is selected, clicking moves the nearest pin.
+                    If none selected, click moves the nearest pin.
                   </div>
                 </div>
                 <label style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -767,23 +674,23 @@ function seedDefaults(cfg) {
                 {/* Quick actions */}
                 <div style={{ display:'flex', gap:8 }}>
                   <button style={S.button} onClick={addDevice}>+ Add Device</button>
-                  <button style={S.button} disabled={selectedInBounds==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
-                  <button style={S.button} disabled={selectedInBounds==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
                 </div>
 
                 {/* Radius slider for selected or draft */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                   <input
                     type="range" min={5} max={2000} step={5}
-                    value={selectedInBounds!=null ? (devices[selectedInBounds]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
+                    value={selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
                     onChange={(e)=>{
                       const r = Number(e.target.value);
-                      if (selectedInBounds!=null) setSelectedDeviceRadius(r);
+                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
                       else setDevDraft(d=>({ ...d, pickupRadius: r }));
                     }}
                   />
                   <code style={{ color:'#9fb0bf' }}>
-                    {(selectedInBounds!=null ? (devices[selectedInBounds]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
+                    {(selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
                   </code>
                 </div>
               </div>
@@ -807,8 +714,8 @@ function seedDefaults(cfg) {
                     key={d.id||i}
                     style={{
                       ...S.button, padding:'6px 10px',
-                      background: selectedInBounds===i ? '#1a2027' : '#0f1418',
-                      borderColor: selectedInBounds===i ? '#2a5c8a' : '#2a323b'
+                      background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
+                      borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b'
                     }}
                     onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
                     title={`${d.title||d.type} (#${i+1})`}
@@ -819,18 +726,101 @@ function seedDefaults(cfg) {
                 {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
               </div>
 
-              {/* If placing, show a small draft panel */}
+              {/* Selected device quick edit (with thumbnail) */}
+              {!placingDev && selectedDevIdx!=null && devices[selectedDevIdx] && (
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                    <div style={{ width:36, height:36, borderRadius:6, overflow:'hidden', border:'1px solid #2a323b' }}>
+                      {(() => {
+                        const d = devices[selectedDevIdx];
+                        const u = getDeviceIconUrl(config, d.iconKey) || U.smoke;
+                        return <img src={u} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
+                      })()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Title</div>
+                      <input
+                        style={S.input}
+                        value={devices[selectedDevIdx].title || ''}
+                        onChange={(e)=> {
+                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], title:e.target.value };
+                          setDevices(next);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Type</div>
+                      <select
+                        style={S.input}
+                        value={devices[selectedDevIdx].type || 'smoke'}
+                        onChange={(e)=> {
+                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], type:e.target.value };
+                          setDevices(next);
+                        }}
+                      >
+                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Icon</div>
+                      <select
+                        style={S.input}
+                        value={devices[selectedDevIdx].iconKey || ''}
+                        onChange={(e)=> {
+                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], iconKey:e.target.value };
+                          setDevices(next);
+                        }}
+                      >
+                        <option value="">(default)</option>
+                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Effect (sec)</div>
+                      <input
+                        type="number" min={5} max={3600}
+                        style={S.input}
+                        value={devices[selectedDevIdx].effectSeconds || 60}
+                        onChange={(e)=> {
+                          const next=[...devices];
+                          next[selectedDevIdx] = {
+                            ...next[selectedDevIdx],
+                            effectSeconds: clamp(Number(e.target.value||0),5,3600)
+                          };
+                          setDevices(next);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop:8, color:'#9fb0bf' }}>
+                    Click the map to move this device; use the slider to change pickup radius.
+                  </div>
+                </div>
+              )}
+
+              {/* New device (placing) panel with thumbnail */}
               {placingDev && (
                 <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
+                  <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                    <div style={{ width:36, height:36, borderRadius:6, overflow:'hidden', border:'1px solid #2a323b' }}>
+                      {(() => {
+                        const u = getDeviceIconUrl(config, devDraft.iconKey) || U.smoke;
+                        return <img src={u} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
+                      })()}
+                    </div>
+                    <Field label="Title">
+                      <input style={S.input} value={devDraft.title}
+                        onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/>
+                    </Field>
                     <Field label="Type">
-                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                      <select style={S.input} value={devDraft.type}
+                        onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
                         {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </Field>
                     <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
+                      <select style={S.input} value={devDraft.iconKey}
+                        onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
                         <option value="">(default)</option>
                         {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
                       </select>
@@ -859,11 +849,10 @@ function seedDefaults(cfg) {
                 showRings={showRings}
                 interactive={placingDev}
                 draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
-                selectedDevIdx={selectedInBounds}
+                selectedDevIdx={selectedDevIdx}
                 onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
                 onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
                 onMoveNearest={(kind, idx, lat, lng)=>{
-                  // fallback if nothing selected: nearest behavior
                   if (kind==='mission') {
                     const list=[...(suite?.missions||[])];
                     const m=list[idx]; if (!m) return;
@@ -884,16 +873,10 @@ function seedDefaults(cfg) {
               />
             </div>
 
-            {/* Overlay mission editor (top + bottom save/close) */}
+            {/* Overlay mission editor */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(880px, 92vw)', maxHeight:'82vh', overflowY:'auto' }}>
-                  {/* top buttons */}
-                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginBottom:8 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
-                    <button style={S.button} onClick={cancelEdit}>Close</button>
-                  </div>
-
+                <div style={{ ...S.card, width:'min(820px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
                   <h3 style={{ marginTop:0 }}>Edit Mission</h3>
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
@@ -929,52 +912,45 @@ function seedDefaults(cfg) {
 
                   {/* Stored Statement composer */}
                   {editing.type === 'stored_statement' && (
-                    <StoredStatementEditor suite={suite} editing={editing} setEditing={setEditing} setDirty={setDirty}/>
-                  )}
-
-                  {/* Photo Opportunity */}
-                  {editing.type === 'photo_opportunity' && (
                     <div style={{ marginBottom: 12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
-                      <Field label="Statement / Prompt">
+                      <div style={{ fontWeight:600, marginBottom:8 }}>Compose stored statement</div>
+
+                      <Field label="Template (click IDs below to insert a tag like #m03# where your cursor is)">
                         <textarea
-                          style={{ ...S.input, height: 100, fontFamily:'ui-monospace, Menlo' }}
-                          value={editing.content?.text || ''}
-                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), text:e.target.value } }); setDirty(true); }}
+                          style={{ ...S.input, height: 130, fontFamily:'ui-monospace, Menlo' }}
+                          value={editing.content?.template || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), template:e.target.value } }); setDirty(true); }}
+                          ref={(el)=>{ if (el) editing.__tplRef = el; }}
                         />
                       </Field>
-                      <Field label="Overlay (choose from library)">
-                        <select
-                          style={S.input}
-                          value={editing.content?.overlayKey || ''}
-                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), overlayKey: e.target.value } }); setDirty(true); }}
-                        >
-                          <option value="">— select overlay —</option>
-                          {(library.overlays||[]).map(o=>(
-                            <option key={o.key} value={o.key}>{o.name || o.key}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Overlay URL (optional override)">
-                        <input
-                          style={S.input}
-                          placeholder="https://…"
-                          value={editing.content?.overlayUrl || ''}
-                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), overlayUrl: e.target.value } }); setDirty(true); }}
-                        />
-                        {(editing.content?.overlayUrl || editing.content?.overlayKey) && (
-                          <div style={{ marginTop:8 }}>
-                            <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview</div>
-                            <img
-                              src={toDirectMediaURL(
-                                editing.content?.overlayUrl ||
-                                (library.overlays||[]).find(x=>x.key===editing.content?.overlayKey)?.url || ''
-                              )}
-                              alt="overlay"
-                              style={{ width:'100%', maxHeight:220, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}
-                            />
-                          </div>
-                        )}
-                      </Field>
+
+                      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Click an ID to insert:</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                        {(suite.missions || []).map((mm) => (
+                          <button
+                            key={mm.id}
+                            type="button"
+                            style={{ ...S.button, padding:'6px 10px' }}
+                            onClick={()=>{
+                              const tag = `#${String(mm.id).toLowerCase()}#`; // e.g. #m03#
+                              const ta = editing.__tplRef;
+                              if (ta) {
+                                const s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+                                const v = editing.content?.template || '';
+                                const next = v.slice(0, s) + tag + v.slice(e);
+                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: next } });
+                                setDirty(true);
+                                requestAnimationFrame(()=>{ ta.focus(); ta.selectionStart = ta.selectionEnd = s + tag.length; });
+                              } else {
+                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: (editing.content?.template || '') + tag } });
+                                setDirty(true);
+                              }
+                            }}
+                          >
+                            {`#${mm.id}#`}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -990,7 +966,7 @@ function seedDefaults(cfg) {
                   )}
 
                   {/* Optional geofence for others */}
-                  {(editing.type!=='geofence_image' && editing.type!=='geofence_video') && (
+                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
@@ -1017,34 +993,31 @@ function seedDefaults(cfg) {
                     </div>
                   )}
 
-                  {/* generic field renderer + media previews */}
                   {(TYPE_FIELDS[editing.type]||[]).map(f=>(
-                    (f.key==='text' && editing.type==='photo_opportunity') ? null : (
-                      <Field key={f.key} label={f.label}>
-                        {f.type==='text' && (
-                          <>
-                            <input style={S.input} value={editing.content?.[f.key] || ''}
-                              onChange={(e)=>{ setEditing({ ...editing, content:{ ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}/>
-                            {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) && (
-                              <MediaPreview url={editing.content?.[f.key]} kind={f.key}/>
-                            )}
-                          </>
-                        )}
-                        {f.type==='number' && (
-                          <input type="number" min={f.min} max={f.max} style={S.input}
-                            value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
-                              const v = e.target.value==='' ? '' : Number(e.target.value);
-                              setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
-                            }}/>
-                        )}
-                        {f.type==='multiline' && editing.type!=='photo_opportunity' && (
-                          <textarea style={{ ...S.input, height:120, fontFamily:'ui-monospace, Menlo' }}
-                            value={editing.content?.[f.key] || ''} onChange={(e)=>{
-                              setEditing({ ...editing, content:{ ...editing.content, [f.key]: e.target.value } }); setDirty(true);
-                            }}/>
-                        )}
-                      </Field>
-                    )
+                    <Field key={f.key} label={f.label}>
+                      {f.type==='text' && (
+                        <>
+                          <input style={S.input} value={editing.content?.[f.key] || ''}
+                            onChange={(e)=>{ setEditing({ ...editing, content:{ ...editing.content, [f.key]: e.target.value } }); setDirty(true); }}/>
+                          {['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].includes(f.key) && (
+                            <MediaPreview url={editing.content?.[f.key]} kind={f.key}/>
+                          )}
+                        </>
+                      )}
+                      {f.type==='number' && (
+                        <input type="number" min={f.min} max={f.max} style={S.input}
+                          value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
+                            const v = e.target.value==='' ? '' : Number(e.target.value);
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
+                          }}/>
+                      )}
+                      {f.type==='multiline' && (
+                        <textarea style={{ ...S.input, height:120, fontFamily:'ui-monospace, Menlo' }}
+                          value={editing.content?.[f.key] || ''} onChange={(e)=>{
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]: e.target.value } }); setDirty(true);
+                          }}/>
+                      )}
+                    </Field>
                   ))}
 
                   <Field label="Points (Reward)">
@@ -1053,10 +1026,8 @@ function seedDefaults(cfg) {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  {/* Feedback (Correct/Wrong) */}
-                  <FeedbackEditor editing={editing} setEditing={setEditing} setDirty={setDirty} library={library} />
-
                   <hr style={S.hr}/>
+
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1067,7 +1038,6 @@ function seedDefaults(cfg) {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  {/* bottom buttons */}
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -1113,7 +1083,7 @@ function seedDefaults(cfg) {
         </main>
       )}
 
-      {/* TEXT rules */}
+      {/* TEXT rules (lightweight, same visual style) */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
       {/* DEVICES tab (simple list) */}
@@ -1152,7 +1122,7 @@ function seedDefaults(cfg) {
         </main>
       )}
 
-      {/* MEDIA (uploads + icons + library) */}
+      {/* MEDIA (uploads + icons + re-seed + picker) */}
       {tab==='media' && (
         <MediaTab
           config={config}
@@ -1163,7 +1133,6 @@ function seedDefaults(cfg) {
             const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
           }}
-          library={library}
         />
       )}
 
@@ -1243,7 +1212,7 @@ function seedDefaults(cfg) {
   );
 }
 
-/* ───────────────────────── Sub-components ───────────────────────── */
+/* ───────────────────────── Sub-tabs & Components ───────────────────────── */
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -1252,7 +1221,6 @@ function Field({ label, children }) {
     </div>
   );
 }
-
 function ColorField({ label, value, onChange }) {
   return (
     <Field label={label}>
@@ -1263,7 +1231,6 @@ function ColorField({ label, value, onChange }) {
     </Field>
   );
 }
-
 function AppearanceEditor({ value, onChange }) {
   const a = value || defaultAppearance();
   return (
@@ -1333,7 +1300,6 @@ function AppearanceEditor({ value, onChange }) {
     </div>
   );
 }
-
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
   const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
@@ -1358,7 +1324,6 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
     </div>
   );
 }
-
 function MediaPreview({ url, kind }) {
   if (!url) return null;
   const u = toDirectMediaURL(String(url).trim());
@@ -1378,6 +1343,24 @@ function MediaPreview({ url, kind }) {
     </div>
   );
 }
+
+/* Styles */
+const S = {
+  body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
+  wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
+  wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
+  sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
+  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
+  missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
+  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
+  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
+  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0f1418', color:'#e9eef2', cursor:'pointer' },
+  tabActive:{ background:'#1a2027' },
+  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
+  hr:{ border:'1px solid #1f262d', borderBottom:'none' },
+  overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
+};
 
 /* MapOverview — shows missions + devices, supports: placing draft, moving selected, moving nearest */
 function MapOverview({
@@ -1455,7 +1438,6 @@ function MapOverview({
       bounds.extend(pos);
     }
 
-    // CLICK: place draft / move selected / move nearest
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
       const lat=e.latlng.lat, lng=e.latlng.lng;
@@ -1482,6 +1464,285 @@ function MapOverview({
       {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
       <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
     </div>
+  );
+}
+
+/* MEDIA tab with DnD + file chooser + Icons editors + picker + re‑apply defaults */
+function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo }) {
+  const [hover, setHover] = useState(false);
+
+  // picker state (global pool)
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSetter, setPickerSetter] = useState(null); // function(url) -> void
+  const openPicker = (setter) => { setPickerSetter(()=>setter); setPickerOpen(true); };
+  const closePicker = () => { setPickerOpen(false); setPickerSetter(null); };
+
+  async function handleDrop(e) {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    let files = [];
+    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
+      for (let i=0;i<e.dataTransfer.items.length;i++) {
+        const it = e.dataTransfer.items[i];
+        if (it.kind==='file') {
+          const f = it.getAsFile(); if (f) files.push(f);
+        }
+      }
+    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
+      files = Array.from(e.dataTransfer.files);
+    }
+    for (const f of files) { await uploadToRepo(f, 'uploads'); }
+  }
+
+  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
+    return (
+      <label style={{ ...S.button, textAlign:'center' }}>
+        {label}
+        <input type="file" multiple style={{ display:'none' }}
+          onChange={async (e)=>{
+            const files = Array.from(e.target.files || []);
+            for (const f of files) {
+              const url = await uploadToRepo(f, folder);
+              if (url && typeof onUploaded==='function') onUploaded(url);
+            }
+            e.target.value = '';
+          }}/>
+      </label>
+    );
+  }
+
+  return (
+    <main style={S.wrap}>
+      <div
+        style={S.card}
+        onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
+        onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
+        onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
+        onDrop={handleDrop}
+      >
+        <h3 style={{ marginTop:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <span>Media</span>
+          <span style={{ display:'flex', gap:8 }}>
+            <button
+              style={S.button}
+              title="Re-seed example icons, rewards and global media pool (non-destructive)"
+              onClick={() => setConfig(seedDefaults(config))}
+            >
+              Re‑apply defaults
+            </button>
+          </span>
+        </h3>
+
+        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
+          Drag & drop files here or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
+          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
+        </div>
+
+        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo} openPicker={openPicker}/>
+        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
+        <IconsEditor config={config} setConfig={setConfig} label="Reward Icons"  kind="rewards"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
+      </div>
+
+      <PickFromMediaModal
+        open={pickerOpen}
+        pool={config?.media?.pool || []}
+        onPick={(url)=>{ if (typeof pickerSetter === 'function') pickerSetter(url); closePicker(); }}
+        onClose={closePicker}
+      />
+    </main>
+  );
+}
+function IconsEditor({ config, setConfig, label, kind, uploadToRepo, openPicker }) {
+  const list = config.icons?.[kind] || [];
+  const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
+
+  return (
+    <div style={{ marginTop:16 }}>
+      <h4 style={{ marginTop:0 }}>{label}</h4>
+      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 200px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+        <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
+      </div>
+      {list.map((row, idx)=>(
+        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 200px', gap:8, alignItems:'center', marginBottom:8 }}>
+          <div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+              <input style={S.input} value={row.url||''}
+                onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }}
+                placeholder="Image URL"/>
+              <label style={{ ...S.button, textAlign:'center' }}>
+                Choose File
+                <input type="file" style={{ display:'none' }}
+                  onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'icons'); if (url) { const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); } }}/>
+              </label>
+              <button
+                style={S.button}
+                type="button"
+                onClick={()=> openPicker && openPicker((url)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); })}
+              >
+                Pick from Media
+              </button>
+            </div>
+            {row.url
+              ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              : <div style={{ color:'#9fb0bf' }}>No image</div>}
+          </div>
+          <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
+          <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
+          <div style={{ display:'flex', gap:6 }}>
+            <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
+            <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
+          </div>
+        </div>
+      ))}
+      <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
+    </div>
+  );
+}
+function PickFromMediaModal({ open, pool = [], onPick, onClose }) {
+  if (!open) return null;
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'grid', placeItems:'center', zIndex:3000 }}>
+      <div style={{ ...S.card, width:'min(900px, 92vw)' }}>
+        <h4 style={{ marginTop:0 }}>Pick from Media Pool</h4>
+        {(!pool || pool.length===0) ? (
+          <div style={{ color:'#9fb0bf' }}>No media in the pool yet.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:12 }}>
+            {pool.map((u, i) => (
+              <div key={i} style={{ border:'1px solid #2a323b', borderRadius:10, overflow:'hidden', background:'#0b0c10' }}>
+                <div style={{ width:'100%', aspectRatio:'1/1', overflow:'hidden' }}>
+                  <img alt="" src={toDirectMediaURL(u)} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                </div>
+                <div style={{ padding:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <code style={{ color:'#9fb0bf', fontSize:11, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:140 }}>
+                    {u.replace(/^https?:\/\/[^/]+/,'')}
+                  </code>
+                  <button style={{ ...S.button, padding:'6px 10px' }} onClick={()=>onPick(u)}>Use</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ marginTop:12, textAlign:'right' }}>
+          <button style={S.button} onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RewardsTab({ config, setConfig }) {
+  const list = Array.isArray(config.media?.rewards) ? config.media.rewards : DEFAULT_REWARDS_SEEDED;
+  const setList = (next) => setConfig({ ...config, media:{ ...(config.media||{}), rewards: next } });
+  return (
+    <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Rewards</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+          <div>Thumbnail</div><div>Name</div><div>Special ability</div><div>Actions</div>
+        </div>
+        {list.map((row, idx)=>(
+          <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+            <div>
+              <input style={S.input} value={row.thumbUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), thumbUrl:e.target.value }; setList(n); }} placeholder="Thumbnail URL"/>
+              {row.thumbUrl && <img alt="thumb" src={toDirectMediaURL(row.thumbUrl)} style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>}
+            </div>
+            <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
+            <input style={S.input} value={row.ability||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), ability:e.target.value }; setList(n); }}/>
+            <div style={{ display:'flex', gap:6 }}>
+              <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
+              <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}), key:(row.key||`rw${idx}`)+'-copy' }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
+            </div>
+          </div>
+        ))}
+        <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`rw${list.length+1}`, name:'', ability:'', thumbUrl:'' }]); }}>+ Add Reward</button>
+      </div>
+    </main>
+  );
+}
+
+/* Text tab (SMS rules) — same tone & layout */
+function TextTab({ suite, config, setConfig, setStatus }) {
+  const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
+
+  function addSmsRule() {
+    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
+    const maxPlayers = config?.forms?.players || 1;
+    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
+    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
+    setConfig({ ...config, textRules: rules });
+    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
+    setStatus('✅ SMS rule added (remember Save All)');
+  }
+  function removeSmsRule(idx) {
+    const rules = [...(config?.textRules || [])];
+    rules.splice(idx, 1);
+    setConfig({ ...config, textRules: rules });
+  }
+
+  // inline quick test
+  function TestSMSInline() {
+    const [to, setTo] = useState('');
+    const [msg, setMsg] = useState('Test message from admin');
+    const [st, setSt] = useState('');
+    async function send() {
+      setSt('Sending…');
+      const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
+      const text = await res.text();
+      setSt(res.ok ? '✅ Sent' : '❌ ' + text);
+    }
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
+          <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+          <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
+          <button style={S.button} onClick={send}>Send Test</button>
+        </div>
+        <div style={{ marginTop: 6, color: '#9fb0bf' }}>{st}</div>
+      </div>
+    );
+  }
+
+  return (
+    <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+          <Field label="Mission (geofence)">
+            <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
+              <option value="">— choose —</option>
+              {(suite.missions || []).map((m) => (
+                <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Phone slot">
+            <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
+              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{'Player ' + n}</option>)}
+            </select>
+          </Field>
+          <Field label="Delay (sec)">
+            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })} />
+          </Field>
+          <Field label="Message">
+            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })} />
+          </Field>
+        </div>
+        <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
+        <hr style={S.hr} />
+        <ul style={{ paddingLeft: 18 }}>
+          {(config.textRules || []).map((r, i) => (
+            <li key={i} style={{ marginBottom: 8 }}>
+              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
+              <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
+            </li>
+          ))}
+        </ul>
+        <details style={{ marginTop: 8 }}>
+          <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
+          <TestSMSInline />
+        </details>
+      </div>
+    </main>
   );
 }
 
@@ -1537,458 +1798,3 @@ function MapPicker({ lat, lng, radius, onChange }) {
     </div>
   );
 }
-
-/* Stored Statement Editor */
-function StoredStatementEditor({ suite, editing, setEditing, setDirty }) {
-  return (
-    <div style={{ marginBottom: 12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
-      <div style={{ fontWeight:600, marginBottom:8 }}>Compose stored statement</div>
-      <Field label="Template (click IDs below to insert a tag like #m03# where your cursor is)">
-        <textarea
-          style={{ ...S.input, height: 130, fontFamily:'ui-monospace, Menlo' }}
-          value={editing.content?.template || ''}
-          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), template:e.target.value } }); setDirty(true); }}
-          ref={(el)=>{ if (el) editing.__tplRef = el; }}
-        />
-      </Field>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Click an ID to insert:</div>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-        {(suite.missions || []).map((mm) => (
-          <button
-            key={mm.id}
-            type="button"
-            style={{ ...S.button, padding:'6px 10px' }}
-            onClick={()=>{
-              const tag = `#${String(mm.id).toLowerCase()}#`; // e.g. #m03#
-              const ta = editing.__tplRef;
-              if (ta) {
-                const s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
-                const v = editing.content?.template || '';
-                const next = v.slice(0, s) + tag + v.slice(e);
-                setEditing({ ...editing, content:{ ...(editing.content||{}), template: next } });
-                setDirty(true);
-                requestAnimationFrame(()=>{ ta.focus(); ta.selectionStart = ta.selectionEnd = s + tag.length; });
-              } else {
-                setEditing({ ...editing, content:{ ...(editing.content||{}), template: (editing.content?.template || '') + tag } });
-                setDirty(true);
-              }
-            }}
-          >
-            {`#${mm.id}#`}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* Feedback editor (correct/wrong) */
-function FeedbackEditor({ editing, setEditing, setDirty, library }) {
-  const f = editing.feedback || {
-    correct: { type:'none', message:'', mediaUrl:'', audioUrl:'', rewardKey:'', clueText:'', device:'none', timePenaltySec:0 },
-    wrong:   { type:'none', message:'', mediaUrl:'', audioUrl:'', punishment:'none', timePenaltySec:0 },
-  };
-  function Row({ kind, label }) {
-    const row = f[kind] || {};
-    return (
-      <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:10 }}>
-        <div style={{ fontWeight:600, marginBottom:6 }}>{label}</div>
-        <Field label="Response type">
-          <select
-            style={S.input}
-            value={row.type || 'none'}
-            onChange={(e)=>{ const val=e.target.value; const newF={ ...f, [kind]: { ...(f[kind]||{}), type: val } }; setEditing({ ...editing, feedback: newF }); setDirty(true); }}
-          >
-            <option value="none">None</option>
-            <option value="message">Message</option>
-            <option value="media">Media (image/video/gif)</option>
-          </select>
-        </Field>
-
-        {(row.type==='message') && (
-          <Field label="Message text">
-            <input
-              style={S.input}
-              value={row.message || ''}
-              onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), message: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-            />
-          </Field>
-        )}
-
-        {(row.type==='media') && (
-          <>
-            <Field label="Media URL">
-              <input
-                style={S.input}
-                value={row.mediaUrl || ''}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), mediaUrl: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              />
-              <MediaPreview url={row.mediaUrl} kind="feedback-media" />
-            </Field>
-            <Field label="Optional Audio URL">
-              <input
-                style={S.input}
-                value={row.audioUrl || ''}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), audioUrl: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              />
-            </Field>
-          </>
-        )}
-
-        {kind==='correct' && (
-          <>
-            <Field label="Reward device to deploy (optional)">
-              <select
-                style={S.input}
-                value={row.device || 'none'}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), device: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              >
-                <option value="none">None</option>
-                <option value="smoke">Smoke</option>
-                <option value="clone">Clone</option>
-                <option value="jammer">Jammer</option>
-              </select>
-            </Field>
-            <Field label="Clue (optional)">
-              <input
-                style={S.input}
-                placeholder="Short clue text…"
-                value={row.clueText || ''}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), clueText: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              />
-            </Field>
-          </>
-        )}
-
-        {kind==='wrong' && (
-          <>
-            <Field label="Punishment (device) (optional)">
-              <select
-                style={S.input}
-                value={row.punishment || 'none'}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), punishment: e.target.value } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              >
-                <option value="none">None</option>
-                <option value="smoke">Smoke</option>
-                <option value="clone">Clone</option>
-                <option value="jammer">Jammer</option>
-              </select>
-            </Field>
-            <Field label="Time penalty (sec)">
-              <input
-                type="number"
-                min={0}
-                max={600}
-                style={S.input}
-                value={row.timePenaltySec || 0}
-                onChange={(e)=>{ const newF={ ...f, [kind]: { ...(f[kind]||{}), timePenaltySec: Number(e.target.value||0) } }; setEditing({ ...editing, feedback:newF }); setDirty(true); }}
-              />
-            </Field>
-          </>
-        )}
-      </div>
-    );
-  }
-  return (
-    <div style={{ marginTop:12 }}>
-      <h4 style={{ marginTop:0 }}>Answer feedback</h4>
-      <Row kind="correct" label="Correct answer" />
-      <Row kind="wrong"   label="Wrong answer" />
-    </div>
-  );
-}
-
-/* TEXT Tab (SMS rules) */
-function TextTab({ suite, config, setConfig, setStatus }) {
-  const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember Save All)');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])];
-    rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-          <Field label="Mission (geofence)">
-            <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-              <option value="">— choose —</option>
-              {(suite.missions || []).map((m) => (
-                <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Phone slot">
-            <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
-              {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
-            </select>
-          </Field>
-          <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
-          </Field>
-          <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
-          </Field>
-        </div>
-        <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr}/>
-        <ul style={{ paddingLeft: 18 }}>
-          {(config.textRules || []).map((r, i) => (
-            <li key={i} style={{ marginBottom: 8 }}>
-              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-              <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
-          <TestSMS />
-        </details>
-      </div>
-    </main>
-  );
-}
-
-function TestSMS() {
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState('Test message from admin');
-  const [status, setStatus] = useState('');
-  async function send() {
-    setStatus('Sending…');
-    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-    const text = await res.text();
-    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
-  }
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-        <button style={S.button} onClick={send}>Send Test</button>
-      </div>
-      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
-    </div>
-  );
-}
-
-/* MEDIA tab with DnD + file chooser + Icons editors + Library previews */
-function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo, library }) {
-  const [hover, setHover] = useState(false);
-  const pool = Array.isArray(config?.media?.pool) ? config.media.pool : [];
-
-  async function handleDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    let files = [];
-    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
-      for (let i=0;i<e.dataTransfer.items.length;i++) {
-        const it = e.dataTransfer.items[i];
-        if (it.kind==='file') {
-          const f = it.getAsFile(); if (f) files.push(f);
-        }
-      }
-    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
-      files = Array.from(e.dataTransfer.files);
-    }
-    for (const f of files) { await uploadToRepo(f, 'uploads'); }
-  }
-
-  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
-    return (
-      <label style={{ ...S.button, textAlign:'center' }}>
-        {label}
-        <input type="file" multiple style={{ display:'none' }}
-          onChange={async (e)=>{
-            const files = Array.from(e.target.files || []);
-            for (const f of files) {
-              const url = await uploadToRepo(f, folder);
-              if (url && typeof onUploaded==='function') onUploaded(url);
-            }
-            e.target.value = '';
-          }}/>
-      </label>
-    );
-  }
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}
-           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
-           onDrop={handleDrop}>
-        <h3 style={{ marginTop:0 }}>Media</h3>
-        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files here or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
-          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
-        </div>
-
-        {/* Icons editors with per-row drag/drop & picker */}
-        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo} pool={pool} libraryImages={libraryImageList(library, pool)}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo} pool={pool} libraryImages={libraryImageList(library, pool)}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Reward Icons"  kind="rewards"  uploadToRepo={uploadToRepo} pool={pool} libraryImages={libraryImageList(library, pool)}/>
-
-        {/* Global library preview (read-only) */}
-        <div style={{ marginTop:16 }}>
-          <h4 style={{ marginTop:0 }}>Global Overlays (read-only)</h4>
-          <Gallery images={(library.overlays||[]).map(o=>({ url:o.url, name:o.name }))} emptyNote="No overlays found."/>
-        </div>
-        <div style={{ marginTop:16 }}>
-          <h4 style={{ marginTop:0 }}>Global Bundles (read-only)</h4>
-          <Gallery images={(library.bundles||[]).flatMap(b=>(b.items||[]).map(it=>({ url:it.url, name:it.name||b.name })))} emptyNote="No bundles found."/>
-        </div>
-      </div>
-    </main>
-  );
-}
-function libraryImageList(library, pool) {
-  const fromBundles = (library?.bundles||[]).flatMap(b => (b.items||[]).map(it => it.url).filter(Boolean));
-  const fromOverlays = (library?.overlays||[]).map(o => o.url).filter(Boolean);
-  const dedup = Array.from(new Set([...(pool||[]), ...fromBundles, ...fromOverlays]));
-  return dedup;
-}
-function Gallery({ images, emptyNote }) {
-  if (!images || images.length===0) return <div style={{ color:'#9fb0bf' }}>{emptyNote}</div>;
-  return (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:8 }}>
-      {images.map((it, i)=>(
-        <div key={i} style={{ border:'1px solid #2a323b', borderRadius:8, padding:6 }}>
-          <img src={toDirectMediaURL(it.url)} alt={it.name||'img'} style={{ width:'100%', height:86, objectFit:'cover', borderRadius:6 }}/>
-          {it.name && <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4, textOverflow:'ellipsis', overflow:'hidden', whiteSpace:'nowrap' }}>{it.name}</div>}
-        </div>
-      ))}
-    </div>
-  );
-}
-function IconsEditor({ config, setConfig, label, kind, uploadToRepo, pool, libraryImages }) {
-  const list = config.icons?.[kind] || [];
-  const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
-
-  const [pickerOpenIdx, setPickerOpenIdx] = useState(null);
-
-  async function handleDropRow(e, idx) {
-    e.preventDefault(); e.stopPropagation();
-    const file = e.dataTransfer?.files?.[0]; if (!file) return;
-    const url = await uploadToRepo(file, 'icons');
-    if (url) { const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); }
-  }
-
-  return (
-    <div style={{ marginTop:16 }}>
-      <h4 style={{ marginTop:0 }}>{label}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 160px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Icon</div><div>Name</div><div>Key (pin purpose)</div><div>Actions</div>
-      </div>
-      {list.map((row, idx)=>(
-        <div
-          key={row.key||idx}
-          style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 160px', gap:8, alignItems:'center', marginBottom:8 }}
-          onDragOver={(e)=>{ e.preventDefault(); }}
-          onDrop={(e)=>handleDropRow(e, idx)}
-        >
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-              <input style={S.input} value={row.url||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} placeholder="Image URL"/>
-              <label style={{ ...S.button, textAlign:'center' }}>
-                Choose File
-                <input type="file" style={{ display:'none' }}
-                  onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'icons'); if (url) { const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); } }}/>
-              </label>
-            </div>
-            <div style={{ display:'flex', gap:8, marginTop:6 }}>
-              <button style={S.button} onClick={()=>setPickerOpenIdx(idx)}>Pick from Media</button>
-            </div>
-            {row.url
-              ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-              : <div style={{ color:'#9fb0bf' }}>No image</div>}
-          </div>
-          <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-          <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
-          <div style={{ display:'flex', gap:6 }}>
-            <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-            <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-          </div>
-
-          {/* Picker modal */}
-          {pickerOpenIdx===idx && (
-            <div style={S.overlay}>
-              <div style={{ ...S.card, width:'min(800px, 92vw)', maxHeight:'80vh', overflow:'auto' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <h4 style={{ margin:0 }}>Pick from Media</h4>
-                  <button style={S.button} onClick={()=>setPickerOpenIdx(null)}>Close</button>
-                </div>
-                <Gallery
-                  images={(libraryImages||[]).map(u=>({ url:u }))}
-                  emptyNote="No media found."
-                />
-                <div style={{ display:'flex', gap:8, marginTop:8, justifyContent:'flex-end' }}>
-                  <button style={S.button} onClick={()=>setPickerOpenIdx(null)}>Done</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-      <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
-    </div>
-  );
-}
-
-function RewardsTab({ config, setConfig }) {
-  const list = Array.isArray(config.media?.rewards) ? config.media.rewards : DEFAULT_REWARDS;
-  const setList = (next) => setConfig({ ...config, media:{ ...(config.media||{}), rewards: next } });
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Rewards</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-          <div>Thumbnail</div><div>Name</div><div>Special ability</div><div>Actions</div>
-        </div>
-        {list.map((row, idx)=>(
-          <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-            <div>
-              <input style={S.input} value={row.thumbUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), thumbUrl:e.target.value }; setList(n); }} placeholder="Thumbnail URL"/>
-              {row.thumbUrl && <img alt="thumb" src={toDirectMediaURL(row.thumbUrl)} style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>}
-            </div>
-            <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-            <input style={S.input} value={row.ability||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), ability:e.target.value }; setList(n); }}/>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-              <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}), key:(row.key||`rw${idx}`)+'-copy' }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-            </div>
-          </div>
-        ))}
-        <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`rw${list.length+1}`, name:'', ability:'', thumbUrl:'' }]); }}>+ Add Reward</button>
-      </div>
-    </main>
-  );
-}
-
-/* Styles */
-const S = {
-  body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
-  wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
-  wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
-  sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
-  missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
-  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
-  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
-  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0f1418', color:'#e9eef2', cursor:'pointer' },
-  tabActive:{ background:'#1a2027' },
-  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
-  hr:{ border:'1px solid #1f262d', borderBottom:'none' },
-  overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
-};
