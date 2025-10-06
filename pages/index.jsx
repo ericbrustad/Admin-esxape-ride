@@ -231,6 +231,20 @@ export default function Admin() {
 
   const [uploadStatus, setUploadStatus] = useState('');
 
+  // NEW: single-button Save & Publish controls
+  const [deployDelaySec, setDeployDelaySec] = useState(5);
+  const [savePubBusy, setSavePubBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('deployDelaySec');
+      if (saved != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(saved) || 0)));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {}
+  }, [deployDelaySec]);
+
   const gameBase =
     ((typeof window !== 'undefined'
       ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
@@ -367,6 +381,63 @@ export default function Admin() {
       setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
     } catch (e) {
       setStatus('❌ Publish failed: ' + (e?.message || e));
+    }
+  }
+
+  // NEW: Combine Save + Publish with a delay before publish (lets Vercel pick up the commit cleanly)
+  async function saveAndPublish() {
+    if (!suite || !config) return;
+    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+    setSavePubBusy(true);
+    setStatus('Saving… (writing missions + config safely)');
+    let saveOk = false;
+
+    try {
+      const r = await fetch('/api/save-bundle' + qs, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ missions: suite, config })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      saveOk = true;
+      setStatus(`✅ Saved. Waiting ${deployDelaySec}s before publish…`);
+    } catch (e) {
+      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
+      await new Promise(r => setTimeout(r, 900));
+      try {
+        const r2 = await fetch('/api/save-bundle' + qs, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ missions: suite, config })
+        });
+        if (!r2.ok) throw new Error(await r2.text());
+        saveOk = true;
+        setStatus(`✅ Saved after retry. Waiting ${deployDelaySec}s before publish…`);
+      } catch (e2) {
+        setSavePubBusy(false);
+        setStatus('❌ Save failed — publish skipped: ' + (e2?.message || e2));
+        return;
+      }
+    }
+
+    if (saveOk && deployDelaySec > 0) {
+      await new Promise(r => setTimeout(r, deployDelaySec * 1000));
+    }
+
+    try {
+      setStatus('Publishing…');
+      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
+      });
+      const data = await res.json().catch(()=> ({}));
+      if (!res.ok) throw new Error(data?.error || 'Publish failed');
+      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game (delay ${deployDelaySec}s used)`);
+    } catch (e) {
+      setStatus('❌ Publish failed: ' + (e?.message || e));
+    } finally {
+      setSavePubBusy(false);
     }
   }
 
@@ -522,7 +593,7 @@ export default function Admin() {
     } catch {
       setDevResults([]);
     } finally {
-           setDevSearching(false);
+      setDevSearching(false);
     }
   }
   function applySearchResult(r) {
@@ -590,9 +661,25 @@ export default function Admin() {
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Keep header controls */}
-            <button onClick={saveAll} style={S.button}>💾 Save All</button>
-            <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
+            {/* Combined Save + Publish with optional delay */}
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                Deploy delay (sec):
+                <input
+                  type="number" min={0} max={120}
+                  value={deployDelaySec}
+                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                  style={{ ...S.input, width:90 }}
+                />
+              </label>
+              <button
+                onClick={saveAndPublish}
+                disabled={savePubBusy}
+                style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
+              >
+                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
+              </button>
+            </div>
 
             <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
