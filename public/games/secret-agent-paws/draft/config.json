@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "ll",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.995557,
+      "lng": -93.309868
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "ll",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.995557,
+      "lng": -93.309868
+    }
+  ],
   "media": {},
   "icons": {
     "missions": [],
