@@ -118,9 +118,11 @@ function applyDefaultIcons(cfg) {
   const next = { ...cfg, icons: { missions:[], devices:[], rewards:[], ...(cfg.icons || {}) } };
   function ensure(kind, arr) {
     const list = [...(next.icons[kind] || [])];
-    const keys = new Set(list.map(x => (x.key||'').toLowerCase()));
-    for (const it of arr) {
-      if (!keys.has((it.key||'').toLowerCase())) list.push({ ...it });
+    theKeys: {
+      const keys = new Set(list.map(x => (x.key||'').toLowerCase()));
+      for (const it of arr) {
+        if (!keys.has((it.key||'').toLowerCase())) list.push({ ...it });
+      }
     }
     next.icons[kind] = list;
   }
@@ -153,7 +155,7 @@ const TYPE_FIELDS = {
   geofence_image: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'imageUrl',  label:'Image URL (https)', type:'text' },
     { key:'overlayText',label:'Caption/Text', type:'text', optional: true },
@@ -161,7 +163,7 @@ const TYPE_FIELDS = {
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'videoUrl',  label:'Video URL (https)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
@@ -220,16 +222,13 @@ function defaultAppearance() {
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
-const DEFAULT_REWARDS = [
-  { key:'gold-coin', name:'Gold Coin', ability:'Adds a coin to your wallet.', thumbUrl:'/media/bundles/GOLDEN%20COIN.png' },
-];
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('');
+  const [activeSlug, setActiveSlug] = useState('default'); // Default Game slug to avoid Missing slug
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -252,7 +251,7 @@ export default function Admin() {
   const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [selectedMissionIdx, setSelectedMissionIdx] = useState(null);
 
-  // Device manager
+  // Device manager (missions-side placement only)
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
@@ -265,23 +264,23 @@ export default function Admin() {
   const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
-  // Map UI options
-  const [mapPinSize, setMapPinSize] = useState(24);
+  // Selected Pin size (only affects selected pin)
+  const [selectedPinSize, setSelectedPinSize] = useState(28);
+  const defaultPinSize = 24;
+
+  // Undo/Redo history
+  const historyRef = useRef({ past: [], future: [] });
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('deployDelaySec');
-      if (saved != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(saved) || 0)));
-      const savedPin = localStorage.getItem('mapPinSize');
-      if (savedPin != null) setMapPinSize(clamp(Number(savedPin) || 24, 12, 64));
+      const savedDelay = localStorage.getItem('deployDelaySec');
+      if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
+      const savedSel = localStorage.getItem('selectedPinSize');
+      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
     } catch {}
   }, []);
-  useEffect(() => {
-    try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {}
-  }, [deployDelaySec]);
-  useEffect(() => {
-    try { localStorage.setItem('mapPinSize', String(mapPinSize)); } catch {}
-  }, [mapPinSize]);
+  useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
+  useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -290,6 +289,48 @@ export default function Admin() {
 
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig({ ...config, devices: list, powerups: list });
+
+  function snapshotState() {
+    return {
+      missions: JSON.parse(JSON.stringify(suite?.missions || [])),
+      devices: JSON.parse(JSON.stringify(getDevices() || [])),
+    };
+  }
+  function pushHistory() {
+    if (!suite || !config) return;
+    historyRef.current.past.push(snapshotState());
+    historyRef.current.future = [];
+  }
+  function canUndo() { return historyRef.current.past.length > 0; }
+  function canRedo() { return historyRef.current.future.length > 0; }
+  function undo() {
+    if (!canUndo()) return;
+    const current = snapshotState();
+    const prev = historyRef.current.past.pop();
+    historyRef.current.future.push(current);
+    setSuite((s) => ({ ...s, missions: prev.missions }));
+    setDevices(prev.devices);
+    setStatus('↶ Undid last change');
+  }
+  function redo() {
+    if (!canRedo()) return;
+    const current = snapshotState();
+    const next = historyRef.current.future.pop();
+    historyRef.current.past.push(current);
+    setSuite((s) => ({ ...s, missions: next.missions }));
+    setDevices(next.devices);
+    setStatus('↷ Redid last change');
+  }
+  useEffect(() => {
+    function onKey(e) {
+      const z = e.key === 'z' || e.key === 'Z';
+      const y = e.key === 'y' || e.key === 'Y';
+      if ((e.ctrlKey || e.metaKey) && z) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if ((e.ctrlKey || e.metaKey) && y) { e.preventDefault(); redo(); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // attach once
 
   /* load games */
   useEffect(() => {
@@ -307,11 +348,15 @@ export default function Admin() {
     (async () => {
       try {
         setStatus('Loading…');
-        const missionUrls = activeSlug ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`] : [`/missions.json`];
-        const configUrl   = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
+        const missionUrls = activeSlug
+          ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
+          : [`/missions.json`];
+        const configUrls = activeSlug
+          ? [`/api/config?slug=${encodeURIComponent(activeSlug)}`, `/api/config`]
+          : [`/api/config`];
 
         const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchJsonSafe(configUrl, defaultConfig());
+        const c0 = await fetchFirstJson(configUrls, defaultConfig());
 
         const dc = defaultConfig();
         const normalized = {
@@ -338,12 +383,12 @@ export default function Admin() {
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
-        // Re-apply defaults if sets are empty/missing
         merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
         setConfig(merged);
         setSelected(null); setEditing(null); setDirty(false);
+        setSelectedDevIdx(null); setSelectedMissionIdx(null);
         setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
@@ -363,9 +408,7 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
-      // Game-wide map defaults (for coherent region)
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
-      // Geofence mode (admin-side toggle; the Game app can use this)
       geofence: { mode: 'test' }, // 'test' | 'live'
     };
   }
@@ -385,10 +428,10 @@ export default function Admin() {
     }
   }
 
-  async function saveAll() {
+  async function saveAllWithSlug(slug) {
     if (!suite || !config) return;
     setStatus('Saving… (writing missions + config safely)');
-    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+    const qs = `?slug=${encodeURIComponent(slug)}`;
     try {
       const r = await fetch('/api/save-bundle' + qs, {
         method: 'POST',
@@ -398,6 +441,7 @@ export default function Admin() {
       });
       if (!r.ok) throw new Error(await r.text());
       setStatus('✅ Saved (files committed). If Game files changed, Vercel will redeploy.');
+      return true;
     } catch (e) {
       setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
       await new Promise(r => setTimeout(r, 900));
@@ -410,80 +454,38 @@ export default function Admin() {
         });
         if (!r2.ok) throw new Error(await r2.text());
         setStatus('✅ Saved after retry.');
+        return true;
       } catch (e2) {
         setStatus('❌ Save failed: ' + (e2?.message || e2));
+        return false;
       }
     }
   }
-  async function handlePublish() {
+  async function handlePublishWithSlug(slug) {
     try {
       setStatus('Publishing…');
-      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Publish failed');
-      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
-    } catch (e) {
-      setStatus('❌ Publish failed: ' + (e?.message || e));
-    }
-  }
-
-  // Combined Save + Publish with a delay
-  async function saveAndPublish() {
-    if (!suite || !config) return;
-    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
-    setSavePubBusy(true);
-    setStatus('Saving… (writing missions + config safely)');
-    let saveOk = false;
-
-    try {
-      const r = await fetch('/api/save-bundle' + qs, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ missions: suite, config })
-      });
-      if (!r.ok) throw new Error(await r.text());
-      saveOk = true;
-      setStatus(`✅ Saved. Waiting ${deployDelaySec}s before publish…`);
-    } catch (e) {
-      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
-      await new Promise(r => setTimeout(r, 900));
-      try {
-        const r2 = await fetch('/api/save-bundle' + qs, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ missions: suite, config })
-        });
-        if (!r2.ok) throw new Error(await r2.text());
-        saveOk = true;
-        setStatus(`✅ Saved after retry. Waiting ${deployDelaySec}s before publish…`);
-      } catch (e2) {
-        setSavePubBusy(false);
-        setStatus('❌ Save failed — publish skipped: ' + (e2?.message || e2));
-        return;
-      }
-    }
-
-    if (saveOk && deployDelaySec > 0) {
-      await new Promise(r => setTimeout(r, deployDelaySec * 1000));
-    }
-
-    try {
-      setStatus('Publishing…');
-      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
+      const res  = await fetch(`/api/game/${encodeURIComponent(slug)}?channel=published`, {
         method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
       });
       const data = await res.json().catch(()=> ({}));
       if (!res.ok) throw new Error(data?.error || 'Publish failed');
-      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game (delay ${deployDelaySec}s used)`);
+      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
+      return true;
     } catch (e) {
       setStatus('❌ Publish failed: ' + (e?.message || e));
-    } finally {
-      setSavePubBusy(false);
+      return false;
     }
+  }
+
+  async function saveAndPublish() {
+    if (!suite || !config) return;
+    const slug = activeSlug || 'default';
+    setSavePubBusy(true);
+    const saved = await saveAllWithSlug(slug);
+    if (!saved) { setSavePubBusy(false); return; }
+    if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
+    await handlePublishWithSlug(slug);
+    setSavePubBusy(false);
   }
 
   /* Missions CRUD */
@@ -542,21 +544,24 @@ export default function Admin() {
     if (i >= 0) missions[i] = obj; else missions.push(obj);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ Mission saved (remember Save All)');
+    setStatus('✅ Mission saved');
   }
   function removeMission(id) {
     if (!suite) return;
+    pushHistory();
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
     if (!suite) return;
+    pushHistory();
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
     setSuite({ ...suite, missions: list });
   }
   function duplicateMission(idx) {
+    pushHistory();
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
@@ -564,10 +569,10 @@ export default function Admin() {
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
-    setStatus('✅ Duplicated (remember Save All)');
+    setStatus('✅ Duplicated');
   }
 
-  /* Devices (Map-Side Manager) */
+  /* Devices (map-side placement on Missions tab only) */
   const devices = getDevices();
   function deviceIconUrlFromKey(key) {
     if (!key) return '';
@@ -582,6 +587,7 @@ export default function Admin() {
   }
   function saveDraftDevice() {
     if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
+    pushHistory();
     const item = {
       id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
       title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
@@ -596,10 +602,11 @@ export default function Admin() {
     setPlacingDev(false);
     setSelectedDevIdx((devices?.length || 0));
     setSelectedMissionIdx(null);
-    setStatus('✅ Device added (remember Save All)');
+    setStatus('✅ Device added');
   }
   function deleteSelectedDevice() {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list.splice(selectedDevIdx, 1);
     setDevices(list);
@@ -607,6 +614,7 @@ export default function Admin() {
   }
   function duplicateSelectedDevice() {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const src = devices[selectedDevIdx]; if (!src) return;
     const copy = { ...JSON.parse(JSON.stringify(src)) };
     copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
@@ -615,37 +623,41 @@ export default function Admin() {
   }
   function moveSelectedDevice(lat, lng) {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
     setDevices(list);
   }
   function setSelectedDeviceRadius(r) {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
     setDevices(list);
   }
 
-  // Missions selection operations from map
+  // Mission selection operations
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
+    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
     c.lat = Number(lat.toFixed(6));
     c.lng = Number(lng.toFixed(6));
     c.geofenceEnabled = true;
-    c.radiusMeters = Number(c.radiusMeters || 25);
+    c.radiusMeters = clamp(Number(c.radiusMeters || 25), 5, 500);
     list[selectedMissionIdx] = { ...m, content: c };
     setSuite({ ...suite, missions: list });
     setStatus(`Moved mission #${selectedMissionIdx+1}`);
   }
   function setSelectedMissionRadius(r) {
     if (selectedMissionIdx == null) return;
+    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
-    c.radiusMeters = clamp(Number(r || 0), 1, 2000);
+    c.radiusMeters = clamp(Number(r || 0), 5, 500); // 5–500 only
     c.geofenceEnabled = true;
     if (!isFinite(Number(c.lat)) || !isFinite(Number(c.lng))) {
       c.lat = Number(config.map?.centerLat || 44.9778);
@@ -655,7 +667,7 @@ export default function Admin() {
     setSuite({ ...suite, missions: list });
   }
 
-  // Address search
+  // Address search (for Missions tab placement)
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
@@ -678,12 +690,13 @@ export default function Admin() {
     if (placingDev) {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
+      pushHistory();
       moveSelectedDevice(lat, lon);
     } else if (selectedMissionIdx != null) {
+      pushHistory();
       moveSelectedMission(lat, lon);
     } else {
-      setPlacingDev(true);
-      setDevDraft(d => ({ ...d, lat, lng: lon }));
+      // No placement when none selected (readability)
     }
     setDevResults([]);
   }
@@ -722,25 +735,31 @@ export default function Admin() {
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
 
-  // Slider binding for selected entity
-  const sliderDisabled = (selectedMissionIdx==null && selectedDevIdx==null && !placingDev);
-  const sliderValue = selectedMissionIdx!=null
+  // Slider binding for radius
+  const radiusSliderDisabled = (selectedMissionIdx==null && selectedDevIdx==null && !placingDev);
+  const radiusValue = selectedMissionIdx!=null
     ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : selectedDevIdx!=null
       ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
       : Number(devDraft.pickupRadius ?? 0);
-  const sliderLabel =
+  const radiusMin = selectedMissionIdx != null ? 5 : 5;
+  const radiusMax = selectedMissionIdx != null ? 500 : 2000; // missions 5–500, devices up to 2000
+  const radiusLabel =
     selectedMissionIdx!=null ? `M${selectedMissionIdx+1} radius`
     : selectedDevIdx!=null    ? `D${selectedDevIdx+1} radius`
     : placingDev              ? 'New device radius'
     : 'Select a pin to adjust radius';
+
+  const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
+
+  const tabsOrder = ['missions','devices','settings','text','media','test'];
 
   return (
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {['settings','missions','text','devices','map','media','test'].map((t)=>(
+            {tabsOrder.map((t)=>(
               <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
                 {t.toUpperCase()}
               </button>
@@ -748,7 +767,7 @@ export default function Admin() {
             <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8 }}>
               <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="">(legacy root)</option>
+                <option value="default">(Default Game)</option>
                 {games.map(g=>(
                   <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                 ))}
@@ -756,7 +775,7 @@ export default function Admin() {
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Combined Save + Publish with optional delay */}
+            {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                 Deploy delay (sec):
@@ -776,10 +795,10 @@ export default function Admin() {
               </button>
             </div>
 
-            <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a href={activeSlug && activeSlug!=='default' ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
-            <a href={activeSlug?`/api/config?slug=${encodeURIComponent(activeSlug)}`:'/config.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/api/config'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
           </div>
@@ -790,10 +809,12 @@ export default function Admin() {
       {/* MISSIONS */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
-          {/* Left list (new mission button here) */}
+          {/* Left list */}
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
               <button onClick={startNew} style={S.button}>+ New Mission</button>
+              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
+              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
             </div>
             <input
               placeholder="Search…"
@@ -831,7 +852,7 @@ export default function Admin() {
           {/* Right: Overview Map + device controls + overlay editor */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Overview Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
@@ -843,9 +864,12 @@ export default function Admin() {
                     <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    Pin size:
-                    <input type="range" min={16} max={48} step={2} value={mapPinSize} onChange={(e)=>setMapPinSize(Number(e.target.value))}/>
-                    <code style={{ color:'#9fb0bf' }}>{mapPinSize}px</code>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedPinSizeDisabled}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'#9fb0bf' }}>{selectedPinSize}px</code>
                   </label>
                 </div>
               </div>
@@ -853,7 +877,7 @@ export default function Admin() {
               {/* Device / Mission manager row */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
                 <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                  <input placeholder="Search address or place for device/mission…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
+                  <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
                   <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
                   <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
                 </form>
@@ -867,9 +891,9 @@ export default function Admin() {
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                   <input
-                    type="range" min={5} max={2000} step={5}
-                    disabled={sliderDisabled}
-                    value={sliderValue}
+                    type="range" min={radiusMin} max={radiusMax} step={5}
+                    disabled={radiusSliderDisabled}
+                    value={radiusValue}
                     onChange={(e)=>{
                       const r = Number(e.target.value);
                       if (selectedMissionIdx!=null) setSelectedMissionRadius(r);
@@ -878,7 +902,7 @@ export default function Admin() {
                     }}
                   />
                   <code style={{ color:'#9fb0bf' }}>
-                    {sliderLabel}: {sliderDisabled ? '—' : sliderValue} m
+                    {radiusLabel}: {radiusSliderDisabled ? '—' : radiusValue} m
                   </code>
                 </div>
               </div>
@@ -919,7 +943,7 @@ export default function Admin() {
                 {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
               </div>
 
-              {/* Draft device editor with preview */}
+              {/* Draft device editor */}
               {placingDev && (
                 <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
                   <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
@@ -956,7 +980,7 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Map */}
+              {/* Map (editable on Missions tab) */}
               <MapOverview
                 missions={(suite?.missions)||[]}
                 devices={(config?.devices)||[]}
@@ -973,7 +997,9 @@ export default function Admin() {
                 onSelectMission={(i)=>{ setSelectedMissionIdx(i); setSelectedDevIdx(null); setPlacingDev(false); }}
                 mapCenter={mapCenter}
                 mapZoom={mapZoom}
-                iconSizePx={mapPinSize}
+                defaultIconSizePx={defaultPinSize}
+                selectedIconSizePx={selectedPinSize}
+                readOnly={false}
               />
             </div>
 
@@ -998,7 +1024,7 @@ export default function Admin() {
                     </select>
                   </Field>
 
-                  {/* Icon select with thumbnail (no free-form upload) */}
+                  {/* Icon select with thumbnail (inventory-only) */}
                   <Field label="Icon">
                     <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                       <select
@@ -1093,7 +1119,7 @@ export default function Admin() {
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
-                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                       />
                     </div>
                   )}
@@ -1114,7 +1140,7 @@ export default function Admin() {
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                             center={mapCenter}
-                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -1147,7 +1173,8 @@ export default function Admin() {
                         <input type="number" min={f.min} max={f.max} style={S.input}
                           value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
                             const v = e.target.value==='' ? '' : Number(e.target.value);
-                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
+                            const vClamped = (f.key==='radiusMeters') ? clamp(v,5,500) : v;
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:vClamped } }); setDirty(true);
                           }}/>
                       )}
                       {f.type==='multiline' && (
@@ -1165,115 +1192,8 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
-                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.correct?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.correct?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Reward media"
-                      dir="bundles"
-                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.correct?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                    />
-                  )}
-                  {editing.correct?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Reward device (optional)">
-                      <select style={S.input}
-                        value={editing.correct?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Clue (optional)">
-                      <input style={S.input}
-                        value={editing.correct?.clue || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
-
-                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.wrong?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.wrong?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Penalty media"
-                      dir="bundles"
-                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.wrong?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                    />
-                  )}
-                  {editing.wrong?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Punishment device (optional)">
-                      <select style={S.input}
-                        value={editing.wrong?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Delay (seconds, optional)">
-                      <input type="number" min={0} max={3600} style={S.input}
-                        value={editing.wrong?.delaySec ?? 0}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
-
-                  <hr style={S.hr}/>
-
-                  {/* Continue button flag */}
+                  {/* Continue button toggle */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input
                       type="checkbox"
@@ -1283,6 +1203,7 @@ export default function Admin() {
                     Show “Continue” button to close this mission
                   </label>
 
+                  {/* Appearance override */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1301,6 +1222,78 @@ export default function Admin() {
                 </div>
               </div>
             )}
+          </section>
+        </main>
+      )}
+
+      {/* DEVICES (Overview Map, read-only for pins) */}
+      {tab==='devices' && (
+        <main style={S.wrapGrid2}>
+          {/* Left: Device list */}
+          <aside style={S.sidebarTall}>
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
+              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
+            </div>
+            <ul style={{ paddingLeft: 18 }}>
+              {(devices||[]).map((x,i)=>(
+                <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
+                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
+                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
+                  <button
+                    style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
+                    onClick={()=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+                  >
+                    Select
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” on the Missions tab to place devices.</div>}
+          </aside>
+
+          {/* Right: Read‑only Overview Map */}
+          <section style={{ position:'relative' }}>
+            <div style={S.card}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
+                <div>
+                  <h3 style={{ margin:0 }}>Overview Map (read‑only)</h3>
+                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                    This view doesn’t move pins. Use the Missions tab to place or move pins.
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedPinSizeDisabled}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'#9fb0bf' }}>{selectedPinSize}px</code>
+                  </label>
+                </div>
+              </div>
+
+              <MapOverview
+                missions={(suite?.missions)||[]}
+                devices={devices}
+                icons={config.icons||DEFAULT_ICONS}
+                showRings={showRings}
+                mapCenter={mapCenter}
+                mapZoom={mapZoom}
+                defaultIconSizePx={defaultPinSize}
+                selectedIconSizePx={selectedPinSize}
+                // Read‑only: allow selecting, but no dragging or click-to-move
+                selectedDevIdx={selectedDevIdx}
+                selectedMissionIdx={selectedMissionIdx}
+                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+                onSelectMission={(i)=>{ setSelectedMissionIdx(i); setSelectedDevIdx(null); }}
+                readOnly={true}
+              />
+            </div>
           </section>
         </main>
       )}
@@ -1364,7 +1357,7 @@ export default function Admin() {
               </Field>
             </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-              These defaults ensure all pins open centered in the same region. The Game client can use <b>Geofence Mode</b> to allow “click‑to‑enter” in test, and real GPS entry in live.
+              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click‑to‑enter in test vs GPS in live.
             </div>
           </div>
 
@@ -1381,64 +1374,6 @@ export default function Admin() {
 
       {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
-
-      {/* DEVICES (list) */}
-      {tab==='devices' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop:0 }}>Devices</h3>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” on the Missions tab or map-side manager.</div>}
-            <ul style={{ paddingLeft:18 }}>
-              {(devices||[]).map((x,i)=>(
-                <li key={x.id||i} style={{ marginBottom:8 }}>
-                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • radius {x.pickupRadius}m • effect {x.effectSeconds}s
-                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • lat {x.lat}, lng {x.lng}</> : ' • (not placed)'}
-                  {x.iconKey?<> • icon <code>{x.iconKey}</code></>:null}
-                  <button style={{ ...S.button, marginLeft:8, padding:'6px 10px' }}
-                    onClick={()=>{ const next=[...devices]; next.splice(i,1); setDevices(next); }}>Remove</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </main>
-      )}
-
-      {/* MAP */}
-      {tab==='map' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:8, flexWrap:'wrap' }}>
-              <h3 style={{ margin:0 }}>Game Map</h3>
-              <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                </label>
-                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  Pin size:
-                  <input type="range" min={16} max={48} step={2} value={mapPinSize} onChange={(e)=>setMapPinSize(Number(e.target.value))}/>
-                  <code style={{ color:'#9fb0bf' }}>{mapPinSize}px</code>
-                </label>
-              </div>
-            </div>
-            <MapOverview
-              missions={(suite?.missions)||[]}
-              devices={devices}
-              icons={config.icons||DEFAULT_ICONS}
-              showRings={showRings}
-              mapCenter={mapCenter}
-              mapZoom={mapZoom}
-              iconSizePx={mapPinSize}
-              // enable selecting on this tab too
-              selectedDevIdx={selectedDevIdx}
-              selectedMissionIdx={selectedMissionIdx}
-              onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
-              onSelectMission={(i)=>{ setSelectedMissionIdx(i); setSelectedDevIdx(null); }}
-              onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
-              onMoveSelectedMission={(lat,lng)=>moveSelectedMission(lat,lng)}
-            />
-          </div>
-        </main>
-      )}
 
       {/* MEDIA — Icons + Reward & Penalty pools */}
       {tab==='media' && (
@@ -1468,12 +1403,12 @@ export default function Admin() {
                     <option value="published">published</option>
                   </select>
                 </label>
-                <TestLauncher slug={activeSlug||''} channel={testChannel} preferPretty={true} popup={false}/>
+                <TestLauncher slug={activeSlug||'default'} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
-              <iframe src={`${gameBase}/?slug=${activeSlug||''}&channel=${testChannel}&preview=1`}
+              <iframe src={`${gameBase}/?slug=${encodeURIComponent(activeSlug||'default')}&channel=${testChannel}&preview=1`}
                 style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}/>
             )}
           </div>
@@ -1518,7 +1453,7 @@ export default function Admin() {
                 if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
                 const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
                 if (jj.ok) setGames(jj.games || []);
-                setActiveSlug(j.slug); setNewTitle(''); setShowNewGame(false);
+                setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
               }}>Create</button>
             </div>
           </div>
@@ -1688,7 +1623,9 @@ function MapOverview({
   selectedDevIdx = null, selectedMissionIdx = null,
   onDraftChange = null, onMoveSelected = null, onMoveSelectedMission = null,
   onSelectDevice = null, onSelectMission = null,
-  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13, iconSizePx = 24,
+  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13,
+  defaultIconSizePx = 24, selectedIconSizePx = 28,
+  readOnly = false,
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
@@ -1743,12 +1680,13 @@ function MapOverview({
       const pos=getMissionPos(m); if(!pos) return;
       const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
       const isSel = (selectedMissionIdx===idx);
-      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,iconSizePx), draggable:isSel}).addTo(layer);
+      const size = isSel ? selectedIconSizePx : defaultIconSizePx;
+      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,size), draggable:(!readOnly && isSel)}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
       let circle=null;
       if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer); }
       marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectMission && onSelectMission(idx); });
-      if(isSel){
+      if(!readOnly && isSel){
         marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
         marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission && onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
       }
@@ -1760,22 +1698,23 @@ function MapOverview({
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,iconSizePx), draggable:hl}).addTo(layer);
+      const size = hl ? selectedIconSizePx : defaultIconSizePx;
+      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
       let circle=null;
       if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
       marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice && onSelectDevice(idx); });
-      if(hl){
+      if(!readOnly && hl){
         marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
         marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected && onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
       }
       bounds.extend(pos);
     });
 
-    // Draft device
-    if(draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
+    // Draft device (missions tab only)
+    if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,iconSizePx), draggable:true }).addTo(layer);
+      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
       if(showRings && Number(draftDevice.radius)>0){
         const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
         mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
@@ -1784,14 +1723,15 @@ function MapOverview({
       bounds.extend(pos);
     }
 
-    // Click handler: place draft, or move selected device/mission ONLY
+    // Click handler
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
+      if (readOnly) return; // no moving in read-only view
       const lat=e.latlng.lat, lng=e.latlng.lng;
       if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      // else: do nothing (no accidental nearest-pin moves)
+      // else do nothing
     };
     map.on('click', map._clickHandler);
 
@@ -1800,7 +1740,7 @@ function MapOverview({
   },[
     leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
     selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
-    onSelectDevice, onSelectMission, mapCenter, mapZoom, iconSizePx
+    onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly
   ]);
 
   return (
@@ -1811,11 +1751,11 @@ function MapOverview({
   );
 }
 
-/* MapPicker — geofence mini map with draggable marker + radius slider */
+/* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
 function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
   const divRef = useRef(null);
   const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
-  const [rad, setRad] = useState(Number(radius) || 25);
+  const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1827,7 +1767,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
   }, []);
 
-  useEffect(() => { setRad(Number(radius) || 25); }, [radius]);
+  useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
 
   useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
@@ -1845,13 +1785,13 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
       marker.on('dragend', () => {
         const p = marker.getLatLng();
-        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(rad));
+        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
       });
 
       map.on('click', (e) => {
         marker.setLatLng(e.latlng);
         circle.setLatLng(e.latlng);
-        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(rad));
+        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
       });
 
       divRef.current._leaflet_map = map;
@@ -1868,7 +1808,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       marker.setLatLng(pos);
       circle.setLatLng(pos);
       map.setView(pos, map.getZoom());
-      circle.setRadius(Number(rad) || 25);
+      circle.setRadius(Number(clamp(rad,5,500)));
     }
   }, [leafletReady, lat, lng, rad, onChange, center]);
 
@@ -1878,9 +1818,9 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
-          type="range" min={5} max={2000} step={5} value={rad}
+          type="range" min={5} max={500} step={5} value={rad}
           onChange={(e) => {
-            const next = Number(e.target.value);
+            const next = clamp(Number(e.target.value),5,500);
             setRad(next);
             if (divRef.current?._circle) divRef.current._circle.setRadius(next);
             if (divRef.current?._marker) {
@@ -2238,7 +2178,7 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember Save All)');
+    setStatus('✅ SMS rule added');
   }
   function removeSmsRule(idx) {
     const rules = [...(config?.textRules || [])];
