@@ -1,87 +1,40 @@
 // pages/api/list-media.js
-// Canonical listing of media for the Admin inventory.
-// Prefers Admin public assets; falls back to Game only if Admin doesn't have it.
-// De-duplicates by filename (case-insensitive).
-
-import fs from 'fs';
-import path from 'path';
-
-const EXTS = {
-  image: /\.(png|jpg|jpeg|webp)$/i,
-  gif: /\.(gif)$/i,
-  video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
-};
-
-function classify(name) {
-  if (EXTS.gif.test(name)) return 'gif';
-  if (EXTS.image.test(name)) return 'image';
-  if (EXTS.video.test(name)) return 'video';
-  if (EXTS.audio.test(name)) return 'audio';
+function classify(url) {
+  const s = url.toLowerCase();
+  if (/\.(png|jpg|jpeg|webp)$/.test(s)) return 'image';
+  if (/\.(gif)$/.test(s)) return 'gif';
+  if (/\.(mp4|webm|mov)$/.test(s)) return 'video';
+  if (/\.(mp3|wav|ogg|m4a)$/.test(s)) return 'audio';
   return 'other';
 }
 
-function listFiles(absDir) {
-  try {
-    return fs
-      .readdirSync(absDir, { withFileTypes: true })
-      .filter(d => d.isFile())
-      .map(d => d.name);
-  } catch {
-    return [];
-  }
-}
-
 export default async function handler(req, res) {
+  if (req.method !== 'GET') return res.status(405).end();
   try {
-    const dir = (req.query.dir || 'bundles').toString(); // 'bundles' | 'overlays'
-    const cwd = process.cwd();
-    const gameOrigin = process.env.NEXT_PUBLIC_GAME_ORIGIN || '';
+    const requested = String(req.query.dir || '').replace(/[^a-z0-9_-]/gi, '');
+    const dir = ['uploads', 'bundles', 'icons'].includes(requested) ? requested : 'uploads';
 
-    // Priority: 1) Admin public (canonical), 2) Game public (fallback if Admin missing)
-    const adminRoot = path.join(cwd, 'public', 'media', dir);
-    const gameRoot  = path.join(cwd, 'game', 'public', 'media', dir);
+    const token  = process.env.GITHUB_TOKEN;
+    const user   = process.env.GITHUB_USER;
+    const repo   = process.env.GITHUB_REPO;
+    const branch = process.env.GITHUB_BRANCH || 'main';
 
-    const adminNames = listFiles(adminRoot);
-    const gameNames  = listFiles(gameRoot);
+    const basePath = `public/media/${dir}`;
+    const url = `https://api.github.com/repos/${user}/${repo}/contents/${basePath}?ref=${branch}`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
-    const seenByName = new Set(); // case-insensitive
-    const out = [];
+    if (!r.ok) return res.status(200).json({ items: [] });
 
-    // 1) Admin (canonical)
-    for (const name of adminNames) {
-      const type = classify(name);
-      if (type === 'other') continue;
-      const key = name.toLowerCase();
-      if (seenByName.has(key)) continue;
-      seenByName.add(key);
-      out.push({
-        name,
-        url: `/media/${dir}/${encodeURIComponent(name)}`,
-        type,
-        source: 'admin',
+    const arr = await r.json();
+    const items = (Array.isArray(arr) ? arr : [])
+      .filter(it => it.type === 'file')
+      .map(it => {
+        const urlPath = `/media/${dir}/${it.name}`;
+        return { name: it.name, url: urlPath, type: classify(it.name) };
       });
-    }
 
-    // 2) Game (fallback only for names not present in Admin)
-    if (gameOrigin) {
-      for (const name of gameNames) {
-        const type = classify(name);
-        if (type === 'other') continue;
-        const key = name.toLowerCase();
-        if (seenByName.has(key)) continue; // Admin has it → skip Game
-        seenByName.add(key);
-        out.push({
-          name,
-          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
-          type,
-          source: 'game',
-        });
-      }
-    }
-
-    return res.status(200).json({ ok: true, items: out });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+    res.status(200).json({ items });
+  } catch {
+    res.status(200).json({ items: [] });
   }
 }
