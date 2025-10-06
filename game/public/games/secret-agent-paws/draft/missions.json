@@ -1,39 +1,6 @@
 {
-  "version": "0.0.3",
+  "version": "0.0.1",
   "missions": [
-    {
-      "id": "m02",
-      "title": "New Mission",
-      "type": "multiple_choice",
-      "iconKey": "trivia",
-      "iconUrl": "/media/bundles/CLUEgreen.png",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "video",
-        "audioUrl": "https://drive.google.com/file/d/1t7v_C1CS31-b2o3-cohnS6vhceWQpUoi/view?usp=sharing"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "question": "yy",
-        "choices": [
-          "u",
-          "u",
-          "u"
-        ],
-        "correctIndex": 0,
-        "mediaUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=4x4hail8&dl=0",
-        "geofenceEnabled": true,
-        "lat": 44.9778,
-        "lng": -93.265,
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false
-    },
     {
       "id": "m01",
       "title": "Welcome",
