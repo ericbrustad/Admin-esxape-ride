@@ -21,7 +21,27 @@
         "lng": "",
         "radiusMeters": 25,
         "cooldownSeconds": 30
-      }
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
     },
     {
       "id": "m06",
@@ -44,7 +64,27 @@
         "lng": -93.237662,
         "radiusMeters": 25,
         "cooldownSeconds": 30
-      }
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
     },
     {
       "id": "m07",
@@ -68,7 +108,27 @@
         "lng": -93.265,
         "radiusMeters": 255,
         "cooldownSeconds": 30
-      }
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
     },
     {
       "id": "m08",
@@ -91,7 +151,27 @@
         "lng": "",
         "radiusMeters": 25,
         "cooldownSeconds": 30
-      }
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
     }
   ]
 }
