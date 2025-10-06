@@ -1801,7 +1801,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid '#1f2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
