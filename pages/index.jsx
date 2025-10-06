@@ -2088,7 +2088,9 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyD
           onChange={async (e)=>{
             const files = Array.from(e.target.files || []);
             for (const f of files) {
-              const url = await uploadToRepo(f, folder);
+              // before: const url = await uploadToRepo(f, 'icons');
+              const url = await uploadToRepo(f, 'uploads');
+
               if (url && typeof onUploaded==='function') onUploaded(url);
             }
             e.target.value = '';
