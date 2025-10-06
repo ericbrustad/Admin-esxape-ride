@@ -69,6 +69,24 @@ function classifyByExt(u) {
   return 'other';
 }
 
+/** NEW: Merge inventory across dirs so uploads show up everywhere */
+async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
+  const seen = new Set();
+  const out = [];
+  await Promise.all(dirs.map(async (dir) => {
+    try {
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
+      const j = await r.json();
+      (j?.items || []).forEach(it => {
+        // Normalize & de-duplicate by URL
+        const url = it.url || '';
+        if (!seen.has(url)) { seen.add(url); out.push(it); }
+      });
+    } catch {}
+  }));
+  return out;
+}
+
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
   // filenames are relative to /media/bundles/
@@ -1469,6 +1487,7 @@ function MediaPreview({ url, kind }) {
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
+  const isAudio = /\.(mp3|wav|ogg|m4a)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
@@ -1476,6 +1495,8 @@ function MediaPreview({ url, kind }) {
         <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+      ) : isAudio ? (
+        <audio src={u} controls style={{ width:'100%' }} />
       ) : (
         <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
       )}
@@ -1784,8 +1805,7 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
   const [pool, setPool] = useState([]);
   useEffect(()=>{ (async()=>{
     try {
-      const r = await fetch(`/api/list-media?dir=bundles`);
-      const j = await r.json(); setPool(j?.items || []);
+      setPool(await listInventory(['icons','bundles','uploads']));
     } catch {}
   })(); }, []);
 
@@ -1832,8 +1852,7 @@ function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
   const [pool, setPool] = useState([]);
   useEffect(()=>{ (async()=>{
     try {
-      const r = await fetch(`/api/list-media?dir=bundles`);
-      const j = await r.json(); setPool(j?.items || []);
+      setPool(await listInventory(['uploads','bundles']));
     } catch {}
   })(); }, []);
 
@@ -1887,9 +1906,8 @@ function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acce
 
   React.useEffect(()=>{ (async()=>{
     try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`);
-      const j = await r.json();
-      setPool(j?.items || []);
+      // Merge specified dir with uploads so fresh uploads appear
+      setPool(await listInventory([dir, 'uploads']));
     } catch {}
   })(); }, [dir]);
 
@@ -1904,7 +1922,7 @@ function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acce
       (acceptKinds.includes('video') && type.startsWith('video/')) ||
       (acceptKinds.includes('audio') && type.startsWith('audio/'));
     if (!ok) return;
-    const pathFolder = (acceptKinds.includes('image') || acceptKinds.includes('gif')) ? 'uploads' : 'uploads';
+    const pathFolder = 'uploads';
     const u = await uploadToRepo(f, pathFolder);
     if (u) onChangeUrl(u);
   }
@@ -1962,8 +1980,7 @@ function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onCl
 
   useEffect(()=>{ (async()=>{
     try {
-      const r = await fetch('/api/list-media?dir=bundles');
-      const j = await r.json(); setPool(j?.items || []);
+      setPool(await listInventory(['uploads','bundles','icons']));
     } catch {}
   })(); }, []);
 
@@ -1988,7 +2005,7 @@ function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onCl
             <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t?{ background:'#1a2027' }:{}) }} onClick={()=>setTab(t)}>
               {t.toUpperCase()}
             </button>
-          )}
+          ))}
           <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
