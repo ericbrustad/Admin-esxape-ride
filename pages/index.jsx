@@ -2001,11 +2001,12 @@ function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onCl
           <button style={S.button} onClick={onClose}>Close</button>
         </div>
         <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {tabs.map(t=>
-            <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t?{ background:'#1a2027' }:{}) }} onClick={()=>setTab(t)}>
-              {t.toUpperCase()}
-            </button>
-          ))}
+  {tabs.map(t => ( // <--- FIX: Changed '{' to '('
+    <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }} onClick={() => setTab(t)}>
+      {t.toUpperCase()}
+    </button>
+  ))}
+</div>
           <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
