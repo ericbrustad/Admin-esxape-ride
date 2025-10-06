@@ -1,0 +1,14 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "new game 5",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
