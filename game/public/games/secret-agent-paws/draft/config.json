@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "ss",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "ss",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
