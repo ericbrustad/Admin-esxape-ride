@@ -23,20 +23,15 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
-    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'https://example.invalid');
+    const url = new URL(u);
     const host = url.host.toLowerCase();
 
-    // Serve project-local absolute paths as-is
-    if (u.startsWith('/')) return u;
-
-    // Dropbox
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
       url.searchParams.delete('dl');
       if (!url.searchParams.has('raw')) url.searchParams.set('raw', '1');
       return url.toString();
     }
-    // Google Drive
     if (host.endsWith('drive.google.com')) {
       let id = '';
       if (url.pathname.startsWith('/file/d/')) {
@@ -63,48 +58,48 @@ function hexToRgb(hex) {
 /* ───────────────────────── Constants ───────────────────────── */
 const TYPE_FIELDS = {
   multiple_choice: [
-    { key:'question', label:'Question', type:'text' },
-    { key:'mediaUrl',  label:'Image or Video URL (optional)', type:'text' },
+    { key:'question', label:'Question', type:'text' },                       // question first (we still skip dup in renderer)
+    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   short_answer: [
     { key:'question',   label:'Question', type:'text' },
     { key:'answer',     label:'Correct Answer', type:'text' },
-    { key:'acceptable', label:'Also Accept (comma-separated, optional)', type:'text' }, // optional
-    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text' },
+    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text', optional: true }, // optional now
+    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   statement: [
     { key:'text',     label:'Statement Text', type:'multiline' },
-    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   video: [
     { key:'videoUrl',   label:'Video URL (https)', type:'text' },
-    { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
+    { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
   ],
   geofence_image: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
     { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'imageUrl',  label:'Image URL (https, optional)', type:'text' },
-    { key:'overlayText',label:'Caption/Text (optional)', type:'text' },
+    { key:'imageUrl',  label:'Image URL (https)', type:'text' },
+    { key:'overlayText',label:'Caption/Text', type:'text', optional: true },
   ],
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
     { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'videoUrl',  label:'Video URL (https, optional)', type:'text' },
-    { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
+    { key:'videoUrl',  label:'Video URL (https)', type:'text' },
+    { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
   ],
   ar_image: [
     { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
     { key:'assetUrl',  label:'AR Overlay Image URL (png/jpg)', type:'text' },
-    { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
+    { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
   ],
   ar_video: [
     { key:'markerUrl', label:'AR Marker Image URL (png/jpg)', type:'text' },
     { key:'assetUrl',  label:'AR Video URL (mp4)', type:'text' },
-    { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
+    { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
   ],
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
@@ -150,74 +145,9 @@ function defaultAppearance() {
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
-
-/* ────── Default images: prefer /public/media/bundles; fall back to repo paths ────── */
-const BASES = [
-  '/media/bundles',                 // <== put defaults here for reliable serving
-  '/games/lib/media/bundles',
-  '/lib/media/bundles',
-  '/media/defaults',
+const DEFAULT_REWARDS = [
+  { key:'gold-coin', name:'Gold Coin', ability:'Adds a coin to your wallet.', thumbUrl:'/media/bundles/GOLDEN%20COIN.png' },
 ];
-const u = (file) => BASES.map(b => `${b}/${encodeURIComponent(file)}`)[0]; // prefer first
-
-const U = {
-  robot:   u('ROBOT1small.png'),
-  smoke:   u('SMOKE BOMB.png'),
-  evid:    u('evidence 2.png'),
-  clue:    u('CLUEgreen.png'),
-  coin:    u('GOLDEN COIN.png'),
-  trivia:  u('trivia icon.png'),
-  trivia2: u('trivia yellow.png'),
-};
-
-const DEFAULT_DEVICE_ICONS = [
-  { key: 'dev-clone', name: 'Roaming Robot', url: U.robot },
-  { key: 'dev-smoke', name: 'Smoke Shield',  url: U.smoke },
-];
-const DEFAULT_MISSION_ICONS = [
-  { key: 'trivia',   name: 'Trivia',   url: U.trivia },
-  { key: 'trivia-2', name: 'Trivia 2', url: U.trivia2 },
-];
-const DEFAULT_REWARD_ICONS = [
-  { key: 'evidence',  name: 'Evidence',  url: U.evid },
-  { key: 'clue',      name: 'Clue',      url: U.clue },
-  { key: 'gold-coin', name: 'Gold Coin', url: U.coin },
-];
-const DEFAULT_REWARDS_SEEDED = [
-  { key: 'gold-coin', name: 'Gold Coin', ability: 'Adds a coin to your wallet.', thumbUrl: U.coin },
-];
-
-function seedDefaults(cfg) {
-  const next = {
-    ...cfg,
-    icons: { ...(cfg.icons || {}) },
-    media: { ...(cfg.media || {}) },
-  };
-  const ensure = (kind, seeds) => {
-    const list = Array.isArray(next.icons[kind]) ? [...next.icons[kind]] : [];
-    const have = new Set(list.map((x) => (x.key || '').toLowerCase()));
-    seeds.forEach((s) => {
-      if (s.url && !have.has((s.key || '').toLowerCase())) list.push(s);
-    });
-    next.icons[kind] = list;
-  };
-  ensure('devices',  DEFAULT_DEVICE_ICONS);
-  ensure('missions', DEFAULT_MISSION_ICONS);
-  ensure('rewards',  DEFAULT_REWARD_ICONS);
-
-  if (!Array.isArray(next.media.rewards) || next.media.rewards.length === 0) {
-    next.media.rewards = DEFAULT_REWARDS_SEEDED;
-  }
-
-  const pool = Array.isArray(next.media.pool) ? next.media.pool.slice() : [];
-  const addPool = (url) => { if (url && !pool.includes(url)) pool.push(url); };
-  [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2].forEach(addPool);
-  ['devices','missions','rewards'].forEach(k => {
-    (next.icons[k] || []).forEach(it => addPool(it.url));
-  });
-  next.media.pool = pool;
-  return next;
-}
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
@@ -243,7 +173,7 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // Device manager (right by the map)
+  // Device manager (map side)
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
@@ -303,7 +233,7 @@ export default function Admin() {
         };
 
         setSuite(normalized);
-        setConfig(seedDefaults(merged)); // ensure defaults & pool exist
+        setConfig(merged);
         setSelected(null); setEditing(null); setDirty(false);
         setStatus('');
       } catch (e) {
@@ -343,15 +273,33 @@ export default function Admin() {
 
   async function saveAll() {
     if (!suite || !config) return;
-    setStatus('Saving… (this may trigger a redeploy)');
+    setStatus('Saving… (writing missions + config safely)');
     const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
-    const [a,b] = await Promise.all([
-      fetch('/api/save' + qs,        { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ missions: suite }) }),
-      fetch('/api/save-config' + qs, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ config }) }),
-    ]);
-    const ok = a.ok && b.ok;
-    if (!ok) setStatus('❌ Save failed:\n' + (await a.text()) + '\n' + (await b.text()));
-    else     setStatus('✅ Saved (files committed). Vercel will redeploy the Game project if /game files changed.');
+    try {
+      const r = await fetch('/api/save-bundle' + qs, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ missions: suite, config })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setStatus('✅ Saved (files committed). If Game files changed, Vercel will redeploy.');
+    } catch (e) {
+      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
+      await new Promise(r => setTimeout(r, 900));
+      try {
+        const r2 = await fetch('/api/save-bundle' + qs, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ missions: suite, config })
+        });
+        if (!r2.ok) throw new Error(await r2.text());
+        setStatus('✅ Saved after retry.');
+      } catch (e2) {
+        setStatus('❌ Save failed: ' + (e2?.message || e2));
+      }
+    }
   }
   async function handlePublish() {
     try {
@@ -380,9 +328,10 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       iconKey: '',
+      iconUrl: '',
       rewards: { points: 25 },
-      onCorrect: defaultResponse('correct'),
-      onWrong:   defaultResponse('wrong'),
+      correct: { mode: 'none' },
+      wrong:   { mode: 'none' },
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
@@ -393,57 +342,31 @@ export default function Admin() {
     const e = JSON.parse(JSON.stringify(m));
     e.appearanceOverrideEnabled = !!e.appearanceOverrideEnabled;
     e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
-    e.onCorrect = normalizeResponse(e.onCorrect, 'correct');
-    e.onWrong   = normalizeResponse(e.onWrong, 'wrong');
+    if (!e.correct) e.correct = { mode: 'none' };
+    if (!e.wrong)   e.wrong   = { mode: 'none' };
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
   function bumpVersion(v) {
     const p = String(v || '0.0.0').split('.').map(n=>parseInt(n||'0',10)); while (p.length<3) p.push(0); p[2]+=1; return p.join('.');
   }
-
-  // optional fields set (won’t block saving)
-  const OPTIONAL = new Set(['acceptable','mediaUrl','overlayText','imageUrl','videoUrl']);
-
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
-    // Validate per type
-    if (editing.type === 'short_answer') {
-      const q = editing.content?.question?.trim();
-      const a = editing.content?.answer?.trim();
-      if (!q) return setStatus('❌ Missing: Question');
-      if (!a) return setStatus('❌ Missing: Correct Answer');
-    } else if (editing.type === 'multiple_choice') {
-      const q = editing.content?.question?.trim();
-      const choices = Array.isArray(editing.content?.choices) ? editing.content.choices.filter(Boolean) : [];
-      const ci = editing.content?.correctIndex;
-      if (!q) return setStatus('❌ Missing: Question');
-      if (choices.length < 2) return setStatus('❌ Multiple Choice requires at least 2 options');
-      if (!(Number.isInteger(ci) && ci >= 0 && ci < choices.length)) return setStatus('❌ Pick a correct option (radio)');
-    } else {
-      // Generic: only block truly required numeric fields (Leaflet picker covers geo)
-      // Nothing extra
-    }
-
-    // Enforce only non-optional textual fields if given in TYPE_FIELDS
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
-      if (f.type === 'number') continue;
-      if (OPTIONAL.has(f.key)) continue;
+      if (f.type === 'number' || f.optional) continue;
+      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue; // explicitly optional
       const v = editing.content?.[f.key];
-      if (v === undefined || v === null || v === '') return setStatus('❌ Missing: ' + f.label);
+      if (v === undefined || v === null || v === '') {
+        return setStatus('❌ Missing: ' + f.label);
+      }
     }
-
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
-    // tidy responses
-    obj.onCorrect = normalizeResponse(obj.onCorrect, 'correct');
-    obj.onWrong   = normalizeResponse(obj.onWrong, 'wrong');
-
     if (i >= 0) missions[i] = obj; else missions.push(obj);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
@@ -524,19 +447,23 @@ export default function Admin() {
     setDevices(list);
   }
 
-  // Address search (by the map) — Nominatim
+  // ── Address search (by the map) — Nominatim ───────────────────────────
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
     if (!q) return;
-    setDevSearching(true); setDevResults([]);
+    setDevSearching(true);
+    setDevResults([]);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
-      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
       const j = await r.json();
       setDevResults(Array.isArray(j) ? j : []);
-    } catch { setDevResults([]); }
-    setDevSearching(false);
+    } catch {
+      setDevResults([]);
+    } finally {
+      setDevSearching(false);
+    }
   }
   function applySearchResult(r) {
     const lat = Number(r.lat), lon = Number(r.lon);
@@ -557,7 +484,6 @@ export default function Admin() {
     });
   }
 
-  // upload helper: add to /public/media/... and add to media pool
   async function uploadToRepo(file, subfolder='uploads') {
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
@@ -569,30 +495,10 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    const url = `/${path.replace(/^public\//,'')}`;
-    if (res.ok) {
-      setUploadStatus(`✅ Uploaded ${safeName}`);
-      // add to media pool for picker
-      setConfig(prev => {
-        const pool = Array.isArray(prev?.media?.pool) ? [...prev.media.pool] : [];
-        if (!pool.includes(url)) pool.push(url);
-        return { ...prev, media: { ...(prev.media||{}), pool } };
-      });
-      return url;
-    } else {
-      setUploadStatus(`❌ ${j?.error || 'upload failed'}`);
-      return '';
-    }
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+    return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
-  function getDeviceIconUrl(cfg, key) {
-    if (!key) return '';
-    const list = cfg?.icons?.devices || [];
-    const it = list.find((x) => (x.key || '') === key);
-    return it?.url ? toDirectMediaURL(it.url) : '';
-  }
-
-  /* Avoid SSR crash if loading */
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
@@ -608,7 +514,7 @@ export default function Admin() {
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {['settings','missions','text','devices','map','media','rewards','test'].map(t=>(
+            {['settings','missions','text','devices','map','media','test'].map(t=>(
               <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
                 {t.toUpperCase()}
               </button>
@@ -625,7 +531,6 @@ export default function Admin() {
             </div>
 
             <button onClick={startNew} style={S.button}>+ New Mission</button>
-
             <button onClick={saveAll} style={S.button}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
 
@@ -640,7 +545,7 @@ export default function Admin() {
         </div>
       </header>
 
-      {/* MISSIONS (left list) + MAP (right) with Device Manager */}
+      {/* MISSIONS (list left + map right + overlay editor) */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
           {/* Left list */}
@@ -678,7 +583,7 @@ export default function Admin() {
             </div>
           </aside>
 
-          {/* Right side: Device Manager + Overview Map; mission editor overlays here */}
+          {/* Right: Overview Map + device controls + overlay editor */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8 }}>
@@ -694,28 +599,18 @@ export default function Admin() {
                 </label>
               </div>
 
-              {/* Device Manager controls row */}
+              {/* Device manager row */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
-                {/* Address bar + search */}
                 <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                  <input
-                    placeholder="Search address or place for device…"
-                    style={S.input}
-                    value={devSearchQ}
-                    onChange={(e)=>setDevSearchQ(e.target.value)}
-                  />
+                  <input placeholder="Search address or place for device…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
                   <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
                   <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
                 </form>
-
-                {/* Quick actions */}
                 <div style={{ display:'flex', gap:8 }}>
                   <button style={S.button} onClick={addDevice}>+ Add Device</button>
                   <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
                   <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
                 </div>
-
-                {/* Radius slider for selected or draft */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                   <input
                     type="range" min={5} max={2000} step={5}
@@ -744,7 +639,7 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Compact list of devices to select */}
+              {/* Compact device selector */}
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
                 {(devices||[]).map((d,i)=>(
                   <button
@@ -763,101 +658,17 @@ export default function Admin() {
                 {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
               </div>
 
-              {/* Selected device quick edit (with thumbnail) */}
-              {!placingDev && selectedDevIdx!=null && devices[selectedDevIdx] && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
-                    <div style={{ width:36, height:36, borderRadius:6, overflow:'hidden', border:'1px solid #2a323b' }}>
-                      {(() => {
-                        const d = devices[selectedDevIdx];
-                        const u = getDeviceIconUrl(config, d.iconKey) || U.smoke;
-                        return <img src={toDirectMediaURL(u)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
-                      })()}
-                    </div>
-                    <div>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Title</div>
-                      <input
-                        style={S.input}
-                        value={devices[selectedDevIdx].title || ''}
-                        onChange={(e)=> {
-                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], title:e.target.value };
-                          setDevices(next);
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Type</div>
-                      <select
-                        style={S.input}
-                        value={devices[selectedDevIdx].type || 'smoke'}
-                        onChange={(e)=> {
-                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], type:e.target.value };
-                          setDevices(next);
-                        }}
-                      >
-                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Icon</div>
-                      <select
-                        style={S.input}
-                        value={devices[selectedDevIdx].iconKey || ''}
-                        onChange={(e)=> {
-                          const next=[...devices]; next[selectedDevIdx] = { ...next[selectedDevIdx], iconKey:e.target.value };
-                          setDevices(next);
-                        }}
-                      >
-                        <option value="">(default)</option>
-                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Effect (sec)</div>
-                      <input
-                        type="number" min={5} max={3600}
-                        style={S.input}
-                        value={devices[selectedDevIdx].effectSeconds || 60}
-                        onChange={(e)=> {
-                          const next=[...devices];
-                          next[selectedDevIdx] = {
-                            ...next[selectedDevIdx],
-                            effectSeconds: clamp(Number(e.target.value||0),5,3600)
-                          };
-                          setDevices(next);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ marginTop:8, color:'#9fb0bf' }}>
-                    Click the map to move this device; use the slider to change pickup radius.
-                  </div>
-                </div>
-              )}
-
-              {/* New device (placing) panel with thumbnail */}
               {placingDev && (
                 <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'36px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
-                    <div style={{ width:36, height:36, borderRadius:6, overflow:'hidden', border:'1px solid #2a323b' }}>
-                      {(() => {
-                        const u = getDeviceIconUrl(config, devDraft.iconKey) || U.smoke;
-                        return <img src={toDirectMediaURL(u)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
-                      })()}
-                    </div>
-                    <Field label="Title">
-                      <input style={S.input} value={devDraft.title}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/>
-                    </Field>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                     <Field label="Type">
-                      <select style={S.input} value={devDraft.type}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
                         {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </Field>
                     <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
+                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
                         <option value="">(default)</option>
                         {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
                       </select>
@@ -914,15 +725,13 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(820px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
-                  {/* Sticky top controls */}
-                  <div style={{ position:'sticky', top:0, background:'#12181d', zIndex:2, paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
-                    <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-                      <button style={S.button} onClick={saveToList}>Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
-                    </div>
+                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
+                  {/* TOP buttons */}
+                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                    <button style={S.button} onClick={saveToList}>Save Mission</button>
+                    <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
 
-                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Type">
@@ -933,91 +742,86 @@ export default function Admin() {
                       ))}
                     </select>
                   </Field>
+
+                  {/* Icon select + drop/pick */}
                   <Field label="Icon">
-                    <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
-                      <option value="">(default)</option>
-                      {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                    </select>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                      <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
+                        <option value="">(default)</option>
+                        {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                      </select>
+                      <DropOrPick
+                        label="(or drop/pick image to assign)"
+                        dir="bundles"
+                        url={editing.iconUrl || ''}
+                        onChangeUrl={(u)=>{ setEditing({ ...editing, iconUrl:u }); setDirty(true); }}
+                        uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                      />
+                    </div>
                   </Field>
 
                   <hr style={S.hr}/>
 
-                  {/* MC editor */}
-                  {editing.type==='multiple_choice' && (
-                    <div style={{ marginBottom:12 }}>
-                      <MultipleChoiceEditor
-                        value={Array.isArray(editing.content?.choices)?editing.content.choices:[]}
-                        correctIndex={editing.content?.correctIndex}
-                        onChange={({ choices, correctIndex })=>{
-                          setEditing({ ...editing, content:{ ...editing.content, choices, correctIndex } }); setDirty(true);
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Response settings for Q/A missions */}
-                  {(editing.type==='multiple_choice' || editing.type==='short_answer') && (
+                  {/* QUESTION-FIRST ORDERING */}
+                  {editing.type === 'multiple_choice' && (
                     <>
-                      <ResponseEditor
-                        title="Correct Answer response"
-                        value={normalizeResponse(editing.onCorrect,'correct')}
-                        showClueOption
-                        devices={config?.devices || config?.powerups || []}
-                        icons={config.icons || DEFAULT_ICONS}
-                        onChange={(v)=>{ setEditing({ ...editing, onCorrect: v }); setDirty(true); }}
-                      />
-                      <ResponseEditor
-                        title="Wrong Answer response"
-                        value={normalizeResponse(editing.onWrong,'wrong')}
-                        devices={config?.devices || config?.powerups || []}
-                        icons={config.icons || DEFAULT_ICONS}
-                        onChange={(v)=>{ setEditing({ ...editing, onWrong: v }); setDirty(true); }}
-                      />
+                      <Field label="Question">
+                        <input
+                          style={S.input}
+                          value={editing.content?.question || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), question:e.target.value } }); setDirty(true); }}
+                        />
+                      </Field>
+                      <div style={{ marginBottom: 12 }}>
+                        <MultipleChoiceEditor
+                          value={Array.isArray(editing.content?.choices) ? editing.content.choices : []}
+                          correctIndex={editing.content?.correctIndex}
+                          onChange={({ choices, correctIndex }) => {
+                            setEditing({ ...editing, content: { ...editing.content, choices, correctIndex } });
+                            setDirty(true);
+                          }}
+                        />
+                      </div>
                     </>
                   )}
 
-                  {/* Stored Statement composer */}
-                  {editing.type === 'stored_statement' && (
-                    <div style={{ marginBottom: 12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
-                      <div style={{ fontWeight:600, marginBottom:8 }}>Compose stored statement</div>
-
-                      <Field label="Template (click IDs below to insert a tag like #m03# where your cursor is)">
-                        <textarea
-                          style={{ ...S.input, height: 130, fontFamily:'ui-monospace, Menlo' }}
-                          value={editing.content?.template || ''}
-                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), template:e.target.value } }); setDirty(true); }}
-                          ref={(el)=>{ if (el) editing.__tplRef = el; }}
+                  {editing.type === 'short_answer' && (
+                    <>
+                      <Field label="Question">
+                        <input
+                          style={S.input}
+                          value={editing.content?.question || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), question:e.target.value } }); setDirty(true); }}
                         />
                       </Field>
+                      <Field label="Correct Answer">
+                        <input
+                          style={S.input}
+                          value={editing.content?.answer || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), answer:e.target.value } }); setDirty(true); }}
+                        />
+                      </Field>
+                      <Field label="Also Accept (comma-separated) (optional)">
+                        <input
+                          style={S.input}
+                          value={editing.content?.acceptable || ''}
+                          onChange={(e)=>{ setEditing({ ...editing, content:{ ...(editing.content||{}), acceptable:e.target.value } }); setDirty(true); }}
+                        />
+                      </Field>
+                    </>
+                  )}
 
-                      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Click an ID to insert:</div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                        {(suite.missions || []).map((mm) => (
-                          <button
-                            key={mm.id}
-                            type="button"
-                            style={{ ...S.button, padding:'6px 10px' }}
-                            onClick={()=>{
-                              const tag = `#${String(mm.id).toLowerCase()}#`;
-                              const ta = editing.__tplRef;
-                              if (ta) {
-                                const s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
-                                const v = editing.content?.template || '';
-                                const next = v.slice(0, s) + tag + v.slice(e);
-                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: next } });
-                                setDirty(true);
-                                requestAnimationFrame(()=>{ ta.focus(); ta.selectionStart = ta.selectionEnd = s + tag.length; });
-                              } else {
-                                setEditing({ ...editing, content:{ ...(editing.content||{}), template: (editing.content?.template || '') + tag } });
-                                setDirty(true);
-                              }
-                            }}
-                          >
-                            {`#${mm.id}#`}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  {editing.type === 'statement' && (
+                    <Field label="Statement Text">
+                      <textarea
+                        style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                        value={editing.content?.text || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, content: { ...(editing.content || {}), text: e.target.value } });
+                          setDirty(true);
+                        }}
+                      />
+                    </Field>
                   )}
 
                   {/* Geofence types */}
@@ -1059,7 +863,12 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {(TYPE_FIELDS[editing.type]||[]).map(f=>(
+                  {/* Remaining generic fields (skip ones we rendered above) */}
+                  {(TYPE_FIELDS[editing.type] || [])
+                    .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
+                    .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
+                    .filter(f => !(editing.type === 'statement' && f.key === 'text'))
+                    .map(f=>(
                     <Field key={f.key} label={f.label}>
                       {f.type==='text' && (
                         <>
@@ -1092,8 +901,112 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  <hr style={S.hr}/>
+                  {/* Outcomes: Correct / Wrong */}
+                  <hr style={S.hr} />
+                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <Field label="Mode">
+                      <select style={S.input}
+                        value={editing.correct?.mode || 'none'}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
+                        <option value="none">None</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="gif">GIF</option>
+                        <option value="statement">Statement</option>
+                      </select>
+                    </Field>
+                    <Field label="Optional audio URL (mp3/wav)">
+                      <input style={S.input}
+                        value={editing.correct?.audioUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  </div>
+                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
+                    <DropOrPick
+                      label="Media"
+                      dir="bundles"
+                      url={editing.correct?.mediaUrl || ''}
+                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
+                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                    />
+                  )}
+                  {editing.correct?.mode === 'statement' && (
+                    <Field label="Statement text">
+                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Reward device (optional)">
+                      <select style={S.input}
+                        value={editing.correct?.deviceType || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
+                        <option value="">(none)</option>
+                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Clue (optional)">
+                      <input style={S.input}
+                        value={editing.correct?.clue || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                    <div />
+                  </div>
 
+                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <Field label="Mode">
+                      <select style={S.input}
+                        value={editing.wrong?.mode || 'none'}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
+                        <option value="none">None</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="gif">GIF</option>
+                        <option value="statement">Statement</option>
+                      </select>
+                    </Field>
+                    <Field label="Optional audio URL (mp3/wav)">
+                      <input style={S.input}
+                        value={editing.wrong?.audioUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  </div>
+                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
+                    <DropOrPick
+                      label="Media"
+                      dir="bundles"
+                      url={editing.wrong?.mediaUrl || ''}
+                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
+                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                    />
+                  )}
+                  {editing.wrong?.mode === 'statement' && (
+                    <Field label="Statement text">
+                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Punishment device (optional)">
+                      <select style={S.input}
+                        value={editing.wrong?.deviceType || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
+                        <option value="">(none)</option>
+                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Delay (seconds, optional)">
+                      <input type="number" min={0} max={3600} style={S.input}
+                        value={editing.wrong?.delaySec ?? 0}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
+                    </Field>
+                    <div />
+                  </div>
+
+                  {/* Appearance override */}
+                  <hr style={S.hr}/>
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1104,7 +1017,7 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  {/* Bottom controls mirror (for convenience) */}
+                  {/* Bottom buttons remain */}
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -1153,7 +1066,7 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
-      {/* DEVICES tab (simple list) */}
+      {/* DEVICES list */}
       {tab==='devices' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -1174,7 +1087,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MAP (read-only large) */}
+      {/* MAP */}
       {tab==='map' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -1189,7 +1102,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MEDIA (uploads + icons + re-seed + picker) */}
+      {/* MEDIA */}
       {tab==='media' && (
         <MediaTab
           config={config}
@@ -1202,9 +1115,6 @@ export default function Admin() {
           }}
         />
       )}
-
-      {/* REWARDS */}
-      {tab==='rewards' && <RewardsTab config={config} setConfig={setConfig}/>}
 
       {/* TEST */}
       {tab==='test' && (
@@ -1275,129 +1185,6 @@ export default function Admin() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ───────────────────────── Response editor (Correct/Wrong) ───────────────────────── */
-function defaultResponse(kind='correct') {
-  return {
-    show: { kind:'none', mediaUrl:'', audioUrl:'', text:'' },
-    action: { kind:'none', deviceKey:'', seconds:0, clueText:'' },
-  };
-}
-function normalizeResponse(r, kind='correct') {
-  const d = defaultResponse(kind);
-  const x = { ...(r||{}) };
-  x.show   = { ...d.show, ...(x.show||{}) };
-  x.action = { ...d.action, ...(x.action||{}) };
-  return x;
-}
-function ResponseEditor({ title, value, onChange, showClueOption=false, devices=[], icons={} }) {
-  const v = normalizeResponse(value);
-
-  return (
-    <div style={{ marginBottom:12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-        <Field label="Show">
-          <select
-            style={S.input}
-            value={v.show.kind}
-            onChange={(e)=>onChange({ ...v, show:{ ...v.show, kind:e.target.value } })}
-          >
-            <option value="none">None</option>
-            <option value="image">Image</option>
-            <option value="video">Video</option>
-            <option value="gif">GIF</option>
-            <option value="audio">Audio (+image optional)</option>
-            <option value="statement">Statement</option>
-          </select>
-        </Field>
-
-        {(v.show.kind==='image' || v.show.kind==='video' || v.show.kind==='gif' || v.show.kind==='audio') && (
-          <Field label={v.show.kind==='audio' ? 'Image/GIF URL (optional)' : 'Media URL'}>
-            <input
-              style={S.input}
-              value={v.show.mediaUrl}
-              onChange={(e)=>onChange({ ...v, show:{ ...v.show, mediaUrl:e.target.value } })}
-            />
-            <MediaPreview url={v.show.mediaUrl} kind="response"/>
-          </Field>
-        )}
-
-        {v.show.kind==='audio' && (
-          <Field label="Audio URL (mp3)">
-            <input
-              style={S.input}
-              value={v.show.audioUrl}
-              onChange={(e)=>onChange({ ...v, show:{ ...v.show, audioUrl:e.target.value } })}
-            />
-          </Field>
-        )}
-
-        {v.show.kind==='statement' && (
-          <Field label="Text to display">
-            <textarea
-              style={{ ...S.input, height:90 }}
-              value={v.show.text}
-              onChange={(e)=>onChange({ ...v, show:{ ...v.show, text:e.target.value } })}
-            />
-          </Field>
-        )}
-      </div>
-
-      <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-        <Field label="Action">
-          <select
-            style={S.input}
-            value={v.action.kind}
-            onChange={(e)=>onChange({ ...v, action:{ ...v.action, kind:e.target.value } })}
-          >
-            <option value="none">None</option>
-            <option value="deploy_device">Deploy Device</option>
-            {showClueOption && <option value="clue">Give Clue</option>}
-            <option value="delay">Delay</option>
-          </select>
-        </Field>
-
-        {v.action.kind==='deploy_device' && (
-          <Field label="Device">
-            <select
-              style={S.input}
-              value={v.action.deviceKey || ''}
-              onChange={(e)=>onChange({ ...v, action:{ ...v.action, deviceKey:e.target.value } })}
-            >
-              <option value="">— pick device —</option>
-              {(devices||[]).map((d,i)=><option key={d.id||i} value={d.id||d.key||`d${i+1}`}>{d.title||d.type||(`Device ${i+1}`)}</option>)}
-            </select>
-          </Field>
-        )}
-
-        {v.action.kind==='delay' && (
-          <Field label="Delay (seconds)">
-            <input
-              type="number"
-              min={1}
-              max={3600}
-              style={S.input}
-              value={v.action.seconds || 0}
-              onChange={(e)=>onChange({ ...v, action:{ ...v.action, seconds: Math.max(1, Number(e.target.value||0)) } })}
-            />
-          </Field>
-        )}
-
-        {showClueOption && v.action.kind==='clue' && (
-          <Field label="Clue text">
-            <input
-              style={S.input}
-              value={v.action.clueText || ''}
-              onChange={(e)=>onChange({ ...v, action:{ ...v.action, clueText:e.target.value } })}
-            />
-          </Field>
-        )}
-      </div>
     </div>
   );
 }
@@ -1552,7 +1339,7 @@ const S = {
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
 };
 
-/* MapOverview — same as before (placement/move/nearest) */
+/* MapOverview — shows missions + devices, supports: placing draft, moving selected, moving nearest */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
   interactive = false, draftDevice = null, selectedDevIdx = null,
@@ -1600,7 +1387,7 @@ function MapOverview({
 
     (missions||[]).forEach((m,idx)=>{
       const pos=getMissionPos(m); if(!pos) return;
-      const url=iconUrl('missions', m.iconKey);
+      const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
       L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',false)}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
       if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
@@ -1657,17 +1444,9 @@ function MapOverview({
   );
 }
 
-/* MEDIA tab with DnD + file chooser + Icons editors + picker + re‑apply defaults + Add URL */
+/* MEDIA tab */
 function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo }) {
   const [hover, setHover] = useState(false);
-
-  // picker state (global pool)
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerSetter, setPickerSetter] = useState(null); // function(url) -> void
-  const openPicker = (setter) => { setPickerSetter(()=>setter); setPickerOpen(true); };
-  const closePicker = () => { setPickerOpen(false); setPickerSetter(null); };
-
-  const [addUrl, setAddUrl] = useState('');
 
   async function handleDrop(e) {
     e.preventDefault(); e.stopPropagation(); setHover(false);
@@ -1702,98 +1481,59 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
     );
   }
 
-  const pool = Array.isArray(config?.media?.pool) ? config.media.pool : [];
-
   return (
     <main style={S.wrap}>
-      <div
-        style={S.card}
-        onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-        onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-        onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
-        onDrop={handleDrop}
-      >
-        <h3 style={{ marginTop:0, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-          <span>Media</span>
-          <span style={{ display:'flex', gap:8 }}>
-            <button
-              style={S.button}
-              title="Re-seed example icons, rewards and global media pool (non-destructive)"
-              onClick={() => setConfig(seedDefaults(config))}
-            >
-              Re‑apply defaults
-            </button>
-          </span>
-        </h3>
-
+      <div style={S.card}
+           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
+           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
+           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
+           onDrop={handleDrop}>
+        <h3 style={{ marginTop:0 }}>Media</h3>
         <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
           Drag & drop files here or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
           <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
         </div>
 
-        <div style={{ marginBottom:12, display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-          <input
-            style={S.input}
-            placeholder="Add URL to Media Pool (https…)"
-            value={addUrl}
-            onChange={(e)=>setAddUrl(e.target.value)}
-          />
-          <button
-            style={S.button}
-            onClick={()=>{
-              const u = addUrl.trim();
-              if (!u) return;
-              const p = Array.isArray(config?.media?.pool) ? [...config.media.pool] : [];
-              if (!p.includes(u)) p.push(u);
-              setConfig({ ...config, media:{ ...(config.media||{}), pool:p } });
-              setAddUrl('');
-            }}
-          >Add to Pool</button>
-        </div>
-
-        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo} openPicker={openPicker}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Reward Icons"  kind="rewards"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
+        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
+        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
       </div>
-
-      <PickFromMediaModal
-        open={pickerOpen}
-        pool={pool}
-        onPick={(url)=>{ if (typeof pickerSetter === 'function') pickerSetter(url); closePicker(); }}
-        onClose={closePicker}
-      />
     </main>
   );
 }
-function IconsEditor({ config, setConfig, label, kind, uploadToRepo, openPicker }) {
+function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
   const list = config.icons?.[kind] || [];
   const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
+
+  const [pool, setPool] = useState([]);
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`/api/list-media?dir=bundles`);
+      const j = await r.json(); setPool(j?.items || []);
+    } catch {}
+  })(); }, []);
 
   return (
     <div style={{ marginTop:16 }}>
       <h4 style={{ marginTop:0 }}>{label}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 200px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
         <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
       </div>
       {list.map((row, idx)=>(
-        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 200px', gap:8, alignItems:'center', marginBottom:8 }}>
+        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
           <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-              <input style={S.input} value={row.url||''}
-                onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }}
-                placeholder="Image URL"/>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+              <input style={S.input} value={row.url||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} placeholder="Image URL"/>
               <label style={{ ...S.button, textAlign:'center' }}>
                 Choose File
                 <input type="file" style={{ display:'none' }}
                   onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'icons'); if (url) { const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); } }}/>
               </label>
-              <button
-                style={S.button}
-                type="button"
-                onClick={()=> openPicker && openPicker((url)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); })}
-              >
-                Pick from Media
-              </button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
+              <select style={S.input} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} value="">
+                <option value="">Pick from media pool…</option>
+                {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
+              </select>
             </div>
             {row.url
               ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
@@ -1811,74 +1551,10 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo, openPicker 
     </div>
   );
 }
-function PickFromMediaModal({ open, pool = [], onPick, onClose }) {
-  if (!open) return null;
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'grid', placeItems:'center', zIndex:3000 }}>
-      <div style={{ ...S.card, width:'min(900px, 92vw)' }}>
-        <h4 style={{ marginTop:0 }}>Pick from Media Pool</h4>
-        {(!pool || pool.length===0) ? (
-          <div style={{ color:'#9fb0bf' }}>No media in the pool yet.</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:12 }}>
-            {pool.map((u, i) => (
-              <div key={i} style={{ border:'1px solid #2a323b', borderRadius:10, overflow:'hidden', background:'#0b0c10' }}>
-                <div style={{ width:'100%', aspectRatio:'1/1', overflow:'hidden' }}>
-                  <img alt="" src={toDirectMediaURL(u)} style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
-                </div>
-                <div style={{ padding:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <code style={{ color:'#9fb0bf', fontSize:11, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:140 }}>
-                    {u.replace(/^https?:\/\/[^/]+/,'')}
-                  </code>
-                  <button style={{ ...S.button, padding:'6px 10px' }} onClick={()=>onPick(u)}>Use</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ marginTop:12, textAlign:'right' }}>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function RewardsTab({ config, setConfig }) {
-  const list = Array.isArray(config.media?.rewards) ? config.media.rewards : DEFAULT_REWARDS_SEEDED;
-  const setList = (next) => setConfig({ ...config, media:{ ...(config.media||{}), rewards: next } });
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Rewards</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 1fr 200px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-          <div>Thumbnail</div><div>Name</div><div>Special ability</div><div>Media URL (optional)</div><div>Actions</div>
-        </div>
-        {list.map((row, idx)=>(
-          <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 1fr 200px', gap:8, alignItems:'center', marginBottom:8 }}>
-            <div>
-              <input style={S.input} value={row.thumbUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), thumbUrl:e.target.value }; setList(n); }} placeholder="Thumbnail URL"/>
-              {row.thumbUrl && <img alt="thumb" src={toDirectMediaURL(row.thumbUrl)} style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>}
-            </div>
-            <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-            <input style={S.input} value={row.ability||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), ability:e.target.value }; setList(n); }}/>
-            <input style={S.input} value={row.mediaUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), mediaUrl:e.target.value }; setList(n); }}/>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-              <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}), key:(row.key||`rw${idx}`)+'-copy' }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-            </div>
-          </div>
-        ))}
-        <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`rw${list.length+1}`, name:'', ability:'', thumbUrl:'', mediaUrl:'' }]); }}>+ Add Reward</button>
-      </div>
-    </main>
-  );
-}
-
-/* Text tab left as before (includes inline SMS test) */
+/* Mission Text rules (unchanged from your build) */
 function TextTab({ suite, config, setConfig, setStatus }) {
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-
   function addSmsRule() {
     if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
     const maxPlayers = config?.forms?.players || 1;
@@ -1893,29 +1569,6 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     rules.splice(idx, 1);
     setConfig({ ...config, textRules: rules });
   }
-
-  function TestSMSInline() {
-    const [to, setTo] = useState('');
-    const [msg, setMsg] = useState('Test message from admin');
-    const [st, setSt] = useState('');
-    async function send() {
-      setSt('Sending…');
-      const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-      const text = await res.text();
-      setSt(res.ok ? '✅ Sent' : '❌ ' + text);
-    }
-    return (
-      <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-          <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-          <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-          <button style={S.button} onClick={send}>Send Test</button>
-        </div>
-        <div style={{ marginTop: 6, color: '#9fb0bf' }}>{st}</div>
-      </div>
-    );
-  }
-
   return (
     <main style={S.wrap}>
       <div style={S.card}>
@@ -1931,18 +1584,18 @@ function TextTab({ suite, config, setConfig, setStatus }) {
           </Field>
           <Field label="Phone slot">
             <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
-              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{'Player ' + n}</option>)}
+              {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
             </select>
           </Field>
           <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })} />
+            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
           </Field>
           <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })} />
+            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
           </Field>
         </div>
         <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr} />
+        <hr style={S.hr}/>
         <ul style={{ paddingLeft: 18 }}>
           {(config.textRules || []).map((r, i) => (
             <li key={i} style={{ marginBottom: 8 }}>
@@ -1953,10 +1606,54 @@ function TextTab({ suite, config, setConfig, setStatus }) {
         </ul>
         <details style={{ marginTop: 8 }}>
           <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
-          <TestSMSInline />
+          <TestSMS />
         </details>
       </div>
     </main>
+  );
+}
+
+/* Drop or Pick from Media (reusable) */
+function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo }) {
+  const [pool, setPool] = React.useState([]);
+  const [hover, setHover] = React.useState(false);
+
+  React.useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`);
+      const j = await r.json();
+      setPool(j?.items || []);
+    } catch {}
+  })(); }, [dir]);
+
+  async function onDrop(e) {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
+    if (!f) return;
+    const path = dir === 'overlays' ? 'overlays' : 'uploads';
+    const u = await uploadToRepo(f, path);
+    if (u) onChangeUrl(u);
+  }
+
+  return (
+    <Field label={label}>
+      <div
+        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
+        onDragOver={(e)=>{e.preventDefault();}}
+        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
+        onDrop={onDrop}
+        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
+      >
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder="Drop a file, paste URL, or pick below…" />
+          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
+            <option value="">Pick from media…</option>
+            {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
+          </select>
+        </div>
+        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
+      </div>
+    </Field>
   );
 }
 
@@ -2009,6 +1706,28 @@ function MapPicker({ lat, lng, radius, onChange }) {
         <input type="range" min={5} max={2000} step={5} value={r} onChange={(e)=>setR(Number(e.target.value))}/>
         <code style={{ color:'#9fb0bf' }}>{r} m</code>
       </div>
+    </div>
+  );
+}
+
+function TestSMS() {
+  const [to, setTo] = useState('');
+  const [msg, setMsg] = useState('Test message from admin');
+  const [status, setStatus] = useState('');
+  async function send() {
+    setStatus('Sending…');
+    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
+    const text = await res.text();
+    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
+        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
+        <button style={S.button} onClick={send}>Send Test</button>
+      </div>
+      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
     </div>
   );
 }
