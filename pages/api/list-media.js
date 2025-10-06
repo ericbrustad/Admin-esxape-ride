@@ -1,7 +1,7 @@
 // pages/api/list-media.js
-// Enumerates media items for the Admin "Media Inventory" browser.
-// Returns {ok, items:[{name,url,type,source}...]}
-// Looks in multiple locations so your repo organization is flexible.
+// Canonical listing of media for the Admin inventory.
+// Prefers Admin public assets; falls back to Game only if Admin doesn't have it.
+// De-duplicates by filename (case-insensitive).
 
 import fs from 'fs';
 import path from 'path';
@@ -21,7 +21,7 @@ function classify(name) {
   return 'other';
 }
 
-function listDirFilesSafe(absDir) {
+function listFiles(absDir) {
   try {
     return fs
       .readdirSync(absDir, { withFileTypes: true })
@@ -32,58 +32,56 @@ function listDirFilesSafe(absDir) {
   }
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
   try {
     const dir = (req.query.dir || 'bundles').toString(); // 'bundles' | 'overlays'
     const cwd = process.cwd();
-
-    // Candidate locations (support older and current layouts).
-    const candidates = [
-      // Admin served (best — guarantees browser access via /media/…)
-      { root: path.join(cwd, 'public', 'media', dir), urlBase: `/media/${dir}/`, source: 'admin-public' },
-      // Game's public (served on Game origin; we expose absolute URLs if NEXT_PUBLIC_GAME_ORIGIN is set)
-      { root: path.join(cwd, 'game', 'public', 'media', dir), urlBase: 'GAME_ORIGIN', source: 'game-public' },
-      // Optional legacy/staging folders people sometimes add (readable, but not directly served):
-      { root: path.join(cwd, 'games', 'lib', 'media', dir), urlBase: null, source: 'repo-lib' },
-      { root: path.join(cwd, 'games', 'lib', dir), urlBase: null, source: 'repo-lib' },
-      { root: path.join(cwd, 'lib', 'media', dir), urlBase: null, source: 'repo-lib' },
-    ];
-
     const gameOrigin = process.env.NEXT_PUBLIC_GAME_ORIGIN || '';
-    const items = [];
 
-    for (const c of candidates) {
-      const names = listDirFilesSafe(c.root);
-      for (const name of names) {
+    // Priority: 1) Admin public (canonical), 2) Game public (fallback if Admin missing)
+    const adminRoot = path.join(cwd, 'public', 'media', dir);
+    const gameRoot  = path.join(cwd, 'game', 'public', 'media', dir);
+
+    const adminNames = listFiles(adminRoot);
+    const gameNames  = listFiles(gameRoot);
+
+    const seenByName = new Set(); // case-insensitive
+    const out = [];
+
+    // 1) Admin (canonical)
+    for (const name of adminNames) {
+      const type = classify(name);
+      if (type === 'other') continue;
+      const key = name.toLowerCase();
+      if (seenByName.has(key)) continue;
+      seenByName.add(key);
+      out.push({
+        name,
+        url: `/media/${dir}/${encodeURIComponent(name)}`,
+        type,
+        source: 'admin',
+      });
+    }
+
+    // 2) Game (fallback only for names not present in Admin)
+    if (gameOrigin) {
+      for (const name of gameNames) {
         const type = classify(name);
         if (type === 'other') continue;
-
-        // Only locations that are actually served should build a browser-usable URL.
-        if (c.urlBase === `/media/${dir}/`) {
-          items.push({ name, url: `${c.urlBase}${encodeURIComponent(name)}`, type, source: c.source });
-        } else if (c.urlBase === 'GAME_ORIGIN' && gameOrigin) {
-          items.push({ name, url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`, type, source: c.source });
-        } else {
-          // Repo-only locations are listed for reference but do not generate URLs (not accessible at runtime).
-          // Skip these because the browser cannot load them directly.
-        }
+        const key = name.toLowerCase();
+        if (seenByName.has(key)) continue; // Admin has it → skip Game
+        seenByName.add(key);
+        out.push({
+          name,
+          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
+          type,
+          source: 'game',
+        });
       }
     }
 
-    // De-duplicate by URL (prefer admin-public over game-public)
-    const seen = new Set();
-    const out = [];
-    for (const it of items) {
-      if (!it.url) continue;
-      const key = it.url.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(it);
-    }
-
-    res.status(200).json({ ok: true, items: out });
+    return res.status(200).json({ ok: true, items: out });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e?.message || String(e) });
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
 }
-
