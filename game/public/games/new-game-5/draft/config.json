@@ -65,15 +65,23 @@
     ]
   },
   "appearance": {
-    "fontFamily": "Arial, Helvetica, sans-serif",
-    "fontSizePx": 58,
+    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    "fontSizePx": 22,
     "fontColor": "#ffffff",
     "textBgColor": "#000000",
     "textBgOpacity": 0,
-    "screenBgColor": "#ff0505",
+    "screenBgColor": "#000000",
     "screenBgOpacity": 0,
     "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top"
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  },
+  "geofence": {
+    "mode": "test"
   }
 }
