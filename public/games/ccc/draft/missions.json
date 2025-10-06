@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.1",
   "missions": [
     {
       "id": "m01",
@@ -30,38 +30,6 @@
       "wrong": {
         "mode": "none"
       },
-      "showContinue": true
-    },
-    {
-      "id": "m02",
-      "title": "New Mission",
-      "type": "multiple_choice",
-      "iconKey": "trivia-2",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "none"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "question": "vv",
-        "choices": [
-          "v",
-          "c",
-          "x"
-        ],
-        "correctIndex": 0,
-        "mediaUrl": "",
-        "geofenceEnabled": false,
-        "lat": "",
-        "lng": "",
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
