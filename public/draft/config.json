@@ -18,34 +18,88 @@
   "devices": [
     {
       "id": "d01",
-      "title": "dddv",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 160,
       "effectSeconds": 120,
-      "lat": 44.978055,
-      "lng": -93.265671
+      "lat": 44.978764,
+      "lng": -93.267135
     }
   ],
   "powerups": [
     {
       "id": "d01",
-      "title": "dddv",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 100,
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 160,
       "effectSeconds": 120,
-      "lat": 44.978055,
-      "lng": -93.265671
+      "lat": 44.978764,
+      "lng": -93.267135
     }
   ],
   "media": {
-    "pool": []
+    "rewards": [
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": "/games/lib/media/bundles/GOLDEN%20COIN.png"
+      }
+    ],
+    "pool": [
+      "/games/lib/media/bundles/ROBOT1small.png",
+      "/games/lib/media/bundles/SMOKE%20BOMB.png",
+      "/games/lib/media/bundles/evidence%202.png",
+      "/games/lib/media/bundles/CLUEgreen.png",
+      "/games/lib/media/bundles/GOLDEN%20COIN.png",
+      "/games/lib/media/bundles/trivia%20icon.png",
+      "/games/lib/media/bundles/trivia%20yellow.png"
+    ]
   },
   "icons": {
-    "missions": [],
-    "devices": [],
-    "rewards": []
+    "missions": [
+      {
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "/games/lib/media/bundles/trivia%20icon.png"
+      },
+      {
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "/games/lib/media/bundles/trivia%20yellow.png"
+      }
+    ],
+    "devices": [
+      {
+        "key": "dev-clone",
+        "name": "Roaming Robot",
+        "url": "/games/lib/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-smoke",
+        "name": "Smoke Shield",
+        "url": "/games/lib/media/bundles/SMOKE%20BOMB.png"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "/games/lib/media/bundles/evidence%202.png"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "/games/lib/media/bundles/CLUEgreen.png"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "/games/lib/media/bundles/GOLDEN%20COIN.png"
+      }
+    ]
   },
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
