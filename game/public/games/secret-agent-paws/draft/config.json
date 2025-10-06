@@ -48,12 +48,12 @@
       {
         "key": "trivia",
         "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
+        "url": "https://game.esxaperide.com/media/bundles/trivia%20icon.png"
       },
       {
         "key": "trivia-2",
         "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
+        "url": "https://game.esxaperide.com/media/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
