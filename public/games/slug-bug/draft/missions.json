@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.1",
   "missions": [
     {
       "id": "m01",
@@ -30,31 +30,6 @@
       "wrong": {
         "mode": "none"
       },
-      "showContinue": true
-    },
-    {
-      "id": "m02",
-      "title": "new new saved mission",
-      "type": "geofence_image",
-      "iconKey": "trivia",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "none"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "lat": "",
-        "lng": "",
-        "radiusMeters": 25,
-        "cooldownSeconds": 30,
-        "imageUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=o0rozlzt&dl=0",
-        "overlayText": ""
-      },
-      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
