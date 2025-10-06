@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.1",
   "missions": [
     {
       "id": "m01",
@@ -30,39 +30,6 @@
       "wrong": {
         "mode": "none"
       }
-    },
-    {
-      "id": "m02",
-      "title": "dvdvdd",
-      "type": "multiple_choice",
-      "iconKey": "trivia",
-      "iconUrl": "",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "image",
-        "mediaUrl": "/media/uploads/1759724352472-secret_agent_man.gif"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "question": "dvdvdv",
-        "choices": [
-          "d",
-          "s",
-          "v"
-        ],
-        "correctIndex": 0,
-        "mediaUrl": "",
-        "geofenceEnabled": false,
-        "lat": "",
-        "lng": "",
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false
     }
   ]
 }
