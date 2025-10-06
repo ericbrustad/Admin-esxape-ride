@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.34",
+  "version": "0.6.35",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -128,6 +128,81 @@
       "wrong": {
         "mode": "none"
       },
+      "showContinue": true
+    },
+    {
+      "id": "m08",
+      "title": "horses",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "how many?",
+        "choices": [
+          "1",
+          "2",
+          "3"
+        ],
+        "correctIndex": 1,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
+    },
+    {
+      "id": "m01",
+      "title": "save me",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "sss",
+        "choices": [
+          "ss",
+          "s",
+          "sss"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
