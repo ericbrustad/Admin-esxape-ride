@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "missions": [
     {
       "id": "m01",
@@ -25,6 +25,38 @@
         "correctIndex": 0,
         "mediaUrl": "",
         "geofenceEnabled": true,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "showContinue": true
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "bbbbbbbbbbbbbbbbbbbbb",
+        "choices": [
+          "b",
+          "bb",
+          "bbb"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
         "lat": "",
         "lng": "",
         "radiusMeters": 25,
