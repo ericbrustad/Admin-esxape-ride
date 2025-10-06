@@ -522,7 +522,7 @@ export default function Admin() {
     } catch {
       setDevResults([]);
     } finally {
-      setDevSearching(false);
+           setDevSearching(false);
     }
   }
   function applySearchResult(r) {
@@ -1440,7 +1440,10 @@ function MapOverview({
 
   useEffect(()=>{ if(typeof window==='undefined')return;
     if(window.L){ setLeafletReady(true); return; }
-    const link=document.createElement('link'); link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    const linkId='leaflet-css';
+    if(!document.getElementById(linkId)){
+      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    }
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
   },[]);
 
@@ -1515,6 +1518,96 @@ function MapOverview({
     <div>
       {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
       <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+    </div>
+  );
+}
+
+/* MapPicker — geofence mini map with draggable marker + radius slider */
+function MapPicker({ lat, lng, radius = 25, onChange }) {
+  const divRef = useRef(null);
+  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
+  const [rad, setRad] = useState(Number(radius) || 25);
+
+  // Load Leaflet once (same pattern as MapOverview)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setLeafletReady(true); return; }
+    const linkId='leaflet-css';
+    if(!document.getElementById(linkId)){
+      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    }
+    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
+  }, []);
+
+  // Sync local radius when prop changes
+  useEffect(() => { setRad(Number(radius) || 25); }, [radius]);
+
+  // Initialize + update map
+  useEffect(() => {
+    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    if (!divRef.current._leaflet_map) {
+      const startLat = isFinite(Number(lat)) ? Number(lat) : 44.9778;
+      const startLng = isFinite(Number(lng)) ? Number(lng) : -93.2650;
+      const map = L.map(divRef.current, { center: [startLat, startLng], zoom: 14 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+      const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+      const circle = L.circle([startLat, startLng], { radius: Number(rad) || 25, color: '#60a5fa', fillOpacity: 0.08 }).addTo(map);
+
+      marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
+      marker.on('dragend', () => {
+        const p = marker.getLatLng();
+        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(rad));
+      });
+
+      map.on('click', (e) => {
+        marker.setLatLng(e.latlng);
+        circle.setLatLng(e.latlng);
+        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(rad));
+      });
+
+      divRef.current._leaflet_map = map;
+      divRef.current._marker = marker;
+      divRef.current._circle = circle;
+    } else {
+      // Update position if props lat/lng change
+      const map = divRef.current._leaflet_map;
+      const marker = divRef.current._marker;
+      const circle = divRef.current._circle;
+
+      const haveLat = isFinite(Number(lat));
+      const haveLng = isFinite(Number(lng));
+      if (haveLat && haveLng) {
+        const pos = [Number(lat), Number(lng)];
+        marker.setLatLng(pos);
+        circle.setLatLng(pos);
+        map.setView(pos, map.getZoom());
+      }
+      circle.setRadius(Number(rad) || 25);
+    }
+  }, [leafletReady, lat, lng, rad, onChange]);
+
+  return (
+    <div>
+      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
+        <input
+          type="range" min={5} max={2000} step={5} value={rad}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            setRad(next);
+            if (divRef.current?._circle) divRef.current._circle.setRadius(next);
+            if (divRef.current?._marker) {
+              const p = divRef.current._marker.getLatLng();
+              onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), next);
+            }
+          }}
+        />
+        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
+      </div>
+      <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>Click map to set location. Drag marker to fine‑tune.</div>
     </div>
   );
 }
