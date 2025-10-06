@@ -26,16 +26,6 @@
       "durationSec": 60,
       "respawnSec": 300,
       "stock": 1
-    },
-    {
-      "id": "d02",
-      "title": "dd",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 45.000383,
-      "lng": -93.308838
     }
   ],
   "powerups": [
@@ -49,16 +39,6 @@
       "durationSec": 60,
       "respawnSec": 300,
       "stock": 1
-    },
-    {
-      "id": "d02",
-      "title": "dd",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 45.000383,
-      "lng": -93.308838
     }
   ],
   "media": {
