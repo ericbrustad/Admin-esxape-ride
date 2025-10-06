@@ -15,8 +15,50 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "cc",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.995799,
+      "lng": -93.314675
+    },
+    {
+      "id": "d02",
+      "title": "gg",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 495,
+      "effectSeconds": 111,
+      "lat": 44.991312,
+      "lng": -93.357249
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "cc",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.995799,
+      "lng": -93.314675
+    },
+    {
+      "id": "d02",
+      "title": "gg",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 495,
+      "effectSeconds": 111,
+      "lat": 44.991312,
+      "lng": -93.357249
+    }
+  ],
   "media": {
     "rewards": [
       {
