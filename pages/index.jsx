@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import TestLauncher from '../components/TestLauncher';
+import React, { useEffect, useRef, useState } from 'react'; 
+import TestLauncher from '../components/TestLauncher'
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -858,11 +858,22 @@ export default function Admin() {
     );
   }
 
+  // ── UPDATED: Save uploads under typed folders in media pool
   async function uploadToRepo(file, subfolder='uploads') {
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
-    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
+
+    // Determine type by MIME and filename (gif/image/video/audio)
+    const fp = `${(file.type||'')}`.toLowerCase() + ' ' + `${(file.name||'')}`.toLowerCase();
+    const type =
+      /gif/.test(fp)   ? 'gif'   :
+      /image/.test(fp) ? 'image' :
+      /video/.test(fp) ? 'video' :
+      /audio/.test(fp) ? 'audio' : 'image';
+
+    const safeName = (file.name || 'file').replace(/[^\w.\-]+/g, '_');
+    const path   = `public/media/uploads/${type}/${Date.now()}-${safeName}`;
+
     setUploadStatus(`Uploading ${safeName}…`);
     const res = await fetch('/api/upload', {
       method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
@@ -1515,7 +1526,7 @@ export default function Admin() {
               </Field>
             </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click‑to‑enter in test vs GPS in live.
+              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
             </div>
           </div>
 
@@ -1896,486 +1907,487 @@ function MapOverview({
     });
 
     // Devices
-    (devices||[]).forEach((d,idx)=>{
-      const pos=getDevicePos(d); if(!pos) return;
-      const url=iconUrl('devices', d.iconKey);
-      const hl = (selectedDevIdx===idx);
-      const size = hl ? selectedIconSizePx : defaultIconSizePx;
-      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl && !!onMoveSelected)}).addTo(layer);
-      const rad=Number(d.pickupRadius||0);
-      let circle=null;
-      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
-      if (onSelectDevice) {
-        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice(idx); });
-      }
-      if(!readOnly && hl && onMoveSelected){
-        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
-        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      }
-      bounds.extend(pos);
-    });
-
-    // Draft device (Devices tab)
-    if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
-      const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
-      if(showRings && Number(draftDevice.radius)>0){
-        const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
-        mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
-      }
-      mk.on('dragend',()=>{ const p=mk.getLatLng(); onDraftChange && onDraftChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      bounds.extend(pos);
-    }
-
-    // Click handler
-    if (map._clickHandler) map.off('click', map._clickHandler);
-    map._clickHandler = (e) => {
-      if (readOnly) return;
-      const lat=e.latlng.lat, lng=e.latlng.lng;
-      if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-    };
-    map.on('click', map._clickHandler);
-
-    if (lockToRegion) {
-      map.setView(initialCenter, initialZoom);
-    } else if(bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.2));
-    } else {
-      map.setView(initialCenter, initialZoom);
-    }
-  },[
-    leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
-    selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
-    onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly, lockToRegion
-  ]);
-
-  return (
-    <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
-    </div>
-  );
-}
-
-/* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
-function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
-  const divRef = useRef(null);
-  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
-  const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.L) { setLeafletReady(true); return; }
-    const linkId='leaflet-css';
-    if(!document.getElementById(linkId)){
-      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    }
-    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
-  }, []);
-
-  useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
-
-  useEffect(() => {
-    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
-    const L = window.L; if (!L) return;
-
-    const startLat = isFinite(Number(lat)) ? Number(lat) : Number(center.lat);
-    const startLng = isFinite(Number(lng)) ? Number(lng) : Number(center.lng);
-
-    if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [startLat, startLng], zoom: 14 });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
-      const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
-      const circle = L.circle([startLat, startLng], { radius: Number(rad) || 25, color: '#60a5fa', fillOpacity: 0.08 }).addTo(map);
-
-      marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
-      marker.on('dragend', () => {
-        const p = marker.getLatLng();
-        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
-      });
-
-      map.on('click', (e) => {
-        marker.setLatLng(e.latlng);
-        circle.setLatLng(e.latlng);
-        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
-      });
-
-      divRef.current._leaflet_map = map;
-      divRef.current._marker = marker;
-      divRef.current._circle = circle;
-    } else {
-      const map = divRef.current._leaflet_map;
-      const marker = divRef.current._marker;
-      const circle = divRef.current._circle;
-
-      const haveLat = isFinite(Number(lat));
-      const haveLng = isFinite(Number(lng));
-      const pos = haveLat && haveLng ? [Number(lat), Number(lng)] : [Number(center.lat), Number(center.lng)];
-      marker.setLatLng(pos);
-      circle.setLatLng(pos);
-      map.setView(pos, map.getZoom());
-      circle.setRadius(Number(clamp(rad,5,500)));
-    }
-  }, [leafletReady, lat, lng, rad, onChange, center]);
-
-  return (
-    <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
-        <input
-          type="range" min={5} max={500} step={5} value={rad}
-          onChange={(e) => {
-            const next = clamp(Number(e.target.value),5,500);
-            setRad(next);
-            if (divRef.current?._circle) divRef.current._circle.setRadius(next);
-            if (divRef.current?._marker) {
-              const p = divRef.current._marker.getLatLng();
-              onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), next);
-            }
-          }}
-        />
-        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
-      </div>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>Click map to set location. Drag marker to fine‑tune.</div>
-    </div>
-  );
-}
-
-/* MEDIA tab (Icons + Reward/Penalty pools) */
-function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
-  const [hover, setHover] = useState(false);
-
-  async function handleDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    let files = [];
-    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
-      for (let i=0;i<e.dataTransfer.items.length;i++) {
-        const it = e.dataTransfer.items[i];
-        if (it.kind==='file') {
-          const f = it.getAsFile(); if (f) files.push(f);
+        (devices||[]).forEach((d,idx)=>{
+          const pos=getDevicePos(d); if(!pos) return;
+          const url=iconUrl('devices', d.iconKey);
+          const hl = (selectedDevIdx===idx);
+          const size = hl ? selectedIconSizePx : defaultIconSizePx;
+          const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl && !!onMoveSelected)}).addTo(layer);
+          const rad=Number(d.pickupRadius||0);
+          let circle=null;
+          if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
+          if (onSelectDevice) {
+            marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice(idx); });
+          }
+          if(!readOnly && hl && onMoveSelected){
+            marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
+            marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+          }
+          bounds.extend(pos);
+        });
+    
+        // Draft device (Devices tab)
+        if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
+          const pos=[draftDevice.lat, draftDevice.lng];
+          const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
+          if(showRings && Number(draftDevice.radius)>0){
+            const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
+            mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
+          }
+          mk.on('dragend',()=>{ const p=mk.getLatLng(); onDraftChange && onDraftChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+          bounds.extend(pos);
         }
-      }
-    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
-      files = Array.from(e.dataTransfer.files);
+    
+        // Click handler
+        if (map._clickHandler) map.off('click', map._clickHandler);
+        map._clickHandler = (e) => {
+          if (readOnly) return;
+          const lat=e.latlng.lat, lng=e.latlng.lng;
+          if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
+          if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
+          if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
+        };
+        map.on('click', map._clickHandler);
+    
+        if (lockToRegion) {
+          map.setView(initialCenter, initialZoom);
+        } else if(bounds.isValid()) {
+          map.fitBounds(bounds.pad(0.2));
+        } else {
+          map.setView(initialCenter, initialZoom);
+        }
+      },[
+        leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
+        selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
+        onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly, lockToRegion
+      ]);
+    
+      return (
+        <div>
+          {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
+          <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+        </div>
+      );
     }
-    for (const f of files) { await uploadToRepo(f, 'uploads'); }
-  }
-
-  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
-    return (
-      <label style={{ ...S.button, textAlign:'center' }}>
-        {label}
-        <input type="file" multiple style={{ display:'none' }}
-          onChange={async (e)=>{
-            const files = Array.from(e.target.files || []);
-            for (const f of files) {
-              const url = await uploadToRepo(f, folder);
-              if (url && typeof onUploaded==='function') onUploaded(url);
+    
+    /* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
+    function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
+      const divRef = useRef(null);
+      const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
+      const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
+    
+      useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (window.L) { setLeafletReady(true); return; }
+        const linkId='leaflet-css';
+        if(!document.getElementById(linkId)){
+          const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+        }
+        const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
+      }, []);
+    
+      useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
+    
+      useEffect(() => {
+        if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+        const L = window.L; if (!L) return;
+    
+        const startLat = isFinite(Number(lat)) ? Number(lat) : Number(center.lat);
+        const startLng = isFinite(Number(lng)) ? Number(lng) : Number(center.lng);
+    
+        if (!divRef.current._leaflet_map) {
+          const map = L.map(divRef.current, { center: [startLat, startLng], zoom: 14 });
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+          const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+          const circle = L.circle([startLat, startLng], { radius: Number(rad) || 25, color: '#60a5fa', fillOpacity: 0.08 }).addTo(map);
+    
+          marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
+          marker.on('dragend', () => {
+            const p = marker.getLatLng();
+            onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
+          });
+    
+          map.on('click', (e) => {
+            marker.setLatLng(e.latlng);
+            circle.setLatLng(e.latlng);
+            onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
+          });
+    
+          divRef.current._leaflet_map = map;
+          divRef.current._marker = marker;
+          divRef.current._circle = circle;
+        } else {
+          const map = divRef.current._leaflet_map;
+          const marker = divRef.current._marker;
+          const circle = divRef.current._circle;
+    
+          const haveLat = isFinite(Number(lat));
+          const haveLng = isFinite(Number(lng));
+          const pos = haveLat && haveLng ? [Number(lat), Number(lng)] : [Number(center.lat), Number(center.lng)];
+          marker.setLatLng(pos);
+          circle.setLatLng(pos);
+          map.setView(pos, map.getZoom());
+          circle.setRadius(Number(clamp(rad,5,500)));
+        }
+      }, [leafletReady, lat, lng, rad, onChange, center]);
+    
+      return (
+        <div>
+          {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
+          <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
+            <input
+              type="range" min={5} max={500} step={5} value={rad}
+              onChange={(e) => {
+                const next = clamp(Number(e.target.value),5,500);
+                setRad(next);
+                if (divRef.current?._circle) divRef.current._circle.setRadius(next);
+                if (divRef.current?._marker) {
+                  const p = divRef.current._marker.getLatLng();
+                  onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), next);
+                }
+              }}
+            />
+            <code style={{ color:'#9fb0bf' }}>{rad} m</code>
+          </div>
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>Click map to set location. Drag marker to fine‑tune.</div>
+        </div>
+      );
+    }
+    
+    /* MEDIA tab (Icons + Reward/Penalty pools) */
+    function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
+      const [hover, setHover] = useState(false);
+    
+      async function handleDrop(e) {
+        e.preventDefault(); e.stopPropagation(); setHover(false);
+        let files = [];
+        if (e.dataTransfer?.items && e.dataTransfer.items.length) {
+          for (let i=0;i<e.dataTransfer.items.length;i++) {
+            const it = e.dataTransfer.items[i];
+            if (it.kind==='file') {
+              const f = it.getAsFile(); if (f) files.push(f);
             }
-            e.target.value = '';
-          }}/>
-      </label>
-    );
-  }
-
-  const rewardsPool = Array.isArray(config.media?.rewardsPool) ? config.media.rewardsPool : [];
-  const penaltiesPool = Array.isArray(config.media?.penaltiesPool) ? config.media.penaltiesPool : [];
-  const setRewardsPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), rewardsPool: next } });
-  const setPenaltiesPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), penaltiesPool: next } });
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}
-           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
-           onDrop={handleDrop}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0, fontSize:24 }}>Media</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re‑apply default assets</button>
-        </div>
-
-        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files anywhere on this page or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
-          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
-        </div>
-
-        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
-
-        <MediaPoolEditor
-          title="Reward Media"
-          items={rewardsPool}
-          onChange={setRewardsPool}
-          uploadToRepo={uploadToRepo}
-        />
-        <MediaPoolEditor
-          title="Penalty Media"
-          items={penaltiesPool}
-          onChange={setPenaltiesPool}
-          uploadToRepo={uploadToRepo}
-        />
-      </div>
-    </main>
-  );
-}
-function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
-  const list = config.icons?.[kind] || [];
-  const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
-
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['icons','bundles','uploads'])); } catch {}
-  })(); }, []);
-
-  function setUrlAndMaybeName(idx, url) {
-    const n=[...list];
-    const before = n[idx] || {};
-    const nameEmpty = !before.name || String(before.name).trim()==='';
-    n[idx] = { ...before, url };
-    if (nameEmpty) n[idx].name = baseNameFromUrl(url);
-    setList(n);
-  }
-
-  return (
-    <div style={{ marginTop:16 }}>
-      <h4 style={{ marginTop:0, fontSize:20 }}>{label}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
-      </div>
-      {list.map((row, idx)=>(
-        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-              <input style={S.input} value={row.url||''} onChange={(e)=>setUrlAndMaybeName(idx, e.target.value)} placeholder="Image URL"/>
-              <label style={{ ...S.button, textAlign:'center' }}>
-                Choose File
-                <input
-                  type="file" style={{ display:'none' }}
-                  onChange={async (e)=>{
-                    const f=e.target.files?.[0]; if (!f) return;
-                    const url=await uploadToRepo(f,'icons');
-                    if (url) setUrlAndMaybeName(idx, url);
-                  }}
-                />
-              </label>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
-              <select
-                style={S.input}
-                onChange={(e)=> setUrlAndMaybeName(idx, e.target.value) }
-                value=""
-              >
-                <option value="">Pick from media pool…</option>
-                {pool.filter(it=>it.type==='image' || it.type==='gif').map((it) => (
-                  <option key={it.url} value={it.url}>{it.name}</option>
-                ))}
-              </select>
-            </div>
-            {row.url
-              ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-              : <div style={{ color:'#9fb0bf' }}>No image</div>}
-          </div>
-          <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-          <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
-          <div style={{ display:'flex', gap:6 }}>
-            <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-            <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-          </div>
-        </div>
-      ))}
-      <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
-    </div>
-  );
-}
-function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles'])); } catch {}
-  })(); }, []);
-
-  return (
-    <div style={{ marginTop:20 }}>
-      <h4 style={{ margin:'0 0 8px 0', fontSize:20 }}>{title}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Thumbnail</div><div>URL</div><div>Format</div><div>Actions</div>
-      </div>
-      {(items||[]).map((row, idx)=>{
-        const type = classifyByExt(row.url||'');
+          }
+        } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
+          files = Array.from(e.dataTransfer.files);
+        }
+        for (const f of files) { await uploadToRepo(f, 'uploads'); }
+      }
+    
+      function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
         return (
-          <div key={idx} style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-            <div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                <input style={S.input} value={row.url||''}
-                  onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
-                  placeholder="Image/Video/GIF/Audio URL" />
-                <label style={{ ...S.button, textAlign:'center' }}>
-                  Choose File
-                  <input type="file" style={{ display:'none' }}
-                    onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'uploads'); if (url) { const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n); } }}/>
-                </label>
-              </div>
-              <select style={{ ...S.input, marginTop:6 }}
-                onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }} value="">
-                <option value="">Pick from media inventory…</option>
-                {pool.map((it) => <option key={it.url} value={it.url}>{it.name}</option>)}
-              </select>
-              {row.url ? <MediaPreview url={row.url} kind="preview"/> : null}
+          <label style={{ ...S.button, textAlign:'center' }}>
+            {label}
+            <input type="file" multiple style={{ display:'none' }}
+              onChange={async (e)=>{
+                const files = Array.from(e.target.files || []);
+                for (const f of files) {
+                  const url = await uploadToRepo(f, folder);
+                  if (url && typeof onUploaded==='function') onUploaded(url);
+                }
+                e.target.value = '';
+              }}/>
+          </label>
+        );
+      }
+    
+      const rewardsPool = Array.isArray(config.media?.rewardsPool) ? config.media.rewardsPool : [];
+      const penaltiesPool = Array.isArray(config.media?.penaltiesPool) ? config.media.penaltiesPool : [];
+      const setRewardsPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), rewardsPool: next } });
+      const setPenaltiesPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), penaltiesPool: next } });
+    
+      return (
+        <main style={S.wrap}>
+          <div style={S.card}
+               onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
+               onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
+               onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
+               onDrop={handleDrop}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <h3 style={{ marginTop:0, fontSize:24 }}>Media</h3>
+              <button style={S.button} onClick={onReapplyDefaults}>Re‑apply default assets</button>
             </div>
-            <div><code>{row.url ? (row.url.split('.').pop().split('?')[0] || '').toLowerCase() : ''}</code></div>
-            <div style={{ textTransform:'capitalize' }}>{type}</div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={S.button} onClick={()=>{ const n=[...items]; n.splice(idx,1); onChange(n); }}>Delete</button>
-              <button style={S.button} onClick={()=>{ const n=[...items]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); onChange(n); }}>Duplicate</button>
+    
+            <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
+              Drag & drop files anywhere on this page or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
+              <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
+            </div>
+    
+            <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
+            <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
+    
+            <MediaPoolEditor
+              title="Reward Media"
+              items={rewardsPool}
+              onChange={setRewardsPool}
+              uploadToRepo={uploadToRepo}
+            />
+            <MediaPoolEditor
+              title="Penalty Media"
+              items={penaltiesPool}
+              onChange={setPenaltiesPool}
+              uploadToRepo={uploadToRepo}
+            />
+          </div>
+        </main>
+      );
+    }
+    function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
+      const list = config.icons?.[kind] || [];
+      const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
+    
+      const [pool, setPool] = useState([]);
+      useEffect(()=>{ (async()=>{
+        try { setPool(await listInventory(['icons','bundles','uploads'])); } catch {}
+      })(); }, []);
+    
+      function setUrlAndMaybeName(idx, url) {
+        const n=[...list];
+        const before = n[idx] || {};
+        const nameEmpty = !before.name || String(before.name).trim()==='';
+        n[idx] = { ...before, url };
+        if (nameEmpty) n[idx].name = baseNameFromUrl(url);
+        setList(n);
+      }
+    
+      return (
+        <div style={{ marginTop:16 }}>
+          <h4 style={{ marginTop:0, fontSize:20 }}>{label}</h4>
+          <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+            <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
+          </div>
+          {list.map((row, idx)=>(
+            <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+              <div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                  <input style={S.input} value={row.url||''} onChange={(e)=>setUrlAndMaybeName(idx, e.target.value)} placeholder="Image URL"/>
+                  <label style={{ ...S.button, textAlign:'center' }}>
+                    Choose File
+                    <input
+                      type="file" style={{ display:'none' }}
+                      onChange={async (e)=>{
+                        const f=e.target.files?.[0]; if (!f) return;
+                        const url=await uploadToRepo(f,'icons');
+                        if (url) setUrlAndMaybeName(idx, url);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
+                  <select
+                    style={S.input}
+                    onChange={(e)=> setUrlAndMaybeName(idx, e.target.value) }
+                    value=""
+                  >
+                    <option value="">Pick from media pool…</option>
+                    {pool.filter(it=>it.type==='image' || it.type==='gif').map((it) => (
+                      <option key={it.url} value={it.url}>{it.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {row.url
+                  ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                  : <div style={{ color:'#9fb0bf' }}>No image</div>}
+              </div>
+              <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
+              <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
+              <div style={{ display:'flex', gap:6 }}>
+                <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
+                <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
+              </div>
+            </div>
+          ))}
+          <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
+        </div>
+      );
+    }
+    function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
+      const [pool, setPool] = useState([]);
+      useEffect(()=>{ (async()=>{
+        try { setPool(await listInventory(['uploads','bundles'])); } catch {}
+      })(); }, []);
+    
+      return (
+        <div style={{ marginTop:20 }}>
+          <h4 style={{ margin:'0 0 8px 0', fontSize:20 }}>{title}</h4>
+          <div style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+            <div>Thumbnail</div><div>URL</div><div>Format</div><div>Actions</div>
+          </div>
+          {(items||[]).map((row, idx)=>{
+            const type = classifyByExt(row.url||'');
+            return (
+              <div key={idx} style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+                <div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                    <input style={S.input} value={row.url||''}
+                      onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
+                      placeholder="Image/Video/GIF/Audio URL" />
+                    <label style={{ ...S.button, textAlign:'center' }}>
+                      Choose File
+                      <input type="file" style={{ display:'none' }}
+                        onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'uploads'); if (url) { const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n); } }}/>
+                    </label>
+                  </div>
+                  <select style={{ ...S.input, marginTop:6 }}
+                    onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }} value="">
+                    <option value="">Pick from media inventory…</option>
+                    {pool.map((it) => <option key={it.url} value={it.url}>{it.name}</option>)}
+                  </select>
+                  {row.url ? <MediaPreview url={row.url} kind="preview"/> : null}
+                </div>
+                <div><code>{row.url ? (row.url.split('.').pop().split('?')[0] || '').toLowerCase() : ''}</code></div>
+                <div style={{ textTransform:'capitalize' }}>{type}</div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button style={S.button} onClick={()=>{ const n=[...items]; n.splice(idx,1); onChange(n); }}>Delete</button>
+                  <button style={S.button} onClick={()=>{ const n=[...items]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); onChange(n); }}>Duplicate</button>
+                </div>
+              </div>
+            );
+          })}
+          <button style={S.button} onClick={()=>{ onChange([...(items||[]), { url:'' }]); }}>+ Add Media</button>
+        </div>
+      );
+    }
+    
+    /* Inventory modal (for pools & editors that allow picking) */
+    function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
+      const [pool, setPool] = useState([]);
+      const [q, setQ] = useState('');
+      const [tab, setTab] = useState(acceptKinds[0] || 'image');
+    
+      useEffect(()=>{ (async()=>{
+        try { setPool(await listInventory(['uploads','bundles','icons'])); } catch {}
+      })(); }, []);
+    
+      const groups = {
+        image: pool.filter(x=>x.type==='image'),
+        gif:   pool.filter(x=>x.type==='gif'),
+        video: pool.filter(x=>x.type==='video'),
+        audio: pool.filter(x=>x.type==='audio'),
+      };
+      const tabs = ['image','gif','video','audio'].filter(t=>acceptKinds.includes(t));
+      const shown = (groups[tab]||[]).filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
+    
+      return (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
+          <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
+            <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+              {tabs.map((t) => (
+                <button
+                  key={t}
+                  style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }}
+                  onClick={()=>setTab(t)}
+                >
+                  {t.toUpperCase()}
+                </button>
+              ))}
+              <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
+              {shown.map((it)=>(
+                <div key={it.url} style={{ border:'1px solid #22303c', borderRadius:10, padding:8 }}>
+                  <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>{it.name} <span style={{ opacity:.7 }}>({it.type})</span></div>
+                  {it.type==='video' ? (
+                    <video src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }} />
+                  ) : it.type==='audio' ? (
+                    <div style={{ height:120, display:'grid', placeItems:'center', border:'1px dashed #2a323b', borderRadius:8, color:'#9fb0bf' }}>
+                      .{it.url.split('.').pop().split('?')[0]}
+                    </div>
+                  ) : (
+                    <img alt="" src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }}/>
+                  )}
+                  <button style={{ ...S.button, marginTop:8, width:'100%' }} onClick={()=>onPick(it.url)}>Use</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:10 }}>
+              <button style={S.button} onClick={onClose}>Close</button>
             </div>
           </div>
-        );
-      })}
-      <button style={S.button} onClick={()=>{ onChange([...(items||[]), { url:'' }]); }}>+ Add Media</button>
-    </div>
-  );
-}
-
-/* Inventory modal (for pools & editors that allow picking) */
-function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
-  const [pool, setPool] = useState([]);
-  const [q, setQ] = useState('');
-  const [tab, setTab] = useState(acceptKinds[0] || 'image');
-
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles','icons'])); } catch {}
-  })(); }, []);
-
-  const groups = {
-    image: pool.filter(x=>x.type==='image'),
-    gif:   pool.filter(x=>x.type==='gif'),
-    video: pool.filter(x=>x.type==='video'),
-    audio: pool.filter(x=>x.type==='audio'),
-  };
-  const tabs = ['image','gif','video','audio'].filter(t=>acceptKinds.includes(t));
-  const shown = (groups[tab]||[]).filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
-      <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
-        <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {tabs.map((t) => (
-            <button
-              key={t}
-              style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }}
-              onClick={()=>setTab(t)}
-            >
-              {t.toUpperCase()}
-            </button>
-          ))}
-          <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
-          {shown.map((it)=>(
-            <div key={it.url} style={{ border:'1px solid #22303c', borderRadius:10, padding:8 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>{it.name} <span style={{ opacity:.7 }}>({it.type})</span></div>
-              {it.type==='video' ? (
-                <video src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }} />
-              ) : it.type==='audio' ? (
-                <div style={{ height:120, display:'grid', placeItems:'center', border:'1px dashed #2a323b', borderRadius:8, color:'#9fb0bf' }}>
-                  .{it.url.split('.').pop().split('?')[0]}
-                </div>
-              ) : (
-                <img alt="" src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }}/>
-              )}
-              <button style={{ ...S.button, marginTop:8, width:'100%' }} onClick={()=>onPick(it.url)}>Use</button>
+      );
+    }
+    
+    /* TEXT tab */
+    function TextTab({ suite, config, setConfig, setStatus }) {
+      const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
+      function addSmsRule() {
+        if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
+        const maxPlayers = config?.forms?.players || 1;
+        if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
+        const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
+        setConfig({ ...config, textRules: rules });
+        setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
+        setStatus('✅ SMS rule added');
+      }
+      function removeSmsRule(idx) {
+        const rules = [...(config?.textRules || [])];
+        rules.splice(idx, 1);
+        setConfig({ ...config, textRules: rules });
+      }
+      return (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
+              <Field label="Mission (geofence)">
+                <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
+                  <option value="">— choose —</option>
+                  {(suite.missions || []).map((m) => (
+                    <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Phone slot">
+                <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
+                  {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
+                </select>
+              </Field>
+              <Field label="Delay (sec)">
+                <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
+              </Field>
+              <Field label="Message">
+                <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
+              </Field>
             </div>
-          ))}
-        </div>
-        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:10 }}>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* TEXT tab */
-function TextTab({ suite, config, setConfig, setStatus }) {
-  const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])];
-    rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-          <Field label="Mission (geofence)">
-            <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-              <option value="">— choose —</option>
-              {(suite.missions || []).map((m) => (
-                <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
+            <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
+            <hr style={S.hr}/>
+            <ul style={{ paddingLeft: 18 }}>
+              {(config.textRules || []).map((r, i) => (
+                <li key={i} style={{ marginBottom: 8 }}>
+                  <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
+                  <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
+                </li>
               ))}
-            </select>
-          </Field>
-          <Field label="Phone slot">
-            <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
-              {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
-            </select>
-          </Field>
-          <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
-          </Field>
-          <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
-          </Field>
+            </ul>
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
+              <TestSMS />
+            </details>
+          </div>
+        </main>
+      );
+    }
+    function TestSMS() {
+      const [to, setTo] = useState('');
+      const [msg, setMsg] = useState('Test message from admin');
+      const [status, setStatus] = useState('');
+      async function send() {
+        setStatus('Sending…');
+        const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
+        const text = await res.text();
+        setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
+      }
+      return (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
+            <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
+            <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
+            <button style={S.button} onClick={send}>Send Test</button>
+          </div>
+          <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
         </div>
-        <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr}/>
-        <ul style={{ paddingLeft: 18 }}>
-          {(config.textRules || []).map((r, i) => (
-            <li key={i} style={{ marginBottom: 8 }}>
-              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-              <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
-          <TestSMS />
-        </details>
-      </div>
-    </main>
-  );
-}
-function TestSMS() {
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState('Test message from admin');
-  const [status, setStatus] = useState('');
-  async function send() {
-    setStatus('Sending…');
-    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-    const text = await res.text();
-    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
-  }
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-        <button style={S.button} onClick={send}>Send Test</button>
-      </div>
-      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
-    </div>
-  );
-}
+      );
+    }
+    
