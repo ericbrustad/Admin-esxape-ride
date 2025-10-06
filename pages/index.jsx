@@ -75,7 +75,7 @@ async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
   const out = [];
   await Promise.all(dirs.map(async (dir) => {
     try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
       const j = await r.json();
       (j?.items || []).forEach(it => {
         const url = it.url || '';
@@ -95,10 +95,18 @@ function baseNameFromUrl(url) {
     return file.replace(/[-_]+/g, ' ').trim();
   }
 }
+function qs(obj) {
+  const p = new URLSearchParams();
+  Object.entries(obj).forEach(([k,v])=>{
+    if (v===undefined || v===null || v==='') return;
+    p.set(k, String(v));
+  });
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}
 
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
-  // filenames are relative to /media/bundles/
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
@@ -226,7 +234,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('default'); // Default Game slug
+  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -237,19 +245,19 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
-  const [suite, setSuite]   = useState(null); // missions + version
-  const [config, setConfig] = useState(null); // devices + media + icons + appearance
+  const [suite, setSuite]   = useState(null);
+  const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // Selection states
+  // selections
   const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [selectedMissionIdx, setSelectedMissionIdx] = useState(null);
 
-  // Device manager (Devices tab)
+  // Devices tab
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
@@ -258,21 +266,27 @@ export default function Admin() {
 
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // Combined Save & Publish controls
+  // Combined Save & Publish
   const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
-  // Selected Pin size (only affects selected pin)
+  // Pin size (selected)
   const [selectedPinSize, setSelectedPinSize] = useState(28);
   const defaultPinSize = 24;
 
-  // Undo/Redo history
+  // Undo/Redo
   const historyRef = useRef({ past: [], future: [] });
 
-  // Settings → Map center search
+  // Settings → Region search
   const [mapSearchQ, setMapSearchQ] = useState('');
   const [mapSearching, setMapSearching] = useState(false);
   const [mapResults, setMapResults] = useState([]);
+
+  // Test preview nonce (force iframe reload)
+  const [previewNonce, setPreviewNonce] = useState(0);
+
+  // Delete confirm modal
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -333,30 +347,33 @@ export default function Admin() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []); // attach once
+  }, []);
 
   /* load games */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/games', { credentials:'include' });
+        const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
         const j = await r.json();
         if (j.ok) setGames(j.games || []);
       } catch {}
     })();
   }, []);
 
-  /* load suite/config */
+  /* load suite/config when slug changes */
   useEffect(() => {
     (async () => {
       try {
         setStatus('Loading…');
-        const missionUrls = activeSlug
-          ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`]
-          : [`/missions.json`];
-        const configUrls = activeSlug
-          ? [`/api/config?slug=${encodeURIComponent(activeSlug)}`, `/api/config`]
-          : [`/api/config`];
+        const isDefault = !activeSlug || activeSlug === 'default';
+
+        const missionUrls = isDefault
+          ? ['/missions.json']
+          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+
+        const configUrls = isDefault
+          ? ['/api/config']
+          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
 
         const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
         const c0 = await fetchFirstJson(configUrls, defaultConfig());
@@ -370,7 +387,7 @@ export default function Admin() {
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
             correct: x.correct || { mode:'none' },
             wrong:   x.wrong   || { mode:'none' },
-            showContinue: x.showContinue !== false, // default true
+            showContinue: x.showContinue !== false,
           })),
         };
 
@@ -412,7 +429,7 @@ export default function Admin() {
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
-      geofence: { mode: 'test' }, // 'test' | 'live'
+      geofence: { mode: 'test' },
     };
   }
   function defaultContentForType(t) {
@@ -431,99 +448,139 @@ export default function Admin() {
     }
   }
 
+  /* ── API helpers respecting Default Game (legacy root) ── */
+  function isDefaultSlug(slug) { return !slug || slug === 'default'; }
+
   async function saveAllWithSlug(slug) {
     if (!suite || !config) return false;
-    setStatus('Saving… (writing missions + config safely)');
-    const qs = `?slug=${encodeURIComponent(slug)}`;
+    setStatus('Saving…');
+    const url = isDefaultSlug(slug)
+      ? `/api/save-bundle`
+      : `/api/save-bundle${qs({ slug })}`;
     try {
-      const r = await fetch('/api/save-bundle' + qs, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ missions: suite, config })
       });
-      if (!r.ok) throw new Error(await r.text());
-      setStatus('✅ Saved (files committed). If Game files changed, Vercel will redeploy.');
+      const text = await r.text();
+      if (!r.ok) throw new Error(text || 'save failed');
+      setStatus('✅ Saved');
       return true;
     } catch (e) {
-      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
-      await new Promise(r => setTimeout(r, 900));
+      setStatus('❌ Save failed: ' + (e?.message || e));
+      return false;
+    }
+  }
+
+  async function publishWithSlug(slug, channel='published') {
+    // Try query form first (/api/game?slug=x&channel=...), fall back to path (/api/game/x?channel=...)
+    const first = isDefaultSlug(slug)
+      ? `/api/game${qs({ channel })}`
+      : `/api/game${qs({ slug, channel })}`;
+    const fallback = isDefaultSlug(slug)
+      ? null
+      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
+
+    try {
+      const res = await fetch(first, {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({ action:'publish' })
+      });
+      const txt = await res.text();
+      let data = {};
+      try { data = JSON.parse(txt); } catch {}
+      if (!res.ok) { if (fallback) throw new Error('try fallback'); else throw new Error(txt||'publish failed'); }
+      setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
+      return true;
+    } catch (e) {
+      if (!fallback) { setStatus('❌ Publish failed: ' + (e?.message||e)); return false; }
       try {
-        const r2 = await fetch('/api/save-bundle' + qs, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ missions: suite, config })
+        const res2 = await fetch(fallback, {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({ action:'publish' })
         });
-        if (!r2.ok) throw new Error(await r2.text());
-        setStatus('✅ Saved after retry.');
+        const txt2 = await res2.text();
+        let data2 = {};
+        try { data2 = JSON.parse(txt2); } catch {}
+        if (!res2.ok) throw new Error(txt2||'publish failed');
+        setStatus(`✅ Published${data2?.version ? ` v${data2.version}` : ''}`);
         return true;
       } catch (e2) {
-        setStatus('❌ Save failed: ' + (e2?.message || e2));
+        setStatus('❌ Publish failed: ' + (e2?.message || e2));
         return false;
       }
     }
   }
-  async function handlePublishWithSlug(slug) {
+
+  async function reloadGamesList() {
     try {
-      setStatus('Publishing…');
-      const res  = await fetch(`/api/game/${encodeURIComponent(slug)}?channel=published`, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
-      });
-      const data = await res.json().catch(()=> ({}));
-      if (!res.ok) throw new Error(data?.error || 'Publish failed');
-      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
-      return true;
-    } catch (e) {
-      setStatus('❌ Publish failed: ' + (e?.message || e));
-      return false;
-    }
+      const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+      const j = await r.json();
+      if (j.ok) setGames(j.games || []);
+    } catch {}
   }
+
   async function saveAndPublish() {
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
     setSavePubBusy(true);
+
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
+
+    // optional deploy delay
     if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
-    await handlePublishWithSlug(slug);
+
+    await publishWithSlug(slug, 'published');
+
+    // Refresh state, list & preview
+    await reloadGamesList();
+    setPreviewNonce(n => n + 1);
     setSavePubBusy(false);
   }
 
-  /* Delete game (clear entire game) */
-  async function deleteGame() {
+  /* Delete game (with modal confirm) */
+  async function reallyDeleteGame() {
     const slug = activeSlug || 'default';
-    const ok = window.confirm(`Delete entire game "${slug}"? This removes all missions, devices, and media references for this game.`);
-    if (!ok) return;
+    const urlTry = [
+      `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,                 // DELETE /api/games?slug=x
+      !isDefaultSlug(slug) ? `/api/game${qs({ slug })}` : null,                      // DELETE /api/game?slug=x
+      !isDefaultSlug(slug) ? `/api/games/${encodeURIComponent(slug)}` : null,        // DELETE /api/games/x
+      !isDefaultSlug(slug) ? `/api/game/${encodeURIComponent(slug)}` : null,         // DELETE /api/game/x
+    ].filter(Boolean);
+
     setStatus('Deleting game…');
-    try {
-      const res = await fetch(`/api/games?slug=${encodeURIComponent(slug)}`, { method:'DELETE', credentials:'include' });
-      if (res.ok) {
-        setStatus('✅ Game deleted');
-        // Refresh games, fall back to default
-        try {
-          const rr = await fetch('/api/games', { credentials:'include' });
-          const jj = await rr.json();
-          if (jj.ok) setGames(jj.games || []);
-        } catch {}
-        setActiveSlug('default');
-      } else {
-        // Fallback: clear locally & save
-        pushHistory();
-        setSuite({ version:'0.0.0', missions:[] });
-        setConfig(c => ({
-          ...c,
-          devices: [],
-          powerups: [],
-          media: { rewardsPool:[], penaltiesPool:[] },
-          textRules: [],
-        }));
-        const saved = await saveAllWithSlug(slug);
-        if (saved) setStatus('✅ Cleared game content (fallback).');
-      }
-    } catch (e) {
-      setStatus('❌ Delete failed: ' + (e?.message || e));
+    let ok = false, lastErr = '';
+    for (const u of urlTry) {
+      try {
+        const res = await fetch(u, { method:'DELETE', credentials:'include' });
+        if (res.ok) { ok = true; break; }
+        lastErr = await res.text();
+      } catch (e) { lastErr = e?.message || String(e); }
     }
+
+    if (!ok) {
+      // Fall back: clear locally & save (root or slug)
+      pushHistory();
+      setSuite({ version:'0.0.0', missions:[] });
+      setConfig(c => ({
+        ...c, devices: [], powerups: [], media: { rewardsPool:[], penaltiesPool:[] }, textRules: [],
+      }));
+      const saved = await saveAllWithSlug(slug);
+      if (saved) { setStatus('✅ Cleared game content'); ok = true; }
+    }
+
+    if (ok) {
+      await reloadGamesList();
+      setActiveSlug('default');
+      setStatus('✅ Game deleted');
+      setPreviewNonce(n => n + 1);
+    } else {
+      setStatus('❌ Delete failed: ' + (lastErr || 'unknown error'));
+    }
+    setConfirmDeleteOpen(false);
   }
 
   /* Missions CRUD */
@@ -569,7 +626,7 @@ export default function Admin() {
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number' || f.optional) continue;
-      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue; // explicitly optional
+      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue;
       const v = editing.content?.[f.key];
       if (v === undefined || v === null || v === '') {
         return setStatus('❌ Missing: ' + f.label);
@@ -579,7 +636,9 @@ export default function Admin() {
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
-    setSuite({ ...suite, missions: (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]), version: bumpVersion(suite.version || '0.0.0') });
+
+    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
+    setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
     setStatus('✅ Mission saved');
   }
@@ -622,8 +681,8 @@ export default function Admin() {
     setSelectedMissionIdx(null);
     setDevDraft({
       title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120,
-      lat:Number((config.map?.centerLat ?? 44.9778).toFixed ? (config.map.centerLat) : 44.9778),
-      lng:Number((config.map?.centerLng ?? -93.2650).toFixed ? (config.map.centerLng) : -93.2650)
+      lat:Number((config.map?.centerLat ?? 44.9778)),
+      lng:Number((config.map?.centerLng ?? -93.2650))
     });
   }
   function saveDraftDevice() {
@@ -698,7 +757,7 @@ export default function Admin() {
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
-    c.radiusMeters = clamp(Number(r || 0), 5, 500); // 5–500 only
+    c.radiusMeters = clamp(Number(r || 0), 5, 500);
     c.geofenceEnabled = true;
     if (!isFinite(Number(c.lat)) || !isFinite(Number(c.lng))) {
       c.lat = Number(config.map?.centerLat || 44.9778);
@@ -770,12 +829,10 @@ export default function Admin() {
     const allUrls = new Set(inv.map(i => i.url));
     const used = new Set();
 
-    // icons by key
     const iconUrlByKey = {};
     (config?.icons?.missions || []).forEach(i => { if (i.key && i.url) iconUrlByKey['missions:'+i.key]=i.url; });
     (config?.icons?.devices  || []).forEach(i => { if (i.key && i.url) iconUrlByKey['devices:'+i.key]=i.url; });
 
-    // missions
     (suite?.missions || []).forEach(m => {
       if (m.iconUrl) used.add(m.iconUrl);
       if (m.iconKey && iconUrlByKey['missions:'+m.iconKey]) used.add(iconUrlByKey['missions:'+m.iconKey]);
@@ -784,24 +841,17 @@ export default function Admin() {
       if (m.correct?.mediaUrl) used.add(m.correct.mediaUrl);
       if (m.wrong?.mediaUrl)   used.add(m.wrong.mediaUrl);
     });
-
-    // devices
     (getDevices() || []).forEach(d => {
       if (d.iconKey && iconUrlByKey['devices:'+d.iconKey]) used.add(iconUrlByKey['devices:'+d.iconKey]);
     });
-
-    // pools
     (config?.media?.rewardsPool || []).forEach(x => x.url && used.add(x.url));
     (config?.media?.penaltiesPool || []).forEach(x => x.url && used.add(x.url));
-
-    // Any icons list entries themselves are "inventory", so they’re not auto-marked unused unless not referenced above
 
     const unused = inv.filter(i => !used.has(i.url));
     const usedCount = used.size;
     const total = inv.length;
 
     setStatus(`Scan complete: ${usedCount}/${total} media referenced; ${unused.length} unused.`);
-    // Show a modal-like report
     alert(
       `${usedCount}/${total} media referenced\n` +
       (unused.length ? `Unused files:\n- `+unused.map(u=>u.url).join('\n- ') : 'No unused files detected')
@@ -836,13 +886,11 @@ export default function Admin() {
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
 
-  // Missions tab slider binding
   const missionRadiusDisabled = (selectedMissionIdx==null);
   const missionRadiusValue = selectedMissionIdx!=null
     ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
 
-  // Devices tab slider binding
   const deviceRadiusDisabled = (selectedDevIdx==null && !placingDev);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
@@ -851,6 +899,9 @@ export default function Admin() {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   const tabsOrder = ['missions','devices','settings','text','media','test'];
+
+  const isDefault = !activeSlug || activeSlug === 'default';
+  const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
     <div style={S.body}>
@@ -862,7 +913,7 @@ export default function Admin() {
                 {t.toUpperCase()}
               </button>
             ))}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
               <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                 <option value="default">(Default Game)</option>
@@ -874,7 +925,7 @@ export default function Admin() {
             </div>
 
             {/* Save & Publish with optional delay */}
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                 Deploy delay (sec):
                 <input
@@ -885,7 +936,13 @@ export default function Admin() {
                 />
               </label>
               <button
-                onClick={saveAndPublish}
+                onClick={async ()=>{
+                  await saveAndPublish();
+                  // hard reload data after
+                  const isDefaultNow = !activeSlug || activeSlug === 'default';
+                  // re-pull suite/config for confidence
+                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
+                }}
                 disabled={savePubBusy}
                 style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
               >
@@ -893,10 +950,14 @@ export default function Admin() {
               </button>
             </div>
 
-            <a href={activeSlug && activeSlug!=='default' ? `/games/${encodeURIComponent(activeSlug)}/missions.json` : '/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={isDefault ? '/missions.json' : `/games/${encodeURIComponent(activeSlug)}/missions.json`}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
-            <a href={activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : '/api/config'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
           </div>
@@ -947,7 +1008,7 @@ export default function Admin() {
             </div>
           </aside>
 
-          {/* Right: Missions Map + mission controls + overlay editor */}
+          {/* Right: Missions Map */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
@@ -972,7 +1033,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Mission radius control */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
                 <input
                   type="range" min={5} max={500} step={5}
@@ -990,9 +1050,9 @@ export default function Admin() {
                 devices={(config?.devices)||[]}
                 icons={config.icons || DEFAULT_ICONS}
                 showRings={showRings}
-                interactive={false}             // no placing devices here
+                interactive={false}
                 draftDevice={null}
-                selectedDevIdx={null}           // devices not editable
+                selectedDevIdx={null}
                 selectedMissionIdx={selectedMissionIdx}
                 onDraftChange={null}
                 onMoveSelected={null}
@@ -1012,7 +1072,6 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  {/* Floating / sticky top bar */}
                   <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
@@ -1058,7 +1117,6 @@ export default function Admin() {
 
                   <hr style={S.hr}/>
 
-                  {/* QUESTION-FIRST ORDERING */}
                   {editing.type === 'multiple_choice' && (
                     <>
                       <Field label="Question">
@@ -1120,19 +1178,17 @@ export default function Admin() {
                     </Field>
                   )}
 
-                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
-                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
+                        onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                       />
                     </div>
                   )}
 
-                  {/* Optional geofence for others */}
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
@@ -1148,7 +1204,7 @@ export default function Admin() {
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                             center={mapCenter}
-                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
+                            onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -1161,7 +1217,6 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* Remaining generic fields */}
                   {(TYPE_FIELDS[editing.type] || [])
                     .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
                     .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
@@ -1201,7 +1256,6 @@ export default function Admin() {
                   </Field>
 
                   <hr style={S.hr} />
-                  {/* Continue button toggle */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input
                       type="checkbox"
@@ -1211,7 +1265,6 @@ export default function Admin() {
                     Show “Continue” button to close this mission
                   </label>
 
-                  {/* Appearance override */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1237,7 +1290,6 @@ export default function Admin() {
       {/* DEVICES */}
       {tab==='devices' && (
         <main style={S.wrapGrid2}>
-          {/* Left: Device list + actions */}
           <aside style={S.sidebarTall}>
             <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
               <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
@@ -1287,14 +1339,13 @@ export default function Admin() {
             {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
-          {/* Right: Devices map (editable, conforms to region) */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Devices Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Select a <b>device</b> pin to move it. Use search or “My location” to jump. Map follows your **Game Region** center/zoom.
+                    Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
@@ -1312,7 +1363,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* Device radius control */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
                 <input
                   type="range" min={5} max={2000} step={5}
@@ -1331,7 +1381,6 @@ export default function Admin() {
                 </code>
               </div>
 
-              {/* Draft device editor */}
               {placingDev && (
                 <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
                   <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
@@ -1377,7 +1426,6 @@ export default function Admin() {
                 mapZoom={mapZoom}
                 defaultIconSizePx={defaultPinSize}
                 selectedIconSizePx={selectedPinSize}
-                // Devices tab: enable selecting & moving devices only
                 interactive={placingDev}
                 draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
                 selectedDevIdx={selectedDevIdx}
@@ -1388,7 +1436,7 @@ export default function Admin() {
                 onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
                 onSelectMission={null}
                 readOnly={false}
-                lockToRegion={true}   // ← keep map on predetermined region
+                lockToRegion={true}
               />
             </div>
           </section>
@@ -1417,7 +1465,6 @@ export default function Admin() {
             </Field>
           </div>
 
-          {/* Game Region & Geofence */}
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
@@ -1472,11 +1519,15 @@ export default function Admin() {
             </div>
           </div>
 
-          {/* Maintenance */}
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }} onClick={deleteGame}>🗑 Delete Game</button>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=> setConfirmDeleteOpen(true)}
+              >
+                🗑 Delete Game
+              </button>
               <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
             </div>
           </div>
@@ -1495,7 +1546,7 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
-      {/* MEDIA — Icons + Reward & Penalty pools */}
+      {/* MEDIA */}
       {tab==='media' && (
         <MediaTab
           config={config}
@@ -1516,20 +1567,29 @@ export default function Admin() {
           <div style={S.card}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <h3 style={{ margin:0 }}>Play Test</h3>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <label>Channel:&nbsp;
                   <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
                 </label>
-                <TestLauncher slug={activeSlug||'default'} channel={testChannel} preferPretty={true} popup={false}/>
+                <button style={S.button} onClick={()=>setPreviewNonce(n=>n+1)}>Reload preview</button>
+                <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
-              <iframe src={`${gameBase}/?slug=${encodeURIComponent(activeSlug||'default')}&channel=${testChannel}&preview=1`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}/>
+              <iframe
+                key={previewNonce} // hard refresh on nonce change
+                src={`${gameBase}/?${new URLSearchParams({
+                  ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
+                  channel: testChannel,
+                  preview: '1',
+                  cb: String(Date.now())
+                }).toString()}`}
+                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
+              />
             )}
           </div>
         </main>
@@ -1569,12 +1629,32 @@ export default function Admin() {
                   method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
                   body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
                 });
-                const j = await r.json();
+                const j = await r.json().catch(()=>({ ok:false }));
                 if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
-                const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
-                if (jj.ok) setGames(jj.games || []);
+                await reloadGamesList();
                 setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
               }}>Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDeleteOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
+          <div style={{ ...S.card, width:420 }}>
+            <h3 style={{ marginTop:0 }}>Delete Game</h3>
+            <div style={{ color:'#e9eef2', marginBottom:12 }}>
+              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={reallyDeleteGame}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -1721,7 +1801,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid '#1f2329' },
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
@@ -1835,7 +1915,7 @@ function MapOverview({
       bounds.extend(pos);
     });
 
-    // Draft device (when adding on Devices tab)
+    // Draft device (Devices tab)
     if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
       const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
@@ -2159,77 +2239,7 @@ function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
   );
 }
 
-/* Inventory + DropOrPick (kept for pools and rich editors where allowed) */
-function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acceptKinds = ['image','gif','video','audio'] }) {
-  const [pool, setPool] = React.useState([]);
-  const [hover, setHover] = React.useState(false);
-  const [showInv, setShowInv] = React.useState(false);
-
-  React.useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory([dir, 'uploads'])); } catch {}
-  })(); }, [dir]);
-
-  async function onDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
-    if (!f) return;
-    const type = f.type.toLowerCase();
-    const ok =
-      (acceptKinds.includes('image') && type.startsWith('image/')) ||
-      (acceptKinds.includes('gif')   && f.name.toLowerCase().endsWith('.gif')) ||
-      (acceptKinds.includes('video') && type.startsWith('video/')) ||
-      (acceptKinds.includes('audio') && type.startsWith('audio/'));
-    if (!ok) return;
-    const u = await uploadToRepo(f, 'uploads');
-    if (u) onChangeUrl(u);
-  }
-
-  function hint() {
-    const kinds = acceptKinds.includes('video') ? '.mp4 / .webm / .mov'
-      : acceptKinds.includes('audio') ? '.mp3 / .wav / .ogg / .m4a'
-      : acceptKinds.includes('gif')   ? '.gif'
-      : '.png / .jpg / .jpeg / .webp';
-    const word = acceptKinds.includes('video') ? 'video'
-      : acceptKinds.includes('audio') ? 'audio'
-      : acceptKinds.includes('gif')   ? 'GIF'
-      : 'image';
-    return `Drop a ${word} (${kinds}) here, paste a URL, or open inventory ↓`;
-  }
-
-  const filtered = pool.filter(it => acceptKinds.includes(it.type));
-
-  return (
-    <Field label={label}>
-      <div
-        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
-        onDragOver={(e)=>{e.preventDefault();}}
-        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
-        onDrop={onDrop}
-        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
-      >
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
-          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder={hint()} />
-          <button type="button" style={S.button} onClick={()=>setShowInv(true)}>Open Media Inventory</button>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
-          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
-            <option value="">Quick pick from inventory…</option>
-            {filtered.map((it) => <option key={it.url} value={it.url}>{it.name}</option>)}
-          </select>
-        </div>
-        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
-      </div>
-
-      {showInv && (
-        <MediaInventoryModal
-          acceptKinds={acceptKinds}
-          onClose={()=>setShowInv(false)}
-          onPick={(u)=>{ onChangeUrl(u); setShowInv(false); }}
-        />
-      )}
-    </Field>
-  );
-}
+/* Inventory modal (for pools & editors that allow picking) */
 function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
   const [pool, setPool] = useState([]);
   const [q, setQ] = useState('');
@@ -2348,7 +2358,6 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     </main>
   );
 }
-
 function TestSMS() {
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState('Test message from admin');
