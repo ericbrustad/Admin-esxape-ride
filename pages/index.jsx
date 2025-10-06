@@ -2077,6 +2077,38 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
   const [hover, setHover] = useState(false);
 
+  /* ####################################################################################################################
+  ##################################################################### */
+  
+  <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+  <input
+    style={S.input}
+    value={row.url||''}
+    onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
+    placeholder="Image/Video/GIF/Audio URL"
+  />
+  <label style={{ ...S.button, textAlign:'center' }}>
+    Choose File
+    <input type="file" style={{ display:'none' }}
+      onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return;
+        const url = await uploadToRepo(f, 'uploads');
+        const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n);
+      }}/>
+  </label>
+  <button style={S.button} onClick={async ()=>{
+    const u = String(items[idx]?.url || '').trim();
+    if (!u) return alert('Paste a URL first');
+    try {
+      setUploadStatus('Importing from URL…');
+      const local = await importFromUrl(u);
+      const n=[...items]; n[idx]={ ...(n[idx]||{}), url: local }; onChange(n);
+      setUploadStatus('✅ Imported');
+    } catch(e) {
+      setUploadStatus('❌ ' + (e?.message || 'import failed'));
+    }
+  }}>Import URL</button>
+</div>
+
   async function handleDrop(e) {
     e.preventDefault(); e.stopPropagation(); setHover(false);
     let files = [];
