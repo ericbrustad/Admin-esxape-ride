@@ -1,5 +1,5 @@
 {
-  "version": "0.0.3",
+  "version": "0.0.4",
   "missions": [
     {
       "id": "m01",
@@ -28,6 +28,32 @@
       "wrong": {
         "mode": "none"
       }
+    },
+    {
+      "id": "m02",
+      "title": "video",
+      "type": "video",
+      "iconKey": "",
+      "iconUrl": "/media/uploads/1759749280819-361908030_MONSTER_SHRUGGING_400px.gif",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "videoUrl": "https://youtu.be/xeviGB4AOXg?si=dcxCxMxn__fFm_Mt",
+        "overlayText": "",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false
     }
   ]
 }
