@@ -81,6 +81,11 @@
         "key": "gold-coin",
         "name": "Gold Coin",
         "url": "/media/bundles/GOLDEN%20COIN.png"
+      },
+      {
+        "key": "rewards-4",
+        "name": "",
+        "url": ""
       }
     ]
   },
