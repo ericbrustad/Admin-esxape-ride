@@ -23,8 +23,8 @@
       "iconKey": "roaming-robot",
       "pickupRadius": 375,
       "effectSeconds": 120,
-      "lat": 44.977186,
-      "lng": -93.277705
+      "lat": 44.9767,
+      "lng": -93.300194
     },
     {
       "id": "d02",
@@ -33,8 +33,8 @@
       "iconKey": "smoke-shield",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.976987,
-      "lng": -93.289436
+      "lat": 44.975602,
+      "lng": -93.288342
     }
   ],
   "powerups": [
@@ -45,8 +45,8 @@
       "iconKey": "roaming-robot",
       "pickupRadius": 375,
       "effectSeconds": 120,
-      "lat": 44.977186,
-      "lng": -93.277705
+      "lat": 44.9767,
+      "lng": -93.300194
     },
     {
       "id": "d02",
@@ -55,8 +55,8 @@
       "iconKey": "smoke-shield",
       "pickupRadius": 100,
       "effectSeconds": 120,
-      "lat": 44.976987,
-      "lng": -93.289436
+      "lat": 44.975602,
+      "lng": -93.288342
     }
   ],
   "media": {
@@ -96,6 +96,11 @@
         "key": "roaming-robot",
         "name": "Roaming Robot",
         "url": "/media/icons/1759680357102-casper.jpg"
+      },
+      {
+        "key": "devices-3",
+        "name": "",
+        "url": ""
       }
     ],
     "rewards": [
