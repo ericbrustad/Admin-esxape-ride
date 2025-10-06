@@ -10,6 +10,19 @@ async function fetchJsonSafe(url, fallback) {
   } catch {}
   return fallback;
 }
+
+async function importFromUrl(rawUrl) {
+  const res = await fetch('/api/upload-url', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    credentials:'include',
+    body: JSON.stringify({ url: rawUrl })
+  });
+  const j = await res.json().catch(()=>({}));
+  if (!res.ok || !j?.ok) throw new Error(j?.error || 'import failed');
+  return j.url; // /media/uploads/<type>/<file>
+}
+
 async function fetchFirstJson(urls, fallback) {
   for (const u of urls) {
     try {
