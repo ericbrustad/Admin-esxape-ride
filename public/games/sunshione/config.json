@@ -1,0 +1,19 @@
+{
+  "game": {
+    "title": "SUNSHIONE",
+    "type": "Mystery"
+  },
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  }
+}
