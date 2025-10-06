@@ -25,7 +25,6 @@ function toDirectMediaURL(u) {
   try {
     const url = new URL(u);
     const host = url.host.toLowerCase();
-
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
       url.searchParams.delete('dl');
@@ -54,17 +53,66 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
+const EXTS = {
+  image: /\.(png|jpg|jpeg|webp)$/i,
+  gif: /\.(gif)$/i,
+  video: /\.(mp4|webm|mov)$/i,
+  audio: /\.(mp3|wav|ogg|m4a)$/i,
+};
+function classifyByExt(u) {
+  if (!u) return 'other';
+  const s = String(u).toLowerCase();
+  if (EXTS.gif.test(s)) return 'gif';
+  if (EXTS.image.test(s)) return 'image';
+  if (EXTS.video.test(s)) return 'video';
+  if (EXTS.audio.test(s)) return 'audio';
+  return 'other';
+}
+
+/* ───────────────────────── Defaults ───────────────────────── */
+const DEFAULT_BUNDLES = {
+  // filenames are relative to /media/bundles/
+  devices: [
+    { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
+    { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+  ],
+  missions: [
+    { key:'trivia',   name:'Trivia',   url:'/media/bundles/trivia%20icon.png' },
+    { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
+  ],
+  rewards: [
+    { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
+    { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
+    { key:'gold-coin', name:'Gold Coin', url:'/media/bundles/GOLDEN%20COIN.png' },
+  ],
+};
+
+function applyDefaultIcons(cfg) {
+  const next = { ...cfg, icons: { missions:[], devices:[], rewards:[], ...(cfg.icons || {}) } };
+  function ensure(kind, arr) {
+    const list = [...(next.icons[kind] || [])];
+    const keys = new Set(list.map(x => (x.key||'').toLowerCase()));
+    for (const it of arr) {
+      if (!keys.has((it.key||'').toLowerCase())) list.push({ ...it });
+    }
+    next.icons[kind] = list;
+  }
+  ensure('missions', DEFAULT_BUNDLES.missions);
+  ensure('devices',  DEFAULT_BUNDLES.devices);
+  ensure('rewards',  DEFAULT_BUNDLES.rewards);
+  return next;
+}
 
 /* ───────────────────────── Constants ───────────────────────── */
 const TYPE_FIELDS = {
   multiple_choice: [
-    { key:'question', label:'Question', type:'text' },                       // question first (we still skip dup in renderer)
-    { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
+    { key:'question', label:'Question', type:'text' },
+    { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   short_answer: [
     { key:'question',   label:'Question', type:'text' },
     { key:'answer',     label:'Correct Answer', type:'text' },
-    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text', optional: true }, // optional now
+    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text', optional: true },
     { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   statement: [
@@ -173,7 +221,7 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // Device manager (map side)
+  // Device manager
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
@@ -220,17 +268,23 @@ export default function Admin() {
             ...x,
             appearanceOverrideEnabled: !!x.appearanceOverrideEnabled,
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
+            correct: x.correct || { mode:'none' },
+            wrong:   x.wrong   || { mode:'none' },
           })),
         };
-        const merged = {
+
+        let merged = {
           ...dc, ...c0,
           timer: { ...dc.timer, ...(c0.timer || {}) },
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
-          media: { ...(c0.media || {}) },
+          media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
           icons: { ...(c0.icons || {}), ...DEFAULT_ICONS },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
         };
+
+        // Re-apply defaults if sets are empty/missing
+        merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
         setConfig(merged);
@@ -251,7 +305,8 @@ export default function Admin() {
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
       devices: [], powerups: [],
-      media: {}, icons: DEFAULT_ICONS,
+      media: { rewardsPool:[], penaltiesPool:[] },
+      icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
     };
   }
@@ -397,6 +452,11 @@ export default function Admin() {
 
   /* Devices (Map-Side Manager) */
   const devices = getDevices();
+  function deviceIconUrlFromKey(key) {
+    if (!key) return '';
+    const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
+    return it?.url || '';
+  }
   function addDevice() {
     setPlacingDev(true);
     setSelectedDevIdx(null);
@@ -447,7 +507,7 @@ export default function Admin() {
     setDevices(list);
   }
 
-  // ── Address search (by the map) — Nominatim ───────────────────────────
+  // Address search
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
@@ -530,7 +590,7 @@ export default function Admin() {
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            <button onClick={startNew} style={S.button}>+ New Mission</button>
+            {/* Keep header controls */}
             <button onClick={saveAll} style={S.button}>💾 Save All</button>
             <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
 
@@ -545,11 +605,14 @@ export default function Admin() {
         </div>
       </header>
 
-      {/* MISSIONS (list left + map right + overlay editor) */}
+      {/* MISSIONS */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
-          {/* Left list */}
+          {/* Left list (new mission button here) */}
           <aside style={S.sidebarTall}>
+            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+              <button onClick={startNew} style={S.button}>+ New Mission</button>
+            </div>
             <input
               placeholder="Search…"
               onChange={(e) => {
@@ -639,28 +702,39 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* Compact device selector */}
+              {/* Device chips with tiny preview */}
               <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-                {(devices||[]).map((d,i)=>(
-                  <button
-                    key={d.id||i}
-                    style={{
-                      ...S.button, padding:'6px 10px',
-                      background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
-                      borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b'
-                    }}
-                    onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
-                    title={`${d.title||d.type} (#${i+1})`}
-                  >
-                    D{i+1} {d.title ? `— ${d.title}` : ''}
-                  </button>
-                ))}
+                {(devices||[]).map((d,i)=>{
+                  const url = deviceIconUrlFromKey(d.iconKey);
+                  return (
+                    <button
+                      key={d.id||i}
+                      style={{
+                        ...S.button, padding:'6px 10px',
+                        background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
+                        borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b',
+                        display:'flex', alignItems:'center', gap:6
+                      }}
+                      onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
+                      title={`${d.title||d.type} (#${i+1})`}
+                    >
+                      {url ? <img alt="" src={toDirectMediaURL(url)} style={{ width:16, height:16, objectFit:'cover', borderRadius:3 }}/> : null}
+                      D{i+1} {d.title ? `— ${d.title}` : ''}
+                    </button>
+                  );
+                })}
                 {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
               </div>
 
+              {/* Draft device editor with preview */}
               {placingDev && (
                 <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                    <div>
+                      {devDraft.iconKey
+                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+                    </div>
                     <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                     <Field label="Type">
                       <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
@@ -721,12 +795,11 @@ export default function Admin() {
               />
             </div>
 
-            {/* Overlay mission editor */}
+            {/* Mission editor (overlay) */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(820px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
                   <h3 style={{ marginTop:0 }}>Edit Mission</h3>
-                  {/* TOP buttons */}
                   <div style={{ display:'flex', gap:8, marginBottom:8 }}>
                     <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -743,16 +816,17 @@ export default function Admin() {
                     </select>
                   </Field>
 
-                  {/* Icon select + drop/pick */}
+                  {/* Icon select + drop/pick/inventory */}
                   <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
                       <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
                         <option value="">(default)</option>
                         {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
                       </select>
                       <DropOrPick
-                        label="(or drop/pick image to assign)"
+                        label="(or pick a specific image — recommended: PNG/JPG/GIF)"
                         dir="bundles"
+                        acceptKinds={['image','gif']}
                         url={editing.iconUrl || ''}
                         onChangeUrl={(u)=>{ setEditing({ ...editing, iconUrl:u }); setDirty(true); }}
                         uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
@@ -924,8 +998,9 @@ export default function Admin() {
                   </div>
                   {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
                     <DropOrPick
-                      label="Media"
+                      label="Reward media"
                       dir="bundles"
+                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
                       url={editing.correct?.mediaUrl || ''}
                       onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
                       uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
@@ -975,8 +1050,9 @@ export default function Admin() {
                   </div>
                   {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
                     <DropOrPick
-                      label="Media"
+                      label="Penalty media"
                       dir="bundles"
+                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
                       url={editing.wrong?.mediaUrl || ''}
                       onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
                       uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
@@ -1005,7 +1081,6 @@ export default function Admin() {
                     <div />
                   </div>
 
-                  {/* Appearance override */}
                   <hr style={S.hr}/>
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
@@ -1017,7 +1092,6 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  {/* Bottom buttons remain */}
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -1063,10 +1137,10 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT rules */}
+      {/* TEXT rules (unchanged) */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
-      {/* DEVICES list */}
+      {/* DEVICES (list) */}
       {tab==='devices' && (
         <main style={S.wrap}>
           <div style={S.card}>
@@ -1102,13 +1176,14 @@ export default function Admin() {
         </main>
       )}
 
-      {/* MEDIA */}
+      {/* MEDIA — Icons + Reward & Penalty pools */}
       {tab==='media' && (
         <MediaTab
           config={config}
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
+          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
           uploadToRepo={async (file, folder)=> {
             const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
@@ -1141,7 +1216,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* New Game modal */}
+      {/* New Game modal (unchanged) */}
       {showNewGame && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
           <div style={{ ...S.card, width:420 }}>
@@ -1339,7 +1414,7 @@ const S = {
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
 };
 
-/* MapOverview — shows missions + devices, supports: placing draft, moving selected, moving nearest */
+/* MapOverview — shows missions + devices */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
   interactive = false, draftDevice = null, selectedDevIdx = null,
@@ -1444,8 +1519,8 @@ function MapOverview({
   );
 }
 
-/* MEDIA tab */
-function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo }) {
+/* MEDIA tab (Icons + Reward/Penalty pools) */
+function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
   const [hover, setHover] = useState(false);
 
   async function handleDrop(e) {
@@ -1481,6 +1556,11 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
     );
   }
 
+  const rewardsPool = Array.isArray(config.media?.rewardsPool) ? config.media.rewardsPool : [];
+  const penaltiesPool = Array.isArray(config.media?.penaltiesPool) ? config.media.penaltiesPool : [];
+  const setRewardsPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), rewardsPool: next } });
+  const setPenaltiesPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), penaltiesPool: next } });
+
   return (
     <main style={S.wrap}>
       <div style={S.card}
@@ -1488,14 +1568,31 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
            onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
            onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
            onDrop={handleDrop}>
-        <h3 style={{ marginTop:0 }}>Media</h3>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ marginTop:0 }}>Media</h3>
+          <button style={S.button} onClick={onReapplyDefaults}>Re‑apply default assets</button>
+        </div>
+
         <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files here or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
+          Drag & drop files anywhere on this page or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
           <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
         </div>
 
         <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
         <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
+
+        <MediaPoolEditor
+          title="Reward Media"
+          items={rewardsPool}
+          onChange={setRewardsPool}
+          uploadToRepo={uploadToRepo}
+        />
+        <MediaPoolEditor
+          title="Penalty Media"
+          items={penaltiesPool}
+          onChange={setPenaltiesPool}
+          uploadToRepo={uploadToRepo}
+        />
       </div>
     </main>
   );
@@ -1532,7 +1629,7 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
             <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
               <select style={S.input} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} value="">
                 <option value="">Pick from media pool…</option>
-                {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
+                {pool.filter(it=>it.type==='image' || it.type==='gif').map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
               </select>
             </div>
             {row.url
@@ -1551,8 +1648,192 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
     </div>
   );
 }
+function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
+  const [pool, setPool] = useState([]);
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`/api/list-media?dir=bundles`);
+      const j = await r.json(); setPool(j?.items || []);
+    } catch {}
+  })(); }, []);
 
-/* Mission Text rules (unchanged from your build) */
+  return (
+    <div style={{ marginTop:20 }}>
+      <h4 style={{ margin:'0 0 8px 0' }}>{title}</h4>
+      <div style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+        <div>Thumbnail</div><div>URL</div><div>Format</div><div>Actions</div>
+      </div>
+      {(items||[]).map((row, idx)=>{
+        const type = classifyByExt(row.url||'');
+        return (
+          <div key={idx} style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+            <div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                <input style={S.input} value={row.url||''}
+                  onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
+                  placeholder="Image/Video/GIF/Audio URL" />
+                <label style={{ ...S.button, textAlign:'center' }}>
+                  Choose File
+                  <input type="file" style={{ display:'none' }}
+                    onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'uploads'); if (url) { const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n); } }}/>
+                </label>
+              </div>
+              <select style={{ ...S.input, marginTop:6 }}
+                onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }} value="">
+                <option value="">Pick from media inventory…</option>
+                {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
+              </select>
+              {row.url ? <MediaPreview url={row.url} kind="preview"/> : null}
+            </div>
+            <div><code>{row.url ? (row.url.split('.').pop().split('?')[0] || '').toLowerCase() : ''}</code></div>
+            <div style={{ textTransform:'capitalize' }}>{type}</div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button style={S.button} onClick={()=>{ const n=[...items]; n.splice(idx,1); onChange(n); }}>Delete</button>
+              <button style={S.button} onClick={()=>{ const n=[...items]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); onChange(n); }}>Duplicate</button>
+            </div>
+          </div>
+        );
+      })}
+      <button style={S.button} onClick={()=>{ onChange([...(items||[]), { url:'' }]); }}>+ Add Media</button>
+    </div>
+  );
+}
+
+/* Inventory + DropOrPick */
+function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acceptKinds = ['image','gif','video','audio'] }) {
+  const [pool, setPool] = React.useState([]);
+  const [hover, setHover] = React.useState(false);
+  const [showInv, setShowInv] = React.useState(false);
+
+  React.useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`);
+      const j = await r.json();
+      setPool(j?.items || []);
+    } catch {}
+  })(); }, [dir]);
+
+  async function onDrop(e) {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
+    if (!f) return;
+    const type = f.type.toLowerCase();
+    const ok =
+      (acceptKinds.includes('image') && type.startsWith('image/')) ||
+      (acceptKinds.includes('gif')   && f.name.toLowerCase().endsWith('.gif')) ||
+      (acceptKinds.includes('video') && type.startsWith('video/')) ||
+      (acceptKinds.includes('audio') && type.startsWith('audio/'));
+    if (!ok) return;
+    const pathFolder = (acceptKinds.includes('image') || acceptKinds.includes('gif')) ? 'uploads' : 'uploads';
+    const u = await uploadToRepo(f, pathFolder);
+    if (u) onChangeUrl(u);
+  }
+
+  function hint() {
+    const kinds = acceptKinds.includes('video') ? '.mp4 / .webm / .mov'
+      : acceptKinds.includes('audio') ? '.mp3 / .wav / .ogg / .m4a'
+      : acceptKinds.includes('gif')   ? '.gif'
+      : '.png / .jpg / .jpeg / .webp';
+    const word = acceptKinds.includes('video') ? 'video'
+      : acceptKinds.includes('audio') ? 'audio'
+      : acceptKinds.includes('gif')   ? 'GIF'
+      : 'image';
+    return `Drop a ${word} (${kinds}) here, paste a URL, or open inventory ↓`;
+  }
+
+  const filtered = pool.filter(it => acceptKinds.includes(it.type));
+
+  return (
+    <Field label={label}>
+      <div
+        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
+        onDragOver={(e)=>{e.preventDefault();}}
+        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
+        onDrop={onDrop}
+        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
+      >
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder={hint()} />
+          <button type="button" style={S.button} onClick={()=>setShowInv(true)}>Open Media Inventory</button>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
+          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
+            <option value="">Quick pick from inventory…</option>
+            {filtered.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
+          </select>
+        </div>
+        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
+      </div>
+
+      {showInv && (
+        <MediaInventoryModal
+          acceptKinds={acceptKinds}
+          onClose={()=>setShowInv(false)}
+          onPick={(u)=>{ onChangeUrl(u); setShowInv(false); }}
+        />
+      )}
+    </Field>
+  );
+}
+function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
+  const [pool, setPool] = useState([]);
+  const [q, setQ] = useState('');
+  const [tab, setTab] = useState(acceptKinds[0] || 'image');
+
+  useEffect(()=>{ (async()=>{
+    try {
+      const r = await fetch('/api/list-media?dir=bundles');
+      const j = await r.json(); setPool(j?.items || []);
+    } catch {}
+  })(); }, []);
+
+  const groups = {
+    image: pool.filter(x=>x.type==='image'),
+    gif:   pool.filter(x=>x.type==='gif'),
+    video: pool.filter(x=>x.type==='video'),
+    audio: pool.filter(x=>x.type==='audio'),
+  };
+  const tabs = ['image','gif','video','audio'].filter(t=>acceptKinds.includes(t));
+  const shown = (groups[tab]||[]).filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
+      <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <h3 style={{ margin:0 }}>Media Inventory</h3>
+          <button style={S.button} onClick={onClose}>Close</button>
+        </div>
+        <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+          {tabs.map(t=>
+            <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t?{ background:'#1a2027' }:{}) }} onClick={()=>setTab(t)}>
+              {t.toUpperCase()}
+            </button>
+          )}
+          <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
+          {shown.map(it=>(
+            <div key={it.url} style={{ border:'1px solid #22303c', borderRadius:10, padding:8 }}>
+              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>{it.name} <span style={{ opacity:.7 }}>({it.type})</span></div>
+              {it.type==='video' ? (
+                <video src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }} />
+              ) : it.type==='audio' ? (
+                <div style={{ height:120, display:'grid', placeItems:'center', border:'1px dashed #2a323b', borderRadius:8, color:'#9fb0bf' }}>
+                  .{it.url.split('.').pop().split('?')[0]}
+                </div>
+              ) : (
+                <img alt="" src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }}/>
+              )}
+              <button style={{ ...S.button, marginTop:8, width:'100%' }} onClick={()=>onPick(it.url)}>Use</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* TEXT tab (as before) */
 function TextTab({ suite, config, setConfig, setStatus }) {
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
   function addSmsRule() {
@@ -1610,103 +1891,6 @@ function TextTab({ suite, config, setConfig, setStatus }) {
         </details>
       </div>
     </main>
-  );
-}
-
-/* Drop or Pick from Media (reusable) */
-function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo }) {
-  const [pool, setPool] = React.useState([]);
-  const [hover, setHover] = React.useState(false);
-
-  React.useEffect(()=>{ (async()=>{
-    try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`);
-      const j = await r.json();
-      setPool(j?.items || []);
-    } catch {}
-  })(); }, [dir]);
-
-  async function onDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
-    if (!f) return;
-    const path = dir === 'overlays' ? 'overlays' : 'uploads';
-    const u = await uploadToRepo(f, path);
-    if (u) onChangeUrl(u);
-  }
-
-  return (
-    <Field label={label}>
-      <div
-        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
-        onDragOver={(e)=>{e.preventDefault();}}
-        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
-        onDrop={onDrop}
-        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
-      >
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
-          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder="Drop a file, paste URL, or pick below…" />
-          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
-            <option value="">Pick from media…</option>
-            {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
-          </select>
-        </div>
-        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
-      </div>
-    </Field>
-  );
-}
-
-/* Map picker for mission editor only */
-function MapPicker({ lat, lng, radius, onChange }) {
-  const divRef = useRef(null);
-  const mapRef = useRef(null);
-  const circleRef = useRef(null);
-  const markerRef = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [r, setR] = useState(radius || 25);
-  const defaultPos = [typeof lat === 'number' ? lat : 44.9778, typeof lng === 'number' ? lng : -93.265];
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.L) { setReady(true); return; }
-    const link = document.createElement('link'); link.rel='stylesheet';
-    link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    const s = document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setReady(true); document.body.appendChild(s);
-  }, []);
-  useEffect(() => {
-    if (!ready || !divRef.current || typeof window === 'undefined') return;
-    const L = window.L; if (!L) return;
-    if (!mapRef.current) {
-      mapRef.current = L.map(divRef.current).setView(defaultPos, (typeof lat === 'number' && typeof lng === 'number') ? 16 : 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(mapRef.current);
-      markerRef.current = L.marker(defaultPos, { draggable:true }).addTo(mapRef.current);
-      circleRef.current = L.circle(markerRef.current.getLatLng(), { radius: r || 25, color:'#33a8ff' }).addTo(mapRef.current);
-      const sync = () => { const p=markerRef.current.getLatLng(); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r||25)); onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r||25)); };
-      markerRef.current.on('dragend', sync);
-      mapRef.current.on('click', (e)=>{ markerRef.current.setLatLng(e.latlng); sync(); });
-      sync();
-    } else {
-      const p=defaultPos; markerRef.current.setLatLng(p); circleRef.current.setLatLng(p); circleRef.current.setRadius(Number(r||25));
-    }
-  }, [ready]); // eslint-disable-line
-  useEffect(()=>{ setR(radius || 25); },[radius]);
-  useEffect(() => {
-    if (circleRef.current && markerRef.current) {
-      circleRef.current.setRadius(Number(r || 25));
-      const p = markerRef.current.getLatLng();
-      onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(r || 25));
-    }
-  }, [r]); // eslint-disable-line
-
-  return (
-    <div>
-      <div ref={divRef} style={{ width:'100%', height:320, borderRadius:12, overflow:'hidden', border:'1px solid #2a323b', marginBottom:8 }} />
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
-        <input type="range" min={5} max={2000} step={5} value={r} onChange={(e)=>setR(Number(e.target.value))}/>
-        <code style={{ color:'#9fb0bf' }}>{r} m</code>
-      </div>
-    </div>
   );
 }
 
