@@ -1,5 +1,5 @@
 {
-  "version": "0.0.2",
+  "version": "0.0.3",
   "missions": [
     {
       "id": "m01",
@@ -49,6 +49,38 @@
           "m"
         ],
         "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false
+    },
+    {
+      "id": "m03",
+      "title": "New Mission",
+      "type": "short_answer",
+      "iconKey": "",
+      "iconUrl": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "image",
+        "mediaUrl": "/media/uploads/1759722156749-CLUEgreenBLACK.png",
+        "clue": "rhrrhhrrh"
+      },
+      "wrong": {
+        "mode": "gif",
+        "mediaUrl": "/media/uploads/1759722211174-wrong_answer.gif",
+        "delaySec": 10
+      },
+      "content": {
+        "question": "jjjj",
+        "answer": "j..",
+        "acceptable": "",
         "mediaUrl": "",
         "geofenceEnabled": false,
         "lat": "",
