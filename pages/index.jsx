@@ -1,93 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
-/* ===================== [1] THEME PRESETS ===================== */
-const THEMES = [
-  {
-    key: 'noir',
-    label: 'Noir (Deep Dark)',
-    appearance: {
-      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-      fontSizePx: 22,
-      fontColor: '#e9eef2',
-      textBgColor: '#000000',
-      textBgOpacity: 0.2,
-      screenBgColor: '#0b0c10',
-      screenBgOpacity: 0.0,
-      screenBgImage: '',
-      textAlign: 'center',
-      textVertical: 'top',
-    }
-  },
-  {
-    key: 'slate',
-    label: 'Slate',
-    appearance: {
-      fontFamily: 'Georgia, serif',
-      fontSizePx: 22,
-      fontColor: '#e8edf3',
-      textBgColor: '#0f172a',
-      textBgOpacity: 0.30,
-      screenBgColor: '#111827',
-      screenBgOpacity: 0.10,
-      screenBgImage: '',
-      textAlign: 'center',
-      textVertical: 'top',
-    }
-  },
-  {
-    key: 'emerald',
-    label: 'Emerald',
-    appearance: {
-      fontFamily: 'Arial, Helvetica, sans-serif',
-      fontSizePx: 22,
-      fontColor: '#eafff7',
-      textBgColor: '#064e3b',
-      textBgOpacity: 0.28,
-      screenBgColor: '#062925',
-      screenBgOpacity: 0.10,
-      screenBgImage: '',
-      textAlign: 'center',
-      textVertical: 'top',
-    }
-  },
-  {
-    key: 'sunrise',
-    label: 'Sunrise (Warm)',
-    appearance: {
-      fontFamily: 'Times New Roman, Times, serif',
-      fontSizePx: 22,
-      fontColor: '#2b2b2b',
-      textBgColor: '#fff0d6',
-      textBgOpacity: 0.75,
-      screenBgColor: '#ffe8c2',
-      screenBgOpacity: 0.50,
-      screenBgImage: '',
-      textAlign: 'center',
-      textVertical: 'top',
-    }
-  },
-  {
-    key: 'paper',
-    label: 'Paper (Light)',
-    appearance: {
-      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-      fontSizePx: 22,
-      fontColor: '#161616',
-      textBgColor: '#ffffff',
-      textBgOpacity: 0.85,
-      screenBgColor: '#f6f7fb',
-      screenBgOpacity: 0.80,
-      screenBgImage: '',
-      textAlign: 'center',
-      textVertical: 'top',
-    }
-  },
-];
-function findTheme(key) {
-  return THEMES.find(t => t.key === key) || THEMES[0];
-}
-
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
   try {
@@ -110,7 +23,7 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
-    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    const url = new URL(u);
     const host = url.host.toLowerCase();
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
@@ -173,6 +86,7 @@ const DEFAULT_BUNDLES = {
     { key:'gold-coin', name:'Gold Coin', url:'/media/bundles/GOLDEN%20COIN.png' },
   ],
 };
+
 function applyDefaultIcons(cfg) {
   const next = { ...cfg, icons: { missions:[], devices:[], rewards:[], ...(cfg.icons || {}) } };
   function ensure(kind, arr) {
@@ -289,6 +203,13 @@ export default function Admin() {
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('');
+  const [showNewGame, setShowNewGame] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newType, setNewType] = useState('Mystery');
+  const [newMode, setNewMode] = useState('single');
+  const [newDurationMin, setNewDurationMin] = useState(0);
+  const [newAlertMin, setNewAlertMin] = useState(10);
+
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
@@ -309,22 +230,6 @@ export default function Admin() {
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
   const [uploadStatus, setUploadStatus] = useState('');
-
-  /* ---------- Game Picker / Wizard ---------- */
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerCards, setPickerCards] = useState([]);
-  const [showNewWizard, setShowNewWizard] = useState(false);
-  const [wiz, setWiz] = useState({
-    title: '',
-    type: 'Mystery',
-    mode: 'single',
-    players: 1,
-    durationMinutes: 0,
-    alertMinutes: 10,
-    coverImage: '',
-    description: '',
-    themeKey: 'noir',
-  });
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -376,11 +281,6 @@ export default function Admin() {
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
           icons: { ...(c0.icons || {}), ...DEFAULT_ICONS },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
-          themeKey: c0.themeKey || dc.themeKey,
-          game: {
-            ...(dc.game || {}),
-            ...(c0.game || {}),
-          }
         };
 
         // Re-apply defaults if sets are empty/missing
@@ -397,20 +297,17 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlug]);
 
-  /* ------- default config seeded from theme ------- */
   function defaultConfig() {
-    const seed = findTheme('noir').appearance;
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery', coverImage:'', description:'' },
+      game:   { title:'Untitled Game', type:'Mystery' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
       devices: [], powerups: [],
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
-      themeKey: 'noir',
-      appearance: seed,
+      appearance: defaultAppearance(),
     };
   }
   function defaultContentForType(t) {
@@ -429,7 +326,6 @@ export default function Admin() {
     }
   }
 
-  /* ---------- Save All (safe) + Publish + Save&Publish ---------- */
   async function saveAll() {
     if (!suite || !config) return;
     setStatus('Saving… (writing missions + config safely)');
@@ -471,17 +367,6 @@ export default function Admin() {
       setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
     } catch (e) {
       setStatus('❌ Publish failed: ' + (e?.message || e));
-    }
-  }
-  async function saveAndPublish() {
-    try {
-      setStatus('Saving…');
-      await saveAll();
-      setStatus('Saved. Preparing to publish (waiting for Vercel to pick up commits)…');
-      await new Promise(r => setTimeout(r, 21000));
-      await handlePublish();
-    } catch (e) {
-      setStatus('❌ Save & Publish failed: ' + (e?.message || e));
     }
   }
 
@@ -674,42 +559,6 @@ export default function Admin() {
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
-  /* ---------------- Game Picker helpers ---------------- */
-  function slugify(s) {
-    return String(s || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '')
-      .slice(0, 48);
-  }
-  async function openPicker() {
-    const list = await Promise.all(
-      (games || []).map(async (g) => {
-        const c = await fetchJsonSafe(`/api/config?slug=${encodeURIComponent(g.slug)}`, {});
-        return {
-          slug: g.slug,
-          title: g.title || g.slug,
-          type: g.type || 'Mystery',
-          players: c?.forms?.players || g.players || 1,
-          description: c?.game?.description || '',
-          coverImage: c?.game?.coverImage || '',
-        };
-      })
-    );
-    setPickerCards(list);
-    setShowPicker(true);
-  }
-  async function uploadCover(file) {
-    const url = await uploadToRepo(file, 'covers');
-    if (url) setWiz({ ...wiz, coverImage: url });
-  }
-  useEffect(() => {
-    if (!activeSlug && games && games.length) {
-      openPicker();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [games, activeSlug]);
-
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
@@ -738,15 +587,12 @@ export default function Admin() {
                   <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                 ))}
               </select>
-              <button style={S.button} onClick={()=>setShowNewWizard(true)}>+ New Game</button>
-              <button style={S.button} onClick={openPicker}>Open Picker</button>
+              <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
             {/* Keep header controls */}
             <button onClick={saveAll} style={S.button}>💾 Save All</button>
-            <button onClick={saveAndPublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>
-              Save & Publish
-            </button>
+            <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
 
             <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
@@ -1288,74 +1134,6 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
-
-          {/* GAME MGMT + THEME PRESET */}
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Management</h3>
-
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'end' }}>
-              <div>
-                <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick a game</div>
-                <select style={S.input} value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)}>
-                  <option value="">(legacy root)</option>
-                  {games.map(g => <option key={g.slug} value={g.slug}>{g.title} — {g.slug}</option>)}
-                </select>
-              </div>
-
-              <button
-                style={{ ...S.button }}
-                onClick={async ()=>{
-                  if (!activeSlug) { setStatus('❌ Pick a game to duplicate'); return; }
-                  const newTitle = prompt('New title for duplicate:','Copy of '+(games.find(g=>g.slug===activeSlug)?.title||activeSlug));
-                  if (!newTitle) return;
-                  const res = await fetch('/api/games/duplicate', {
-                    method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-                    body: JSON.stringify({ sourceSlug: activeSlug, title: newTitle })
-                  });
-                  const j = await res.json().catch(()=>({}));
-                  if (!res.ok || !j.ok) { setStatus('❌ Duplicate failed: '+(j?.error||'server error')); return; }
-                  const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
-                  if (jj.ok) setGames(jj.games || []);
-                  setActiveSlug(j.slug);
-                  setStatus('✅ Duplicated to '+j.slug);
-                }}
-              >Duplicate</button>
-
-              <button
-                style={{ ...S.button, background:'#3a1010', border:'1px solid #652626' }}
-                onClick={async ()=>{
-                  if (!activeSlug) { setStatus('❌ Pick a game to delete'); return; }
-                  if (!confirm('Delete this game? This removes its /games/<slug> content from the repo.')) return;
-                  const res = await fetch('/api/games?slug='+encodeURIComponent(activeSlug), {
-                    method:'DELETE', credentials:'include'
-                  });
-                  const j = await res.json().catch(()=>({}));
-                  if (!res.ok || !j.ok) { setStatus('❌ Delete failed: '+(j?.error||'server error')); return; }
-                  const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
-                  if (jj.ok) setGames(jj.games || []);
-                  setActiveSlug('');
-                  setStatus('✅ Game deleted');
-                }}
-              >Delete</button>
-            </div>
-
-            <div style={{ marginTop:12 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Theme preset</div>
-              <select
-                style={S.input}
-                value={config.themeKey || 'noir'}
-                onChange={(e)=>{
-                  const t = findTheme(e.target.value);
-                  setConfig({ ...config, themeKey: t.key, appearance: t.appearance });
-                }}
-              >
-                {THEMES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-              </select>
-              <div style={{ color:'#9fb0bf', marginTop:6, fontSize:12 }}>
-                Theme applies globally and carries into the Game client (unless a mission overrides appearance).
-              </div>
-            </div>
-          </div>
         </main>
       )}
 
@@ -1438,61 +1216,50 @@ export default function Admin() {
         </main>
       )}
 
-      {/* GAME PICKER + NEW GAME WIZARD */}
-      <GamePickerModal
-        open={showPicker}
-        cards={pickerCards}
-        onCreate={() => { setShowPicker(false); setShowNewWizard(true); }}
-        onSelect={(slug) => { setActiveSlug(slug); setShowPicker(false); }}
-        onClose={() => setShowPicker(false)}
-      />
-      <NewGameWizard
-        open={showNewWizard}
-        value={wiz}
-        setValue={setWiz}
-        themes={THEMES}
-        onUploadCover={uploadCover}
-        onCancel={()=>{ setShowNewWizard(false); setShowPicker(true); }}
-        onCreate={async ()=>{
-          if (!wiz.title.trim()) { setStatus('❌ Enter a game title'); return; }
-
-          // 1) create the game
-          const r = await fetch('/api/games', {
-            method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-            body: JSON.stringify({ title:wiz.title.trim(), type:wiz.type, mode:wiz.mode }),
-          });
-          const j = await r.json().catch(()=>({}));
-          if (!r.ok || !j.ok) { setStatus('❌ '+(j?.error||'create failed')); return; }
-
-          // 2) seed config
-          const theme = findTheme(wiz.themeKey);
-          const seeded = {
-            ...defaultConfig(),
-            themeKey: wiz.themeKey,
-            appearance: theme.appearance,
-            splash: { enabled:true, mode:wiz.mode },
-            game: { title: wiz.title.trim(), type: wiz.type, coverImage: wiz.coverImage || '', description: wiz.description || '' },
-            forms: { players: wiz.players || (wiz.mode==='head2head'?2:wiz.mode==='multi'?4:1) },
-            timer: { durationMinutes: wiz.durationMinutes, alertMinutes: wiz.alertMinutes },
-          };
-
-          await fetch('/api/save-config?slug='+encodeURIComponent(j.slug), {
-            method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-            body: JSON.stringify({ config: seeded }),
-          });
-
-          // 3) refresh and open
-          try {
-            const rr = await fetch('/api/games', { credentials:'include' });
-            const jj = await rr.json(); if (jj.ok) setGames(jj.games || []);
-          } catch {}
-
-          setActiveSlug(j.slug);
-          setShowNewWizard(false);
-          setShowPicker(false);
-          setStatus('✅ Game created. You can start adding missions.');
-        }}
-      />
+      {/* New Game modal (unchanged) */}
+      {showNewGame && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
+          <div style={{ ...S.card, width:420 }}>
+            <h3 style={{ marginTop:0 }}>Create New Game</h3>
+            <Field label="Game Title"><input style={S.input} value={newTitle} onChange={(e)=>setNewTitle(e.target.value)}/></Field>
+            <Field label="Game Type">
+              <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
+                {GAME_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Mode">
+              <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
+                <option value="single">Single Player</option>
+                <option value="head2head">Head to Head (2)</option>
+                <option value="multi">Multiple (4)</option>
+              </select>
+            </Field>
+            <Field label="Duration (minutes — 0 = infinite; count UP)">
+              <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin}
+                onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}/>
+            </Field>
+            <Field label="Alert before end (minutes)">
+              <input type="number" min={1} max={120} style={S.input} value={newAlertMin}
+                onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}/>
+            </Field>
+            <div style={{ display:'flex', gap:8, marginTop:12 }}>
+              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
+              <button style={S.button} onClick={async ()=>{
+                if (!newTitle.trim()) return;
+                const r = await fetch('/api/games', {
+                  method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+                  body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
+                });
+                const j = await r.json();
+                if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
+                const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
+                if (jj.ok) setGames(jj.games || []);
+                setActiveSlug(j.slug); setNewTitle(''); setShowNewGame(false);
+              }}>Create</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1706,7 +1473,7 @@ function MapOverview({
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      L.marker(pos, {icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
+      L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
       if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
@@ -2126,6 +1893,7 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     </main>
   );
 }
+
 function TestSMS() {
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState('Test message from admin');
@@ -2144,138 +1912,6 @@ function TestSMS() {
         <button style={S.button} onClick={send}>Send Test</button>
       </div>
       <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
-    </div>
-  );
-}
-
-/* ---------- Game Picker & New Game Wizard ---------- */
-function GamePickerModal({ open, cards, onCreate, onSelect, onClose }) {
-  if (!open) return null;
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
-      <div style={{ ...S.card, width:'min(1100px, 96vw)', maxHeight:'86vh', overflow:'auto' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <h3 style={{ margin:0 }}>Choose a Game</h3>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12 }}>
-          <div style={{ border:'1px dashed #2a323b', borderRadius:12, padding:12, display:'grid', placeItems:'center' }}>
-            <button style={S.button} onClick={onCreate}>+ Create New Game</button>
-          </div>
-          {(cards || []).map((c) => (
-            <div key={c.slug} style={{ border:'1px solid #2a323b', borderRadius:12, overflow:'hidden', background:'#0b0c10' }}>
-              {c.coverImage ? (
-                <img src={toDirectMediaURL(c.coverImage)} alt="" style={{ width:'100%', height:140, objectFit:'cover', display:'block' }}/>
-              ) : (
-                <div style={{ height:140, display:'grid', placeItems:'center', color:'#9fb0bf', background:'#0f1418' }}>No cover</div>
-              )}
-              <div style={{ padding:12 }}>
-                <div style={{ fontWeight:700 }}>{c.title}</div>
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{c.type} • {c.players} player{c.players>1?'s':''}</div>
-                {c.description ? <div style={{ marginTop:6, fontSize:13, color:'#c9d3dc' }}>{c.description}</div> : null}
-                <div style={{ marginTop:10 }}>
-                  <button style={S.button} onClick={()=>onSelect(c.slug)}>Open</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-function NewGameWizard({ open, value, setValue, onUploadCover, themes, onCancel, onCreate }) {
-  if (!open) return null;
-  const aTheme = themes.find(t => t.key === value.themeKey) || themes[0];
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
-      <div style={{ ...S.card, width:'min(740px, 96vw)', maxHeight:'86vh', overflow:'auto' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <h3 style={{ marginTop:0 }}>Create New Game</h3>
-          <button style={S.button} onClick={onCancel}>Close</button>
-        </div>
-
-        <div style={{ display:'grid', gap:12, gridTemplateColumns:'1fr 1fr' }}>
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Title</div>
-            <input style={S.input} value={value.title} onChange={(e)=>setValue({ ...value, title:e.target.value })}/>
-          </div>
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Type</div>
-            <select style={S.input} value={value.type} onChange={(e)=>setValue({ ...value, type:e.target.value })}>
-              {GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Mode</div>
-            <select style={S.input} value={value.mode} onChange={(e)=>setValue({ ...value, mode:e.target.value })}>
-              <option value="single">Single Player</option>
-              <option value="head2head">Head to Head (2)</option>
-              <option value="multi">Multiple (4)</option>
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Players</div>
-            <input type="number" min={1} max={8} style={S.input} value={value.players}
-              onChange={(e)=>setValue({ ...value, players: Math.max(1, Number(e.target.value||1)) })}/>
-          </div>
-
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Duration (minutes — 0 = infinite)</div>
-            <input type="number" min={0} max={24*60} style={S.input} value={value.durationMinutes}
-              onChange={(e)=>setValue({ ...value, durationMinutes: Math.max(0, Number(e.target.value||0)) })}/>
-          </div>
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Timer alarm (minutes before end)</div>
-            <input type="number" min={1} max={120} style={S.input} value={value.alertMinutes}
-              onChange={(e)=>setValue({ ...value, alertMinutes: Math.max(1, Number(e.target.value||1)) })}/>
-          </div>
-
-          <div style={{ gridColumn:'1 / -1' }}>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Description (optional)</div>
-            <textarea style={{ ...S.input, height:90 }} value={value.description}
-              onChange={(e)=>setValue({ ...value, description: e.target.value })}/>
-          </div>
-
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Cover image (URL)</div>
-            <input style={S.input} value={value.coverImage} onChange={(e)=>setValue({ ...value, coverImage:e.target.value })}/>
-            <div style={{ marginTop:6 }}>
-              <label style={{ ...S.button, display:'inline-block' }}>
-                Upload cover
-                <input type="file" accept="image/*" style={{ display:'none' }}
-                  onChange={(e)=>{ const f=e.target.files?.[0]; if (f) onUploadCover(f); e.target.value=''; }}/>
-              </label>
-            </div>
-            {value.coverImage ? (
-              <img src={toDirectMediaURL(value.coverImage)} alt="" style={{ marginTop:8, width:'100%', height:160, objectFit:'cover', borderRadius:8, border:'1px solid #2a323b' }}/>
-            ) : null}
-          </div>
-
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Theme</div>
-            <select style={S.input} value={value.themeKey} onChange={(e)=>setValue({ ...value, themeKey:e.target.value })}>
-              {THEMES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
-            <div style={{ marginTop:8, border:'1px dashed #2a323b', borderRadius:8, padding:10 }}>
-              <div style={{
-                background: aTheme.appearance.screenBgColor,
-                padding:10, borderRadius:6, color:aTheme.appearance.fontColor,
-                fontFamily: aTheme.appearance.fontFamily, textAlign:aTheme.appearance.textAlign
-              }}>
-                Theme preview
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display:'flex', gap:8, marginTop:12 }}>
-          <button style={S.button} onClick={onCancel}>Cancel</button>
-          <button style={S.button} onClick={onCreate}>Create</button>
-        </div>
-      </div>
     </div>
   );
 }
