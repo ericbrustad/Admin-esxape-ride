@@ -1,4 +1,6 @@
 // pages/api/list-media.js
+import { ghEnv, resolveBranch, ghHeaders } from './_gh-helpers';
+
 function classify(url) {
   const s = url.toLowerCase();
   if (/\.(png|jpg|jpeg|webp)$/.test(s)) return 'image';
@@ -14,24 +16,23 @@ export default async function handler(req, res) {
     const requested = String(req.query.dir || '').replace(/[^a-z0-9_-]/gi, '');
     const dir = ['uploads', 'bundles', 'icons'].includes(requested) ? requested : 'uploads';
 
-    const token  = process.env.GITHUB_TOKEN;
-    const user   = process.env.GITHUB_USER;
-    const repo   = process.env.GITHUB_REPO;
-    const branch = process.env.GITHUB_BRANCH || 'main';
+    const { token, owner, repo, branch } = ghEnv();
+    const ref = await resolveBranch({ token, owner, repo, branch });
 
     const basePath = `public/media/${dir}`;
-    const url = `https://api.github.com/repos/${user}/${repo}/contents/${basePath}?ref=${branch}`;
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${basePath}?ref=${encodeURIComponent(ref)}`;
+    const r = await fetch(url, { headers: ghHeaders(token), cache: 'no-store' });
 
-    if (!r.ok) return res.status(200).json({ items: [] });
+    if (!r.ok) return res.status(200).json({ items: [] }); // empty ok
 
     const arr = await r.json();
     const items = (Array.isArray(arr) ? arr : [])
       .filter(it => it.type === 'file')
-      .map(it => {
-        const urlPath = `/media/${dir}/${it.name}`;
-        return { name: it.name, url: urlPath, type: classify(it.name) };
-      });
+      .map(it => ({
+        name: it.name,
+        url: `/media/${dir}/${it.name}`,
+        type: classify(it.name),
+      }));
 
     res.status(200).json({ items });
   } catch {
