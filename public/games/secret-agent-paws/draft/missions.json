@@ -1,5 +1,5 @@
 {
-  "version": "0.0.3",
+  "version": "0.0.4",
   "missions": [
     {
       "id": "m01",
@@ -9,20 +9,19 @@
         "points": 10
       },
       "content": {
-        "text": "Welcome to Secret Agent PAWS! Ready to play?"
+        "text": "Welcome to Secret Agent PAWS! Ready to play?",
+        "geofenceEnabled": true,
+        "lat": 44.977639,
+        "lng": -93.26498,
+        "radiusMeters": 25
       },
       "appearanceOverrideEnabled": false,
-      "appearance": {
-        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        "fontSizePx": 22,
-        "fontColor": "#ffffff",
-        "textBgColor": "#000000",
-        "textBgOpacity": 0,
-        "screenBgColor": "#000000",
-        "screenBgOpacity": 0,
-        "screenBgImage": "",
-        "textAlign": "center",
-        "textVertical": "top"
+      "correct": {
+        "mode": "image",
+        "mediaUrl": "/media/uploads/1759722431910-male_spy.jpg"
+      },
+      "wrong": {
+        "mode": "none"
       }
     },
     {
