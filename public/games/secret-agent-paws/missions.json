@@ -1,4 +1,31 @@
 {
-  "version": "1.0.0",
-  "missions": []
+  "version": "1.0.1",
+  "missions": [
+    {
+      "id": "m01",
+      "title": "Welcome to The Case of The Missing Sqeakers",
+      "type": "statement",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "text": "A lighthearted spy-thriller where the dog is the star agent and the owner is their trusted handler. \nObjective: To find the hidden stash of stolen squeakers and foil the plans of the notorious (and fluffy) villain, Baron von Squirrely.",
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "showContinue": true
+    }
+  ]
 }
