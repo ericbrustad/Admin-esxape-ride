@@ -1,6 +1,4 @@
 // pages/api/save-bundle.js
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -21,7 +19,7 @@ export default async function handler(req, res) {
     async function putFile(path, content) {
       const url = `https://api.github.com/repos/${user}/${repo}/contents/${path}`;
       const body = {
-        message: `update ${path}`,
+        message: `update ${path} via Admin UI`,
         content: Buffer.from(content).toString('base64'),
         branch,
       };
@@ -41,6 +39,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify(body),
       });
+
       if (!r.ok) throw new Error(await r.text());
       return await r.json();
     }
