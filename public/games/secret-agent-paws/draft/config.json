@@ -15,52 +15,67 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "type": "jammer",
-      "title": "jam",
-      "iconKey": "devices-1",
-      "lat": 44.989797,
-      "lng": -93.286518
-    }
-  ],
-  "powerups": [
-    {
-      "type": "jammer",
-      "title": "jam",
-      "iconKey": "devices-1",
-      "lat": 44.989797,
-      "lng": -93.286518
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
-    "library": [
+    "rewards": [
       {
-        "url": "/media/uploads/1759695550282-arrow.jfif",
-        "name": "arrow.jfif"
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": "/games/lib/media/bundles/GOLDEN%20COIN.png"
       }
+    ],
+    "pool": [
+      "/games/lib/media/bundles/ROBOT1small.png",
+      "/games/lib/media/bundles/SMOKE%20BOMB.png",
+      "/games/lib/media/bundles/evidence%202.png",
+      "/games/lib/media/bundles/CLUEgreen.png",
+      "/games/lib/media/bundles/GOLDEN%20COIN.png",
+      "/games/lib/media/bundles/trivia%20icon.png",
+      "/games/lib/media/bundles/trivia%20yellow.png"
     ]
   },
   "icons": {
     "missions": [
       {
-        "key": "missions-1",
-        "name": "",
-        "url": ""
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "/games/lib/media/bundles/trivia%20icon.png"
+      },
+      {
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "/games/lib/media/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
       {
-        "key": "devices-1",
-        "name": "",
-        "url": "/media/icons/1759695642527-panda_intel_intro_image.jpg"
+        "key": "dev-clone",
+        "name": "Roaming Robot",
+        "url": "/games/lib/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-smoke",
+        "name": "Smoke Shield",
+        "url": "/games/lib/media/bundles/SMOKE%20BOMB.png"
       }
     ],
     "rewards": [
       {
-        "key": "rewards-1",
-        "name": "",
-        "url": ""
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "/games/lib/media/bundles/evidence%202.png"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "/games/lib/media/bundles/CLUEgreen.png"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "/games/lib/media/bundles/GOLDEN%20COIN.png"
       }
     ]
   },
