@@ -1,16 +1,4 @@
 {
   "version": "0.0.1",
-  "missions": [
-    {
-      "id": "m01",
-      "title": "Welcome",
-      "type": "statement",
-      "rewards": {
-        "points": 10
-      },
-      "content": {
-        "text": "Welcome to new game 5! Ready to play?"
-      }
-    }
-  ]
+  "missions": []
 }
