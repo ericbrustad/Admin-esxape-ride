@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       return res.json({ ok: true, games });
     }
 
-    // POST — create a new game
+    // POST — create new game
     if (req.method === 'POST') {
       const { title, type, mode, timer } = req.body;
       const slug = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game';
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       return res.json({ ok: true, slug });
     }
 
-    // DELETE — delete entire game folder (delete each file inside)
+    // DELETE — delete entire game folder
     if (req.method === 'DELETE') {
       const slug = String(req.query.slug || '');
       if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug' });
