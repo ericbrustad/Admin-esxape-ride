@@ -15,50 +15,8 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "Smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 475,
-      "effectSeconds": 120,
-      "lat": 44.911765,
-      "lng": -93.3252
-    },
-    {
-      "id": "d02",
-      "title": "ggg",
-      "type": "clone",
-      "iconKey": "roaming-robot",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.925911,
-      "lng": -93.325199
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "Smoke",
-      "type": "smoke",
-      "iconKey": "",
-      "pickupRadius": 475,
-      "effectSeconds": 120,
-      "lat": 44.911765,
-      "lng": -93.3252
-    },
-    {
-      "id": "d02",
-      "title": "ggg",
-      "type": "clone",
-      "iconKey": "roaming-robot",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.925911,
-      "lng": -93.325199
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -74,6 +32,21 @@
         "key": "trivia-2",
         "name": "Trivia 2",
         "url": "/media/bundles/trivia%20yellow.png"
+      },
+      {
+        "key": "missions-3",
+        "name": "",
+        "url": "/media/icons/1759751997852-Breaking_newsc.jpg"
+      },
+      {
+        "key": "missions-4",
+        "name": "",
+        "url": "/media/uploads/1759747497723-chicken.png"
+      },
+      {
+        "key": "missions-5",
+        "name": "",
+        "url": "/media/uploads/1759747492479-bra_icon.png"
       }
     ],
     "devices": [
