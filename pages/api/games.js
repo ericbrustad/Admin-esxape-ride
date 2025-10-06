@@ -1,6 +1,4 @@
 // pages/api/games.js
-import fetch from 'node-fetch';
-
 const token  = process.env.GITHUB_TOKEN;
 const user   = process.env.GITHUB_USER;
 const repo   = process.env.GITHUB_REPO;
@@ -8,8 +6,8 @@ const branch = process.env.GITHUB_BRANCH || 'main';
 
 export default async function handler(req, res) {
   try {
+    // 🟢 List games
     if (req.method === 'GET') {
-      // list subfolders in /public/games
       const r = await fetch(
         `https://api.github.com/repos/${user}/${repo}/contents/public/games?ref=${branch}`,
         { headers:{ Authorization:`Bearer ${token}` } }
@@ -22,6 +20,7 @@ export default async function handler(req, res) {
       return res.json({ ok:true, games });
     }
 
+    // 🟡 Create new game
     if (req.method === 'POST') {
       const { title, type, mode, timer } = req.body;
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -46,7 +45,7 @@ export default async function handler(req, res) {
       for (const f of files) {
         const url = `https://api.github.com/repos/${user}/${repo}/contents/${f.path}`;
         const body = {
-          message:`create ${f.path}`,
+          message:`create ${f.path} via Admin UI`,
           content:Buffer.from(f.content).toString('base64'),
           branch,
         };
@@ -60,11 +59,12 @@ export default async function handler(req, res) {
       return res.json({ ok:true, slug });
     }
 
+    // 🔴 Delete game
     if (req.method === 'DELETE') {
       const { slug } = req.query;
       if (!slug) return res.status(400).json({ ok:false, error:'Missing slug' });
 
-      // delete entire folder by deleting its files
+      // list and delete each file in the folder
       const list = await fetch(
         `https://api.github.com/repos/${user}/${repo}/contents/public/games/${slug}?ref=${branch}`,
         { headers:{ Authorization:`Bearer ${token}` } }
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
             Authorization:`Bearer ${token}`,
             'Content-Type':'application/json',
           },
-          body: JSON.stringify({ message:`delete ${f.path}`, sha:f.sha, branch }),
+          body: JSON.stringify({ message:`delete ${f.path} via Admin UI`, sha:f.sha, branch }),
         });
       }
 
