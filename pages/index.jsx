@@ -23,15 +23,20 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
-    const url = new URL(u);
+    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'https://example.invalid');
     const host = url.host.toLowerCase();
 
+    // Serve project-local absolute paths as-is
+    if (u.startsWith('/')) return u;
+
+    // Dropbox
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
       url.searchParams.delete('dl');
       if (!url.searchParams.has('raw')) url.searchParams.set('raw', '1');
       return url.toString();
     }
+    // Google Drive
     if (host.endsWith('drive.google.com')) {
       let id = '';
       if (url.pathname.startsWith('/file/d/')) {
@@ -64,7 +69,7 @@ const TYPE_FIELDS = {
   short_answer: [
     { key:'question',   label:'Question', type:'text' },
     { key:'answer',     label:'Correct Answer', type:'text' },
-    { key:'acceptable', label:'Also Accept (comma-separated)', type:'text' },
+    { key:'acceptable', label:'Also Accept (comma-separated, optional)', type:'text' }, // optional
     { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text' },
   ],
   statement: [
@@ -80,15 +85,15 @@ const TYPE_FIELDS = {
     { key:'lng', label:'Longitude', type:'number' },
     { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'imageUrl',  label:'Image URL (https)', type:'text' },
-    { key:'overlayText',label:'Caption/Text', type:'text' },
+    { key:'imageUrl',  label:'Image URL (https, optional)', type:'text' },
+    { key:'overlayText',label:'Caption/Text (optional)', type:'text' },
   ],
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
     { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
-    { key:'videoUrl',  label:'Video URL (https)', type:'text' },
+    { key:'videoUrl',  label:'Video URL (https, optional)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text' },
   ],
   ar_image: [
@@ -146,23 +151,23 @@ function defaultAppearance() {
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
 
-/* ───────────────── Default examples & pool seeding (non‑destructive) ───────────────── */
-const DEFAULT_ASSET_BASES = [
+/* ────── Default images: prefer /public/media/bundles; fall back to repo paths ────── */
+const BASES = [
+  '/media/bundles',                 // <== put defaults here for reliable serving
   '/games/lib/media/bundles',
   '/lib/media/bundles',
-  '/media/bundles',
+  '/media/defaults',
 ];
-const urlFromBases = (file) => DEFAULT_ASSET_BASES.map((b)=>`${b}/${encodeURIComponent(file)}`);
-const firstUrl = (candidates) => candidates[0];
+const u = (file) => BASES.map(b => `${b}/${encodeURIComponent(file)}`)[0]; // prefer first
 
 const U = {
-  robot:   firstUrl(urlFromBases('ROBOT1small.png')),
-  smoke:   firstUrl(urlFromBases('SMOKE BOMB.png')),
-  evid:    firstUrl(urlFromBases('evidence 2.png')),
-  clue:    firstUrl(urlFromBases('CLUEgreen.png')),
-  coin:    firstUrl(urlFromBases('GOLDEN COIN.png')),
-  trivia:  firstUrl(urlFromBases('trivia icon.png')),
-  trivia2: firstUrl(urlFromBases('trivia yellow.png')),
+  robot:   u('ROBOT1small.png'),
+  smoke:   u('SMOKE BOMB.png'),
+  evid:    u('evidence 2.png'),
+  clue:    u('CLUEgreen.png'),
+  coin:    u('GOLDEN COIN.png'),
+  trivia:  u('trivia icon.png'),
+  trivia2: u('trivia yellow.png'),
 };
 
 const DEFAULT_DEVICE_ICONS = [
@@ -181,7 +186,6 @@ const DEFAULT_REWARD_ICONS = [
 const DEFAULT_REWARDS_SEEDED = [
   { key: 'gold-coin', name: 'Gold Coin', ability: 'Adds a coin to your wallet.', thumbUrl: U.coin },
 ];
-const DEFAULT_MEDIA_POOL = [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2];
 
 function seedDefaults(cfg) {
   const next = {
@@ -206,9 +210,10 @@ function seedDefaults(cfg) {
   }
 
   const pool = Array.isArray(next.media.pool) ? next.media.pool.slice() : [];
-  DEFAULT_MEDIA_POOL.forEach((u) => { if (u && !pool.includes(u)) pool.push(u); });
+  const addPool = (url) => { if (url && !pool.includes(url)) pool.push(url); };
+  [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2].forEach(addPool);
   ['devices','missions','rewards'].forEach(k => {
-    (next.icons[k] || []).forEach(it => { if (it.url && !pool.includes(it.url)) pool.push(it.url); });
+    (next.icons[k] || []).forEach(it => addPool(it.url));
   });
   next.media.pool = pool;
   return next;
@@ -376,6 +381,8 @@ export default function Admin() {
       type: 'multiple_choice',
       iconKey: '',
       rewards: { points: 25 },
+      onCorrect: defaultResponse('correct'),
+      onWrong:   defaultResponse('wrong'),
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
@@ -386,26 +393,57 @@ export default function Admin() {
     const e = JSON.parse(JSON.stringify(m));
     e.appearanceOverrideEnabled = !!e.appearanceOverrideEnabled;
     e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
+    e.onCorrect = normalizeResponse(e.onCorrect, 'correct');
+    e.onWrong   = normalizeResponse(e.onWrong, 'wrong');
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
   function bumpVersion(v) {
     const p = String(v || '0.0.0').split('.').map(n=>parseInt(n||'0',10)); while (p.length<3) p.push(0); p[2]+=1; return p.join('.');
   }
+
+  // optional fields set (won’t block saving)
+  const OPTIONAL = new Set(['acceptable','mediaUrl','overlayText','imageUrl','videoUrl']);
+
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
+    // Validate per type
+    if (editing.type === 'short_answer') {
+      const q = editing.content?.question?.trim();
+      const a = editing.content?.answer?.trim();
+      if (!q) return setStatus('❌ Missing: Question');
+      if (!a) return setStatus('❌ Missing: Correct Answer');
+    } else if (editing.type === 'multiple_choice') {
+      const q = editing.content?.question?.trim();
+      const choices = Array.isArray(editing.content?.choices) ? editing.content.choices.filter(Boolean) : [];
+      const ci = editing.content?.correctIndex;
+      if (!q) return setStatus('❌ Missing: Question');
+      if (choices.length < 2) return setStatus('❌ Multiple Choice requires at least 2 options');
+      if (!(Number.isInteger(ci) && ci >= 0 && ci < choices.length)) return setStatus('❌ Pick a correct option (radio)');
+    } else {
+      // Generic: only block truly required numeric fields (Leaflet picker covers geo)
+      // Nothing extra
+    }
+
+    // Enforce only non-optional textual fields if given in TYPE_FIELDS
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number') continue;
+      if (OPTIONAL.has(f.key)) continue;
       const v = editing.content?.[f.key];
-      if (f.key !== 'mediaUrl' && (v === undefined || v === null || v === '')) return setStatus('❌ Missing: ' + f.label);
+      if (v === undefined || v === null || v === '') return setStatus('❌ Missing: ' + f.label);
     }
+
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
+    // tidy responses
+    obj.onCorrect = normalizeResponse(obj.onCorrect, 'correct');
+    obj.onWrong   = normalizeResponse(obj.onWrong, 'wrong');
+
     if (i >= 0) missions[i] = obj; else missions.push(obj);
     setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
@@ -547,7 +585,6 @@ export default function Admin() {
     }
   }
 
-  // small helper for device icon URL
   function getDeviceIconUrl(cfg, key) {
     if (!key) return '';
     const list = cfg?.icons?.devices || [];
@@ -734,7 +771,7 @@ export default function Admin() {
                       {(() => {
                         const d = devices[selectedDevIdx];
                         const u = getDeviceIconUrl(config, d.iconKey) || U.smoke;
-                        return <img src={u} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
+                        return <img src={toDirectMediaURL(u)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
                       })()}
                     </div>
                     <div>
@@ -805,7 +842,7 @@ export default function Admin() {
                     <div style={{ width:36, height:36, borderRadius:6, overflow:'hidden', border:'1px solid #2a323b' }}>
                       {(() => {
                         const u = getDeviceIconUrl(config, devDraft.iconKey) || U.smoke;
-                        return <img src={u} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
+                        return <img src={toDirectMediaURL(u)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>;
                       })()}
                     </div>
                     <Field label="Title">
@@ -877,6 +914,14 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(820px, 92vw)', maxHeight:'80vh', overflowY:'auto' }}>
+                  {/* Sticky top controls */}
+                  <div style={{ position:'sticky', top:0, background:'#12181d', zIndex:2, paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                    <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                      <button style={S.button} onClick={saveToList}>Save Mission</button>
+                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                    </div>
+                  </div>
+
                   <h3 style={{ marginTop:0 }}>Edit Mission</h3>
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
@@ -910,6 +955,27 @@ export default function Admin() {
                     </div>
                   )}
 
+                  {/* Response settings for Q/A missions */}
+                  {(editing.type==='multiple_choice' || editing.type==='short_answer') && (
+                    <>
+                      <ResponseEditor
+                        title="Correct Answer response"
+                        value={normalizeResponse(editing.onCorrect,'correct')}
+                        showClueOption
+                        devices={config?.devices || config?.powerups || []}
+                        icons={config.icons || DEFAULT_ICONS}
+                        onChange={(v)=>{ setEditing({ ...editing, onCorrect: v }); setDirty(true); }}
+                      />
+                      <ResponseEditor
+                        title="Wrong Answer response"
+                        value={normalizeResponse(editing.onWrong,'wrong')}
+                        devices={config?.devices || config?.powerups || []}
+                        icons={config.icons || DEFAULT_ICONS}
+                        onChange={(v)=>{ setEditing({ ...editing, onWrong: v }); setDirty(true); }}
+                      />
+                    </>
+                  )}
+
                   {/* Stored Statement composer */}
                   {editing.type === 'stored_statement' && (
                     <div style={{ marginBottom: 12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
@@ -932,7 +998,7 @@ export default function Admin() {
                             type="button"
                             style={{ ...S.button, padding:'6px 10px' }}
                             onClick={()=>{
-                              const tag = `#${String(mm.id).toLowerCase()}#`; // e.g. #m03#
+                              const tag = `#${String(mm.id).toLowerCase()}#`;
                               const ta = editing.__tplRef;
                               if (ta) {
                                 const s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
@@ -1038,6 +1104,7 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
+                  {/* Bottom controls mirror (for convenience) */}
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -1083,7 +1150,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT rules (lightweight, same visual style) */}
+      {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
       {/* DEVICES tab (simple list) */}
@@ -1208,6 +1275,129 @@ export default function Admin() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ───────────────────────── Response editor (Correct/Wrong) ───────────────────────── */
+function defaultResponse(kind='correct') {
+  return {
+    show: { kind:'none', mediaUrl:'', audioUrl:'', text:'' },
+    action: { kind:'none', deviceKey:'', seconds:0, clueText:'' },
+  };
+}
+function normalizeResponse(r, kind='correct') {
+  const d = defaultResponse(kind);
+  const x = { ...(r||{}) };
+  x.show   = { ...d.show, ...(x.show||{}) };
+  x.action = { ...d.action, ...(x.action||{}) };
+  return x;
+}
+function ResponseEditor({ title, value, onChange, showClueOption=false, devices=[], icons={} }) {
+  const v = normalizeResponse(value);
+
+  return (
+    <div style={{ marginBottom:12, border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+        <Field label="Show">
+          <select
+            style={S.input}
+            value={v.show.kind}
+            onChange={(e)=>onChange({ ...v, show:{ ...v.show, kind:e.target.value } })}
+          >
+            <option value="none">None</option>
+            <option value="image">Image</option>
+            <option value="video">Video</option>
+            <option value="gif">GIF</option>
+            <option value="audio">Audio (+image optional)</option>
+            <option value="statement">Statement</option>
+          </select>
+        </Field>
+
+        {(v.show.kind==='image' || v.show.kind==='video' || v.show.kind==='gif' || v.show.kind==='audio') && (
+          <Field label={v.show.kind==='audio' ? 'Image/GIF URL (optional)' : 'Media URL'}>
+            <input
+              style={S.input}
+              value={v.show.mediaUrl}
+              onChange={(e)=>onChange({ ...v, show:{ ...v.show, mediaUrl:e.target.value } })}
+            />
+            <MediaPreview url={v.show.mediaUrl} kind="response"/>
+          </Field>
+        )}
+
+        {v.show.kind==='audio' && (
+          <Field label="Audio URL (mp3)">
+            <input
+              style={S.input}
+              value={v.show.audioUrl}
+              onChange={(e)=>onChange({ ...v, show:{ ...v.show, audioUrl:e.target.value } })}
+            />
+          </Field>
+        )}
+
+        {v.show.kind==='statement' && (
+          <Field label="Text to display">
+            <textarea
+              style={{ ...S.input, height:90 }}
+              value={v.show.text}
+              onChange={(e)=>onChange({ ...v, show:{ ...v.show, text:e.target.value } })}
+            />
+          </Field>
+        )}
+      </div>
+
+      <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+        <Field label="Action">
+          <select
+            style={S.input}
+            value={v.action.kind}
+            onChange={(e)=>onChange({ ...v, action:{ ...v.action, kind:e.target.value } })}
+          >
+            <option value="none">None</option>
+            <option value="deploy_device">Deploy Device</option>
+            {showClueOption && <option value="clue">Give Clue</option>}
+            <option value="delay">Delay</option>
+          </select>
+        </Field>
+
+        {v.action.kind==='deploy_device' && (
+          <Field label="Device">
+            <select
+              style={S.input}
+              value={v.action.deviceKey || ''}
+              onChange={(e)=>onChange({ ...v, action:{ ...v.action, deviceKey:e.target.value } })}
+            >
+              <option value="">— pick device —</option>
+              {(devices||[]).map((d,i)=><option key={d.id||i} value={d.id||d.key||`d${i+1}`}>{d.title||d.type||(`Device ${i+1}`)}</option>)}
+            </select>
+          </Field>
+        )}
+
+        {v.action.kind==='delay' && (
+          <Field label="Delay (seconds)">
+            <input
+              type="number"
+              min={1}
+              max={3600}
+              style={S.input}
+              value={v.action.seconds || 0}
+              onChange={(e)=>onChange({ ...v, action:{ ...v.action, seconds: Math.max(1, Number(e.target.value||0)) } })}
+            />
+          </Field>
+        )}
+
+        {showClueOption && v.action.kind==='clue' && (
+          <Field label="Clue text">
+            <input
+              style={S.input}
+              value={v.action.clueText || ''}
+              onChange={(e)=>onChange({ ...v, action:{ ...v.action, clueText:e.target.value } })}
+            />
+          </Field>
+        )}
+      </div>
     </div>
   );
 }
@@ -1362,7 +1552,7 @@ const S = {
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
 };
 
-/* MapOverview — shows missions + devices, supports: placing draft, moving selected, moving nearest */
+/* MapOverview — same as before (placement/move/nearest) */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
   interactive = false, draftDevice = null, selectedDevIdx = null,
@@ -1467,7 +1657,7 @@ function MapOverview({
   );
 }
 
-/* MEDIA tab with DnD + file chooser + Icons editors + picker + re‑apply defaults */
+/* MEDIA tab with DnD + file chooser + Icons editors + picker + re‑apply defaults + Add URL */
 function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRepo }) {
   const [hover, setHover] = useState(false);
 
@@ -1476,6 +1666,8 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
   const [pickerSetter, setPickerSetter] = useState(null); // function(url) -> void
   const openPicker = (setter) => { setPickerSetter(()=>setter); setPickerOpen(true); };
   const closePicker = () => { setPickerOpen(false); setPickerSetter(null); };
+
+  const [addUrl, setAddUrl] = useState('');
 
   async function handleDrop(e) {
     e.preventDefault(); e.stopPropagation(); setHover(false);
@@ -1510,6 +1702,8 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
     );
   }
 
+  const pool = Array.isArray(config?.media?.pool) ? config.media.pool : [];
+
   return (
     <main style={S.wrap}>
       <div
@@ -1537,6 +1731,26 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
           <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
         </div>
 
+        <div style={{ marginBottom:12, display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+          <input
+            style={S.input}
+            placeholder="Add URL to Media Pool (https…)"
+            value={addUrl}
+            onChange={(e)=>setAddUrl(e.target.value)}
+          />
+          <button
+            style={S.button}
+            onClick={()=>{
+              const u = addUrl.trim();
+              if (!u) return;
+              const p = Array.isArray(config?.media?.pool) ? [...config.media.pool] : [];
+              if (!p.includes(u)) p.push(u);
+              setConfig({ ...config, media:{ ...(config.media||{}), pool:p } });
+              setAddUrl('');
+            }}
+          >Add to Pool</button>
+        </div>
+
         <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo} openPicker={openPicker}/>
         <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
         <IconsEditor config={config} setConfig={setConfig} label="Reward Icons"  kind="rewards"  uploadToRepo={uploadToRepo} openPicker={openPicker}/>
@@ -1544,7 +1758,7 @@ function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, uploadToRe
 
       <PickFromMediaModal
         open={pickerOpen}
-        pool={config?.media?.pool || []}
+        pool={pool}
         onPick={(url)=>{ if (typeof pickerSetter === 'function') pickerSetter(url); closePicker(); }}
         onClose={closePicker}
       />
@@ -1637,30 +1851,31 @@ function RewardsTab({ config, setConfig }) {
     <main style={S.wrap}>
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Rewards</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-          <div>Thumbnail</div><div>Name</div><div>Special ability</div><div>Actions</div>
+        <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 1fr 200px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
+          <div>Thumbnail</div><div>Name</div><div>Special ability</div><div>Media URL (optional)</div><div>Actions</div>
         </div>
         {list.map((row, idx)=>(
-          <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
+          <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 1fr 200px', gap:8, alignItems:'center', marginBottom:8 }}>
             <div>
               <input style={S.input} value={row.thumbUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), thumbUrl:e.target.value }; setList(n); }} placeholder="Thumbnail URL"/>
               {row.thumbUrl && <img alt="thumb" src={toDirectMediaURL(row.thumbUrl)} style={{ marginTop:6, width:'100%', maxHeight:80, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>}
             </div>
             <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
             <input style={S.input} value={row.ability||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), ability:e.target.value }; setList(n); }}/>
+            <input style={S.input} value={row.mediaUrl||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), mediaUrl:e.target.value }; setList(n); }}/>
             <div style={{ display:'flex', gap:6 }}>
               <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
               <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}), key:(row.key||`rw${idx}`)+'-copy' }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
             </div>
           </div>
         ))}
-        <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`rw${list.length+1}`, name:'', ability:'', thumbUrl:'' }]); }}>+ Add Reward</button>
+        <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`rw${list.length+1}`, name:'', ability:'', thumbUrl:'', mediaUrl:'' }]); }}>+ Add Reward</button>
       </div>
     </main>
   );
 }
 
-/* Text tab (SMS rules) — same tone & layout */
+/* Text tab left as before (includes inline SMS test) */
 function TextTab({ suite, config, setConfig, setStatus }) {
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
 
@@ -1679,7 +1894,6 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     setConfig({ ...config, textRules: rules });
   }
 
-  // inline quick test
   function TestSMSInline() {
     const [to, setTo] = useState('');
     const [msg, setMsg] = useState('Test message from admin');
