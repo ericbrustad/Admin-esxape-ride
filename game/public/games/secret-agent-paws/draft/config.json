@@ -17,80 +17,19 @@
   "textRules": [],
   "devices": [],
   "powerups": [],
-  "media": {
-    "rewards": [
-      {
-        "key": "gold-coin",
-        "name": "Gold Coin",
-        "ability": "Adds a coin to your wallet.",
-        "thumbUrl": "/media/bundles/GOLDEN%20COIN.png"
-      }
-    ],
-    "pool": [
-      "/media/bundles/ROBOT1small.png",
-      "/media/bundles/SMOKE%20BOMB.png",
-      "/media/bundles/evidence%202.png",
-      "/media/bundles/CLUEgreen.png",
-      "/media/bundles/GOLDEN%20COIN.png",
-      "/media/bundles/trivia%20icon.png",
-      "/media/bundles/trivia%20yellow.png"
-    ]
-  },
+  "media": {},
   "icons": {
-    "missions": [
-      {
-        "key": "trivia",
-        "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
-      },
-      {
-        "key": "trivia-2",
-        "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
-      },
-      {
-        "key": "missions-3",
-        "name": "Clue",
-        "url": "/media/bundles/CLUEgreen.png"
-      }
-    ],
-    "devices": [
-      {
-        "key": "dev-clone",
-        "name": "Roaming Robot",
-        "url": "/media/bundles/ROBOT1small.png"
-      },
-      {
-        "key": "dev-smoke",
-        "name": "Smoke Shield",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
-      }
-    ],
-    "rewards": [
-      {
-        "key": "evidence",
-        "name": "Evidence",
-        "url": "/media/bundles/evidence%202.png"
-      },
-      {
-        "key": "clue",
-        "name": "Clue",
-        "url": "/media/bundles/CLUEgreen.png"
-      },
-      {
-        "key": "gold-coin",
-        "name": "Gold Coin",
-        "url": "/media/bundles/GOLDEN%20COIN.png"
-      }
-    ]
+    "missions": [],
+    "devices": [],
+    "rewards": []
   },
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
     "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
+    "fontColor": "#110303",
+    "textBgColor": "#cfcece",
     "textBgOpacity": 0,
-    "screenBgColor": "#000000",
+    "screenBgColor": "#d4c9c9",
     "screenBgOpacity": 0,
     "screenBgImage": "",
     "textAlign": "center",
