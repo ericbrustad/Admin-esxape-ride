@@ -220,6 +220,9 @@ function defaultAppearance() {
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
+const DEFAULT_REWARDS = [
+  { key:'gold-coin', name:'Gold Coin', ability:'Adds a coin to your wallet.', thumbUrl:'/media/bundles/GOLDEN%20COIN.png' },
+];
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
@@ -245,12 +248,15 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
+  // Selection states
+  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
+  const [selectedMissionIdx, setSelectedMissionIdx] = useState(null);
+
   // Device manager
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
   const [placingDev, setPlacingDev] = useState(false);
-  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
   const [uploadStatus, setUploadStatus] = useState('');
@@ -259,15 +265,23 @@ export default function Admin() {
   const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
+  // Map UI options
+  const [mapPinSize, setMapPinSize] = useState(24);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem('deployDelaySec');
       if (saved != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(saved) || 0)));
+      const savedPin = localStorage.getItem('mapPinSize');
+      if (savedPin != null) setMapPinSize(clamp(Number(savedPin) || 24, 12, 64));
     } catch {}
   }, []);
   useEffect(() => {
     try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {}
   }, [deployDelaySec]);
+  useEffect(() => {
+    try { localStorage.setItem('mapPinSize', String(mapPinSize)); } catch {}
+  }, [mapPinSize]);
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -349,9 +363,9 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
-      // NEW: Game-wide map defaults (for coherent region)
+      // Game-wide map defaults (for coherent region)
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
-      // NEW: Geofence mode (admin-side toggle; the Game app can use this)
+      // Geofence mode (admin-side toggle; the Game app can use this)
       geofence: { mode: 'test' }, // 'test' | 'live'
     };
   }
@@ -485,14 +499,13 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       iconKey: '',
-      // iconUrl removed from editor path (kept for legacy read only)
       rewards: { points: 25 },
       correct: { mode: 'none' },
       wrong:   { mode: 'none' },
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
-      showContinue: true, // NEW
+      showContinue: true,
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -564,6 +577,7 @@ export default function Admin() {
   function addDevice() {
     setPlacingDev(true);
     setSelectedDevIdx(null);
+    setSelectedMissionIdx(null);
     setDevDraft({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
   }
   function saveDraftDevice() {
@@ -581,6 +595,7 @@ export default function Admin() {
     setDevices([...(devices || []), item]);
     setPlacingDev(false);
     setSelectedDevIdx((devices?.length || 0));
+    setSelectedMissionIdx(null);
     setStatus('✅ Device added (remember Save All)');
   }
   function deleteSelectedDevice() {
@@ -611,6 +626,35 @@ export default function Admin() {
     setDevices(list);
   }
 
+  // Missions selection operations from map
+  function moveSelectedMission(lat, lng) {
+    if (selectedMissionIdx == null) return;
+    const list = [...(suite?.missions || [])];
+    const m = list[selectedMissionIdx]; if (!m) return;
+    const c = { ...(m.content || {}) };
+    c.lat = Number(lat.toFixed(6));
+    c.lng = Number(lng.toFixed(6));
+    c.geofenceEnabled = true;
+    c.radiusMeters = Number(c.radiusMeters || 25);
+    list[selectedMissionIdx] = { ...m, content: c };
+    setSuite({ ...suite, missions: list });
+    setStatus(`Moved mission #${selectedMissionIdx+1}`);
+  }
+  function setSelectedMissionRadius(r) {
+    if (selectedMissionIdx == null) return;
+    const list = [...(suite?.missions || [])];
+    const m = list[selectedMissionIdx]; if (!m) return;
+    const c = { ...(m.content || {}) };
+    c.radiusMeters = clamp(Number(r || 0), 1, 2000);
+    c.geofenceEnabled = true;
+    if (!isFinite(Number(c.lat)) || !isFinite(Number(c.lng))) {
+      c.lat = Number(config.map?.centerLat || 44.9778);
+      c.lng = Number(config.map?.centerLng || -93.2650);
+    }
+    list[selectedMissionIdx] = { ...m, content: c };
+    setSuite({ ...suite, missions: list });
+  }
+
   // Address search
   async function devSearch(e) {
     e?.preventDefault();
@@ -635,6 +679,8 @@ export default function Admin() {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
       moveSelectedDevice(lat, lon);
+    } else if (selectedMissionIdx != null) {
+      moveSelectedMission(lat, lon);
     } else {
       setPlacingDev(true);
       setDevDraft(d => ({ ...d, lat, lng: lon }));
@@ -675,6 +721,19 @@ export default function Admin() {
 
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
+
+  // Slider binding for selected entity
+  const sliderDisabled = (selectedMissionIdx==null && selectedDevIdx==null && !placingDev);
+  const sliderValue = selectedMissionIdx!=null
+    ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
+    : selectedDevIdx!=null
+      ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
+      : Number(devDraft.pickupRadius ?? 0);
+  const sliderLabel =
+    selectedMissionIdx!=null ? `M${selectedMissionIdx+1} radius`
+    : selectedDevIdx!=null    ? `D${selectedDevIdx+1} radius`
+    : placingDev              ? 'New device radius'
+    : 'Select a pin to adjust radius';
 
   return (
     <div style={S.body}>
@@ -776,38 +835,50 @@ export default function Admin() {
                 <div>
                   <h3 style={{ margin:0 }}>Overview Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Click to place a device (when “Add Device” is active). If a device is selected, click to move it.
+                    Click a pin to select. Drag a selected pin or click the map to move it. Nothing moves unless selected (or when “Add Device” is active).
                   </div>
                 </div>
-                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                </label>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Pin size:
+                    <input type="range" min={16} max={48} step={2} value={mapPinSize} onChange={(e)=>setMapPinSize(Number(e.target.value))}/>
+                    <code style={{ color:'#9fb0bf' }}>{mapPinSize}px</code>
+                  </label>
+                </div>
               </div>
 
-              {/* Device manager row */}
+              {/* Device / Mission manager row */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
                 <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                  <input placeholder="Search address or place for device…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
+                  <input placeholder="Search address or place for device/mission…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
                   <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
                   <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
                 </form>
-                <div style={{ display:'flex', gap:8 }}>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                   <button style={S.button} onClick={addDevice}>+ Add Device</button>
                   <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
                   <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
+                  {(selectedDevIdx!=null || selectedMissionIdx!=null) && (
+                    <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); setSelectedMissionIdx(null); }}>Clear selection</button>
+                  )}
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                   <input
                     type="range" min={5} max={2000} step={5}
-                    value={selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
+                    disabled={sliderDisabled}
+                    value={sliderValue}
                     onChange={(e)=>{
                       const r = Number(e.target.value);
-                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                      if (selectedMissionIdx!=null) setSelectedMissionRadius(r);
+                      else if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
                       else setDevDraft(d=>({ ...d, pickupRadius: r }));
                     }}
                   />
                   <code style={{ color:'#9fb0bf' }}>
-                    {(selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
+                    {sliderLabel}: {sliderDisabled ? '—' : sliderValue} m
                   </code>
                 </div>
               </div>
@@ -837,7 +908,7 @@ export default function Admin() {
                         borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b',
                         display:'flex', alignItems:'center', gap:6
                       }}
-                      onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
+                      onClick={() => { setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
                       title={`${d.title||d.type} (#${i+1})`}
                     >
                       {url ? <img alt="" src={toDirectMediaURL(url)} style={{ width:16, height:16, objectFit:'cover', borderRadius:3 }}/> : null}
@@ -894,10 +965,15 @@ export default function Admin() {
                 interactive={placingDev}
                 draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
                 selectedDevIdx={selectedDevIdx}
+                selectedMissionIdx={selectedMissionIdx}
                 onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
                 onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
+                onMoveSelectedMission={(lat,lng)=>moveSelectedMission(lat,lng)}
+                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
+                onSelectMission={(i)=>{ setSelectedMissionIdx(i); setSelectedDevIdx(null); setPlacingDev(false); }}
                 mapCenter={mapCenter}
                 mapZoom={mapZoom}
+                iconSizePx={mapPinSize}
               />
             </div>
 
@@ -1197,7 +1273,7 @@ export default function Admin() {
 
                   <hr style={S.hr}/>
 
-                  {/* NEW: Continue button flag */}
+                  {/* Continue button flag */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input
                       type="checkbox"
@@ -1251,7 +1327,7 @@ export default function Admin() {
             </Field>
           </div>
 
-          {/* NEW: Game Region & Geofence */}
+          {/* Game Region & Geofence */}
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
@@ -1331,11 +1407,18 @@ export default function Admin() {
       {tab==='map' && (
         <main style={S.wrap}>
           <div style={S.card}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:8, flexWrap:'wrap' }}>
               <h3 style={{ margin:0 }}>Game Map</h3>
-              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-              </label>
+              <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                </label>
+                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  Pin size:
+                  <input type="range" min={16} max={48} step={2} value={mapPinSize} onChange={(e)=>setMapPinSize(Number(e.target.value))}/>
+                  <code style={{ color:'#9fb0bf' }}>{mapPinSize}px</code>
+                </label>
+              </div>
             </div>
             <MapOverview
               missions={(suite?.missions)||[]}
@@ -1344,6 +1427,14 @@ export default function Admin() {
               showRings={showRings}
               mapCenter={mapCenter}
               mapZoom={mapZoom}
+              iconSizePx={mapPinSize}
+              // enable selecting on this tab too
+              selectedDevIdx={selectedDevIdx}
+              selectedMissionIdx={selectedMissionIdx}
+              onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+              onSelectMission={(i)=>{ setSelectedMissionIdx(i); setSelectedDevIdx(null); }}
+              onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
+              onMoveSelectedMission={(lat,lng)=>moveSelectedMission(lat,lng)}
             />
           </div>
         </main>
@@ -1593,25 +1684,29 @@ const S = {
 /* MapOverview — shows missions + devices */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
-  interactive = false, draftDevice = null, selectedDevIdx = null,
-  onDraftChange = null, onMoveSelected = null,
-  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13,
+  interactive = false, draftDevice = null,
+  selectedDevIdx = null, selectedMissionIdx = null,
+  onDraftChange = null, onMoveSelected = null, onMoveSelectedMission = null,
+  onSelectDevice = null, onSelectMission = null,
+  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13, iconSizePx = 24,
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
   function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng);
-    if(!isFinite(lat)||!isFinite(lng))return null; if(!(c.geofenceEnabled||Number(c.radiusMeters)>0))return null; return [lat,lng]; }
+    if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function getDevicePos(d){ const lat=Number(d?.lat),lng=Number(d?.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?toDirectMediaURL(it.url||''):''; }
-  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false){
+  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false, size=24){
+    const s = Math.max(12, Math.min(64, Number(size)||24));
     const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
-      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
+      ? `<img src="${imgUrl}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
+      : `<div style="width:${s-4}px;height:${s-4}px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
+    const font = Math.round(s*0.5);
     return window.L.divIcon({
       className:'num-pin',
-      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
-      iconSize:[24,28], iconAnchor:[12,12]
+      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-${Math.round(s*0.45)}px;left:50%;transform:translateX(-50%);font-weight:700;font-size:${font}px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
+      iconSize:[s, s+4], iconAnchor:[s/2, s/2]
     });
   }
 
@@ -1643,28 +1738,44 @@ function MapOverview({
     const layer=map._layerGroup;
     const bounds=L.latLngBounds([]);
 
+    // Missions
     (missions||[]).forEach((m,idx)=>{
       const pos=getMissionPos(m); if(!pos) return;
       const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
-      L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',false)}).addTo(layer);
+      const isSel = (selectedMissionIdx===idx);
+      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,iconSizePx), draggable:isSel}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
-      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
+      let circle=null;
+      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer); }
+      marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectMission && onSelectMission(idx); });
+      if(isSel){
+        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
+        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission && onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+      }
       bounds.extend(pos);
     });
 
+    // Devices
     (devices||[]).forEach((d,idx)=>{
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
+      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,iconSizePx), draggable:hl}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
-      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
+      let circle=null;
+      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
+      marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice && onSelectDevice(idx); });
+      if(hl){
+        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
+        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected && onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+      }
       bounds.extend(pos);
     });
 
+    // Draft device
     if(draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true), draggable:true }).addTo(layer);
+      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,iconSizePx), draggable:true }).addTo(layer);
       if(showRings && Number(draftDevice.radius)>0){
         const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
         mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
@@ -1673,19 +1784,24 @@ function MapOverview({
       bounds.extend(pos);
     }
 
-    // Click handler: place draft, or move selected device ONLY
+    // Click handler: place draft, or move selected device/mission ONLY
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
       const lat=e.latlng.lat, lng=e.latlng.lng;
       if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
+      if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       // else: do nothing (no accidental nearest-pin moves)
     };
     map.on('click', map._clickHandler);
 
     if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
     else map.setView(initialCenter, initialZoom);
-  },[leafletReady, missions, devices, icons, showRings, interactive, draftDevice, selectedDevIdx, onDraftChange, onMoveSelected, mapCenter, mapZoom]);
+  },[
+    leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
+    selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
+    onSelectDevice, onSelectMission, mapCenter, mapZoom, iconSizePx
+  ]);
 
   return (
     <div>
