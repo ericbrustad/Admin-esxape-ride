@@ -296,6 +296,88 @@ export default function Admin() {
       });
     })();
   }, []);
+/* ───────────────────────── Default image seeding (examples) ───────────────────────── */
+
+const DEFAULT_ASSET_BASES = [
+  '/games/lib/media/bundles',
+  '/lib/media/bundles',
+  '/media/bundles',
+];
+
+const urlFromBases = (file) =>
+  DEFAULT_ASSET_BASES.map((b) => `${b}/${encodeURIComponent(file)}`);
+const firstUrl = (candidates) => candidates[0]; // keep it simple
+
+// Files you dropped in /games/lib/media/bundles
+const U = {
+  robot:   firstUrl(urlFromBases('ROBOT1small.png')),   // Roaming Robot — clone device icon
+  smoke:   firstUrl(urlFromBases('SMOKE BOMB.png')),    // Smoke Shield — smoke device icon
+  evid:    firstUrl(urlFromBases('evidence 2.png')),    // Evidence — reward icon
+  clue:    firstUrl(urlFromBases('CLUEgreen.png')),     // Clue — reward icon
+  coin:    firstUrl(urlFromBases('GOLDEN COIN.png')),   // Gold Coin — reward icon
+  trivia:  firstUrl(urlFromBases('trivia icon.png')),   // Trivia — mission icon
+  trivia2: firstUrl(urlFromBases('trivia yellow.png')), // Trivia 2 — mission icon
+};
+
+const DEFAULT_DEVICE_ICONS = [
+  { key: 'dev-clone', name: 'Roaming Robot', url: U.robot }, // Clone device
+  { key: 'dev-smoke', name: 'Smoke Shield',  url: U.smoke }, // Smoke device
+];
+
+const DEFAULT_MISSION_ICONS = [
+  { key: 'trivia',   name: 'Trivia',   url: U.trivia },
+  { key: 'trivia-2', name: 'Trivia 2', url: U.trivia2 },
+];
+
+const DEFAULT_REWARD_ICONS = [
+  { key: 'evidence',  name: 'Evidence',  url: U.evid },
+  { key: 'clue',      name: 'Clue',      url: U.clue },
+  { key: 'gold-coin', name: 'Gold Coin', url: U.coin },
+];
+
+const DEFAULT_REWARDS_SEEDED = [
+  { key: 'gold-coin', name: 'Gold Coin', ability: 'Adds a coin to your wallet.', thumbUrl: U.coin },
+];
+
+// So “Pick from Media” is never empty
+const DEFAULT_MEDIA_POOL = [U.robot, U.smoke, U.evid, U.clue, U.coin, U.trivia, U.trivia2];
+
+/** Returns a new config with defaults seeded iff missing (non‑destructive). */
+function seedDefaults(cfg) {
+  const next = {
+    ...cfg,
+    icons: { ...(cfg.icons || {}) },
+    media: { ...(cfg.media || {}) },
+  };
+
+  const ensure = (kind, seeds) => {
+    const list = Array.isArray(next.icons[kind]) ? [...next.icons[kind]] : [];
+    const have = new Set(list.map((x) => (x.key || '').toLowerCase()));
+    seeds.forEach((s) => {
+      if (s.url && !have.has((s.key || '').toLowerCase())) list.push(s);
+    });
+    next.icons[kind] = list;
+  };
+
+  ensure('devices',  DEFAULT_DEVICE_ICONS);
+  ensure('missions', DEFAULT_MISSION_ICONS);
+  ensure('rewards',  DEFAULT_REWARD_ICONS);
+
+  if (!Array.isArray(next.media.rewards) || next.media.rewards.length === 0) {
+    next.media.rewards = DEFAULT_REWARDS_SEEDED;
+  }
+
+  // Build / extend the global pool
+  const pool = Array.isArray(next.media.pool) ? next.media.pool.slice() : [];
+  DEFAULT_MEDIA_POOL.forEach((u) => { if (u && !pool.includes(u)) pool.push(u); });
+  // Also add all icon URLs to the pool (handy!)
+  ['devices','missions','rewards'].forEach(k => {
+    (next.icons[k] || []).forEach(it => { if (it.url && !pool.includes(it.url)) pool.push(it.url); });
+  });
+  next.media.pool = pool;
+
+  return next;
+}
 
   function defaultConfig() {
     return {
