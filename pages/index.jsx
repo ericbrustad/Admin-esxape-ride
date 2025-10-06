@@ -1393,15 +1393,15 @@ export default function Admin() {
                 />
               </Field>
               <Field label="Geofence Mode">
-                <select
-                  style={S.input}
-                  value={config.geofence?.mode || 'test'}
-                  onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
-                >
-                  <option value="test">Test — click to enter (dev)</option>
-                  <option value="live">Live — GPS radius only</option>
-            _geo
-              </Field>
+  <select
+    style={S.input}
+    value={config.geofence?.mode || 'test'}
+    onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
+  >
+    <option value="test">Test — click to enter (dev)</option>
+    <option value="live">Live — GPS radius only</option>
+  </select>  {/* CORRECTED LINE */}
+</Field>
             </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
               These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click‑to‑enter in test vs GPS in live.
