@@ -25,6 +25,16 @@
       "effectSeconds": 120,
       "lat": 44.977186,
       "lng": -93.277705
+    },
+    {
+      "id": "d02",
+      "title": "ssss",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.976987,
+      "lng": -93.289436
     }
   ],
   "powerups": [
@@ -37,6 +47,16 @@
       "effectSeconds": 120,
       "lat": 44.977186,
       "lng": -93.277705
+    },
+    {
+      "id": "d02",
+      "title": "ssss",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.976987,
+      "lng": -93.289436
     }
   ],
   "media": {
