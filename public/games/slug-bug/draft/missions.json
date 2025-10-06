@@ -34,9 +34,9 @@
     },
     {
       "id": "m02",
-      "title": "New Mission",
-      "type": "multiple_choice",
-      "iconKey": "",
+      "title": "new new saved mission",
+      "type": "geofence_image",
+      "iconKey": "trivia",
       "rewards": {
         "points": 25
       },
@@ -47,18 +47,12 @@
         "mode": "none"
       },
       "content": {
-        "question": "vvv",
-        "choices": [
-          "v",
-          "v"
-        ],
-        "correctIndex": 0,
-        "mediaUrl": "",
-        "geofenceEnabled": false,
         "lat": "",
         "lng": "",
         "radiusMeters": 25,
-        "cooldownSeconds": 30
+        "cooldownSeconds": 30,
+        "imageUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=o0rozlzt&dl=0",
+        "overlayText": ""
       },
       "appearanceOverrideEnabled": false,
       "showContinue": true
