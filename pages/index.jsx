@@ -859,19 +859,35 @@ export default function Admin() {
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
-    const array  = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
-    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    setUploadStatus(`Uploading ${safeName}…`);
-    const res = await fetch('/api/upload', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
-    });
-    const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
-    return res.ok ? `/${path.replace(/^public\//,'')}` : '';
-  }
+  // keep subfolder param for backward calls ('uploads' or 'icons'),
+  // but always route into uploads/<type> for new media
+  const array  = await file.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
+  const ext = (file.name.match(/\.[a-z0-9]+$/i)?.[0] || '').toLowerCase();
+  const s = file.type.toLowerCase() + ' ' + file.name.toLowerCase();
+
+  const type =
+    /gif/.test(s)           ? 'gif'   :
+    /image/.test(s)         ? 'image' :
+    /video/.test(s)         ? 'video' :
+    /audio/.test(s)         ? 'audio' : 'image';
+
+  const safeName = file.name.replace(/[^\w.\-]+/g, '-');
+  const path   = `public/media/uploads/${type}/${Date.now()}-${safeName}`;
+
+  setUploadStatus(`Uploading ${safeName}…`);
+  const res = await fetch('/api/upload', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    credentials:'include',
+    body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
+  });
+
+  const j = await res.json().catch(()=>({}));
+  setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+  return res.ok ? `/${path.replace(/^public\//,'')}` : '';
+}
+
 
   if (!suite || !config) {
     return (
