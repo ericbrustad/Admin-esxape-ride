@@ -1706,7 +1706,7 @@ function MapOverview({
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      L.marker(pos',{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
+      L.marker(pos, {icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
       if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
