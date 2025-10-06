@@ -69,7 +69,7 @@ function classifyByExt(u) {
   return 'other';
 }
 
-/** NEW: Merge inventory across dirs so uploads show up everywhere */
+/** Merge inventory across dirs so uploads show up everywhere */
 async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
   const seen = new Set();
   const out = [];
@@ -78,7 +78,6 @@ async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
       const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
       const j = await r.json();
       (j?.items || []).forEach(it => {
-        // Normalize & de-duplicate by URL
         const url = it.url || '';
         if (!seen.has(url)) { seen.add(url); out.push(it); }
       });
@@ -249,7 +248,7 @@ export default function Admin() {
 
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // NEW: single-button Save & Publish controls
+  // Combined Save & Publish controls
   const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
@@ -402,7 +401,7 @@ export default function Admin() {
     }
   }
 
-  // NEW: Combine Save + Publish with a delay before publish (lets Vercel pick up the commit cleanly)
+  // Combined Save + Publish with a delay
   async function saveAndPublish() {
     if (!suite || !config) return;
     const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
@@ -611,7 +610,7 @@ export default function Admin() {
     } catch {
       setDevResults([]);
     } finally {
-      setDevSearching(false);
+           setDevSearching(false);
     }
   }
   function applySearchResult(r) {
@@ -1242,7 +1241,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT rules (unchanged) */}
+      {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
       {/* DEVICES (list) */}
@@ -1321,7 +1320,7 @@ export default function Admin() {
         </main>
       )}
 
-      {/* New Game modal (unchanged) */}
+      {/* New Game modal */}
       {showNewGame && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
           <div style={{ ...S.card, width:420 }}>
@@ -1485,6 +1484,7 @@ function MediaPreview({ url, kind }) {
   if (!url) return null;
   const u = toDirectMediaURL(String(url).trim());
   const lower = u.toLowerCase();
+  theconst = 0; // (no-op guard removed if not needed)
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
   const isAudio = /\.(mp3|wav|ogg|m4a)(\?|#|$)/.test(lower);
@@ -1636,7 +1636,6 @@ function MapPicker({ lat, lng, radius = 25, onChange }) {
   const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
   const [rad, setRad] = useState(Number(radius) || 25);
 
-  // Load Leaflet once (same pattern as MapOverview)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.L) { setLeafletReady(true); return; }
@@ -1647,10 +1646,8 @@ function MapPicker({ lat, lng, radius = 25, onChange }) {
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
   }, []);
 
-  // Sync local radius when prop changes
   useEffect(() => { setRad(Number(radius) || 25); }, [radius]);
 
-  // Initialize + update map
   useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
     const L = window.L; if (!L) return;
@@ -1679,7 +1676,6 @@ function MapPicker({ lat, lng, radius = 25, onChange }) {
       divRef.current._marker = marker;
       divRef.current._circle = circle;
     } else {
-      // Update position if props lat/lng change
       const map = divRef.current._leaflet_map;
       const marker = divRef.current._marker;
       const circle = divRef.current._circle;
@@ -1906,7 +1902,6 @@ function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acce
 
   React.useEffect(()=>{ (async()=>{
     try {
-      // Merge specified dir with uploads so fresh uploads appear
       setPool(await listInventory([dir, 'uploads']));
     } catch {}
   })(); }, [dir]);
@@ -1922,8 +1917,7 @@ function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acce
       (acceptKinds.includes('video') && type.startsWith('video/')) ||
       (acceptKinds.includes('audio') && type.startsWith('audio/'));
     if (!ok) return;
-    const pathFolder = 'uploads';
-    const u = await uploadToRepo(f, pathFolder);
+    const u = await uploadToRepo(f, 'uploads');
     if (u) onChangeUrl(u);
   }
 
@@ -1996,19 +1990,16 @@ function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onCl
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
       <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <h3 style={{ margin:0 }}>Media Inventory</h3>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
         <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {tabs.map(t => (
-            <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }} onClick={() => setTab(t)}>
+          {tabs.map((t) => (
+            <button
+              key={t}
+              style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }}
+              onClick={()=>setTab(t)}
+            >
               {t.toUpperCase()}
             </button>
           ))}
-          {/* MOVE THE INPUT TO BE INSIDE THIS DIV */}
-          <input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
-        </div>
           <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
@@ -2028,19 +2019,22 @@ function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onCl
             </div>
           ))}
         </div>
+        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:10 }}>
+          <button style={S.button} onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   );
 }
 
-/* TEXT tab (as before) */
+/* TEXT tab */
 function TextTab({ suite, config, setConfig, setStatus }) {
   const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
   function addSmsRule() {
     if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
     const maxPlayers = config?.forms?.players || 1;
     if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
+    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
     setStatus('✅ SMS rule added (remember Save All)');
