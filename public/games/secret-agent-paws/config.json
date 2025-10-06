@@ -26,12 +26,12 @@
       {
         "key": "trivia",
         "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
+        "url": "/media/bundles/ROBOT1small.png"
       },
       {
         "key": "trivia-2",
         "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
+        "url": "/media/uploads/1759721609116-.pentagram_money.png"
       }
     ],
     "devices": [
@@ -44,6 +44,11 @@
         "key": "roaming-robot",
         "name": "Roaming Robot",
         "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "devices-3",
+        "name": "1759746016103 download",
+        "url": "/media/uploads/1759746016103-download.jpg"
       }
     ],
     "rewards": [
@@ -65,7 +70,7 @@
     ]
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    "fontFamily": "Courier New, Courier, monospace",
     "fontSizePx": 22,
     "fontColor": "#ffffff",
     "textBgColor": "#000000",
