@@ -82,6 +82,6 @@
     "defaultZoom": 13
   },
   "geofence": {
-    "mode": "test"
+    "mode": "live"
   }
 }
