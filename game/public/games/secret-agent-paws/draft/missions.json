@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.2",
   "missions": [
     {
       "id": "m01",
@@ -24,6 +24,39 @@
         "textAlign": "center",
         "textVertical": "top"
       }
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "iconUrl": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "image",
+        "mediaUrl": "/media/uploads/1759721609116-.pentagram_money.png"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "ffhf",
+        "choices": [
+          "g",
+          "n",
+          "m"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false
     }
   ]
 }
