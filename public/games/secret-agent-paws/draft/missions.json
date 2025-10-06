@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.2",
   "missions": [
     {
       "id": "m01",
@@ -30,6 +30,40 @@
       "wrong": {
         "mode": "none"
       },
+      "showContinue": true
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "trivia-2",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "video",
+        "mediaUrl": "https://www.dropbox.com/scl/fi/mgll0jveor6tjld9bjzuw/2023-08-21-20.44.04.mov?rlkey=2oonuu35o2jmobnv1cm2m1kqi&st=s2876j54&dl=0",
+        "clue": "Well done!!"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "ddd",
+        "choices": [
+          "d",
+          "f",
+          "v"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "https://www.dropbox.com/scl/fi/aherr5xqjg8esdvijb5wl/2023-07-09-11.57.20.jpg?rlkey=lef2j4wda1531xh7iyzfipuy0&st=gr08xly5&dl=0",
+        "geofenceEnabled": true,
+        "lat": 44.9778,
+        "lng": -93.265,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
