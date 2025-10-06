@@ -26,12 +26,12 @@
       {
         "key": "trivia",
         "name": "Trivia",
-        "url": "/media/bundles/ROBOT1small.png"
+        "url": "/media/bundles/trivia%20icon.png"
       },
       {
         "key": "trivia-2",
         "name": "Trivia 2",
-        "url": "/media/uploads/1759721609116-.pentagram_money.png"
+        "url": "/media/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
@@ -44,11 +44,6 @@
         "key": "roaming-robot",
         "name": "Roaming Robot",
         "url": "/media/bundles/ROBOT1small.png"
-      },
-      {
-        "key": "devices-3",
-        "name": "1759746016103 download",
-        "url": "/media/uploads/1759746016103-download.jpg"
       }
     ],
     "rewards": [
@@ -82,8 +77,8 @@
     "textVertical": "top"
   },
   "map": {
-    "centerLat": 44.9778,
-    "centerLng": -93.265,
+    "centerLat": 44.803334,
+    "centerLng": -93.362126,
     "defaultZoom": 13
   },
   "geofence": {
