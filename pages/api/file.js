@@ -1,20 +1,20 @@
 // pages/api/file.js
+import { ghEnv, ghHeaders, resolveBranch } from './_gh-helpers';
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
   try {
     const rawPath = req.query.path;
     const path = Array.isArray(rawPath) ? rawPath[0] : rawPath;
-    if (!path || !path.startsWith('public/')) {
+    if (!path || !String(path).startsWith('public/')) {
       return res.status(400).json({ ok: false, error: 'Missing or invalid path' });
     }
 
-    const token  = process.env.GITHUB_TOKEN;
-    const user   = process.env.GITHUB_USER;
-    const repo   = process.env.GITHUB_REPO;
-    const branch = process.env.GITHUB_BRANCH || 'main';
+    const { token, owner, repo, branch } = ghEnv();
+    const ref = await resolveBranch({ token, owner, repo, branch });
 
-    const url = `https://api.github.com/repos/${user}/${repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`;
-    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'esx-admin' } });
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(ref)}`;
+    const r = await fetch(url, { headers: ghHeaders(token), cache: 'no-store' });
     if (!r.ok) return res.status(r.status).json({ ok: false, error: `GitHub: ${r.status} ${r.statusText}` });
 
     const j = await r.json();
