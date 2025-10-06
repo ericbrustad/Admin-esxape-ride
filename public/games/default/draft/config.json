@@ -68,12 +68,22 @@
       {
         "key": "trivia",
         "name": "Trivia",
-        "url": "/media/icons/1759754759698-panda_cute.jpg"
+        "url": "/media/bundles/trivia%20icon.png"
       },
       {
         "key": "trivia-2",
         "name": "Trivia 2",
         "url": "/media/bundles/trivia%20yellow.png"
+      },
+      {
+        "key": "missions-3",
+        "name": "1759680112223 evidence 2",
+        "url": "/media/uploads/1759680112223-evidence_2.png"
+      },
+      {
+        "key": "missions-4",
+        "name": "1759695132343 blue circle",
+        "url": "/media/icons/1759695132343-blue_circle.png"
       }
     ],
     "devices": [
@@ -85,7 +95,7 @@
       {
         "key": "roaming-robot",
         "name": "Roaming Robot",
-        "url": "/media/bundles/ROBOT1small.png"
+        "url": "/media/icons/1759680357102-casper.jpg"
       }
     ],
     "rewards": [
