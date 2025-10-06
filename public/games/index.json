@@ -47,5 +47,12 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-05T06:38:09.535Z"
+  },
+  {
+    "slug": "new-game-5",
+    "title": "new game 5",
+    "type": "Mystery",
+    "mode": "single",
+    "createdAt": "2025-10-06T04:45:43.938Z"
   }
 ]
