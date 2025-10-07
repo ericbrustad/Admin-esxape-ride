@@ -1321,17 +1321,6 @@ export default function Admin() {
                   {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
                   <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0 8px' }}>
-                    <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(editing.correct?.awardEnabled)}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), awardEnabled:e.target.checked } }); setDirty(true); }}
-                      />
-                      <span style={{ fontSize:12, color:'#9fb0bf' }}>Enable Award (ticker yes/no)</span>
-                    </label>
-                  </div>
-    
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     <Field label="Mode">
                       <select style={S.input}
@@ -2566,7 +2555,10 @@ function PoolList({ title, items }) {
 }
 
 
-<div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+{/* ── On Correct → Award Controls ── */}
+<div style={{ borderTop: '1px solid #1e2a36', paddingTop: 12, marginTop: 12 }}>
+  <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>On Correct — Award</div>
+  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <input
         type="checkbox"
@@ -2636,28 +2628,4 @@ function resolveMediaPick(file) {
     return { ...prev, mediaPickerRequest: null };
   });
 }
-
-
-
-// Assigned + Inventory counts (config-driven + inventory type split)
-const mediaCounts = React.useMemo(() => {
-  const c = config || {};
-  const icons = c.icons || {};
-  const mp = c.media || {};
-
-  const missionIcons = (icons.missions || []).length;
-  const deviceIcons = (icons.devices  || []).length;
-  const rewardIcons = (icons.rewards  || []).length;
-  const rewardsPool = (mp.rewardsPool || []).length;
-  const penaltiesPool = (mp.penaltiesPool || []).length;
-
-  const byType = { image:0, gif:0, video:0, audio:0, other:0 };
-  (media || []).forEach(it => {
-    const t = it.type || it.kind || 'other';
-    if (byType[t] != null) byType[t] += 1;
-    else byType.other += 1;
-  });
-
-  return { missionIcons, deviceIcons, rewardIcons, rewardsPool, penaltiesPool, byType };
-}, [config, media]);
 
