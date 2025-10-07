@@ -311,7 +311,29 @@ export default function Admin() {
 
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
-  const [status, setStatus] = useState('');
+  
+const mediaCounts = React.useMemo(() => {
+  const c = config || {};
+  const icons = c.icons || {};
+  const mp = c.media || {};
+
+  const missionIcons = (icons.missions || []).length;
+  const deviceIcons = (icons.devices  || []).length;
+  const rewardIcons = (icons.rewards  || []).length;
+  const rewardsPool = (mp.rewardsPool || []).length;
+  const penaltiesPool = (mp.penaltiesPool || []).length;
+
+  const byType = { image:0, gif:0, video:0, audio:0, other:0 };
+  (media || []).forEach(it => {
+    const t = it.type || it.kind || 'other';
+    if (byType[t] != null) byType[t] += 1;
+    else byType.other += 1;
+  });
+
+  return { missionIcons, deviceIcons, rewardIcons, rewardsPool, penaltiesPool, byType };
+}, [config, media]);
+
+const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -2592,24 +2614,3 @@ function resolveMediaPick(file) {
 
 
 // Assigned + Inventory counts (config-driven + inventory type split)
-const mediaCounts = React.useMemo(() => {
-  const c = config || {};
-  const icons = c.icons || {};
-  const mp = c.media || {};
-
-  const missionIcons = (icons.missions || []).length;
-  const deviceIcons = (icons.devices  || []).length;
-  const rewardIcons = (icons.rewards  || []).length;
-  const rewardsPool = (mp.rewardsPool || []).length;
-  const penaltiesPool = (mp.penaltiesPool || []).length;
-
-  const byType = { image:0, gif:0, video:0, audio:0, other:0 };
-  (media || []).forEach(it => {
-    const t = it.type || it.kind || 'other';
-    if (byType[t] != null) byType[t] += 1;
-    else byType.other += 1;
-  });
-
-  return { missionIcons, deviceIcons, rewardIcons, rewardsPool, penaltiesPool, byType };
-}, [config, media]);
-
