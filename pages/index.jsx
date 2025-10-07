@@ -11,7 +11,7 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   // ...
 }
-function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); 
 function hexToRgb(hex) {
   //// ...
 }
