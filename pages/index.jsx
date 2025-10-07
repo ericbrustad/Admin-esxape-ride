@@ -3,15 +3,6 @@ import TestLauncher from '../components/TestLauncher';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 
-// Media picker bridge to Media Pool (filters by kind)
-function openMediaPicker({ kind, target }) {
-  // Assumes there is a global setUI/openModal or similar modal state.
-  // We'll set a shared state key 'mediaPickerRequest' and the Media tab/modal will resolve it.
-  setUI(prev => ({ ...prev, mediaPickerRequest: { kind, target, open: true } }));
-}
-
-
-
 async function fetchFirstJson(urls, fallback) {
   for (const u of urls) {
     try {
@@ -296,7 +287,6 @@ const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
 export default function Admin() {
   const [tab, setTab] = useState('missions');
 
-  const [ui, setUI] = useState({ mediaPickerRequest: null });
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default');
   const [showNewGame, setShowNewGame] = useState(false);
@@ -311,29 +301,7 @@ export default function Admin() {
 
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
-  
-const mediaCounts = React.useMemo(() => {
-  const c = config || {};
-  const icons = c.icons || {};
-  const mp = c.media || {};
-
-  const missionIcons = (icons.missions || []).length;
-  const deviceIcons = (icons.devices  || []).length;
-  const rewardIcons = (icons.rewards  || []).length;
-  const rewardsPool = (mp.rewardsPool || []).length;
-  const penaltiesPool = (mp.penaltiesPool || []).length;
-
-  const byType = { image:0, gif:0, video:0, audio:0, other:0 };
-  (media || []).forEach(it => {
-    const t = it.type || it.kind || 'other';
-    if (byType[t] != null) byType[t] += 1;
-    else byType.other += 1;
-  });
-
-  return { missionIcons, deviceIcons, rewardIcons, rewardsPool, penaltiesPool, byType };
-}, [config, media]);
-
-const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1343,17 +1311,6 @@ const [status, setStatus] = useState('');
                   {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
                   <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0 8px' }}>
-                    <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(editing.correct?.awardEnabled)}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), awardEnabled:e.target.checked } }); setDirty(true); }}
-                      />
-                      <span style={{ fontSize:12, color:'#9fb0bf' }}>Enable Award (ticker yes/no)</span>
-                    </label>
-                  </div>
-    
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     <Field label="Mode">
                       <select style={S.input}
@@ -2586,31 +2543,3 @@ function PoolList({ title, items }) {
     </div>
   );
 }
-
-
-
-
-
-function resolveMediaPick(file) {
-  // file = { url, kind, label }
-  setUI(prev => {
-    const req = prev.mediaPickerRequest;
-    if (!req?.target) return { ...prev, mediaPickerRequest: null };
-    const { missionId, path } = req.target;
-    // update mission by id
-    onEditMission(missionId, (curr => {
-      const next = typeof curr === 'function' ? curr() : curr;
-      const m = next;
-      const targetObj = { ...(m[path] || {}) };
-      targetObj.mediaUrl = file?.url || '';
-      targetObj.mediaLabel = file?.label || '';
-      targetObj.awardKind = file?.kind || targetObj.awardKind || '';
-      return { ...m, [path]: targetObj };
-    }));
-    return { ...prev, mediaPickerRequest: null };
-  });
-}
-
-
-
-// Assigned + Inventory counts (config-driven + inventory type split)
