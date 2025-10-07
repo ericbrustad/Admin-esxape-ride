@@ -1321,6 +1321,17 @@ export default function Admin() {
                   {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
                   <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0 8px' }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editing.correct?.awardEnabled)}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), awardEnabled:e.target.checked } }); setDirty(true); }}
+                      />
+                      <span style={{ fontSize:12, color:'#9fb0bf' }}>Enable Award (ticker yes/no)</span>
+                    </label>
+                  </div>
+    
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     <Field label="Mode">
                       <select style={S.input}
@@ -2555,10 +2566,7 @@ function PoolList({ title, items }) {
 }
 
 
-{/* ── On Correct → Award Controls ── */}
-<div style={{ borderTop: '1px solid #1e2a36', paddingTop: 12, marginTop: 12 }}>
-  <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>On Correct — Award</div>
-  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+<div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <input
         type="checkbox"
