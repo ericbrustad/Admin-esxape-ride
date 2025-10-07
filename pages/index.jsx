@@ -2144,6 +2144,36 @@ function MediaPoolTab({
   const [busy, setBusy] = useState(false);
   const [folder, setFolder] = useState('uploads');
   const [addUrl, setAddUrl] = useState('');
+// Add near other hooks in MediaPoolTab:
+const [showInUse, setShowInUse] = useState(false);
+
+// Build a grouped list of ONLY media that is actually in use
+const usedByType = React.useMemo(() => {
+  const groups = { image: [], video: [], audio: [], gif: [] };
+  (inv || []).forEach((it) => {
+    const url = toDirectMediaURL(it.url);
+    const use = usageCounts(url);
+    const total =
+      (use?.rewardsPool || 0) +
+      (use?.penaltiesPool || 0) +
+      (use?.iconMission || 0) +
+      (use?.iconDevice || 0) +
+      (use?.iconReward || 0);
+
+    if (total > 0) {
+      const t = classifyByExt(url);
+      if (groups[t]) {
+        groups[t].push({
+          url,
+          label: baseNameFromUrl(url),
+          use
+        });
+      }
+    }
+  });
+  return groups;
+  // include dependencies used by usageCounts (suite/config) so it stays fresh
+}, [inv, suite, config]);
 
 
 
@@ -2349,6 +2379,27 @@ const usedByType = React.useMemo(() => {
             </button>
           ))}
         </div>
+
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
+  <h3 style={{ margin:0 }}>{active.title}</h3>
+  <div style={{ display:'flex', gap:8 }}>
+    <button
+      style={S.button}
+      onClick={()=> setShowInUse(true)}
+      title="Show media that is currently referenced in the game"
+    >
+      Media Files in use
+    </button>
+    <button
+      style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+      onClick={()=>deleteAll(active.items)}
+      disabled={!active.items.length}
+      title="Delete all files in this type"
+    >
+      Delete All
+    </button>
+  </div>
+</div>
 
         {/* Active section */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
