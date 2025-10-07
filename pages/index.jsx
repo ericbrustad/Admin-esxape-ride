@@ -57,7 +57,7 @@ const EXTS = {
   image: /\.(png|jpg|jpeg|webp)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 function classifyByExt(u) {
   if (!u) return 'other';
@@ -103,6 +103,40 @@ function qs(obj) {
   });
   const s = p.toString();
   return s ? `?${s}` : '';
+}
+// compute repo path from /media/... URL
+function pathFromUrl(u) {
+  try {
+    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+    const p = url.pathname || '';
+    if (p.startsWith('/media/')) return `public${p}`;
+    if (p.startsWith('/public/media/')) return p;
+  } catch {}
+  const s = String(u || '');
+  if (s.startsWith('/media/')) return `public${s}`;
+  if (s.startsWith('/public/media/')) return s;
+  return ''; // external or unknown
+}
+async function deleteMediaPath(repoPath) {
+  const endpoints = [
+    '/api/delete-media',
+    '/api/delete',
+    '/api/media/delete',
+    '/api/repo-delete',
+    '/api/github/delete',
+  ];
+  for (const ep of endpoints) {
+    try {
+      const r = await fetch(ep, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        credentials:'include',
+        body: JSON.stringify({ path: repoPath })
+      });
+      if (r.ok) return true;
+    } catch {}
+  }
+  return false;
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
@@ -369,7 +403,7 @@ export default function Admin() {
 
         const missionUrls = isDefault
           ? ['/missions.json']
-          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, '/missions.json'];
+          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
 
         const configUrls = isDefault
           ? ['/api/config']
@@ -397,7 +431,7 @@ export default function Admin() {
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
-          icons: { ...(c0.icons || {}), ...DEFAULT_ICONS },
+          icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
@@ -455,7 +489,7 @@ export default function Admin() {
     if (!suite || !config) return false;
     setStatus('Saving…');
     const url = isDefaultSlug(slug)
-      ? '/api/save-bundle'
+      ? `/api/save-bundle`
       : `/api/save-bundle${qs({ slug })}`;
     try {
       const r = await fetch(url, {
@@ -475,7 +509,6 @@ export default function Admin() {
   }
 
   async function publishWithSlug(slug, channel='published') {
-    // Try query form first (/api/game?slug=x&channel=...), fall back to path (/api/game/x?channel=...)
     const first = isDefaultSlug(slug)
       ? `/api/game${qs({ channel })}`
       : `/api/game${qs({ slug, channel })}`;
@@ -530,12 +563,10 @@ export default function Admin() {
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
 
-    // optional deploy delay
     if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
 
     await publishWithSlug(slug, 'published');
 
-    // Refresh state, list & preview
     await reloadGamesList();
     setPreviewNonce(n => n + 1);
     setSavePubBusy(false);
@@ -545,10 +576,10 @@ export default function Admin() {
   async function reallyDeleteGame() {
     const slug = activeSlug || 'default';
     const urlTry = [
-      `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,                 // DELETE /api/games?slug=x
-      !isDefaultSlug(slug) ? `/api/game${qs({ slug })}` : null,                      // DELETE /api/game?slug=x
-      !isDefaultSlug(slug) ? `/api/games/${encodeURIComponent(slug)}` : null,        // DELETE /api/games/x
-      !isDefaultSlug(slug) ? `/api/game/${encodeURIComponent(slug)}` : null,         // DELETE /api/game/x
+      `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
+      !isDefaultSlug(slug) ? `/api/game${qs({ slug })}` : null,
+      !isDefaultSlug(slug) ? `/api/games/${encodeURIComponent(slug)}` : null,
+      !isDefaultSlug(slug) ? `/api/game/${encodeURIComponent(slug)}` : null,
     ].filter(Boolean);
 
     setStatus('Deleting game…');
@@ -562,7 +593,6 @@ export default function Admin() {
     }
 
     if (!ok) {
-      // Fall back: clear locally & save (root or slug)
       pushHistory();
       setSuite({ version:'0.0.0', missions:[] });
       setConfig(c => ({
@@ -826,7 +856,6 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     const inv = await listInventory(['uploads','bundles','icons']);
-    const allUrls = new Set(inv.map(i => i.url));
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -847,14 +876,14 @@ export default function Admin() {
     (config?.media?.rewardsPool || []).forEach(x => x.url && used.add(x.url));
     (config?.media?.penaltiesPool || []).forEach(x => x.url && used.add(x.url));
 
-    const unused = inv.filter(i => !used.has(i.url));
-    const usedCount = used.size;
     const total = inv.length;
+    const usedCount = used.size;
+    const unused = inv.filter(i => !used.has(i.url));
 
     setStatus(`Scan complete: ${usedCount}/${total} media referenced; ${unused.length} unused.`);
     alert(
-`${usedCount}/${total} media referenced
-${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No unused files detected'}`
+      `${usedCount}/${total} media referenced\n` +
+      (unused.length ? `Unused files:\n- `+unused.map(u=>u.url).join('\n- ') : 'No unused files detected')
     );
   }
 
@@ -898,7 +927,8 @@ ${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No 
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
-  const tabsOrder = ['missions','devices','settings','text','media','test'];
+  // Tabs: missions / devices / settings / text / media-pool / assigned
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -908,11 +938,21 @@ ${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No 
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {tabsOrder.map((t)=>(
-              <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                {t.toUpperCase()}
-              </button>
-            ))}
+            {tabsOrder.map((t)=>{
+              const labelMap = {
+                'missions':'MISSIONS',
+                'devices':'DEVICES',
+                'settings':'SETTINGS',
+                'text':'TEXT',
+                'media-pool':'MEDIA POOL',
+                'assigned':'ASSIGNED MEDIA',
+              };
+              return (
+                <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                  {labelMap[t] || t.toUpperCase()}
+                </button>
+              );
+            })}
             <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
               <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
@@ -938,9 +978,7 @@ ${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No 
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
-                  // hard reload data after
                   const isDefaultNow = !activeSlug || activeSlug === 'default';
-                  // re-pull suite/config for confidence
                   setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
                 disabled={savePubBusy}
@@ -1325,7 +1363,7 @@ ${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No 
             <ul style={{ paddingLeft: 18 }}>
               {(devices||[]).map((x,i)=>(
                 <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
-                  <code>{`D${i+1}`}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
+                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
                   {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
                   <button
                     style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
@@ -1544,20 +1582,29 @@ ${unused.length ? 'Unused files:\n- ' + unused.map(u=>u.url).join('\n- ') : 'No 
       )}
 
       {/* TEXT rules */}
-      {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
+      {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* MEDIA */}
-      {tab==='media' && (
-        <MediaTab
+      {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
+      {tab==='media-pool' && (
+        <MediaPoolTab
+          suite={suite}
           config={config}
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
           uploadToRepo={async (file, folder)=> {
             const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
           }}
+        />
+      )}
+
+      {/* ASSIGNED MEDIA — renamed Media tab */}
+      {tab==='assigned' && (
+        <AssignedMediaTab
+          config={config}
+          setConfig={setConfig}
+          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
       )}
 
@@ -1781,7 +1828,7 @@ function MediaPreview({ url, kind }) {
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
-  const isAudio = /\.(mp3|wav|ogg|m4a)(\?|#|$)/.test(lower);
+  const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
@@ -1801,11 +1848,11 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 }, // ← fixed
+  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
   missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
   input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
   button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
@@ -1814,8 +1861,9 @@ const S = {
   search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
   hr:{ border:'1px solid #1f262d', borderBottom:'none' },
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
+  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
+  chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
 };
-
 
 /* MapOverview — shows missions + devices */
 function MapOverview({
@@ -2023,361 +2071,450 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
-          type="range" min={5} max={500} step={5} value={rad}
-          onChange={(e) => {
-            const next = clamp(Number(e.target.value),5,500);
+          type="range" min={5} max={500} step={5}
+          value={rad}
+          onChange={(e)=>{
+            const next = clamp(Number(e.target.value)||25, 5, 500);
             setRad(next);
-            if (divRef.current?._circle) divRef.current._circle.setRadius(next);
-            if (divRef.current?._marker) {
+            if (divRef.current?._circle) divRef.current._circle.setRadius(Number(next));
+            if (onChange && divRef.current?._marker) {
               const p = divRef.current._marker.getLatLng();
-              onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), next);
+              onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(next));
             }
           }}
         />
         <code style={{ color:'#9fb0bf' }}>{rad} m</code>
       </div>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>Click map to set location. Drag marker to fine-tune.</div>
     </div>
   );
 }
 
-/* MEDIA tab (Icons + Reward/Penalty pools) */
-function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
-  const [hover, setHover] = useState(false);
+/* TEXT TAB */
+function TextTab({ config, setConfig }) {
+  const [text, setText] = useState((config.textRules || []).join('\n'));
+  useEffect(()=>{ setText((config.textRules || []).join('\n')); }, [config.textRules]);
 
-  async function handleDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    let files = [];
-    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
-      for (let i=0;i<e.dataTransfer.items.length;i++) {
-        const it = e.dataTransfer.items[i];
-        if (it.kind==='file') {
-          const f = it.getAsFile(); if (f) files.push(f);
-        }
-      }
-    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
-      files = Array.from(e.dataTransfer.files);
-    }
-    for (const f of files) { await uploadToRepo(f, 'uploads'); }
-  }
-
-  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
-    return (
-      <label style={{ ...S.button, textAlign:'center' }}>
-        {label}
-        <input type="file" multiple style={{ display:'none' }}
-          onChange={async (e)=>{
-            const files = Array.from(e.target.files || []);
-            for (const f of files) {
-              const url = await uploadToRepo(f, folder);
-              if (url && typeof onUploaded==='function') onUploaded(url);
-            }
-            e.target.value = '';
-          }}/>
-      </label>
-    );
-  }
-
-  const rewardsPool = Array.isArray(config.media?.rewardsPool) ? config.media.rewardsPool : [];
-  const penaltiesPool = Array.isArray(config.media?.penaltiesPool) ? config.media.penaltiesPool : [];
-  const setRewardsPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), rewardsPool: next } });
-  const setPenaltiesPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), penaltiesPool: next } });
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}
-           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
-           onDrop={handleDrop}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0, fontSize:24 }}>Media</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default assets</button>
-        </div>
-
-        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files anywhere on this page or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
-          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
-        </div>
-
-        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
-
-        <MediaPoolEditor
-          title="Reward Media"
-          items={rewardsPool}
-          onChange={setRewardsPool}
-          uploadToRepo={uploadToRepo}
-        />
-        <MediaPoolEditor
-          title="Penalty Media"
-          items={penaltiesPool}
-          onChange={setPenaltiesPool}
-          uploadToRepo={uploadToRepo}
-        />
-      </div>
-    </main>
-  );
-}
-function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
-  const list = config.icons?.[kind] || [];
-  const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
-
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['icons','bundles','uploads'])); } catch {}
-  })(); }, []);
-
-  function setUrlAndMaybeName(idx, url) {
-    const n=[...list];
-    const before = n[idx] || {};
-    const nameEmpty = !before.name || String(before.name).trim()==='';
-    n[idx] = { ...before, url };
-    if (nameEmpty) n[idx].name = baseNameFromUrl(url);
-    setList(n);
-  }
-
-  return (
-    <div style={{ marginTop:16 }}>
-      <h4 style={{ marginTop:0, fontSize:20 }}>{label}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
-      </div>
-      {list.map((row, idx)=>(
-        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-              <input style={S.input} value={row.url||''} onChange={(e)=>setUrlAndMaybeName(idx, e.target.value)} placeholder="Image URL"/>
-              <label style={{ ...S.button, textAlign:'center' }}>
-                Choose File
-                <input
-                  type="file" style={{ display:'none' }}
-                  onChange={async (e)=>{
-                    const f=e.target.files?.[0]; if (!f) return;
-                    const url=await uploadToRepo(f,'icons');
-                    if (url) setUrlAndMaybeName(idx, url);
-                  }}
-                />
-              </label>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
-              <select
-                style={S.input}
-                onChange={(e)=> setUrlAndMaybeName(idx, e.target.value) }
-                value=""
-              >
-                <option value="">Pick from media pool…</option>
-                {pool.filter(it=>it.type==='image' || it.type==='gif').map((it) => (
-                  <option key={it.url} value={it.url}>{it.name}</option>
-                ))}
-              </select>
-            </div>
-            {row.url
-              ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-              : <div style={{ color:'#9fb0bf' }}>No image</div>}
-          </div>
-          <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-          <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
-          <div style={{ display:'flex', gap:6 }}>
-            <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-            <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-          </div>
-        </div>
-      ))}
-      <button style={S.button} onClick={()=>{ setList([...(list||[]), { key: `${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
-    </div>
-  );
-}
-function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles'])); } catch {}
-  })(); }, []);
-
-  return (
-    <div style={{ marginTop:20 }}>
-      <h4 style={{ margin:'0 0 8px 0', fontSize:20 }}>{title}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Thumbnail</div><div>URL</div><div>Format</div><div>Actions</div>
-      </div>
-      {(items||[]).map((row, idx)=>{
-        const type = classifyByExt(row.url||'');
-        return (
-          <div key={idx} style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-            <div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                <input style={S.input} value={row.url||''}
-                  onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
-                  placeholder="Image/Video/GIF/Audio URL" />
-                <label style={{ ...S.button, textAlign:'center' }}>
-                  Choose File
-                  <input type="file" style={{ display:'none' }}
-                    onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'uploads'); if (url) { const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n); } }}/>
-                </label>
-              </div>
-              <select style={{ ...S.input, marginTop:6 }}
-                onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }} value="">
-                <option value="">Pick from media inventory…</option>
-                {pool.map((it) => <option key={it.url} value={it.url}>{it.name}</option>)}
-              </select>
-              {row.url ? <MediaPreview url={row.url} kind="preview"/> : null}
-            </div>
-            <div><code>{row.url ? (row.url.split('.').pop().split('?')[0] || '').toLowerCase() : ''}</code></div>
-            <div style={{ textTransform:'capitalize' }}>{type}</div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={S.button} onClick={()=>{ const n=[...items]; n.splice(idx,1); onChange(n); }}>Delete</button>
-              <button style={S.button} onClick={()=>{ const n=[...items]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); onChange(n); }}>Duplicate</button>
-            </div>
-          </div>
-        );
-      })}
-      <button style={S.button} onClick={()=>{ onChange([...(items||[]), { url:'' }]); }}>+ Add Media</button>
-    </div>
-  );
-}
-
-/* Inventory modal (for pools & editors that allow picking) */
-function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
-  const [pool, setPool] = useState([]);
-  const [q, setQ] = useState('');
-  const [tab, setTab] = useState(acceptKinds[0] || 'image');
-
-  useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles','icons'])); } catch {}
-  })(); }, []);
-
-  const groups = {
-    image: pool.filter(x=>x.type==='image'),
-    gif:   pool.filter(x=>x.type==='gif'),
-    video: pool.filter(x=>x.type==='video'),
-    audio: pool.filter(x=>x.type==='audio'),
-  };
-  const tabs = ['image','gif','video','audio'].filter(t=>acceptKinds.includes(t));
-  const shown = (groups[tab]||[]).filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
-      <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
-        <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {tabs.map((t) => (
-            <button
-              key={t}
-              style={{ ...S.button, padding:'6px 10px', ...(tab===t ? { background:'#1a2027' } : {}) }}
-              onClick={()=>setTab(t)}
-            >
-              {t.toUpperCase()}
-            </button>
-          ))}
-          <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
-          {shown.map((it)=>(
-            <div key={it.url} style={{ border:'1px solid #22303c', borderRadius:10, padding:8 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>{it.name} <span style={{ opacity:.7 }}>({it.type})</span></div>
-              {it.type==='video' ? (
-                <video src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }} />
-              ) : it.type==='audio' ? (
-                <div style={{ height:120, display:'grid', placeItems:'center', border:'1px dashed #2a323b', borderRadius:8, color:'#9fb0bf' }}>
-                  .{it.url.split('.').pop().split('?')[0]}
-                </div>
-              ) : (
-                <img alt="" src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }}/>
-              )}
-              <button style={{ ...S.button, marginTop:8, width:'100%' }} onClick={()=>onPick(it.url)}>Use</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display:'flex', justifyContent:'flex-end', marginTop:10 }}>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* TEXT tab */
-function TextTab({ suite, config, setConfig, setStatus }) {
-  const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])];
-    rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-          <Field label="Mission (geofence)">
-            <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-              <option value="">— choose —</option>
-              {(suite.missions || []).map((m) => (
-                <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Phone slot">
-            <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
-              {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
-            </select>
-          </Field>
-          <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
-          </Field>
-          <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
-          </Field>
+        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
+        <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
+          One rule per line. This saves into <code>config.textRules</code>.
         </div>
-        <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr}/>
-        <ul style={{ paddingLeft: 18 }}>
-          {(config.textRules || []).map((r, i) => (
-            <li key={i} style={{ marginBottom: 8 }}>
-              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-              <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
-          <TestSMS />
-        </details>
+        <textarea
+          style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+        />
+        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+          <button
+            style={S.button}
+            onClick={()=>{
+              const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
+              setConfig(c=>({ ...c, textRules: lines }));
+            }}
+          >
+            Save Rules
+          </button>
+          <button
+            style={S.button}
+            onClick={()=>setText((config.textRules || []).join('\n'))}
+          >
+            Reset
+          </button>
+        </div>
       </div>
     </main>
   );
 }
-function TestSMS() {
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState('Test message from admin');
-  const [status, setStatus] = useState('');
-  async function send() {
-    setStatus('Sending…');
-    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-    const text = await res.text();
-    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
+
+/* ───────────────────────── MEDIA POOL (with sub-tabs & per-file usage) ───────────────────────── */
+function MediaPoolTab({
+  suite,
+  config,
+  setConfig,
+  uploadStatus,
+  setUploadStatus,
+  uploadToRepo,
+}) {
+  const [inv, setInv] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [folder, setFolder] = useState('uploads');
+  const [addUrl, setAddUrl] = useState('');
+
+
+  
+  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
+  const subTabs = [
+    { key:'image', label:'Images' },
+    { key:'video', label:'Videos' },
+    { key:'audio', label:'Audio' },
+    { key:'gif',   label:'GIFs'  },
+  ];
+  const [subTab, setSubTab] = useState('audio');
+
+  useEffect(() => { refreshInventory(); }, []);
+
+  async function refreshInventory() {
+    setBusy(true);
+    try {
+      const items = await listInventory(['uploads','bundles','icons']);
+      setInv(items || []);
+    } finally { setBusy(false); }
   }
+
+  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
+  function same(a,b){ return norm(a) === norm(b); }
+
+  // Per-file usage counts
+  function usageCounts(url) {
+    const nurl = norm(url);
+    const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+    const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+
+    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
+    const iconMission = (suite?.missions || []).reduce((acc, m) => {
+      const direct = m?.iconUrl;
+      if (direct && same(direct, nurl)) return acc + 1;
+      const key = m?.iconKey;
+      if (!key) return acc;
+      const found = (config?.icons?.missions || []).find(i => i.key === key);
+      return acc + (found && same(found.url, nurl) ? 1 : 0);
+    }, 0);
+
+    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
+    const iconDevice = (config?.devices || []).reduce((acc, d) => {
+      const key = d?.iconKey;
+      if (!key) return acc;
+      const found = (config?.icons?.devices || []).find(i => i.key === key);
+      return acc + (found && same(found.url, nurl) ? 1 : 0);
+    }, 0);
+
+    // Reward Icons entries that point to this URL
+    const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
+
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
+  }
+
+  function addPoolItem(kind, url) {
+    const label = baseNameFromUrl(url);
+    setConfig(c => {
+      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
+      if (kind === 'rewards') m.rewardsPool.push({ url, label });
+      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
+      return { ...c, media: m };
+    });
+  }
+  function addIcon(kind, url) {
+    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
+    const name = baseNameFromUrl(url);
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      const list = icons[kind] || [];
+      // allow duplicates (keys must be unique)
+      let finalKey = key;
+      let suffix = 1;
+      while (list.find(i => i.key === finalKey)) {
+        suffix += 1;
+        finalKey = `${key}-${suffix}`;
+      }
+      list.push({ key: finalKey, name, url });
+      icons[kind] = list;
+      return { ...c, icons };
+    });
+  }
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadToRepo(file, folder);
+    if (url) {
+      refreshInventory();
+      setAddUrl(url);
+    }
+  }
+
+  async function deleteOne(url) {
+    const path = pathFromUrl(url);
+    if (!path) {
+      alert('This file cannot be deleted here (external or unknown path).');
+      return false;
+    }
+    if (!window.confirm(`Delete this media file?\n${url}`)) return false;
+    setUploadStatus('Deleting…');
+    const ok = await deleteMediaPath(path);
+    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
+    if (ok) refreshInventory();
+    return ok;
+  }
+
+  async function deleteAll(list) {
+    if (!list?.length) return;
+    if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
+    setUploadStatus('Deleting group…');
+    let okCount = 0;
+    for (const it of list) {
+      const path = pathFromUrl(it.url);
+      if (!path) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deleteMediaPath(path);
+      if (ok) okCount++;
+    }
+    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    refreshInventory();
+  }
+
+  // Group by type
+  const itemsByType = (inv || []).reduce((acc, it) => {
+    const t = classifyByExt(it.url);
+    if (!acc[t]) acc[t] = [];
+    acc[t].push(it);
+    return acc;
+  }, {});
+  const sections = [
+    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
+    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',              items: itemsByType.gif   || [] },
+  ];
+  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-        <button style={S.button} onClick={send}>Send Test</button>
+    <main style={S.wrap}>
+      {/* Upload */}
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Upload</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
+          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
+          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
+            <option value="uploads">uploads</option>
+            <option value="bundles">bundles</option>
+            <option value="icons">icons</option>
+          </select>
+          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
+            Upload
+            <input type="file" onChange={onUpload} style={{ display:'none' }} />
+          </label>
+        </div>
+        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
+        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+          Inventory {busy ? '(loading…)':''}: {inv.length} files
+        </div>
       </div>
-      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
-    </div>
+
+      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+          {subTabs.map(st => (
+            <button
+              key={st.key}
+              onClick={()=>setSubTab(st.key)}
+              style={{ ...S.tab, ...(subTab===st.key?S.tabActive:{}) }}
+            >
+              {st.label.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Active section */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
+          <h3 style={{ margin:0 }}>{active.title}</h3>
+          <button
+            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+            onClick={()=>deleteAll(active.items)}
+            disabled={!active.items.length}
+            title="Delete all files in this type"
+          >
+            Delete All
+          </button>
+        </div>
+
+        {active.items.length === 0 ? (
+          <div style={{ color:'#9fb0bf' }}>No files.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
+            {active.items.map((it, idx)=>{
+              const url = toDirectMediaURL(it.url);
+              const use = usageCounts(url);
+              return (
+                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
+                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {baseNameFromUrl(url)}
+                    </div>
+                    {/* Usage chips next to title (per-file, per service) */}
+                    <div style={S.chipRow}>
+                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
+                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
+                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
+                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
+                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
+                    </div>
+                  </div>
+
+                  <MediaPreview url={url} kind={active.key} />
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+                    {/* Assign actions — labels include per-file counts */}
+                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
+                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
+                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
+                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
+                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
+
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                        Open
+                      </a>
+                      <button
+                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                        onClick={()=>deleteOne(url)}
+                        title="Delete this file"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
 
+/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+  const rewards = config.media?.rewardsPool || [];
+  const penalties = config.media?.penaltiesPool || [];
+  const iconsM = config.icons?.missions || [];
+  const iconsD = config.icons?.devices  || [];
+  const iconsR = config.icons?.rewards  || [];
+
+  function removePoolItem(kind, idx) {
+    if (!window.confirm('Remove this item from the assigned list?')) return;
+    setConfig(c => {
+      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
+      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
+      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
+      return { ...c, media: m };
+    });
+  }
+  function removeIcon(kind, key) {
+    if (!window.confirm('Remove this icon from the assigned list?')) return;
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      icons[kind] = icons[kind].filter(i => i.key !== key);
+      return { ...c, icons };
+    });
+  }
+
+  return (
+    <main style={S.wrap}>
+      {/* Icons */}
+      <div style={S.card}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
+          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
+        </div>
+
+        <IconGroup
+          title={`Mission Icons (${iconsM.length})`}
+          items={iconsM}
+          onRemove={(key)=>removeIcon('missions', key)}
+        />
+        <IconGroup
+          title={`Device Icons (${iconsD.length})`}
+          items={iconsD}
+          onRemove={(key)=>removeIcon('devices', key)}
+        />
+        <IconGroup
+          title={`Reward Icons (${iconsR.length})`}
+          items={iconsR}
+          onRemove={(key)=>removeIcon('rewards', key)}
+        />
+      </div>
+
+      {/* Pools */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <Pool
+            title={`Rewards Pool (${rewards.length})`}
+            items={rewards}
+            onRemove={(idx)=>removePoolItem('rewards', idx)}
+          />
+          <Pool
+            title={`Penalties Pool (${penalties.length})`}
+            items={penalties}
+            onRemove={(idx)=>removePoolItem('penalties', idx)}
+          />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* Shared pieces for Assigned Media */
+function IconGroup({ title, items, onRemove }) {
+  return (
+    <div style={{ marginTop:8 }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
+        {items.map((it)=>(
+          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <div>
+                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
+                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>onRemove(it.key)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Pool({ title, items, onRemove }) {
+  return (
+    <div>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
+        {items.map((it, idx)=>(
+          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+            <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {it.label || baseNameFromUrl(it.url)}
+            </div>
+            <MediaPreview url={it.url} kind="pool item" />
+            <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+      </div>
+    </div>
+  );
+}
