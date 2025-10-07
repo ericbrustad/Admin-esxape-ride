@@ -23,7 +23,7 @@ async function fetchFirstJson(urls, fallback) {
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
-    const url = new URL(u);
+    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
     const host = url.host.toLowerCase();
     if (host.endsWith('dropbox.com')) {
       url.host = 'dl.dropboxusercontent.com';
@@ -57,7 +57,7 @@ const EXTS = {
   image: /\.(png|jpg|jpeg|webp)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 function classifyByExt(u) {
   if (!u) return 'other';
@@ -69,9 +69,78 @@ function classifyByExt(u) {
   return 'other';
 }
 
+/** Merge inventory across dirs so uploads show up everywhere */
+async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
+  const seen = new Set();
+  const out = [];
+  await Promise.all(dirs.map(async (dir) => {
+    try {
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
+      const j = await r.json();
+      (j?.items || []).forEach(it => {
+        const url = it.url || '';
+        if (!seen.has(url)) { seen.add(url); out.push(it); }
+      });
+    } catch {}
+  }));
+  return out;
+}
+function baseNameFromUrl(url) {
+  try {
+    const u = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+    const file = (u.pathname.split('/').pop() || '').replace(/\.[^.]+$/, '');
+    return file.replace(/[-_]+/g, ' ').trim();
+  } catch {
+    const file = (String(url).split('/').pop() || '').replace(/\.[^.]+$/, '');
+    return file.replace(/[-_]+/g, ' ').trim();
+  }
+}
+function qs(obj) {
+  const p = new URLSearchParams();
+  Object.entries(obj).forEach(([k,v])=>{
+    if (v===undefined || v===null || v==='') return;
+    p.set(k, String(v));
+  });
+  const s = p.toString();
+  return s ? `?${s}` : '';
+}
+// compute repo path from /media/... URL
+function pathFromUrl(u) {
+  try {
+    const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
+    const p = url.pathname || '';
+    if (p.startsWith('/media/')) return `public${p}`;
+    if (p.startsWith('/public/media/')) return p;
+  } catch {}
+  const s = String(u || '');
+  if (s.startsWith('/media/')) return `public${s}`;
+  if (s.startsWith('/public/media/')) return s;
+  return ''; // external or unknown
+}
+async function deleteMediaPath(repoPath) {
+  const endpoints = [
+    '/api/delete-media',
+    '/api/delete',
+    '/api/media/delete',
+    '/api/repo-delete',
+    '/api/github/delete',
+  ];
+  for (const ep of endpoints) {
+    try {
+      const r = await fetch(ep, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        credentials:'include',
+        body: JSON.stringify({ path: repoPath })
+      });
+      if (r.ok) return true;
+    } catch {}
+  }
+  return false;
+}
+
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
-  // filenames are relative to /media/bundles/
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
@@ -126,7 +195,7 @@ const TYPE_FIELDS = {
   geofence_image: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'imageUrl',  label:'Image URL (https)', type:'text' },
     { key:'overlayText',label:'Caption/Text', type:'text', optional: true },
@@ -134,7 +203,7 @@ const TYPE_FIELDS = {
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'videoUrl',  label:'Video URL (https)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
@@ -193,16 +262,13 @@ function defaultAppearance() {
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
-const DEFAULT_REWARDS = [
-  { key:'gold-coin', name:'Gold Coin', ability:'Adds a coin to your wallet.', thumbUrl:'/media/bundles/GOLDEN%20COIN.png' },
-];
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('');
+  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -213,23 +279,59 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
-  const [suite, setSuite]   = useState(null); // missions + version
-  const [config, setConfig] = useState(null); // devices + media + icons + appearance
+  const [suite, setSuite]   = useState(null);
+  const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // Device manager
+  // selections
+  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
+  const [selectedMissionIdx, setSelectedMissionIdx] = useState(null);
+
+  // Devices tab
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
   const [placingDev, setPlacingDev] = useState(false);
-  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
   const [uploadStatus, setUploadStatus] = useState('');
+
+  // Combined Save & Publish
+  const [deployDelaySec, setDeployDelaySec] = useState(5);
+  const [savePubBusy, setSavePubBusy] = useState(false);
+
+  // Pin size (selected)
+  const [selectedPinSize, setSelectedPinSize] = useState(28);
+  const defaultPinSize = 24;
+
+  // Undo/Redo
+  const historyRef = useRef({ past: [], future: [] });
+
+  // Settings → Region search
+  const [mapSearchQ, setMapSearchQ] = useState('');
+  const [mapSearching, setMapSearching] = useState(false);
+  const [mapResults, setMapResults] = useState([]);
+
+  // Test preview nonce (force iframe reload)
+  const [previewNonce, setPreviewNonce] = useState(0);
+
+  // Delete confirm modal
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedDelay = localStorage.getItem('deployDelaySec');
+      if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
+      const savedSel = localStorage.getItem('selectedPinSize');
+      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
+    } catch {}
+  }, []);
+  useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
+  useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -239,27 +341,76 @@ export default function Admin() {
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig({ ...config, devices: list, powerups: list });
 
+  function snapshotState() {
+    return {
+      missions: JSON.parse(JSON.stringify(suite?.missions || [])),
+      devices: JSON.parse(JSON.stringify(getDevices() || [])),
+    };
+  }
+  function pushHistory() {
+    if (!suite || !config) return;
+    historyRef.current.past.push(snapshotState());
+    historyRef.current.future = [];
+  }
+  function canUndo() { return historyRef.current.past.length > 0; }
+  function canRedo() { return historyRef.current.future.length > 0; }
+  function undo() {
+    if (!canUndo()) return;
+    const current = snapshotState();
+    const prev = historyRef.current.past.pop();
+    historyRef.current.future.push(current);
+    setSuite((s) => ({ ...s, missions: prev.missions }));
+    setDevices(prev.devices);
+    setStatus('↶ Undid last change');
+  }
+  function redo() {
+    if (!canRedo()) return;
+    const current = snapshotState();
+    const next = historyRef.current.future.pop();
+    historyRef.current.past.push(current);
+    setSuite((s) => ({ ...s, missions: next.missions }));
+    setDevices(next.devices);
+    setStatus('↷ Redid last change');
+  }
+  useEffect(() => {
+    function onKey(e) {
+      const z = e.key === 'z' || e.key === 'Z';
+      const y = e.key === 'y' || e.key === 'Y';
+      if ((e.ctrlKey || e.metaKey) && z) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if ((e.ctrlKey || e.metaKey) && y) { e.preventDefault(); redo(); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   /* load games */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/games', { credentials:'include' });
+        const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
         const j = await r.json();
         if (j.ok) setGames(j.games || []);
       } catch {}
     })();
   }, []);
 
-  /* load suite/config */
+  /* load suite/config when slug changes */
   useEffect(() => {
     (async () => {
       try {
         setStatus('Loading…');
-        const missionUrls = activeSlug ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`] : [`/missions.json`];
-        const configUrl   = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
+        const isDefault = !activeSlug || activeSlug === 'default';
+
+        const missionUrls = isDefault
+          ? ['/missions.json']
+          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+
+        const configUrls = isDefault
+          ? ['/api/config']
+          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
 
         const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchJsonSafe(configUrl, defaultConfig());
+        const c0 = await fetchFirstJson(configUrls, defaultConfig());
 
         const dc = defaultConfig();
         const normalized = {
@@ -270,6 +421,7 @@ export default function Admin() {
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
             correct: x.correct || { mode:'none' },
             wrong:   x.wrong   || { mode:'none' },
+            showContinue: x.showContinue !== false,
           })),
         };
 
@@ -279,16 +431,18 @@ export default function Admin() {
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
-          icons: { ...(c0.icons || {}), ...DEFAULT_ICONS },
+          icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
+          map: { ...dc.map, ...(c0.map || {}) },
+          geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
-        // Re-apply defaults if sets are empty/missing
         merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
         setConfig(merged);
         setSelected(null); setEditing(null); setDirty(false);
+        setSelectedDevIdx(null); setSelectedMissionIdx(null);
         setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
@@ -308,6 +462,8 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
+      geofence: { mode: 'test' },
     };
   }
   function defaultContentForType(t) {
@@ -326,48 +482,135 @@ export default function Admin() {
     }
   }
 
-  async function saveAll() {
-    if (!suite || !config) return;
-    setStatus('Saving… (writing missions + config safely)');
-    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
+  /* ── API helpers respecting Default Game (legacy root) ── */
+  function isDefaultSlug(slug) { return !slug || slug === 'default'; }
+
+  async function saveAllWithSlug(slug) {
+    if (!suite || !config) return false;
+    setStatus('Saving…');
+    const url = isDefaultSlug(slug)
+      ? `/api/save-bundle`
+      : `/api/save-bundle${qs({ slug })}`;
     try {
-      const r = await fetch('/api/save-bundle' + qs, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ missions: suite, config })
       });
-      if (!r.ok) throw new Error(await r.text());
-      setStatus('✅ Saved (files committed). If Game files changed, Vercel will redeploy.');
+      const text = await r.text();
+      if (!r.ok) throw new Error(text || 'save failed');
+      setStatus('✅ Saved');
+      return true;
     } catch (e) {
-      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
-      await new Promise(r => setTimeout(r, 900));
+      setStatus('❌ Save failed: ' + (e?.message || e));
+      return false;
+    }
+  }
+
+  async function publishWithSlug(slug, channel='published') {
+    const first = isDefaultSlug(slug)
+      ? `/api/game${qs({ channel })}`
+      : `/api/game${qs({ slug, channel })}`;
+    const fallback = isDefaultSlug(slug)
+      ? null
+      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
+
+    try {
+      const res = await fetch(first, {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+        body: JSON.stringify({ action:'publish' })
+      });
+      const txt = await res.text();
+      let data = {};
+      try { data = JSON.parse(txt); } catch {}
+      if (!res.ok) { if (fallback) throw new Error('try fallback'); else throw new Error(txt||'publish failed'); }
+      setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
+      return true;
+    } catch (e) {
+      if (!fallback) { setStatus('❌ Publish failed: ' + (e?.message||e)); return false; }
       try {
-        const r2 = await fetch('/api/save-bundle' + qs, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ missions: suite, config })
+        const res2 = await fetch(fallback, {
+          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
+          body: JSON.stringify({ action:'publish' })
         });
-        if (!r2.ok) throw new Error(await r2.text());
-        setStatus('✅ Saved after retry.');
+        const txt2 = await res2.text();
+        let data2 = {};
+        try { data2 = JSON.parse(txt2); } catch {}
+        if (!res2.ok) throw new Error(txt2||'publish failed');
+        setStatus(`✅ Published${data2?.version ? ` v${data2.version}` : ''}`);
+        return true;
       } catch (e2) {
-        setStatus('❌ Save failed: ' + (e2?.message || e2));
+        setStatus('❌ Publish failed: ' + (e2?.message || e2));
+        return false;
       }
     }
   }
-  async function handlePublish() {
+
+  async function reloadGamesList() {
     try {
-      setStatus('Publishing…');
-      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Publish failed');
-      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
-    } catch (e) {
-      setStatus('❌ Publish failed: ' + (e?.message || e));
+      const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+      const j = await r.json();
+      if (j.ok) setGames(j.games || []);
+    } catch {}
+  }
+
+  async function saveAndPublish() {
+    if (!suite || !config) return;
+    const slug = activeSlug || 'default';
+    setSavePubBusy(true);
+
+    const saved = await saveAllWithSlug(slug);
+    if (!saved) { setSavePubBusy(false); return; }
+
+    if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
+
+    await publishWithSlug(slug, 'published');
+
+    await reloadGamesList();
+    setPreviewNonce(n => n + 1);
+    setSavePubBusy(false);
+  }
+
+  /* Delete game (with modal confirm) */
+  async function reallyDeleteGame() {
+    const slug = activeSlug || 'default';
+    const urlTry = [
+      `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
+      !isDefaultSlug(slug) ? `/api/game${qs({ slug })}` : null,
+      !isDefaultSlug(slug) ? `/api/games/${encodeURIComponent(slug)}` : null,
+      !isDefaultSlug(slug) ? `/api/game/${encodeURIComponent(slug)}` : null,
+    ].filter(Boolean);
+
+    setStatus('Deleting game…');
+    let ok = false, lastErr = '';
+    for (const u of urlTry) {
+      try {
+        const res = await fetch(u, { method:'DELETE', credentials:'include' });
+        if (res.ok) { ok = true; break; }
+        lastErr = await res.text();
+      } catch (e) { lastErr = e?.message || String(e); }
     }
+
+    if (!ok) {
+      pushHistory();
+      setSuite({ version:'0.0.0', missions:[] });
+      setConfig(c => ({
+        ...c, devices: [], powerups: [], media: { rewardsPool:[], penaltiesPool:[] }, textRules: [],
+      }));
+      const saved = await saveAllWithSlug(slug);
+      if (saved) { setStatus('✅ Cleared game content'); ok = true; }
+    }
+
+    if (ok) {
+      await reloadGamesList();
+      setActiveSlug('default');
+      setStatus('✅ Game deleted');
+      setPreviewNonce(n => n + 1);
+    } else {
+      setStatus('❌ Delete failed: ' + (lastErr || 'unknown error'));
+    }
+    setConfirmDeleteOpen(false);
   }
 
   /* Missions CRUD */
@@ -383,13 +626,13 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       iconKey: '',
-      iconUrl: '',
       rewards: { points: 25 },
       correct: { mode: 'none' },
       wrong:   { mode: 'none' },
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
+      showContinue: true,
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -399,6 +642,7 @@ export default function Admin() {
     e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
     if (!e.correct) e.correct = { mode: 'none' };
     if (!e.wrong)   e.wrong   = { mode: 'none' };
+    if (e.showContinue === undefined) e.showContinue = true;
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
@@ -412,7 +656,7 @@ export default function Admin() {
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number' || f.optional) continue;
-      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue; // explicitly optional
+      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue;
       const v = editing.content?.[f.key];
       if (v === undefined || v === null || v === '') {
         return setStatus('❌ Missing: ' + f.label);
@@ -422,24 +666,28 @@ export default function Admin() {
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
-    if (i >= 0) missions[i] = obj; else missions.push(obj);
-    setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
+
+    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
+    setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ Mission saved (remember Save All)');
+    setStatus('✅ Mission saved');
   }
   function removeMission(id) {
     if (!suite) return;
+    pushHistory();
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
     if (!suite) return;
+    pushHistory();
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
     setSuite({ ...suite, missions: list });
   }
   function duplicateMission(idx) {
+    pushHistory();
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
@@ -447,10 +695,10 @@ export default function Admin() {
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
-    setStatus('✅ Duplicated (remember Save All)');
+    setStatus('✅ Duplicated');
   }
 
-  /* Devices (Map-Side Manager) */
+  /* Devices (Devices tab only) */
   const devices = getDevices();
   function deviceIconUrlFromKey(key) {
     if (!key) return '';
@@ -460,10 +708,16 @@ export default function Admin() {
   function addDevice() {
     setPlacingDev(true);
     setSelectedDevIdx(null);
-    setDevDraft({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
+    setSelectedMissionIdx(null);
+    setDevDraft({
+      title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120,
+      lat:Number((config.map?.centerLat ?? 44.9778)),
+      lng:Number((config.map?.centerLng ?? -93.2650))
+    });
   }
   function saveDraftDevice() {
     if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
+    pushHistory();
     const item = {
       id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
       title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
@@ -471,16 +725,18 @@ export default function Admin() {
       iconKey: devDraft.iconKey || '',
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
-      lat: Number(devDraft.lat.toFixed(6)),
-      lng: Number(devDraft.lng.toFixed(6)),
+      lat: Number(Number(devDraft.lat).toFixed(6)),
+      lng: Number(Number(devDraft.lng).toFixed(6)),
     };
     setDevices([...(devices || []), item]);
     setPlacingDev(false);
     setSelectedDevIdx((devices?.length || 0));
-    setStatus('✅ Device added (remember Save All)');
+    setSelectedMissionIdx(null);
+    setStatus('✅ Device added');
   }
   function deleteSelectedDevice() {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list.splice(selectedDevIdx, 1);
     setDevices(list);
@@ -488,6 +744,7 @@ export default function Admin() {
   }
   function duplicateSelectedDevice() {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const src = devices[selectedDevIdx]; if (!src) return;
     const copy = { ...JSON.parse(JSON.stringify(src)) };
     copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
@@ -496,18 +753,51 @@ export default function Admin() {
   }
   function moveSelectedDevice(lat, lng) {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
     setDevices(list);
   }
   function setSelectedDeviceRadius(r) {
     if (selectedDevIdx == null) return;
+    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
     setDevices(list);
   }
 
-  // Address search
+  // Missions selection operations (Missions tab only)
+  function moveSelectedMission(lat, lng) {
+    if (selectedMissionIdx == null) return;
+    pushHistory();
+    const list = [...(suite?.missions || [])];
+    const m = list[selectedMissionIdx]; if (!m) return;
+    const c = { ...(m.content || {}) };
+    c.lat = Number(lat.toFixed(6));
+    c.lng = Number(lng.toFixed(6));
+    c.geofenceEnabled = true;
+    c.radiusMeters = clamp(Number(c.radiusMeters || 25), 5, 500);
+    list[selectedMissionIdx] = { ...m, content: c };
+    setSuite({ ...suite, missions: list });
+    setStatus(`Moved mission #${selectedMissionIdx+1}`);
+  }
+  function setSelectedMissionRadius(r) {
+    if (selectedMissionIdx == null) return;
+    pushHistory();
+    const list = [...(suite?.missions || [])];
+    const m = list[selectedMissionIdx]; if (!m) return;
+    const c = { ...(m.content || {}) };
+    c.radiusMeters = clamp(Number(r || 0), 5, 500);
+    c.geofenceEnabled = true;
+    if (!isFinite(Number(c.lat)) || !isFinite(Number(c.lng))) {
+      c.lat = Number(config.map?.centerLat || 44.9778);
+      c.lng = Number(config.map?.centerLng || -93.2650);
+    }
+    list[selectedMissionIdx] = { ...m, content: c };
+    setSuite({ ...suite, missions: list });
+  }
+
+  // Address search (Devices tab)
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
@@ -530,10 +820,8 @@ export default function Admin() {
     if (placingDev) {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
+      pushHistory();
       moveSelectedDevice(lat, lon);
-    } else {
-      setPlacingDev(true);
-      setDevDraft(d => ({ ...d, lat, lng: lon }));
     }
     setDevResults([]);
   }
@@ -542,6 +830,61 @@ export default function Admin() {
     navigator.geolocation.getCurrentPosition(pos => {
       applySearchResult({ lat: pos.coords.latitude, lon: pos.coords.longitude });
     });
+  }
+
+  // Settings → Map center search
+  async function searchMapCenter(e) {
+    e?.preventDefault?.();
+    const q = mapSearchQ.trim();
+    if (!q) return;
+    setMapSearching(true);
+    setMapResults([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
+      const r = await fetch(url);
+      const j = await r.json();
+      setMapResults(Array.isArray(j) ? j : []);
+    } catch { setMapResults([]); }
+    finally { setMapSearching(false); }
+  }
+  function useCenterResult(r) {
+    const lat = Number(r.lat), lng = Number(r.lon);
+    setConfig(c => ({ ...c, map: { ...(c.map||{}), centerLat: Number(lat.toFixed(6)), centerLng: Number(lng.toFixed(6)) } }));
+    setMapResults([]);
+  }
+
+  // Project Health scan
+  async function scanProject() {
+    const inv = await listInventory(['uploads','bundles','icons']);
+    const used = new Set();
+
+    const iconUrlByKey = {};
+    (config?.icons?.missions || []).forEach(i => { if (i.key && i.url) iconUrlByKey['missions:'+i.key]=i.url; });
+    (config?.icons?.devices  || []).forEach(i => { if (i.key && i.url) iconUrlByKey['devices:'+i.key]=i.url; });
+
+    (suite?.missions || []).forEach(m => {
+      if (m.iconUrl) used.add(m.iconUrl);
+      if (m.iconKey && iconUrlByKey['missions:'+m.iconKey]) used.add(iconUrlByKey['missions:'+m.iconKey]);
+      const c = m.content || {};
+      ['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].forEach(k => { if (c[k]) used.add(c[k]); });
+      if (m.correct?.mediaUrl) used.add(m.correct.mediaUrl);
+      if (m.wrong?.mediaUrl)   used.add(m.wrong.mediaUrl);
+    });
+    (getDevices() || []).forEach(d => {
+      if (d.iconKey && iconUrlByKey['devices:'+d.iconKey]) used.add(iconUrlByKey['devices:'+d.iconKey]);
+    });
+    (config?.media?.rewardsPool || []).forEach(x => x.url && used.add(x.url));
+    (config?.media?.penaltiesPool || []).forEach(x => x.url && used.add(x.url));
+
+    const total = inv.length;
+    const usedCount = used.size;
+    const unused = inv.filter(i => !used.has(i.url));
+
+    setStatus(`Scan complete: ${usedCount}/${total} media referenced; ${unused.length} unused.`);
+    alert(
+      `${usedCount}/${total} media referenced\n` +
+      (unused.length ? `Unused files:\n- `+unused.map(u=>u.url).join('\n- ') : 'No unused files detected')
+    );
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
@@ -569,20 +912,51 @@ export default function Admin() {
     );
   }
 
+  const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
+  const mapZoom = Number(config.map?.defaultZoom)||13;
+
+  const missionRadiusDisabled = (selectedMissionIdx==null);
+  const missionRadiusValue = selectedMissionIdx!=null
+    ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
+    : 25;
+
+  const deviceRadiusDisabled = (selectedDevIdx==null && !placingDev);
+  const deviceRadiusValue = selectedDevIdx!=null
+    ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
+    : Number(devDraft.pickupRadius ?? 100);
+
+  const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
+
+  // Tabs: missions / devices / settings / text / media-pool / assigned
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
+
+  const isDefault = !activeSlug || activeSlug === 'default';
+  const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
+
   return (
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {['settings','missions','text','devices','map','media','test'].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                {t.toUpperCase()}
-              </button>
-            ))}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8 }}>
+            {tabsOrder.map((t)=>{
+              const labelMap = {
+                'missions':'MISSIONS',
+                'devices':'DEVICES',
+                'settings':'SETTINGS',
+                'text':'TEXT',
+                'media-pool':'MEDIA POOL',
+                'assigned':'ASSIGNED MEDIA',
+              };
+              return (
+                <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                  {labelMap[t] || t.toUpperCase()}
+                </button>
+              );
+            })}
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
               <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="">(legacy root)</option>
+                <option value="default">(Default Game)</option>
                 {games.map(g=>(
                   <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                 ))}
@@ -590,14 +964,38 @@ export default function Admin() {
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Keep header controls */}
-            <button onClick={saveAll} style={S.button}>💾 Save All</button>
-            <button onClick={handlePublish} style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a' }}>Publish</button>
+            {/* Save & Publish with optional delay */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                Deploy delay (sec):
+                <input
+                  type="number" min={0} max={120}
+                  value={deployDelaySec}
+                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                  style={{ ...S.input, width:90 }}
+                />
+              </label>
+              <button
+                onClick={async ()=>{
+                  await saveAndPublish();
+                  const isDefaultNow = !activeSlug || activeSlug === 'default';
+                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
+                }}
+                disabled={savePubBusy}
+                style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
+              >
+                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
+              </button>
+            </div>
 
-            <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={isDefault ? '/missions.json' : `/games/${encodeURIComponent(activeSlug)}/missions.json`}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
-            <a href={activeSlug?`/api/config?slug=${encodeURIComponent(activeSlug)}`:'/config.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a
+              href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
+              target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
           </div>
@@ -608,10 +1006,12 @@ export default function Admin() {
       {/* MISSIONS */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
-          {/* Left list (new mission button here) */}
+          {/* Left list */}
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
               <button onClick={startNew} style={S.button}>+ New Mission</button>
+              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
+              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
             </div>
             <input
               placeholder="Search…"
@@ -646,163 +1046,76 @@ export default function Admin() {
             </div>
           </aside>
 
-          {/* Right: Overview Map + device controls + overlay editor */}
+          {/* Right: Missions Map */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
-                  <h3 style={{ margin:0 }}>Overview Map</h3>
+                  <h3 style={{ margin:0 }}>Missions Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Click to place a device (when “Add Device” is active). If a device is selected, click to move it.
-                    If none selected, click moves the nearest pin.
+                    Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
                 </div>
-                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                </label>
-              </div>
-
-              {/* Device manager row */}
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
-                <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                  <input placeholder="Search address or place for device…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
-                  <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
-                  <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
-                </form>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button style={S.button} onClick={addDevice}>+ Add Device</button>
-                  <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
-                  <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
-                  <input
-                    type="range" min={5} max={2000} step={5}
-                    value={selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
-                    onChange={(e)=>{
-                      const r = Number(e.target.value);
-                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
-                      else setDevDraft(d=>({ ...d, pickupRadius: r }));
-                    }}
-                  />
-                  <code style={{ color:'#9fb0bf' }}>
-                    {(selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
-                  </code>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedMissionIdx==null}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'#9fb0bf' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                  </label>
                 </div>
               </div>
 
-              {/* Search results */}
-              {devResults.length>0 && (
-                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginBottom:8, maxHeight:160, overflow:'auto' }}>
-                  {devResults.map((r,i)=>(
-                    <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
-                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Device chips with tiny preview */}
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-                {(devices||[]).map((d,i)=>{
-                  const url = deviceIconUrlFromKey(d.iconKey);
-                  return (
-                    <button
-                      key={d.id||i}
-                      style={{
-                        ...S.button, padding:'6px 10px',
-                        background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
-                        borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b',
-                        display:'flex', alignItems:'center', gap:6
-                      }}
-                      onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
-                      title={`${d.title||d.type} (#${i+1})`}
-                    >
-                      {url ? <img alt="" src={toDirectMediaURL(url)} style={{ width:16, height:16, objectFit:'cover', borderRadius:3 }}/> : null}
-                      D{i+1} {d.title ? `— ${d.title}` : ''}
-                    </button>
-                  );
-                })}
-                {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
+                <input
+                  type="range" min={5} max={500} step={5}
+                  disabled={missionRadiusDisabled}
+                  value={missionRadiusValue}
+                  onChange={(e)=> setSelectedMissionRadius(Number(e.target.value)) }
+                />
+                <code style={{ color:'#9fb0bf' }}>
+                  {selectedMissionIdx==null ? 'Select a mission to adjust radius' : `M${selectedMissionIdx+1} radius: ${missionRadiusValue} m`}
+                </code>
               </div>
 
-              {/* Draft device editor with preview */}
-              {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
-                    <div>
-                      {devDraft.iconKey
-                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
-                    </div>
-                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
-                    <Field label="Type">
-                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
-                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
-                        <option value="">(default)</option>
-                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Effect (sec)">
-                      <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
-                    </Field>
-                  </div>
-                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
-                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
-                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
-                    <div style={{ color:'#9fb0bf' }}>
-                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
-                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Map */}
               <MapOverview
                 missions={(suite?.missions)||[]}
                 devices={(config?.devices)||[]}
                 icons={config.icons || DEFAULT_ICONS}
                 showRings={showRings}
-                interactive={placingDev}
-                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
-                selectedDevIdx={selectedDevIdx}
-                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
-                onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
-                onMoveNearest={(kind, idx, lat, lng)=>{
-                  if (kind==='mission') {
-                    const list=[...(suite?.missions||[])];
-                    const m=list[idx]; if (!m) return;
-                    const c={ ...(m.content||{}) };
-                    c.lat=Number(lat.toFixed(6)); c.lng=Number(lng.toFixed(6));
-                    c.geofenceEnabled=true; c.radiusMeters=Number(c.radiusMeters||25);
-                    list[idx]={ ...m, content:c };
-                    setSuite({ ...suite, missions:list });
-                    setStatus(`Moved mission #${idx+1}`);
-                  } else {
-                    const list=[...(getDevices()||[])];
-                    const d=list[idx]; if (!d) return;
-                    d.lat=Number(lat.toFixed(6)); d.lng=Number(lng.toFixed(6));
-                    setDevices(list);
-                    setStatus(`Moved device D${idx+1}`);
-                  }
-                }}
+                interactive={false}
+                draftDevice={null}
+                selectedDevIdx={null}
+                selectedMissionIdx={selectedMissionIdx}
+                onDraftChange={null}
+                onMoveSelected={null}
+                onMoveSelectedMission={(lat,lng)=>moveSelectedMission(lat,lng)}
+                onSelectDevice={null}
+                onSelectMission={(i)=>{ setSelectedMissionIdx(i); }}
+                mapCenter={mapCenter}
+                mapZoom={mapZoom}
+                defaultIconSizePx={defaultPinSize}
+                selectedIconSizePx={selectedPinSize}
+                readOnly={false}
+                lockToRegion={false}
               />
             </div>
 
             {/* Mission editor (overlay) */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
-                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
-                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
-                    <button style={S.button} onClick={cancelEdit}>Close</button>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                    </div>
                   </div>
 
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
@@ -810,33 +1123,38 @@ export default function Admin() {
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map(k=>(
+                      {Object.keys(TYPE_FIELDS).map((k)=>(
                         <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
                       ))}
                     </select>
                   </Field>
 
-                  {/* Icon select + drop/pick/inventory */}
+                  {/* Icon select with thumbnail (inventory-only) */}
                   <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
-                      <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                      <select
+                        style={S.input}
+                        value={editing.iconKey || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                      >
                         <option value="">(default)</option>
-                        {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                        {(config.icons?.missions||[]).map((it)=>(
+                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        ))}
                       </select>
-                      <DropOrPick
-                        label="(or pick a specific image — recommended: PNG/JPG/GIF)"
-                        dir="bundles"
-                        acceptKinds={['image','gif']}
-                        url={editing.iconUrl || ''}
-                        onChangeUrl={(u)=>{ setEditing({ ...editing, iconUrl:u }); setDirty(true); }}
-                        uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                      />
+                      <div>
+                        {(() => {
+                          const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
+                          return sel?.url
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                        })()}
+                      </div>
                     </div>
                   </Field>
 
                   <hr style={S.hr}/>
 
-                  {/* QUESTION-FIRST ORDERING */}
                   {editing.type === 'multiple_choice' && (
                     <>
                       <Field label="Question">
@@ -898,25 +1216,24 @@ export default function Admin() {
                     </Field>
                   )}
 
-                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                        center={mapCenter}
+                        onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                       />
                     </div>
                   )}
 
-                  {/* Optional geofence for others */}
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
                           onChange={(e)=>{ const on=e.target.checked;
                             const next={ ...editing.content, geofenceEnabled:on };
-                            if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.265; }
+                            if (on && (!isFinite(Number(next.lat)) || !isFinite(Number(next.lng)))) { next.lat=mapCenter.lat; next.lng=mapCenter.lng; }
                             setEditing({ ...editing, content:next }); setDirty(true);
                           }}/> Enable geofence for this mission
                       </label>
@@ -924,7 +1241,8 @@ export default function Admin() {
                         <>
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                            center={mapCenter}
+                            onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -937,12 +1255,11 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* Remaining generic fields (skip ones we rendered above) */}
                   {(TYPE_FIELDS[editing.type] || [])
                     .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
                     .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
                     .filter(f => !(editing.type === 'statement' && f.key === 'text'))
-                    .map(f=>(
+                    .map((f)=>(
                     <Field key={f.key} label={f.label}>
                       {f.type==='text' && (
                         <>
@@ -957,7 +1274,8 @@ export default function Admin() {
                         <input type="number" min={f.min} max={f.max} style={S.input}
                           value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
                             const v = e.target.value==='' ? '' : Number(e.target.value);
-                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
+                            const vClamped = (f.key==='radiusMeters') ? clamp(v,5,500) : v;
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:vClamped } }); setDirty(true);
                           }}/>
                       )}
                       {f.type==='multiline' && (
@@ -975,113 +1293,16 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
-                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.correct?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.correct?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Reward media"
-                      dir="bundles"
-                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.correct?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <input
+                      type="checkbox"
+                      checked={editing.showContinue !== false}
+                      onChange={(e)=>{ setEditing({ ...editing, showContinue: e.target.checked }); setDirty(true); }}
                     />
-                  )}
-                  {editing.correct?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Reward device (optional)">
-                      <select style={S.input}
-                        value={editing.correct?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Clue (optional)">
-                      <input style={S.input}
-                        value={editing.correct?.clue || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
+                    Show “Continue” button to close this mission
+                  </label>
 
-                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.wrong?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.wrong?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Penalty media"
-                      dir="bundles"
-                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.wrong?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                    />
-                  )}
-                  {editing.wrong?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Punishment device (optional)">
-                      <select style={S.input}
-                        value={editing.wrong?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Delay (seconds, optional)">
-                      <input type="number" min={0} max={3600} style={S.input}
-                        value={editing.wrong?.delaySec ?? 0}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
-
-                  <hr style={S.hr}/>
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1093,13 +1314,169 @@ export default function Admin() {
                   )}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
+                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
                 </div>
               </div>
             )}
+          </section>
+        </main>
+      )}
+
+      {/* DEVICES */}
+      {tab==='devices' && (
+        <main style={S.wrapGrid2}>
+          <aside style={S.sidebarTall}>
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
+              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
+              <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+                <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
+                <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
+                <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
+              </form>
+
+              <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
+                {devResults.map((r,i)=>(
+                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                    <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                    <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+              <button style={S.button} onClick={addDevice}>+ Add Device</button>
+              <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
+              <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
+              {(selectedDevIdx!=null) && (
+                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); }}>Clear selection</button>
+              )}
+            </div>
+
+            <ul style={{ paddingLeft: 18 }}>
+              {(devices||[]).map((x,i)=>(
+                <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
+                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
+                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
+                  <button
+                    style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
+                    onClick={()=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+                  >
+                    Select
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
+          </aside>
+
+          <section style={{ position:'relative' }}>
+            <div style={S.card}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
+                <div>
+                  <h3 style={{ margin:0 }}>Devices Map</h3>
+                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                    Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
+                  </div>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedDevIdx==null}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'#9fb0bf' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
+                <input
+                  type="range" min={5} max={2000} step={5}
+                  disabled={deviceRadiusDisabled}
+                  value={deviceRadiusValue}
+                  onChange={(e)=>{
+                    const r = Number(e.target.value);
+                    if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                    else setDevDraft(d=>({ ...d, pickupRadius: r }));
+                  }}
+                />
+                <code style={{ color:'#9fb0bf' }}>
+                  {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
+                   : placingDev ? `New device radius: ${deviceRadiusValue} m`
+                   : 'Select a device to adjust radius'}
+                </code>
+              </div>
+
+              {placingDev && (
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                    <div>
+                      {devDraft.iconKey
+                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+                    </div>
+                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
+                    <Field label="Type">
+                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
+                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
+                        <option value="">(default)</option>
+                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Effect (sec)">
+                      <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
+                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
+                    </Field>
+                  </div>
+                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
+                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
+                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
+                    <div style={{ color:'#9fb0bf' }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
+                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <MapOverview
+                missions={(suite?.missions)||[]}
+                devices={devices}
+                icons={config.icons||DEFAULT_ICONS}
+                showRings={showRings}
+                mapCenter={mapCenter}
+                mapZoom={mapZoom}
+                defaultIconSizePx={defaultPinSize}
+                selectedIconSizePx={selectedPinSize}
+                interactive={placingDev}
+                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
+                selectedDevIdx={selectedDevIdx}
+                selectedMissionIdx={null}
+                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
+                onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
+                onMoveSelectedMission={null}
+                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
+                onSelectMission={null}
+                readOnly={false}
+                lockToRegion={true}
+              />
+            </div>
           </section>
         </main>
       )}
@@ -1114,7 +1491,7 @@ export default function Admin() {
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
-                {GAME_TYPES.map(g=><option key={g} value={g}>{g}</option>)}
+                {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
             <Field label="Stripe Splash Page">
@@ -1124,6 +1501,73 @@ export default function Admin() {
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+              <Field label="Default Map Center — Latitude">
+                <input
+                  type="number" step="0.000001" style={S.input}
+                  value={config.map?.centerLat ?? ''}
+                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } })}
+                />
+              </Field>
+              <Field label="Default Map Center — Longitude">
+                <input
+                  type="number" step="0.000001" style={S.input}
+                  value={config.map?.centerLng ?? ''}
+                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
+                />
+              </Field>
+              <Field label="Find center by address/city">
+                <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                  <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
+                  <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
+                </form>
+                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                  {mapResults.map((r,i)=>(
+                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    </div>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Default Zoom">
+                <input
+                  type="number" min={2} max={20} style={S.input}
+                  value={config.map?.defaultZoom ?? 13}
+                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } })}
+                />
+              </Field>
+              <Field label="Geofence Mode">
+                <select
+                  style={S.input}
+                  value={config.geofence?.mode || 'test'}
+                  onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
+                >
+                  <option value="test">Test — click to enter (dev)</option>
+                  <option value="live">Live — GPS radius only</option>
+                </select>
+              </Field>
+            </div>
+            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
+            </div>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Maintenance</h3>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=> setConfirmDeleteOpen(true)}
+              >
+                🗑 Delete Game
+              </button>
+              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
+            </div>
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
@@ -1137,57 +1581,30 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT rules (unchanged) */}
-      {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
+      {/* TEXT rules */}
+      {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* DEVICES (list) */}
-      {tab==='devices' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop:0 }}>Devices</h3>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” on the Missions tab or map-side manager.</div>}
-            <ul style={{ paddingLeft:18 }}>
-              {(devices||[]).map((x,i)=>(
-                <li key={x.id||i} style={{ marginBottom:8 }}>
-                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • radius {x.pickupRadius}m • effect {x.effectSeconds}s
-                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • lat {x.lat}, lng {x.lng}</> : ' • (not placed)'}
-                  {x.iconKey?<> • icon <code>{x.iconKey}</code></>:null}
-                  <button style={{ ...S.button, marginLeft:8, padding:'6px 10px' }}
-                    onClick={()=>{ const next=[...devices]; next.splice(i,1); setDevices(next); }}>Remove</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </main>
-      )}
-
-      {/* MAP */}
-      {tab==='map' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:8 }}>
-              <h3 style={{ margin:0 }}>Game Map</h3>
-              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-              </label>
-            </div>
-            <MapOverview missions={(suite?.missions)||[]} devices={devices} icons={config.icons||DEFAULT_ICONS} showRings={showRings}/>
-          </div>
-        </main>
-      )}
-
-      {/* MEDIA — Icons + Reward & Penalty pools */}
-      {tab==='media' && (
-        <MediaTab
+      {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
+      {tab==='media-pool' && (
+        <MediaPoolTab
+          suite={suite}
           config={config}
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
           uploadToRepo={async (file, folder)=> {
             const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
           }}
+        />
+      )}
+
+      {/* ASSIGNED MEDIA — renamed Media tab */}
+      {tab==='assigned' && (
+        <AssignedMediaTab
+          config={config}
+          setConfig={setConfig}
+          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
       )}
 
@@ -1197,26 +1614,35 @@ export default function Admin() {
           <div style={S.card}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <h3 style={{ margin:0 }}>Play Test</h3>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <label>Channel:&nbsp;
                   <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
                 </label>
-                <TestLauncher slug={activeSlug||''} channel={testChannel} preferPretty={true} popup={false}/>
+                <button style={S.button} onClick={()=>setPreviewNonce(n=>n+1)}>Reload preview</button>
+                <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
-              <iframe src={`${gameBase}/?slug=${activeSlug||''}&channel=${testChannel}&preview=1`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}/>
+              <iframe
+                key={previewNonce} // hard refresh on nonce change
+                src={`${gameBase}/?${new URLSearchParams({
+                  ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
+                  channel: testChannel,
+                  preview: '1',
+                  cb: String(Date.now())
+                }).toString()}`}
+                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
+              />
             )}
           </div>
         </main>
       )}
 
-      {/* New Game modal (unchanged) */}
+      {/* New Game modal */}
       {showNewGame && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
           <div style={{ ...S.card, width:420 }}>
@@ -1224,7 +1650,7 @@ export default function Admin() {
             <Field label="Game Title"><input style={S.input} value={newTitle} onChange={(e)=>setNewTitle(e.target.value)}/></Field>
             <Field label="Game Type">
               <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
-                {GAME_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                {GAME_TYPES.map((t)=><option key={t} value={t}>{t}</option>)}
               </select>
             </Field>
             <Field label="Mode">
@@ -1250,12 +1676,32 @@ export default function Admin() {
                   method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
                   body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
                 });
-                const j = await r.json();
+                const j = await r.json().catch(()=>({ ok:false }));
                 if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
-                const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
-                if (jj.ok) setGames(jj.games || []);
-                setActiveSlug(j.slug); setNewTitle(''); setShowNewGame(false);
+                await reloadGamesList();
+                setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
               }}>Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDeleteOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
+          <div style={{ ...S.card, width:420 }}>
+            <h3 style={{ marginTop:0 }}>Delete Game</h3>
+            <div style={{ color:'#e9eef2', marginBottom:12 }}>
+              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={reallyDeleteGame}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -1290,7 +1736,7 @@ function AppearanceEditor({ value, onChange }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
           <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
-            {FONT_FAMILIES.map(f=><option key={f.v} value={f.v}>{f.label}</option>)}
+            {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
           <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
             Aa — preview text with this font
@@ -1365,7 +1811,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   return (
     <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>Choices (A–E)</div>
-      {[0,1,2,3,4].map(i=>(
+      {[0,1,2,3,4].map((i)=>(
         <div key={i} style={{ display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8 }}>
           <input type="radio" name="mcq-correct" checked={correct===i} onChange={()=>{ setCorrect(i); sync(local,i); }} title="Mark as correct"/>
           <input placeholder={`Choice ${String.fromCharCode(65+i)}`} style={S.input} value={local[i]||''}
@@ -1382,6 +1828,7 @@ function MediaPreview({ url, kind }) {
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
+  const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
@@ -1389,6 +1836,8 @@ function MediaPreview({ url, kind }) {
         <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+      ) : isAudio ? (
+        <audio src={u} controls style={{ width:'100%' }} />
       ) : (
         <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
       )}
@@ -1399,7 +1848,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
@@ -1412,35 +1861,47 @@ const S = {
   search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
   hr:{ border:'1px solid #1f262d', borderBottom:'none' },
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
+  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
+  chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
 };
 
 /* MapOverview — shows missions + devices */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
-  interactive = false, draftDevice = null, selectedDevIdx = null,
-  onDraftChange = null, onMoveSelected = null, onMoveNearest = null,
+  interactive = false, draftDevice = null,
+  selectedDevIdx = null, selectedMissionIdx = null,
+  onDraftChange = null, onMoveSelected = null, onMoveSelectedMission = null,
+  onSelectDevice = null, onSelectMission = null,
+  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13,
+  defaultIconSizePx = 24, selectedIconSizePx = 28,
+  readOnly = false,
+  lockToRegion = false,
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
-  function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng);
-    if(!isFinite(lat)||!isFinite(lng))return null; if(!(c.geofenceEnabled||Number(c.radiusMeters)>0))return null; return [lat,lng]; }
+  function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function getDevicePos(d){ const lat=Number(d?.lat),lng=Number(d?.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?toDirectMediaURL(it.url||''):''; }
-  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false){
+  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false, size=24){
+    const s = Math.max(12, Math.min(64, Number(size)||24));
     const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
-      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
+      ? `<img src="${imgUrl}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
+      : `<div style="width:${s-4}px;height:${s-4}px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
+    const font = Math.round(s*0.5);
     return window.L.divIcon({
       className:'num-pin',
-      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
-      iconSize:[24,28], iconAnchor:[12,12]
+      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-${Math.round(s*0.45)}px;left:50%;transform:translateX(-50%);font-weight:700;font-size:${font}px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
+      iconSize:[s, s+4], iconAnchor:[s/2, s/2]
     });
   }
 
   useEffect(()=>{ if(typeof window==='undefined')return;
     if(window.L){ setLeafletReady(true); return; }
-    const link=document.createElement('link'); link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    const linkId='leaflet-css';
+    if(!document.getElementById(linkId)){
+      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
+    }
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
   },[]);
 
@@ -1448,8 +1909,11 @@ function MapOverview({
     if(!leafletReady || !divRef.current || typeof window==='undefined') return;
     const L = window.L; if (!L) return;
 
+    const initialCenter = [mapCenter?.lat ?? 44.9778, mapCenter?.lng ?? -93.2650];
+    const initialZoom = mapZoom ?? 13;
+
     if(!divRef.current._leaflet_map){
-      const map=L.map(divRef.current,{ center:[44.9778,-93.2650], zoom:13 });
+      const map=L.map(divRef.current,{ center:initialCenter, zoom:initialZoom });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap contributors' }).addTo(map);
       divRef.current._leaflet_map=map;
     }
@@ -1460,28 +1924,50 @@ function MapOverview({
     const layer=map._layerGroup;
     const bounds=L.latLngBounds([]);
 
+    // Missions
     (missions||[]).forEach((m,idx)=>{
       const pos=getMissionPos(m); if(!pos) return;
       const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
-      L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',false)}).addTo(layer);
+      const isSel = (selectedMissionIdx===idx);
+      const size = isSel ? selectedIconSizePx : defaultIconSizePx;
+      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,size), draggable:(!readOnly && isSel)}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
-      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
+      let circle=null;
+      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer); }
+      if (onSelectMission) {
+        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectMission(idx); });
+      }
+      if(!readOnly && isSel && onMoveSelectedMission){
+        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
+        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+      }
       bounds.extend(pos);
     });
 
+    // Devices
     (devices||[]).forEach((d,idx)=>{
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
+      const size = hl ? selectedIconSizePx : defaultIconSizePx;
+      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl && !!onMoveSelected)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
-      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
+      let circle=null;
+      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
+      if (onSelectDevice) {
+        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice(idx); });
+      }
+      if(!readOnly && hl && onMoveSelected){
+        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
+        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
+      }
       bounds.extend(pos);
     });
 
-    if(draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
+    // Draft device (Devices tab)
+    if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true), draggable:true }).addTo(layer);
+      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
       if(showRings && Number(draftDevice.radius)>0){
         const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
         mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
@@ -1490,26 +1976,29 @@ function MapOverview({
       bounds.extend(pos);
     }
 
+    // Click handler
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
+      if (readOnly) return;
       const lat=e.latlng.lat, lng=e.latlng.lng;
       if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-
-      if (!onMoveNearest) return;
-      const candidates=[];
-      (missions||[]).forEach((m,idx)=>{ const p=getMissionPos(m); if(p) candidates.push({ kind:'mission', idx, lat:p[0], lng:p[1] }); });
-      (devices||[]).forEach((d,idx)=>{ const p=getDevicePos(d); if(p) candidates.push({ kind:'device', idx, lat:p[0], lng:p[1] }); });
-      if(candidates.length===0) return;
-
-      let best=null, bestDist=Infinity;
-      candidates.forEach(c=>{ const d=map.distance([c.lat,c.lng], e.latlng); if(d<bestDist){bestDist=d; best=c;} });
-      if(best) onMoveNearest(best.kind, best.idx, lat, lng);
+      if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
     };
     map.on('click', map._clickHandler);
 
-    if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
-  },[leafletReady, missions, devices, icons, showRings, interactive, draftDevice, selectedDevIdx, onDraftChange, onMoveSelected, onMoveNearest]);
+    if (lockToRegion) {
+      map.setView(initialCenter, initialZoom);
+    } else if(bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.2));
+    } else {
+      map.setView(initialCenter, initialZoom);
+    }
+  },[
+    leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
+    selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
+    onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly, lockToRegion
+  ]);
 
   return (
     <div>
@@ -1519,399 +2008,513 @@ function MapOverview({
   );
 }
 
-/* MEDIA tab (Icons + Reward/Penalty pools) */
-function MediaTab({ config, setConfig, uploadStatus, setUploadStatus, onReapplyDefaults, uploadToRepo }) {
-  const [hover, setHover] = useState(false);
+/* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
+function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
+  const divRef = useRef(null);
+  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
+  const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
 
-  async function handleDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    let files = [];
-    if (e.dataTransfer?.items && e.dataTransfer.items.length) {
-      for (let i=0;i<e.dataTransfer.items.length;i++) {
-        const it = e.dataTransfer.items[i];
-        if (it.kind==='file') {
-          const f = it.getAsFile(); if (f) files.push(f);
-        }
-      }
-    } else if (e.dataTransfer?.files && e.dataTransfer.files.length) {
-      files = Array.from(e.dataTransfer.files);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.L) { setLeafletReady(true); return; }
+    const linkId='leaflet-css';
+    if(!document.getElementById(linkId)){
+      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
     }
-    for (const f of files) { await uploadToRepo(f, 'uploads'); }
-  }
+    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
+  }, []);
 
-  function FileChooser({ label='Choose File', folder='uploads', onUploaded }) {
-    return (
-      <label style={{ ...S.button, textAlign:'center' }}>
-        {label}
-        <input type="file" multiple style={{ display:'none' }}
-          onChange={async (e)=>{
-            const files = Array.from(e.target.files || []);
-            for (const f of files) {
-              const url = await uploadToRepo(f, folder);
-              if (url && typeof onUploaded==='function') onUploaded(url);
+  useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
+
+  useEffect(() => {
+    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
+    const L = window.L; if (!L) return;
+
+    const startLat = isFinite(Number(lat)) ? Number(lat) : Number(center.lat);
+    const startLng = isFinite(Number(lng)) ? Number(lng) : Number(center.lng);
+
+    if (!divRef.current._leaflet_map) {
+      const map = L.map(divRef.current, { center: [startLat, startLng], zoom: 14 });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+      const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+      const circle = L.circle([startLat, startLng], { radius: Number(rad) || 25, color: '#60a5fa', fillOpacity: 0.08 }).addTo(map);
+
+      marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
+      marker.on('dragend', () => {
+        const p = marker.getLatLng();
+        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
+      });
+
+      map.on('click', (e) => {
+        marker.setLatLng(e.latlng);
+        circle.setLatLng(e.latlng);
+        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
+      });
+
+      divRef.current._leaflet_map = map;
+      divRef.current._marker = marker;
+      divRef.current._circle = circle;
+    } else {
+      const map = divRef.current._leaflet_map;
+      const marker = divRef.current._marker;
+      const circle = divRef.current._circle;
+
+      const haveLat = isFinite(Number(lat));
+      const haveLng = isFinite(Number(lng));
+      const pos = haveLat && haveLng ? [Number(lat), Number(lng)] : [Number(center.lat), Number(center.lng)];
+      marker.setLatLng(pos);
+      circle.setLatLng(pos);
+      map.setView(pos, map.getZoom());
+      circle.setRadius(Number(clamp(rad,5,500)));
+    }
+  }, [leafletReady, lat, lng, rad, onChange, center]);
+
+  return (
+    <div>
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
+        <input
+          type="range" min={5} max={500} step={5}
+          value={rad}
+          onChange={(e)=>{
+            const next = clamp(Number(e.target.value)||25, 5, 500);
+            setRad(next);
+            if (divRef.current?._circle) divRef.current._circle.setRadius(Number(next));
+            if (onChange && divRef.current?._marker) {
+              const p = divRef.current._marker.getLatLng();
+              onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(next));
             }
-            e.target.value = '';
-          }}/>
-      </label>
-    );
-  }
-
-  const rewardsPool = Array.isArray(config.media?.rewardsPool) ? config.media.rewardsPool : [];
-  const penaltiesPool = Array.isArray(config.media?.penaltiesPool) ? config.media.penaltiesPool : [];
-  const setRewardsPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), rewardsPool: next } });
-  const setPenaltiesPool = (next) => setConfig({ ...config, media: { ...(config.media||{}), penaltiesPool: next } });
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}
-           onDragEnter={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(true); }}
-           onDragOver={(e)=>{ e.preventDefault(); e.stopPropagation(); }}
-           onDragLeave={(e)=>{ e.preventDefault(); e.stopPropagation(); setHover(false); }}
-           onDrop={handleDrop}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0 }}>Media</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re‑apply default assets</button>
-        </div>
-
-        <div style={{ border:'2px dashed #2a323b', borderRadius:12, padding:16, background:hover?'#0e1116':'transparent', marginBottom:12, color:'#9fb0bf' }}>
-          Drag & drop files anywhere on this page or click <em>Choose File</em>. Files are committed to <code>public/media/…</code> and served from <code>/media/…</code>.
-          <span style={{ float:'right' }}><FileChooser/><span style={{ marginLeft:8 }}>{uploadStatus}</span></span>
-        </div>
-
-        <IconsEditor config={config} setConfig={setConfig} label="Mission Icons" kind="missions" uploadToRepo={uploadToRepo}/>
-        <IconsEditor config={config} setConfig={setConfig} label="Device Icons"  kind="devices"  uploadToRepo={uploadToRepo}/>
-
-        <MediaPoolEditor
-          title="Reward Media"
-          items={rewardsPool}
-          onChange={setRewardsPool}
-          uploadToRepo={uploadToRepo}
+          }}
         />
-        <MediaPoolEditor
-          title="Penalty Media"
-          items={penaltiesPool}
-          onChange={setPenaltiesPool}
-          uploadToRepo={uploadToRepo}
-        />
-      </div>
-    </main>
-  );
-}
-function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
-  const list = config.icons?.[kind] || [];
-  const setList = (next) => setConfig({ ...config, icons:{ ...(config.icons||{}), [kind]: next } });
-
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try {
-      const r = await fetch(`/api/list-media?dir=bundles`);
-      const j = await r.json(); setPool(j?.items || []);
-    } catch {}
-  })(); }, []);
-
-  return (
-    <div style={{ marginTop:16 }}>
-      <h4 style={{ marginTop:0 }}>{label}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Icon</div><div>Name</div><div>Key</div><div>Actions</div>
-      </div>
-      {list.map((row, idx)=>(
-        <div key={row.key||idx} style={{ display:'grid', gridTemplateColumns:'160px 1fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-          <div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-              <input style={S.input} value={row.url||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} placeholder="Image URL"/>
-              <label style={{ ...S.button, textAlign:'center' }}>
-                Choose File
-                <input type="file" style={{ display:'none' }}
-                  onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'icons'); if (url) { const n=[...list]; n[idx]={ ...(n[idx]||{}), url }; setList(n); } }}/>
-              </label>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
-              <select style={S.input} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; setList(n); }} value="">
-                <option value="">Pick from media pool…</option>
-                {pool.filter(it=>it.type==='image' || it.type==='gif').map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
-              </select>
-            </div>
-            {row.url
-              ? <img alt="icon" src={toDirectMediaURL(row.url)} style={{ marginTop:6, width:'100%', maxHeight:72, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-              : <div style={{ color:'#9fb0bf' }}>No image</div>}
-          </div>
-          <input style={S.input} value={row.name||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), name:e.target.value }; setList(n); }}/>
-          <input style={S.input} value={row.key||''} onChange={(e)=>{ const n=[...list]; n[idx]={ ...(n[idx]||{}), key:e.target.value }; setList(n); }}/>
-          <div style={{ display:'flex', gap:6 }}>
-            <button style={S.button} onClick={()=>{ const n=[...list]; n.splice(idx,1); setList(n); }}>Delete</button>
-            <button style={S.button} onClick={()=>{ const n=[...list]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); setList(n); }}>Duplicate</button>
-          </div>
-        </div>
-      ))}
-      <button style={S.button} onClick={()=>{ setList([...(list||[]), { key:`${kind}-${list.length+1}`, name:'', url:'' }]); }}>+ Add Icon</button>
-    </div>
-  );
-}
-function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
-  const [pool, setPool] = useState([]);
-  useEffect(()=>{ (async()=>{
-    try {
-      const r = await fetch(`/api/list-media?dir=bundles`);
-      const j = await r.json(); setPool(j?.items || []);
-    } catch {}
-  })(); }, []);
-
-  return (
-    <div style={{ marginTop:20 }}>
-      <h4 style={{ margin:'0 0 8px 0' }}>{title}</h4>
-      <div style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', fontSize:13, color:'#9fb0bf', marginBottom:6 }}>
-        <div>Thumbnail</div><div>URL</div><div>Format</div><div>Actions</div>
-      </div>
-      {(items||[]).map((row, idx)=>{
-        const type = classifyByExt(row.url||'');
-        return (
-          <div key={idx} style={{ display:'grid', gridTemplateColumns:'160px 2fr 1fr 140px', gap:8, alignItems:'center', marginBottom:8 }}>
-            <div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                <input style={S.input} value={row.url||''}
-                  onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }}
-                  placeholder="Image/Video/GIF/Audio URL" />
-                <label style={{ ...S.button, textAlign:'center' }}>
-                  Choose File
-                  <input type="file" style={{ display:'none' }}
-                    onChange={async (e)=>{ const f=e.target.files?.[0]; if (!f) return; const url=await uploadToRepo(f,'uploads'); if (url) { const n=[...items]; n[idx]={ ...(n[idx]||{}), url }; onChange(n); } }}/>
-                </label>
-              </div>
-              <select style={{ ...S.input, marginTop:6 }}
-                onChange={(e)=>{ const n=[...items]; n[idx]={ ...(n[idx]||{}), url:e.target.value }; onChange(n); }} value="">
-                <option value="">Pick from media inventory…</option>
-                {pool.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
-              </select>
-              {row.url ? <MediaPreview url={row.url} kind="preview"/> : null}
-            </div>
-            <div><code>{row.url ? (row.url.split('.').pop().split('?')[0] || '').toLowerCase() : ''}</code></div>
-            <div style={{ textTransform:'capitalize' }}>{type}</div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button style={S.button} onClick={()=>{ const n=[...items]; n.splice(idx,1); onChange(n); }}>Delete</button>
-              <button style={S.button} onClick={()=>{ const n=[...items]; const copy={ ...(n[idx]||{}) }; n.splice(idx+1,0,copy); onChange(n); }}>Duplicate</button>
-            </div>
-          </div>
-        );
-      })}
-      <button style={S.button} onClick={()=>{ onChange([...(items||[]), { url:'' }]); }}>+ Add Media</button>
-    </div>
-  );
-}
-
-/* Inventory + DropOrPick */
-function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acceptKinds = ['image','gif','video','audio'] }) {
-  const [pool, setPool] = React.useState([]);
-  const [hover, setHover] = React.useState(false);
-  const [showInv, setShowInv] = React.useState(false);
-
-  React.useEffect(()=>{ (async()=>{
-    try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`);
-      const j = await r.json();
-      setPool(j?.items || []);
-    } catch {}
-  })(); }, [dir]);
-
-  async function onDrop(e) {
-    e.preventDefault(); e.stopPropagation(); setHover(false);
-    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
-    if (!f) return;
-    const type = f.type.toLowerCase();
-    const ok =
-      (acceptKinds.includes('image') && type.startsWith('image/')) ||
-      (acceptKinds.includes('gif')   && f.name.toLowerCase().endsWith('.gif')) ||
-      (acceptKinds.includes('video') && type.startsWith('video/')) ||
-      (acceptKinds.includes('audio') && type.startsWith('audio/'));
-    if (!ok) return;
-    const pathFolder = (acceptKinds.includes('image') || acceptKinds.includes('gif')) ? 'uploads' : 'uploads';
-    const u = await uploadToRepo(f, pathFolder);
-    if (u) onChangeUrl(u);
-  }
-
-  function hint() {
-    const kinds = acceptKinds.includes('video') ? '.mp4 / .webm / .mov'
-      : acceptKinds.includes('audio') ? '.mp3 / .wav / .ogg / .m4a'
-      : acceptKinds.includes('gif')   ? '.gif'
-      : '.png / .jpg / .jpeg / .webp';
-    const word = acceptKinds.includes('video') ? 'video'
-      : acceptKinds.includes('audio') ? 'audio'
-      : acceptKinds.includes('gif')   ? 'GIF'
-      : 'image';
-    return `Drop a ${word} (${kinds}) here, paste a URL, or open inventory ↓`;
-  }
-
-  const filtered = pool.filter(it => acceptKinds.includes(it.type));
-
-  return (
-    <Field label={label}>
-      <div
-        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
-        onDragOver={(e)=>{e.preventDefault();}}
-        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
-        onDrop={onDrop}
-        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
-      >
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
-          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder={hint()} />
-          <button type="button" style={S.button} onClick={()=>setShowInv(true)}>Open Media Inventory</button>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
-          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
-            <option value="">Quick pick from inventory…</option>
-            {filtered.map(it => <option key={it.url} value={it.url}>{it.name}</option>)}
-          </select>
-        </div>
-        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
-      </div>
-
-      {showInv && (
-        <MediaInventoryModal
-          acceptKinds={acceptKinds}
-          onClose={()=>setShowInv(false)}
-          onPick={(u)=>{ onChangeUrl(u); setShowInv(false); }}
-        />
-      )}
-    </Field>
-  );
-}
-function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
-  const [pool, setPool] = useState([]);
-  const [q, setQ] = useState('');
-  const [tab, setTab] = useState(acceptKinds[0] || 'image');
-
-  useEffect(()=>{ (async()=>{
-    try {
-      const r = await fetch('/api/list-media?dir=bundles');
-      const j = await r.json(); setPool(j?.items || []);
-    } catch {}
-  })(); }, []);
-
-  const groups = {
-    image: pool.filter(x=>x.type==='image'),
-    gif:   pool.filter(x=>x.type==='gif'),
-    video: pool.filter(x=>x.type==='video'),
-    audio: pool.filter(x=>x.type==='audio'),
-  };
-  const tabs = ['image','gif','video','audio'].filter(t=>acceptKinds.includes(t));
-  const shown = (groups[tab]||[]).filter(x=>x.name.toLowerCase().includes(q.toLowerCase()));
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:3000, display:'grid', placeItems:'center', padding:16 }}>
-      <div style={{ ...S.card, width:'min(900px, 95vw)', maxHeight:'85vh', overflow:'auto' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <h3 style={{ margin:0 }}>Media Inventory</h3>
-          <button style={S.button} onClick={onClose}>Close</button>
-        </div>
-        <div style={{ display:'flex', gap:6, marginBottom:10 }}>
-          {tabs.map(t=>
-            <button key={t} style={{ ...S.button, padding:'6px 10px', ...(tab===t?{ background:'#1a2027' }:{}) }} onClick={()=>setTab(t)}>
-              {t.toUpperCase()}
-            </button>
-          )}
-          <input placeholder="Search…" value={q} onChange={(e)=>setQ(e.target.value)} style={{ ...S.input, maxWidth:240, marginLeft:'auto' }}/>
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:10 }}>
-          {shown.map(it=>(
-            <div key={it.url} style={{ border:'1px solid #22303c', borderRadius:10, padding:8 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>{it.name} <span style={{ opacity:.7 }}>({it.type})</span></div>
-              {it.type==='video' ? (
-                <video src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }} />
-              ) : it.type==='audio' ? (
-                <div style={{ height:120, display:'grid', placeItems:'center', border:'1px dashed #2a323b', borderRadius:8, color:'#9fb0bf' }}>
-                  .{it.url.split('.').pop().split('?')[0]}
-                </div>
-              ) : (
-                <img alt="" src={toDirectMediaURL(it.url)} style={{ width:'100%', height:120, objectFit:'cover', borderRadius:8 }}/>
-              )}
-              <button style={{ ...S.button, marginTop:8, width:'100%' }} onClick={()=>onPick(it.url)}>Use</button>
-            </div>
-          ))}
-        </div>
+        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
       </div>
     </div>
   );
 }
 
-/* TEXT tab (as before) */
-function TextTab({ suite, config, setConfig, setStatus }) {
-  const [smsRule, setSmsRule] = useState({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-  function addSmsRule() {
-    if (!smsRule.missionId || !smsRule.message) return setStatus('❌ Pick mission and message');
-    const maxPlayers = config?.forms?.players || 1;
-    if (smsRule.phoneSlot < 1 || smsRule.phoneSlot > Math.max(1, maxPlayers)) return setStatus('❌ Phone slot out of range');
-    const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) }];
-    setConfig({ ...config, textRules: rules });
-    setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added (remember Save All)');
-  }
-  function removeSmsRule(idx) {
-    const rules = [...(config?.textRules || [])];
-    rules.splice(idx, 1);
-    setConfig({ ...config, textRules: rules });
-  }
+/* TEXT TAB */
+function TextTab({ config, setConfig }) {
+  const [text, setText] = useState((config.textRules || []).join('\n'));
+  useEffect(()=>{ setText((config.textRules || []).join('\n')); }, [config.textRules]);
+
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop: 0 }}>Text Message Rules</h3>
-        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-          <Field label="Mission (geofence)">
-            <select style={S.input} value={smsRule.missionId} onChange={(e) => setSmsRule({ ...smsRule, missionId: e.target.value })}>
-              <option value="">— choose —</option>
-              {(suite.missions || []).map((m) => (
-                <option key={m.id} value={m.id}>{m.id} — {m.title}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Phone slot">
-            <select style={S.input} value={smsRule.phoneSlot} onChange={(e) => setSmsRule({ ...smsRule, phoneSlot: Number(e.target.value) })}>
-              {[1,2,3,4].map((n) => <option key={n} value={n}>{'Player '+n}</option>)}
-            </select>
-          </Field>
-          <Field label="Delay (sec)">
-            <input type="number" min={0} max={3600} style={S.input} value={smsRule.delaySec} onChange={(e) => setSmsRule({ ...smsRule, delaySec: e.target.value })}/>
-          </Field>
-          <Field label="Message">
-            <input style={S.input} value={smsRule.message} onChange={(e) => setSmsRule({ ...smsRule, message: e.target.value })}/>
-          </Field>
+        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
+        <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
+          One rule per line. This saves into <code>config.textRules</code>.
         </div>
-        <div style={{ marginTop: 12 }}><button style={S.button} onClick={addSmsRule}>+ Add Rule</button></div>
-        <hr style={S.hr}/>
-        <ul style={{ paddingLeft: 18 }}>
-          {(config.textRules || []).map((r, i) => (
-            <li key={i} style={{ marginBottom: 8 }}>
-              <code>{r.missionId}</code> → Player {r.phoneSlot} • delay {r.delaySec}s • “{r.message}”
-              <button style={{ ...S.button, marginLeft: 8, padding: '6px 10px' }} onClick={() => removeSmsRule(i)}>Remove</button>
-            </li>
-          ))}
-        </ul>
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ cursor: 'pointer' }}>Send a quick test SMS now</summary>
-          <TestSMS />
-        </details>
+        <textarea
+          style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+        />
+        <div style={{ display:'flex', gap:8, marginTop:8 }}>
+          <button
+            style={S.button}
+            onClick={()=>{
+              const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
+              setConfig(c=>({ ...c, textRules: lines }));
+            }}
+          >
+            Save Rules
+          </button>
+          <button
+            style={S.button}
+            onClick={()=>setText((config.textRules || []).join('\n'))}
+          >
+            Reset
+          </button>
+        </div>
       </div>
     </main>
   );
 }
 
-function TestSMS() {
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState('Test message from admin');
-  const [status, setStatus] = useState('');
-  async function send() {
-    setStatus('Sending…');
-    const res = await fetch('/api/sms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, body: msg }) });
-    const text = await res.text();
-    setStatus(res.ok ? '✅ Sent' : '❌ ' + text);
+/* ───────────────────────── MEDIA POOL (with sub-tabs & per-file usage) ───────────────────────── */
+function MediaPoolTab({
+  suite,
+  config,
+  setConfig,
+  uploadStatus,
+  setUploadStatus,
+  uploadToRepo,
+}) {
+  const [inv, setInv] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [folder, setFolder] = useState('uploads');
+  const [addUrl, setAddUrl] = useState('');
+
+
+  
+  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
+  const subTabs = [
+    { key:'image', label:'Images' },
+    { key:'video', label:'Videos' },
+    { key:'audio', label:'Audio' },
+    { key:'gif',   label:'GIFs'  },
+  ];
+  const [subTab, setSubTab] = useState('audio');
+
+  useEffect(() => { refreshInventory(); }, []);
+
+  async function refreshInventory() {
+    setBusy(true);
+    try {
+      const items = await listInventory(['uploads','bundles','icons']);
+      setInv(items || []);
+    } finally { setBusy(false); }
   }
+
+  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
+  function same(a,b){ return norm(a) === norm(b); }
+
+  // Per-file usage counts
+  function usageCounts(url) {
+    const nurl = norm(url);
+    const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+    const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+
+    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
+    const iconMission = (suite?.missions || []).reduce((acc, m) => {
+      const direct = m?.iconUrl;
+      if (direct && same(direct, nurl)) return acc + 1;
+      const key = m?.iconKey;
+      if (!key) return acc;
+      const found = (config?.icons?.missions || []).find(i => i.key === key);
+      return acc + (found && same(found.url, nurl) ? 1 : 0);
+    }, 0);
+
+    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
+    const iconDevice = (config?.devices || []).reduce((acc, d) => {
+      const key = d?.iconKey;
+      if (!key) return acc;
+      const found = (config?.icons?.devices || []).find(i => i.key === key);
+      return acc + (found && same(found.url, nurl) ? 1 : 0);
+    }, 0);
+
+    // Reward Icons entries that point to this URL
+    const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
+
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
+  }
+
+  function addPoolItem(kind, url) {
+    const label = baseNameFromUrl(url);
+    setConfig(c => {
+      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
+      if (kind === 'rewards') m.rewardsPool.push({ url, label });
+      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
+      return { ...c, media: m };
+    });
+  }
+  function addIcon(kind, url) {
+    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
+    const name = baseNameFromUrl(url);
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      const list = icons[kind] || [];
+      // allow duplicates (keys must be unique)
+      let finalKey = key;
+      let suffix = 1;
+      while (list.find(i => i.key === finalKey)) {
+        suffix += 1;
+        finalKey = `${key}-${suffix}`;
+      }
+      list.push({ key: finalKey, name, url });
+      icons[kind] = list;
+      return { ...c, icons };
+    });
+  }
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadToRepo(file, folder);
+    if (url) {
+      refreshInventory();
+      setAddUrl(url);
+    }
+  }
+
+  async function deleteOne(url) {
+    const path = pathFromUrl(url);
+    if (!path) {
+      alert('This file cannot be deleted here (external or unknown path).');
+      return false;
+    }
+    if (!window.confirm(`Delete this media file?\n${url}`)) return false;
+    setUploadStatus('Deleting…');
+    const ok = await deleteMediaPath(path);
+    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
+    if (ok) refreshInventory();
+    return ok;
+  }
+
+  async function deleteAll(list) {
+    if (!list?.length) return;
+    if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
+    setUploadStatus('Deleting group…');
+    let okCount = 0;
+    for (const it of list) {
+      const path = pathFromUrl(it.url);
+      if (!path) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deleteMediaPath(path);
+      if (ok) okCount++;
+    }
+    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    refreshInventory();
+  }
+
+  // Group by type
+  const itemsByType = (inv || []).reduce((acc, it) => {
+    const t = classifyByExt(it.url);
+    if (!acc[t]) acc[t] = [];
+    acc[t].push(it);
+    return acc;
+  }, {});
+  const sections = [
+    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
+    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',              items: itemsByType.gif   || [] },
+  ];
+  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 2fr auto', alignItems: 'center' }}>
-        <input placeholder="+1..." style={S.input} value={to} onChange={(e) => setTo(e.target.value)} />
-        <input placeholder="Message" style={S.input} value={msg} onChange={(e) => setMsg(e.target.value)} />
-        <button style={S.button} onClick={send}>Send Test</button>
+    <main style={S.wrap}>
+      {/* Upload */}
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Upload</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
+          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
+          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
+            <option value="uploads">uploads</option>
+            <option value="bundles">bundles</option>
+            <option value="icons">icons</option>
+          </select>
+          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
+            Upload
+            <input type="file" onChange={onUpload} style={{ display:'none' }} />
+          </label>
+        </div>
+        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
+        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+          Inventory {busy ? '(loading…)':''}: {inv.length} files
+        </div>
       </div>
-      <div style={{ marginTop: 6, color: '#9fb0bf' }}>{status}</div>
+
+      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+          {subTabs.map(st => (
+            <button
+              key={st.key}
+              onClick={()=>setSubTab(st.key)}
+              style={{ ...S.tab, ...(subTab===st.key?S.tabActive:{}) }}
+            >
+              {st.label.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Active section */}
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
+          <h3 style={{ margin:0 }}>{active.title}</h3>
+          <button
+            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+            onClick={()=>deleteAll(active.items)}
+            disabled={!active.items.length}
+            title="Delete all files in this type"
+          >
+            Delete All
+          </button>
+        </div>
+
+        {active.items.length === 0 ? (
+          <div style={{ color:'#9fb0bf' }}>No files.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
+            {active.items.map((it, idx)=>{
+              const url = toDirectMediaURL(it.url);
+              const use = usageCounts(url);
+              return (
+                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
+                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {baseNameFromUrl(url)}
+                    </div>
+                    {/* Usage chips next to title (per-file, per service) */}
+                    <div style={S.chipRow}>
+                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
+                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
+                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
+                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
+                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
+                    </div>
+                  </div>
+
+                  <MediaPreview url={url} kind={active.key} />
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+                    {/* Assign actions — labels include per-file counts */}
+                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
+                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
+                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
+                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
+                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
+
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                        Open
+                      </a>
+                      <button
+                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                        onClick={()=>deleteOne(url)}
+                        title="Delete this file"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
+
+/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+  const rewards = config.media?.rewardsPool || [];
+  const penalties = config.media?.penaltiesPool || [];
+  const iconsM = config.icons?.missions || [];
+  const iconsD = config.icons?.devices  || [];
+  const iconsR = config.icons?.rewards  || [];
+
+  function removePoolItem(kind, idx) {
+    if (!window.confirm('Remove this item from the assigned list?')) return;
+    setConfig(c => {
+      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
+      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
+      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
+      return { ...c, media: m };
+    });
+  }
+  function removeIcon(kind, key) {
+    if (!window.confirm('Remove this icon from the assigned list?')) return;
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      icons[kind] = icons[kind].filter(i => i.key !== key);
+      return { ...c, icons };
+    });
+  }
+
+  return (
+    <main style={S.wrap}>
+      {/* Icons */}
+      <div style={S.card}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
+          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
+        </div>
+
+        <IconGroup
+          title={`Mission Icons (${iconsM.length})`}
+          items={iconsM}
+          onRemove={(key)=>removeIcon('missions', key)}
+        />
+        <IconGroup
+          title={`Device Icons (${iconsD.length})`}
+          items={iconsD}
+          onRemove={(key)=>removeIcon('devices', key)}
+        />
+        <IconGroup
+          title={`Reward Icons (${iconsR.length})`}
+          items={iconsR}
+          onRemove={(key)=>removeIcon('rewards', key)}
+        />
+      </div>
+
+      {/* Pools */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <Pool
+            title={`Rewards Pool (${rewards.length})`}
+            items={rewards}
+            onRemove={(idx)=>removePoolItem('rewards', idx)}
+          />
+          <Pool
+            title={`Penalties Pool (${penalties.length})`}
+            items={penalties}
+            onRemove={(idx)=>removePoolItem('penalties', idx)}
+          />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* Shared pieces for Assigned Media */
+function IconGroup({ title, items, onRemove }) {
+  return (
+    <div style={{ marginTop:8 }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
+        {items.map((it)=>(
+          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <div>
+                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
+                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>onRemove(it.key)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Pool({ title, items, onRemove }) {
+  return (
+    <div>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
+        {items.map((it, idx)=>(
+          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+            <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {it.label || baseNameFromUrl(it.url)}
+            </div>
+            <MediaPreview url={it.url} kind="pool item" />
+            <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+      </div>
     </div>
   );
 }
