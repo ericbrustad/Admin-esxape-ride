@@ -20,6 +20,37 @@ async function fetchFirstJson(urls, fallback) {
   }
   return fallback;
 }
+
+function applyDefaultIcons(cfg) {
+  const next = {
+    ...cfg,
+    icons: {
+      missions: [],
+      devices:  [],
+      rewards:  [],
+      autoDefaults: cfg?.icons?.autoDefaults ?? true, // default ON if missing
+      ...(cfg.icons || {})
+    }
+  };
+
+  // If auto-defaults is OFF, just return without merging any defaults
+  if (next.icons.autoDefaults === false) return next;
+
+  function ensure(kind, arr) {
+    const list = [...(next.icons[kind] || [])];
+    const keys = new Set(list.map(x => (x.key||'').toLowerCase()));
+    for (const it of arr) {
+      if (!keys.has((it.key||'').toLowerCase())) list.push({ ...it });
+    }
+    next.icons[kind] = list;
+  }
+  ensure('missions', DEFAULT_BUNDLES.missions);
+  ensure('devices',  DEFAULT_BUNDLES.devices);
+  ensure('rewards',  DEFAULT_BUNDLES.rewards);
+  return next;
+}
+
+
 function toDirectMediaURL(u) {
   if (!u) return u;
   try {
@@ -495,6 +526,14 @@ export default function Admin() {
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
+    function defaultConfig() {
+  return {
+    // ...
+    icons: { missions: [], devices: [], rewards: [], autoDefaults: false }, // ⟵ add this
+    // ...
+  };
+}
+
   }
   function defaultContentForType(t) {
     const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
