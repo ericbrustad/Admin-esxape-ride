@@ -2147,35 +2147,6 @@ function MediaPoolTab({
 // Add near other hooks in MediaPoolTab:
 const [showInUse, setShowInUse] = useState(false);
 
-// Build a grouped list of ONLY media that is actually in use
-const usedByType = React.useMemo(() => {
-  const groups = { image: [], video: [], audio: [], gif: [] };
-  (inv || []).forEach((it) => {
-    const url = toDirectMediaURL(it.url);
-    const use = usageCounts(url);
-    const total =
-      (use?.rewardsPool || 0) +
-      (use?.penaltiesPool || 0) +
-      (use?.iconMission || 0) +
-      (use?.iconDevice || 0) +
-      (use?.iconReward || 0);
-
-    if (total > 0) {
-      const t = classifyByExt(url);
-      if (groups[t]) {
-        groups[t].push({
-          url,
-          label: baseNameFromUrl(url),
-          use
-        });
-      }
-    }
-  });
-  return groups;
-  // include dependencies used by usageCounts (suite/config) so it stays fresh
-}, [inv, suite, config]);
-
-
 
   // Add near other hooks in MediaPoolTab:
 const [showInUse, setShowInUse] = useState(false);
@@ -2226,6 +2197,53 @@ const usedByType = React.useMemo(() => {
       setInv(items || []);
     } finally { setBusy(false); }
   }
+{showInUse && (
+  <div style={{
+    position:'fixed', inset:0, background:'rgba(0,0,0,0.55)',
+    display:'grid', placeItems:'center', zIndex:4000, padding:16
+  }}>
+    <div style={{ ...S.card, width:'min(1000px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <h3 style={{ margin:0 }}>Media Files in use</h3>
+        <button style={S.button} onClick={()=>setShowInUse(false)}>Close</button>
+      </div>
+
+      {(['image','video','audio','gif']).map((k) => {
+        const list = usedByType[k] || [];
+        if (!list.length) return null;
+        const titles = { image:'Images', video:'Videos', audio:'Audio', gif:'GIFs' };
+        return (
+          <div key={k} style={{ marginBottom:16 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <h4 style={{ margin:0 }}>{titles[k]} ({list.length})</h4>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
+              {list.map((row, i) => (
+                <div key={row.url + i} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                  <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                    {row.label}
+                  </div>
+                  <MediaPreview url={row.url} kind={k} />
+                  <div style={{ ...S.chipRow, marginTop:8 }}>
+                    <span style={S.chip}>Rewards {row.use.rewardsPool}</span>
+                    <span style={S.chip}>Penalties {row.use.penaltiesPool}</span>
+                    <span style={S.chip}>Icon→Missions {row.use.iconMission}</span>
+                    <span style={S.chip}>Icon→Devices {row.use.iconDevice}</span>
+                    <span style={S.chip}>Icon→Rewards {row.use.iconReward}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {(['image','video','audio','gif'].every(k => (usedByType[k]||[]).length === 0)) && (
+        <div style={{ color:'#9fb0bf' }}>No media is currently referenced.</div>
+      )}
+    </div>
+  </div>
+)}
 
   function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
   function same(a,b){ return norm(a) === norm(b); }
