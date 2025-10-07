@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+looks good. this is what i see on the mission maker now. "Answer Responses 
+On Correct —---- i want to see this. On Correct Answer you will receive an Award "ticker selector" for yes or no.  and a dropdown list or buttons to select Image,Video, Audio or Gif. and that can either open up its own window with names and thumnails or open up the media pool window with the folder type selected (which is populated from the Media Pool) where you will select the Reward or Penalty. then we need to bring back the type count on the assigned media folder media types. the number count that each media file has for each type of service (Mission icons, Device icons, Reward icons, Rewards or Penalties) here is the file Please provide one file. import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -1128,14 +1129,16 @@ export default function Admin() {
               />
             </div>
 
-     {/* Mission editor (overlay) */}
+            {/* Mission editor (overlay) */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
-                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
-                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
-                    <button style={S.button} onClick={cancelEdit}>Close</button>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                    </div>
                   </div>
 
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
@@ -1143,33 +1146,38 @@ export default function Admin() {
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map(k=>(
+                      {Object.keys(TYPE_FIELDS).map((k)=>(
                         <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
                       ))}
                     </select>
                   </Field>
 
-                  {/* Icon select + drop/pick/inventory */}
+                  {/* Icon select with thumbnail (inventory-only, read-only list stays elsewhere) */}
                   <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
-                      <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                      <select
+                        style={S.input}
+                        value={editing.iconKey || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                      >
                         <option value="">(default)</option>
-                        {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                        {(config.icons?.missions||[]).map((it)=>(
+                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        ))}
                       </select>
-                      <DropOrPick
-                        label="(or pick a specific image — recommended: PNG/JPG/GIF)"
-                        dir="bundles"
-                        acceptKinds={['image','gif']}
-                        url={editing.iconUrl || ''}
-                        onChangeUrl={(u)=>{ setEditing({ ...editing, iconUrl:u }); setDirty(true); }}
-                        uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                      />
+                      <div>
+                        {(() => {
+                          const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
+                          return sel?.url
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                        })()}
+                      </div>
                     </div>
                   </Field>
 
                   <hr style={S.hr}/>
 
-                  {/* QUESTION-FIRST ORDERING */}
                   {editing.type === 'multiple_choice' && (
                     <>
                       <Field label="Question">
@@ -1231,25 +1239,24 @@ export default function Admin() {
                     </Field>
                   )}
 
-                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                        center={mapCenter}
+                        onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                       />
                     </div>
                   )}
 
-                  {/* Optional geofence for others */}
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
                           onChange={(e)=>{ const on=e.target.checked;
                             const next={ ...editing.content, geofenceEnabled:on };
-                            if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.265; }
+                            if (on && (!isFinite(Number(next.lat)) || !isFinite(Number(next.lng)))) { next.lat=mapCenter.lat; next.lng=mapCenter.lng; }
                             setEditing({ ...editing, content:next }); setDirty(true);
                           }}/> Enable geofence for this mission
                       </label>
@@ -1257,7 +1264,8 @@ export default function Admin() {
                         <>
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                            center={mapCenter}
+                            onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -1270,12 +1278,11 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* Remaining generic fields (skip ones we rendered above) */}
                   {(TYPE_FIELDS[editing.type] || [])
                     .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
                     .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
                     .filter(f => !(editing.type === 'statement' && f.key === 'text'))
-                    .map(f=>(
+                    .map((f)=>(
                     <Field key={f.key} label={f.label}>
                       {f.type==='text' && (
                         <>
@@ -1290,7 +1297,8 @@ export default function Admin() {
                         <input type="number" min={f.min} max={f.max} style={S.input}
                           value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
                             const v = e.target.value==='' ? '' : Number(e.target.value);
-                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
+                            const vClamped = (f.key==='radiusMeters') ? clamp(v,5,500) : v;
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:vClamped } }); setDirty(true);
                           }}/>
                       )}
                       {f.type==='multiline' && (
@@ -1308,113 +1316,105 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  {/* Outcomes: Correct / Wrong */}
+                  {/* ── Correct/Wrong responses — bring back with Ticker option ── */}
+                  <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12, marginTop:8 }}>
+                    <div style={{ fontWeight:600, marginBottom:8 }}>Answer Responses</div>
+
+                    <Field label="On Correct — Reward media (from ASSIGNED MEDIA)">
+                      {((config.media?.rewardsPool || []).length === 0) ? (
+                        <div style={{ color:'#9fb0bf' }}>
+                          No Reward media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+                        </div>
+                      ) : (
+                        <>
+                          <select
+                            style={S.input}
+                            value={editing.correct?.mediaUrl || ''}
+                            onChange={(e)=>{
+                              const url = e.target.value || '';
+                              const mode = url ? 'reward' : 'none';
+                              setEditing({
+                                ...editing,
+                                correct: { ...(editing.correct || {}), mode, mediaUrl: url, ticker: !!editing?.correct?.ticker }
+                              });
+                              setDirty(true);
+                            }}
+                          >
+                            <option value="">(none)</option>
+                            {(config.media.rewardsPool || []).map((it, i)=>(
+                              <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+                            ))}
+                          </select>
+                          <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editing?.correct?.ticker}
+                              onChange={(e)=>{
+                                const ticker = e.target.checked;
+                                setEditing({ ...editing, correct:{ ...(editing.correct||{}), ticker }});
+                                setDirty(true);
+                              }}
+                            />
+                            Ticker (scrolling) for Correct
+                          </label>
+                          {editing.correct?.mediaUrl && <MediaPreview url={editing.correct.mediaUrl} kind="reward" />}
+                        </>
+                      )}
+                    </Field>
+
+                    <Field label="On Wrong — Penalty media (from ASSIGNED MEDIA)">
+                      {((config.media?.penaltiesPool || []).length === 0) ? (
+                        <div style={{ color:'#9fb0bf' }}>
+                          No Penalty media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+                        </div>
+                      ) : (
+                        <>
+                          <select
+                            style={S.input}
+                            value={editing.wrong?.mediaUrl || ''}
+                            onChange={(e)=>{
+                              const url = e.target.value || '';
+                              const mode = url ? 'penalty' : 'none';
+                              setEditing({
+                                ...editing,
+                                wrong: { ...(editing.wrong || {}), mode, mediaUrl: url, ticker: !!editing?.wrong?.ticker }
+                              });
+                              setDirty(true);
+                            }}
+                          >
+                            <option value="">(none)</option>
+                            {(config.media.penaltiesPool || []).map((it, i)=>(
+                              <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+                            ))}
+                          </select>
+                          <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editing?.wrong?.ticker}
+                              onChange={(e)=>{
+                                const ticker = e.target.checked;
+                                setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), ticker }});
+                                setDirty(true);
+                              }}
+                            />
+                            Ticker (scrolling) for Wrong
+                          </label>
+                          {editing.wrong?.mediaUrl && <MediaPreview url={editing.wrong.mediaUrl} kind="penalty" />}
+                        </>
+                      )}
+                    </Field>
+                  </div>
+
                   <hr style={S.hr} />
-                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.correct?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.correct?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Reward media"
-                      dir="bundles"
-                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.correct?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <input
+                      type="checkbox"
+                      checked={editing.showContinue !== false}
+                      onChange={(e)=>{ setEditing({ ...editing, showContinue: e.target.checked }); setDirty(true); }}
                     />
-                  )}
-                  {editing.correct?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Reward device (optional)">
-                      <select style={S.input}
-                        value={editing.correct?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Clue (optional)">
-                      <input style={S.input}
-                        value={editing.correct?.clue || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
+                    Show “Continue” button to close this mission
+                  </label>
 
-                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.wrong?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.wrong?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Penalty media"
-                      dir="bundles"
-                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.wrong?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                    />
-                  )}
-                  {editing.wrong?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Punishment device (optional)">
-                      <select style={S.input}
-                        value={editing.wrong?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Delay (seconds, optional)">
-                      <input type="number" min={0} max={3600} style={S.input}
-                        value={editing.wrong?.delaySec ?? 0}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
-
-                  <hr style={S.hr}/>
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1426,7 +1426,7 @@ export default function Admin() {
                   )}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
+                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
