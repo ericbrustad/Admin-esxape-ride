@@ -2,7 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 
 /* ───────────────────────── Helpers ───────────────────────── */
-
+async function fetchJsonSafe(url, fallback) {
+  try {
+    const r = await fetch(url, { cache: 'no-store', credentials: 'include' });
+    const ct = r.headers.get('content-type') || '';
+    if (r.ok && ct.includes('application/json')) return await r.json();
+  } catch {}
+  return fallback;
+}
 async function fetchFirstJson(urls, fallback) {
   for (const u of urls) {
     try {
@@ -50,7 +57,7 @@ const EXTS = {
   image: /\.(png|jpg|jpeg|webp)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 function classifyByExt(u) {
   if (!u) return 'other';
@@ -97,67 +104,40 @@ function qs(obj) {
   const s = p.toString();
   return s ? `?${s}` : '';
 }
-
-/** Robust mapping from URL → repo path for deletion (handles prefixed paths like /games/<slug>/media/...) */
+// compute repo path from /media/... URL
 function pathFromUrl(u) {
   try {
     const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
     const p = url.pathname || '';
-
-    // Normalize anything that CONTAINS /media/ back to public/media/...
-    const at = p.indexOf('/media/');
-    if (at >= 0) return `public${p.slice(at)}`;
-
-    // Already a public path?
+    if (p.startsWith('/media/')) return `public${p}`;
     if (p.startsWith('/public/media/')) return p;
   } catch {}
-
-  // Fallback for raw strings
   const s = String(u || '');
-  const j = s.indexOf('/media/');
-  if (j >= 0) return `public${s.slice(j)}`;
+  if (s.startsWith('/media/')) return `public${s}`;
   if (s.startsWith('/public/media/')) return s;
-
-  // Unknown / external → not deletable from here
-  return '';
+  return ''; // external or unknown
 }
-
-/** Delete via one of several endpoints; return detailed diagnostics */
 async function deleteMediaPath(repoPath) {
-  const attempts = [
-    { ep: '/api/delete-media',   method: 'POST'   },
-    { ep: '/api/delete-media',   method: 'DELETE' },
-    { ep: '/api/github/delete',  method: 'POST'   },
-    { ep: '/api/github/delete',  method: 'DELETE' },
-    { ep: '/api/delete',         method: 'POST'   },
-    { ep: '/api/delete',         method: 'DELETE' },
-    { ep: '/api/media/delete',   method: 'POST'   },
-    { ep: '/api/media/delete',   method: 'DELETE' },
-    { ep: '/api/repo-delete',    method: 'POST'   },
-    { ep: '/api/repo-delete',    method: 'DELETE' },
+  const endpoints = [
+    '/api/delete-media',
+    '/api/delete',
+    '/api/media/delete',
+    '/api/repo-delete',
+    '/api/github/delete',
   ];
-
-  let last = { endpoint: '', method: '', status: 0, body: '' };
-
-  for (const { ep, method } of attempts) {
+  for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ path: repoPath }),
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        credentials:'include',
+        body: JSON.stringify({ path: repoPath })
       });
-      const body = await r.text().catch(() => '');
-      last = { endpoint: ep, method, status: r.status, body };
-      if (r.ok) return { ok: true, ...last };
-    } catch (e) {
-      last = { endpoint: ep, method, status: 0, body: String(e?.message || e) };
-    }
+      if (r.ok) return true;
+    } catch {}
   }
-
-  return { ok: false, ...last };
+  return false;
 }
-
 
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
@@ -288,7 +268,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('default');
+  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -908,7 +888,6 @@ export default function Admin() {
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
-    // kept for internal use by MediaPool delete diagnostics; no upload UI is exposed
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
     const safeName = file.name.replace(/[^\w.\-]+/g, '_');
@@ -948,8 +927,8 @@ export default function Admin() {
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
-  // Tabs — switched order: MEDIA POOL now left of ASSIGNED MEDIA
-  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned','test'];
+  // Tabs: missions / devices / settings / text / media-pool / assigned
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -967,7 +946,6 @@ export default function Admin() {
                 'text':'TEXT',
                 'media-pool':'MEDIA POOL',
                 'assigned':'ASSIGNED MEDIA',
-                'test':'TEST',
               };
               return (
                 <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
@@ -1128,14 +1106,16 @@ export default function Admin() {
               />
             </div>
 
-     {/* Mission editor (overlay) */}
+            {/* Mission editor (overlay) */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
-                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
-                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
-                    <button style={S.button} onClick={cancelEdit}>Close</button>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                    </div>
                   </div>
 
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
@@ -1143,33 +1123,38 @@ export default function Admin() {
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map(k=>(
+                      {Object.keys(TYPE_FIELDS).map((k)=>(
                         <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
                       ))}
                     </select>
                   </Field>
 
-                  {/* Icon select + drop/pick/inventory */}
+                  {/* Icon select with thumbnail (inventory-only) */}
                   <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8 }}>
-                      <select style={S.input} value={editing.iconKey || ''} onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                      <select
+                        style={S.input}
+                        value={editing.iconKey || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                      >
                         <option value="">(default)</option>
-                        {(config.icons?.missions||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                        {(config.icons?.missions||[]).map((it)=>(
+                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        ))}
                       </select>
-                      <DropOrPick
-                        label="(or pick a specific image — recommended: PNG/JPG/GIF)"
-                        dir="bundles"
-                        acceptKinds={['image','gif']}
-                        url={editing.iconUrl || ''}
-                        onChangeUrl={(u)=>{ setEditing({ ...editing, iconUrl:u }); setDirty(true); }}
-                        uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                      />
+                      <div>
+                        {(() => {
+                          const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
+                          return sel?.url
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                        })()}
+                      </div>
                     </div>
                   </Field>
 
                   <hr style={S.hr}/>
 
-                  {/* QUESTION-FIRST ORDERING */}
                   {editing.type === 'multiple_choice' && (
                     <>
                       <Field label="Question">
@@ -1231,25 +1216,24 @@ export default function Admin() {
                     </Field>
                   )}
 
-                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                        center={mapCenter}
+                        onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                       />
                     </div>
                   )}
 
-                  {/* Optional geofence for others */}
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
                           onChange={(e)=>{ const on=e.target.checked;
                             const next={ ...editing.content, geofenceEnabled:on };
-                            if (on && (!next.lat || !next.lng)) { next.lat=44.9778; next.lng=-93.265; }
+                            if (on && (!isFinite(Number(next.lat)) || !isFinite(Number(next.lng)))) { next.lat=mapCenter.lat; next.lng=mapCenter.lng; }
                             setEditing({ ...editing, content:next }); setDirty(true);
                           }}/> Enable geofence for this mission
                       </label>
@@ -1257,7 +1241,8 @@ export default function Admin() {
                         <>
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
-                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
+                            center={mapCenter}
+                            onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -1270,12 +1255,11 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {/* Remaining generic fields (skip ones we rendered above) */}
                   {(TYPE_FIELDS[editing.type] || [])
                     .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
                     .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
                     .filter(f => !(editing.type === 'statement' && f.key === 'text'))
-                    .map(f=>(
+                    .map((f)=>(
                     <Field key={f.key} label={f.label}>
                       {f.type==='text' && (
                         <>
@@ -1290,7 +1274,8 @@ export default function Admin() {
                         <input type="number" min={f.min} max={f.max} style={S.input}
                           value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
                             const v = e.target.value==='' ? '' : Number(e.target.value);
-                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
+                            const vClamped = (f.key==='radiusMeters') ? clamp(v,5,500) : v;
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:vClamped } }); setDirty(true);
                           }}/>
                       )}
                       {f.type==='multiline' && (
@@ -1308,113 +1293,16 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
-                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.correct?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.correct?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Reward media"
-                      dir="bundles"
-                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.correct?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                  <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                    <input
+                      type="checkbox"
+                      checked={editing.showContinue !== false}
+                      onChange={(e)=>{ setEditing({ ...editing, showContinue: e.target.checked }); setDirty(true); }}
                     />
-                  )}
-                  {editing.correct?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Reward device (optional)">
-                      <select style={S.input}
-                        value={editing.correct?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Clue (optional)">
-                      <input style={S.input}
-                        value={editing.correct?.clue || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
+                    Show “Continue” button to close this mission
+                  </label>
 
-                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <Field label="Mode">
-                      <select style={S.input}
-                        value={editing.wrong?.mode || 'none'}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
-                        <option value="none">None</option>
-                        <option value="image">Image</option>
-                        <option value="video">Video</option>
-                        <option value="gif">GIF</option>
-                        <option value="statement">Statement</option>
-                      </select>
-                    </Field>
-                    <Field label="Optional audio URL (mp3/wav)">
-                      <input style={S.input}
-                        value={editing.wrong?.audioUrl || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  </div>
-                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
-                    <DropOrPick
-                      label="Penalty media"
-                      dir="bundles"
-                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
-                      url={editing.wrong?.mediaUrl || ''}
-                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
-                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
-                    />
-                  )}
-                  {editing.wrong?.mode === 'statement' && (
-                    <Field label="Statement text">
-                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
-                    </Field>
-                  )}
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    <Field label="Punishment device (optional)">
-                      <select style={S.input}
-                        value={editing.wrong?.deviceType || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
-                        <option value="">(none)</option>
-                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Delay (seconds, optional)">
-                      <input type="number" min={0} max={3600} style={S.input}
-                        value={editing.wrong?.delaySec ?? 0}
-                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
-                    </Field>
-                    <div />
-                  </div>
-
-                  <hr style={S.hr}/>
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input type="checkbox" checked={!!editing.appearanceOverrideEnabled}
                       onChange={(e)=>{ setEditing({ ...editing, appearanceOverrideEnabled:e.target.checked }); setDirty(true); }}/>
@@ -1426,7 +1314,7 @@ export default function Admin() {
                   )}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>Save Mission</button>
+                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
@@ -1696,7 +1584,7 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* MEDIA POOL — read-only (no select/add/icon/bundle/upload UI), still allows delete/diagnostics */}
+      {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
       {tab==='media-pool' && (
         <MediaPoolTab
           suite={suite}
@@ -1711,13 +1599,12 @@ export default function Admin() {
         />
       )}
 
-      {/* ASSIGNED MEDIA — read-only (no selection/add/remove/reapply/defaults) */}
+      {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
         <AssignedMediaTab
-          suite={suite}
           config={config}
           setConfig={setConfig}
-          onReapplyDefaults={()=>{}}
+          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
       )}
 
@@ -1741,7 +1628,7 @@ export default function Admin() {
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
               <iframe
-                key={previewNonce}
+                key={previewNonce} // hard refresh on nonce change
                 src={`${gameBase}/?${new URLSearchParams({
                   ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
                   channel: testChannel,
@@ -1961,11 +1848,11 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 }, // <-- fixed
+  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
   missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
   input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
   button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
@@ -2244,7 +2131,7 @@ function TextTab({ config, setConfig }) {
   );
 }
 
-/* ───────────────────────── MEDIA POOL (READ-ONLY) ───────────────────────── */
+/* ───────────────────────── MEDIA POOL (with sub-tabs & per-file usage) ───────────────────────── */
 function MediaPoolTab({
   suite,
   config,
@@ -2255,14 +2142,19 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [folder, setFolder] = useState('uploads');
+  const [addUrl, setAddUrl] = useState('');
 
+
+  
+  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
   const subTabs = [
     { key:'image', label:'Images' },
     { key:'video', label:'Videos' },
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('image');
+  const [subTab, setSubTab] = useState('audio');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -2277,11 +2169,13 @@ function MediaPoolTab({
   function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
   function same(a,b){ return norm(a) === norm(b); }
 
+  // Per-file usage counts
   function usageCounts(url) {
     const nurl = norm(url);
     const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
     const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
 
+    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
     const iconMission = (suite?.missions || []).reduce((acc, m) => {
       const direct = m?.iconUrl;
       if (direct && same(direct, nurl)) return acc + 1;
@@ -2291,64 +2185,89 @@ function MediaPoolTab({
       return acc + (found && same(found.url, nurl) ? 1 : 0);
     }, 0);
 
-    const devicesList = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
-    const iconDevice = (devicesList || []).reduce((acc, d) => {
-      const found = (config?.icons?.devices || []).find(i => i.key === d?.iconKey);
+    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
+    const iconDevice = (config?.devices || []).reduce((acc, d) => {
+      const key = d?.iconKey;
+      if (!key) return acc;
+      const found = (config?.icons?.devices || []).find(i => i.key === key);
       return acc + (found && same(found.url, nurl) ? 1 : 0);
     }, 0);
 
+    // Reward Icons entries that point to this URL
     const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
 
-    const correctUse = (suite?.missions || []).reduce((acc, m)=> acc + (m?.correct?.mediaUrl && same(m.correct.mediaUrl, nurl) ? 1 : 0), 0);
-    const wrongUse   = (suite?.missions || []).reduce((acc, m)=> acc + (m?.wrong?.mediaUrl   && same(m.wrong.mediaUrl,   nurl) ? 1 : 0), 0);
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
+  }
 
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, correctUse, wrongUse };
+  function addPoolItem(kind, url) {
+    const label = baseNameFromUrl(url);
+    setConfig(c => {
+      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
+      if (kind === 'rewards') m.rewardsPool.push({ url, label });
+      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
+      return { ...c, media: m };
+    });
+  }
+  function addIcon(kind, url) {
+    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
+    const name = baseNameFromUrl(url);
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      const list = icons[kind] || [];
+      // allow duplicates (keys must be unique)
+      let finalKey = key;
+      let suffix = 1;
+      while (list.find(i => i.key === finalKey)) {
+        suffix += 1;
+        finalKey = `${key}-${suffix}`;
+      }
+      list.push({ key: finalKey, name, url });
+      icons[kind] = list;
+      return { ...c, icons };
+    });
+  }
+
+  async function onUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = await uploadToRepo(file, folder);
+    if (url) {
+      refreshInventory();
+      setAddUrl(url);
+    }
   }
 
   async function deleteOne(url) {
-    const use = usageCounts(url);
-    const totalUse =
-      (use.rewardsPool||0)+(use.penaltiesPool||0)+(use.iconMission||0)+(use.iconDevice||0)+(use.iconReward||0)+(use.correctUse||0)+(use.wrongUse||0);
-
-    const msg = totalUse > 0
-      ? `This file is referenced ${totalUse} time(s):\n  Rewards ${use.rewardsPool}, Penalties ${use.penaltiesPool}, Icon→Missions ${use.iconMission}, Icon→Devices ${use.iconDevice}, Icon→Rewards ${use.iconReward}, Correct ${use.correctUse}, Wrong ${use.wrongUse}\n\nDelete anyway?\n${url}`
-      : `Delete this media file?\n${url}`;
-    if (!window.confirm(msg)) return false;
-
     const path = pathFromUrl(url);
     if (!path) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
     }
+    if (!window.confirm(`Delete this media file?\n${url}`)) return false;
     setUploadStatus('Deleting…');
-    const res = await deleteMediaPath(path);
-    setUploadStatus(res.ok ? '✅ Deleted' :
-      `❌ Delete failed via ${res.endpoint} [${res.status}] ${res.body?.slice(0,140) || ''}`);
-    if (res.ok) refreshInventory();
-    return res.ok;
+    const ok = await deleteMediaPath(path);
+    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
+    if (ok) refreshInventory();
+    return ok;
   }
 
   async function deleteAll(list) {
     if (!list?.length) return;
     if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
     setUploadStatus('Deleting group…');
-    let okCount = 0, tried = 0, failures = [], skipped = 0;
+    let okCount = 0;
     for (const it of list) {
       const path = pathFromUrl(it.url);
-      if (!path) { skipped++; continue; }
+      if (!path) continue;
       // eslint-disable-next-line no-await-in-loop
-      const res = await deleteMediaPath(path);
-      if (res.ok) okCount++;
-      else failures.push({ url: it.url, endpoint: res.endpoint, status: res.status });
-      tried++;
+      const ok = await deleteMediaPath(path);
+      if (ok) okCount++;
     }
-    setUploadStatus(
-      `✅ Deleted ${okCount}/${tried} (skipped ${skipped} external/unknown).` +
-      (failures.length ? ` Last error: ${failures[0].endpoint} [${failures[0].status}]` : '')
-    );
+    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
     refreshInventory();
   }
 
+  // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
     const t = classifyByExt(it.url);
     if (!acc[t]) acc[t] = [];
@@ -2356,18 +2275,38 @@ function MediaPoolTab({
     return acc;
   }, {});
   const sections = [
-    { key:'image', title:'Images (jpg/png/webp/gif)', items: [...(itemsByType.image||[]), ...(itemsByType.gif||[])] },
-    { key:'video', title:'Video (mp4/webm/mov)',      items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/ogg/m4a)',   items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',                       items: itemsByType.gif   || [] },
+    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
+    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',              items: itemsByType.gif   || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[0];
+  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
 
   return (
     <main style={S.wrap}>
-      {/* Upload UI removed by request */}
+      {/* Upload */}
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Upload</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
+          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
+          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
+            <option value="uploads">uploads</option>
+            <option value="bundles">bundles</option>
+            <option value="icons">icons</option>
+          </select>
+          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
+            Upload
+            <input type="file" onChange={onUpload} style={{ display:'none' }} />
+          </label>
+        </div>
+        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
+        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+          Inventory {busy ? '(loading…)':''}: {inv.length} files
+        </div>
+      </div>
 
-      <div style={{ ...S.card }}>
+      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      <div style={{ ...S.card, marginTop:16 }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
           {subTabs.map(st => (
             <button
@@ -2380,107 +2319,124 @@ function MediaPoolTab({
           ))}
         </div>
 
+        {/* Active section */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
-          <div style={{ display:'flex', gap:8 }}>
-            <button
-              style={S.button}
-              onClick={()=> {
-                const rows = active.items.map(x => ({ url: x.url, path: pathFromUrl(x.url) }));
-                const mapped = rows.filter(r => !!r.path);
-                const unmapped = rows.filter(r => !r.path);
-                const samples = mapped.slice(0, 3).map(r => `${r.url}  →  ${r.path}`).join('\n');
-                alert(
-                  `Delete diagnostics:\n` +
-                  `• Inventory total: ${rows.length}\n` +
-                  `• Resolvable paths: ${mapped.length}\n` +
-                  `• Unresolvable (external/cdn): ${unmapped.length}\n\n` +
-                  (samples ? `Samples:\n${samples}` : `No resolvable samples.`)
-                );
-              }}
-              title="Check path mapping"
-            >
-              Delete diagnostics
-            </button>
-            <button
-              style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-              onClick={()=>deleteAll(active.items)}
-              disabled={!active.items.length}
-              title="Delete all files in this type"
-            >
-              Delete All
-            </button>
-          </div>
+          <button
+            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+            onClick={()=>deleteAll(active.items)}
+            disabled={!active.items.length}
+            title="Delete all files in this type"
+          >
+            Delete All
+          </button>
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files {busy ? '(loading…)':''}.</div>
+          <div style={{ color:'#9fb0bf' }}>No files.</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
+              const use = usageCounts(url);
               return (
                 <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                  <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
-                    {baseNameFromUrl(url)}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
+                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {baseNameFromUrl(url)}
+                    </div>
+                    {/* Usage chips next to title (per-file, per service) */}
+                    <div style={S.chipRow}>
+                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
+                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
+                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
+                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
+                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
+                    </div>
                   </div>
 
                   <MediaPreview url={url} kind={active.key} />
 
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
-                    <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
-                      Open
-                    </a>
-                    <button
-                      style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                      onClick={()=>deleteOne(url)}
-                      title="Delete this file"
-                    >
-                      Delete
-                    </button>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+                    {/* Assign actions — labels include per-file counts */}
+                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
+                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
+                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
+                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
+                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
+
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                        Open
+                      </a>
+                      <button
+                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                        onClick={()=>deleteOne(url)}
+                        title="Delete this file"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files • {uploadStatus}
-        </div>
       </div>
     </main>
   );
 }
 
-/* ───────────────────────── ASSIGNED MEDIA (READ-ONLY) ───────────────────────── */
-function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
+/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
 
-  // read-only snapshot, no selection/adding/removing/reapply
+  function removePoolItem(kind, idx) {
+    if (!window.confirm('Remove this item from the assigned list?')) return;
+    setConfig(c => {
+      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
+      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
+      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
+      return { ...c, media: m };
+    });
+  }
+  function removeIcon(kind, key) {
+    if (!window.confirm('Remove this icon from the assigned list?')) return;
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      icons[kind] = icons[kind].filter(i => i.key !== key);
+      return { ...c, icons };
+    });
+  }
+
   return (
     <main style={S.wrap}>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:8 }}>
-        These are the currently assigned <b>Icons</b> and <b>Media Pools</b>. Manage content in other tabs; no selection or uploads here.
-      </div>
-
       {/* Icons */}
       <div style={S.card}>
-        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
-        <IconList
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
+          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
+        </div>
+
+        <IconGroup
           title={`Mission Icons (${iconsM.length})`}
           items={iconsM}
+          onRemove={(key)=>removeIcon('missions', key)}
         />
-        <IconList
+        <IconGroup
           title={`Device Icons (${iconsD.length})`}
           items={iconsD}
+          onRemove={(key)=>removeIcon('devices', key)}
         />
-        <IconList
+        <IconGroup
           title={`Reward Icons (${iconsR.length})`}
           items={iconsR}
+          onRemove={(key)=>removeIcon('rewards', key)}
         />
       </div>
 
@@ -2488,20 +2444,28 @@ function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
       <div style={{ ...S.card, marginTop:16 }}>
         <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <PoolList title={`Rewards Pool (${rewards.length})`} items={rewards} />
-          <PoolList title={`Penalties Pool (${penalties.length})`} items={penalties} />
+          <Pool
+            title={`Rewards Pool (${rewards.length})`}
+            items={rewards}
+            onRemove={(idx)=>removePoolItem('rewards', idx)}
+          />
+          <Pool
+            title={`Penalties Pool (${penalties.length})`}
+            items={penalties}
+            onRemove={(idx)=>removePoolItem('penalties', idx)}
+          />
         </div>
       </div>
     </main>
   );
 }
 
-/* Shared read-only pieces for Assigned Media */
-function IconList({ title, items }) {
+/* Shared pieces for Assigned Media */
+function IconGroup({ title, items, onRemove }) {
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons.</div>}
+      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
           <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
@@ -2514,6 +2478,12 @@ function IconList({ title, items }) {
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>onRemove(it.key)}
+              >
+                Remove
+              </button>
             </div>
           </div>
         ))}
@@ -2521,8 +2491,7 @@ function IconList({ title, items }) {
     </div>
   );
 }
-
-function PoolList({ title, items }) {
+function Pool({ title, items, onRemove }) {
   return (
     <div>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
@@ -2535,6 +2504,12 @@ function PoolList({ title, items }) {
             <MediaPreview url={it.url} kind="pool item" />
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
+              >
+                Remove
+              </button>
             </div>
           </div>
         ))}
