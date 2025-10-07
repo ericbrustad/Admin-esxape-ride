@@ -1,41 +1,87 @@
 // pages/api/list-media.js
-import { ghEnv, resolveBranch, ghHeaders } from './_gh-helpers';
+// Canonical listing of media for the Admin inventory.
+// Prefers Admin public assets; falls back to Game only if Admin doesn't have it.
+// De-duplicates by filename (case-insensitive).
 
-function classify(url) {
-  const s = url.toLowerCase();
-  if (/\.(png|jpg|jpeg|webp)$/.test(s)) return 'image';
-  if (/\.(gif)$/.test(s)) return 'gif';
-  if (/\.(mp4|webm|mov)$/.test(s)) return 'video';
-  if (/\.(mp3|wav|ogg|m4a)$/.test(s)) return 'audio';
+import fs from 'fs';
+import path from 'path';
+
+const EXTS = {
+  image: /\.(png|jpg|jpeg|webp)$/i,
+  gif: /\.(gif)$/i,
+  video: /\.(mp4|webm|mov)$/i,
+  audio: /\.(mp3|wav|ogg|m4a)$/i,
+};
+
+function classify(name) {
+  if (EXTS.gif.test(name)) return 'gif';
+  if (EXTS.image.test(name)) return 'image';
+  if (EXTS.video.test(name)) return 'video';
+  if (EXTS.audio.test(name)) return 'audio';
   return 'other';
 }
 
-export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).end();
+function listFiles(absDir) {
   try {
-    const requested = String(req.query.dir || '').replace(/[^a-z0-9_-]/gi, '');
-    const dir = ['uploads', 'bundles', 'icons'].includes(requested) ? requested : 'uploads';
-
-    const { token, owner, repo, branch } = ghEnv();
-    const ref = await resolveBranch({ token, owner, repo, branch });
-
-    const basePath = `public/media/${dir}`;
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${basePath}?ref=${encodeURIComponent(ref)}`;
-    const r = await fetch(url, { headers: ghHeaders(token), cache: 'no-store' });
-
-    if (!r.ok) return res.status(200).json({ items: [] }); // empty ok
-
-    const arr = await r.json();
-    const items = (Array.isArray(arr) ? arr : [])
-      .filter(it => it.type === 'file')
-      .map(it => ({
-        name: it.name,
-        url: `/media/${dir}/${it.name}`,
-        type: classify(it.name),
-      }));
-
-    res.status(200).json({ items });
+    return fs
+      .readdirSync(absDir, { withFileTypes: true })
+      .filter(d => d.isFile())
+      .map(d => d.name);
   } catch {
-    res.status(200).json({ items: [] });
+    return [];
+  }
+}
+
+export default async function handler(req, res) {
+  try {
+    const dir = (req.query.dir || 'bundles').toString(); // 'bundles' | 'overlays'
+    const cwd = process.cwd();
+    const gameOrigin = process.env.NEXT_PUBLIC_GAME_ORIGIN || '';
+
+    // Priority: 1) Admin public (canonical), 2) Game public (fallback if Admin missing)
+    const adminRoot = path.join(cwd, 'public', 'media', dir);
+    const gameRoot  = path.join(cwd, 'game', 'public', 'media', dir);
+
+    const adminNames = listFiles(adminRoot);
+    const gameNames  = listFiles(gameRoot);
+
+    const seenByName = new Set(); // case-insensitive
+    const out = [];
+
+    // 1) Admin (canonical)
+    for (const name of adminNames) {
+      const type = classify(name);
+      if (type === 'other') continue;
+      const key = name.toLowerCase();
+      if (seenByName.has(key)) continue;
+      seenByName.add(key);
+      out.push({
+        name,
+        url: `/media/${dir}/${encodeURIComponent(name)}`,
+        type,
+        source: 'admin',
+      });
+    }
+
+    // 2) Game (fallback only for names not present in Admin)
+    if (gameOrigin) {
+      for (const name of gameNames) {
+        const type = classify(name);
+        if (type === 'other') continue;
+        const key = name.toLowerCase();
+        if (seenByName.has(key)) continue; // Admin has it → skip Game
+        seenByName.add(key);
+        out.push({
+          name,
+          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
+          type,
+          source: 'game',
+        });
+      }
+    }
+
+    return res.status(200).json({ ok: true, items: out });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
 }

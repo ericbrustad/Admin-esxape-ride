@@ -75,7 +75,7 @@ async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
   const out = [];
   await Promise.all(dirs.map(async (dir) => {
     try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
+      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
       const j = await r.json();
       (j?.items || []).forEach(it => {
         const url = it.url || '';
@@ -95,18 +95,10 @@ function baseNameFromUrl(url) {
     return file.replace(/[-_]+/g, ' ').trim();
   }
 }
-function qs(obj) {
-  const p = new URLSearchParams();
-  Object.entries(obj).forEach(([k,v])=>{
-    if (v===undefined || v===null || v==='') return;
-    p.set(k, String(v));
-  });
-  const s = p.toString();
-  return s ? `?${s}` : '';
-}
 
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
+  // filenames are relative to /media/bundles/
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
@@ -161,7 +153,7 @@ const TYPE_FIELDS = {
   geofence_image: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'imageUrl',  label:'Image URL (https)', type:'text' },
     { key:'overlayText',label:'Caption/Text', type:'text', optional: true },
@@ -169,7 +161,7 @@ const TYPE_FIELDS = {
   geofence_video: [
     { key:'lat', label:'Latitude', type:'number' },
     { key:'lng', label:'Longitude', type:'number' },
-    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:500 },
+    { key:'radiusMeters',    label:'Geofence Radius (m)', type:'number', min:5, max:2000 },
     { key:'cooldownSeconds', label:'Cooldown (sec)', type:'number', min:5, max:240 },
     { key:'videoUrl',  label:'Video URL (https)', type:'text' },
     { key:'overlayText',label:'Overlay Text (optional)', type:'text', optional: true },
@@ -234,7 +226,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
+  const [activeSlug, setActiveSlug] = useState('');
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -245,59 +237,37 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
-  const [suite, setSuite]   = useState(null);
-  const [config, setConfig] = useState(null);
+  const [suite, setSuite]   = useState(null); // missions + version
+  const [config, setConfig] = useState(null); // devices + media + icons + appearance
   const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const [dirty, setDirty]       = useState(false);
 
-  // selections
-  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
-  const [selectedMissionIdx, setSelectedMissionIdx] = useState(null);
-
-  // Devices tab
+  // Device manager
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
   const [placingDev, setPlacingDev] = useState(false);
+  const [selectedDevIdx, setSelectedDevIdx] = useState(null);
   const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
 
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // Combined Save & Publish
+  // Combined Save & Publish controls
   const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
-  // Pin size (selected)
-  const [selectedPinSize, setSelectedPinSize] = useState(28);
-  const defaultPinSize = 24;
-
-  // Undo/Redo
-  const historyRef = useRef({ past: [], future: [] });
-
-  // Settings → Region search
-  const [mapSearchQ, setMapSearchQ] = useState('');
-  const [mapSearching, setMapSearching] = useState(false);
-  const [mapResults, setMapResults] = useState([]);
-
-  // Test preview nonce (force iframe reload)
-  const [previewNonce, setPreviewNonce] = useState(0);
-
-  // Delete confirm modal
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-
   useEffect(() => {
     try {
-      const savedDelay = localStorage.getItem('deployDelaySec');
-      if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
-      const savedSel = localStorage.getItem('selectedPinSize');
-      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
+      const saved = localStorage.getItem('deployDelaySec');
+      if (saved != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(saved) || 0)));
     } catch {}
   }, []);
-  useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
-  useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
+  useEffect(() => {
+    try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {}
+  }, [deployDelaySec]);
 
   const gameBase =
     ((typeof window !== 'undefined'
@@ -307,76 +277,27 @@ export default function Admin() {
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig({ ...config, devices: list, powerups: list });
 
-  function snapshotState() {
-    return {
-      missions: JSON.parse(JSON.stringify(suite?.missions || [])),
-      devices: JSON.parse(JSON.stringify(getDevices() || [])),
-    };
-  }
-  function pushHistory() {
-    if (!suite || !config) return;
-    historyRef.current.past.push(snapshotState());
-    historyRef.current.future = [];
-  }
-  function canUndo() { return historyRef.current.past.length > 0; }
-  function canRedo() { return historyRef.current.future.length > 0; }
-  function undo() {
-    if (!canUndo()) return;
-    const current = snapshotState();
-    const prev = historyRef.current.past.pop();
-    historyRef.current.future.push(current);
-    setSuite((s) => ({ ...s, missions: prev.missions }));
-    setDevices(prev.devices);
-    setStatus('↶ Undid last change');
-  }
-  function redo() {
-    if (!canRedo()) return;
-    const current = snapshotState();
-    const next = historyRef.current.future.pop();
-    historyRef.current.past.push(current);
-    setSuite((s) => ({ ...s, missions: next.missions }));
-    setDevices(next.devices);
-    setStatus('↷ Redid last change');
-  }
-  useEffect(() => {
-    function onKey(e) {
-      const z = e.key === 'z' || e.key === 'Z';
-      const y = e.key === 'y' || e.key === 'Y';
-      if ((e.ctrlKey || e.metaKey) && z) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-      else if ((e.ctrlKey || e.metaKey) && y) { e.preventDefault(); redo(); }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   /* load games */
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+        const r = await fetch('/api/games', { credentials:'include' });
         const j = await r.json();
         if (j.ok) setGames(j.games || []);
       } catch {}
     })();
   }, []);
 
-  /* load suite/config when slug changes */
+  /* load suite/config */
   useEffect(() => {
     (async () => {
       try {
         setStatus('Loading…');
-        const isDefault = !activeSlug || activeSlug === 'default';
-
-        const missionUrls = isDefault
-          ? ['/missions.json']
-          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
-
-        const configUrls = isDefault
-          ? ['/api/config']
-          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+        const missionUrls = activeSlug ? [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`] : [`/missions.json`];
+        const configUrl   = activeSlug ? `/api/config?slug=${encodeURIComponent(activeSlug)}` : `/api/config`;
 
         const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchFirstJson(configUrls, defaultConfig());
+        const c0 = await fetchJsonSafe(configUrl, defaultConfig());
 
         const dc = defaultConfig();
         const normalized = {
@@ -387,7 +308,7 @@ export default function Admin() {
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
             correct: x.correct || { mode:'none' },
             wrong:   x.wrong   || { mode:'none' },
-            showContinue: x.showContinue !== false,
+            showContinue: x.showContinue !== false, // default true
           })),
         };
 
@@ -403,12 +324,12 @@ export default function Admin() {
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
+        // Re-apply defaults if sets are empty/missing
         merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
         setConfig(merged);
         setSelected(null); setEditing(null); setDirty(false);
-        setSelectedDevIdx(null); setSelectedMissionIdx(null);
         setStatus('');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
@@ -428,8 +349,10 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      // NEW: Game-wide map defaults (for coherent region)
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
-      geofence: { mode: 'test' },
+      // NEW: Geofence mode (admin-side toggle; the Game app can use this)
+      geofence: { mode: 'test' }, // 'test' | 'live'
     };
   }
   function defaultContentForType(t) {
@@ -448,139 +371,105 @@ export default function Admin() {
     }
   }
 
-  /* ── API helpers respecting Default Game (legacy root) ── */
-  function isDefaultSlug(slug) { return !slug || slug === 'default'; }
-
-  async function saveAllWithSlug(slug) {
-    if (!suite || !config) return false;
-    setStatus('Saving…');
-    const url = isDefaultSlug(slug)
-      ? `/api/save-bundle`
-      : `/api/save-bundle${qs({ slug })}`;
+  async function saveAll() {
+    if (!suite || !config) return;
+    setStatus('Saving… (writing missions + config safely)');
+    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
     try {
-      const r = await fetch(url, {
+      const r = await fetch('/api/save-bundle' + qs, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ missions: suite, config })
       });
-      const text = await r.text();
-      if (!r.ok) throw new Error(text || 'save failed');
-      setStatus('✅ Saved');
-      return true;
+      if (!r.ok) throw new Error(await r.text());
+      setStatus('✅ Saved (files committed). If Game files changed, Vercel will redeploy.');
     } catch (e) {
-      setStatus('❌ Save failed: ' + (e?.message || e));
-      return false;
-    }
-  }
-
-  async function publishWithSlug(slug, channel='published') {
-    // Try query form first (/api/game?slug=x&channel=...), fall back to path (/api/game/x?channel=...)
-    const first = isDefaultSlug(slug)
-      ? `/api/game${qs({ channel })}`
-      : `/api/game${qs({ slug, channel })}`;
-    const fallback = isDefaultSlug(slug)
-      ? null
-      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
-
-    try {
-      const res = await fetch(first, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-        body: JSON.stringify({ action:'publish' })
-      });
-      const txt = await res.text();
-      let data = {};
-      try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) { if (fallback) throw new Error('try fallback'); else throw new Error(txt||'publish failed'); }
-      setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
-      return true;
-    } catch (e) {
-      if (!fallback) { setStatus('❌ Publish failed: ' + (e?.message||e)); return false; }
+      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
+      await new Promise(r => setTimeout(r, 900));
       try {
-        const res2 = await fetch(fallback, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ action:'publish' })
+        const r2 = await fetch('/api/save-bundle' + qs, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ missions: suite, config })
         });
-        const txt2 = await res2.text();
-        let data2 = {};
-        try { data2 = JSON.parse(txt2); } catch {}
-        if (!res2.ok) throw new Error(txt2||'publish failed');
-        setStatus(`✅ Published${data2?.version ? ` v${data2.version}` : ''}`);
-        return true;
+        if (!r2.ok) throw new Error(await r2.text());
+        setStatus('✅ Saved after retry.');
       } catch (e2) {
-        setStatus('❌ Publish failed: ' + (e2?.message || e2));
-        return false;
+        setStatus('❌ Save failed: ' + (e2?.message || e2));
       }
     }
   }
-
-  async function reloadGamesList() {
+  async function handlePublish() {
     try {
-      const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
-      const j = await r.json();
-      if (j.ok) setGames(j.games || []);
-    } catch {}
+      setStatus('Publishing…');
+      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Publish failed');
+      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game`);
+    } catch (e) {
+      setStatus('❌ Publish failed: ' + (e?.message || e));
+    }
   }
 
+  // Combined Save + Publish with a delay
   async function saveAndPublish() {
     if (!suite || !config) return;
-    const slug = activeSlug || 'default';
+    const qs = activeSlug ? `?slug=${encodeURIComponent(activeSlug)}` : '';
     setSavePubBusy(true);
+    setStatus('Saving… (writing missions + config safely)');
+    let saveOk = false;
 
-    const saved = await saveAllWithSlug(slug);
-    if (!saved) { setSavePubBusy(false); return; }
-
-    // optional deploy delay
-    if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
-
-    await publishWithSlug(slug, 'published');
-
-    // Refresh state, list & preview
-    await reloadGamesList();
-    setPreviewNonce(n => n + 1);
-    setSavePubBusy(false);
-  }
-
-  /* Delete game (with modal confirm) */
-  async function reallyDeleteGame() {
-    const slug = activeSlug || 'default';
-    const urlTry = [
-      `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,                 // DELETE /api/games?slug=x
-      !isDefaultSlug(slug) ? `/api/game${qs({ slug })}` : null,                      // DELETE /api/game?slug=x
-      !isDefaultSlug(slug) ? `/api/games/${encodeURIComponent(slug)}` : null,        // DELETE /api/games/x
-      !isDefaultSlug(slug) ? `/api/game/${encodeURIComponent(slug)}` : null,         // DELETE /api/game/x
-    ].filter(Boolean);
-
-    setStatus('Deleting game…');
-    let ok = false, lastErr = '';
-    for (const u of urlTry) {
+    try {
+      const r = await fetch('/api/save-bundle' + qs, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ missions: suite, config })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      saveOk = true;
+      setStatus(`✅ Saved. Waiting ${deployDelaySec}s before publish…`);
+    } catch (e) {
+      setStatus('❌ Save failed (auto-retrying)… ' + (e?.message || e));
+      await new Promise(r => setTimeout(r, 900));
       try {
-        const res = await fetch(u, { method:'DELETE', credentials:'include' });
-        if (res.ok) { ok = true; break; }
-        lastErr = await res.text();
-      } catch (e) { lastErr = e?.message || String(e); }
+        const r2 = await fetch('/api/save-bundle' + qs, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ missions: suite, config })
+        });
+        if (!r2.ok) throw new Error(await r2.text());
+        saveOk = true;
+        setStatus(`✅ Saved after retry. Waiting ${deployDelaySec}s before publish…`);
+      } catch (e2) {
+        setSavePubBusy(false);
+        setStatus('❌ Save failed — publish skipped: ' + (e2?.message || e2));
+        return;
+      }
     }
 
-    if (!ok) {
-      // Fall back: clear locally & save (root or slug)
-      pushHistory();
-      setSuite({ version:'0.0.0', missions:[] });
-      setConfig(c => ({
-        ...c, devices: [], powerups: [], media: { rewardsPool:[], penaltiesPool:[] }, textRules: [],
-      }));
-      const saved = await saveAllWithSlug(slug);
-      if (saved) { setStatus('✅ Cleared game content'); ok = true; }
+    if (saveOk && deployDelaySec > 0) {
+      await new Promise(r => setTimeout(r, deployDelaySec * 1000));
     }
 
-    if (ok) {
-      await reloadGamesList();
-      setActiveSlug('default');
-      setStatus('✅ Game deleted');
-      setPreviewNonce(n => n + 1);
-    } else {
-      setStatus('❌ Delete failed: ' + (lastErr || 'unknown error'));
+    try {
+      setStatus('Publishing…');
+      const res  = await fetch(`/api/game/${activeSlug || ''}?channel=published`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ action:'publish' })
+      });
+      const data = await res.json().catch(()=> ({}));
+      if (!res.ok) throw new Error(data?.error || 'Publish failed');
+      setStatus(`✅ Published v${data?.version || ''} — Vercel is redeploying the Game (delay ${deployDelaySec}s used)`);
+    } catch (e) {
+      setStatus('❌ Publish failed: ' + (e?.message || e));
+    } finally {
+      setSavePubBusy(false);
     }
-    setConfirmDeleteOpen(false);
   }
 
   /* Missions CRUD */
@@ -596,13 +485,14 @@ export default function Admin() {
       title: 'New Mission',
       type: 'multiple_choice',
       iconKey: '',
+      // iconUrl removed from editor path (kept for legacy read only)
       rewards: { points: 25 },
       correct: { mode: 'none' },
       wrong:   { mode: 'none' },
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
-      showContinue: true,
+      showContinue: true, // NEW
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -626,7 +516,7 @@ export default function Admin() {
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number' || f.optional) continue;
-      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue;
+      if (f.key === 'acceptable' || f.key === 'mediaUrl') continue; // explicitly optional
       const v = editing.content?.[f.key];
       if (v === undefined || v === null || v === '') {
         return setStatus('❌ Missing: ' + f.label);
@@ -636,28 +526,24 @@ export default function Admin() {
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
-
-    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
-    setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
+    if (i >= 0) missions[i] = obj; else missions.push(obj);
+    setSuite({ ...suite, missions, version: bumpVersion(suite.version || '0.0.0') });
     setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ Mission saved');
+    setStatus('✅ Mission saved (remember Save All)');
   }
   function removeMission(id) {
     if (!suite) return;
-    pushHistory();
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
     if (!suite) return;
-    pushHistory();
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
     setSuite({ ...suite, missions: list });
   }
   function duplicateMission(idx) {
-    pushHistory();
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
@@ -665,10 +551,10 @@ export default function Admin() {
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
-    setStatus('✅ Duplicated');
+    setStatus('✅ Duplicated (remember Save All)');
   }
 
-  /* Devices (Devices tab only) */
+  /* Devices (Map-Side Manager) */
   const devices = getDevices();
   function deviceIconUrlFromKey(key) {
     if (!key) return '';
@@ -678,16 +564,10 @@ export default function Admin() {
   function addDevice() {
     setPlacingDev(true);
     setSelectedDevIdx(null);
-    setSelectedMissionIdx(null);
-    setDevDraft({
-      title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120,
-      lat:Number((config.map?.centerLat ?? 44.9778)),
-      lng:Number((config.map?.centerLng ?? -93.2650))
-    });
+    setDevDraft({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
   }
   function saveDraftDevice() {
     if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
-    pushHistory();
     const item = {
       id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
       title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
@@ -695,18 +575,16 @@ export default function Admin() {
       iconKey: devDraft.iconKey || '',
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
-      lat: Number(Number(devDraft.lat).toFixed(6)),
-      lng: Number(Number(devDraft.lng).toFixed(6)),
+      lat: Number(devDraft.lat.toFixed(6)),
+      lng: Number(devDraft.lng.toFixed(6)),
     };
     setDevices([...(devices || []), item]);
     setPlacingDev(false);
     setSelectedDevIdx((devices?.length || 0));
-    setSelectedMissionIdx(null);
-    setStatus('✅ Device added');
+    setStatus('✅ Device added (remember Save All)');
   }
   function deleteSelectedDevice() {
     if (selectedDevIdx == null) return;
-    pushHistory();
     const list = [...devices];
     list.splice(selectedDevIdx, 1);
     setDevices(list);
@@ -714,7 +592,6 @@ export default function Admin() {
   }
   function duplicateSelectedDevice() {
     if (selectedDevIdx == null) return;
-    pushHistory();
     const src = devices[selectedDevIdx]; if (!src) return;
     const copy = { ...JSON.parse(JSON.stringify(src)) };
     copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
@@ -723,51 +600,18 @@ export default function Admin() {
   }
   function moveSelectedDevice(lat, lng) {
     if (selectedDevIdx == null) return;
-    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
     setDevices(list);
   }
   function setSelectedDeviceRadius(r) {
     if (selectedDevIdx == null) return;
-    pushHistory();
     const list = [...devices];
     list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
     setDevices(list);
   }
 
-  // Missions selection operations (Missions tab only)
-  function moveSelectedMission(lat, lng) {
-    if (selectedMissionIdx == null) return;
-    pushHistory();
-    const list = [...(suite?.missions || [])];
-    const m = list[selectedMissionIdx]; if (!m) return;
-    const c = { ...(m.content || {}) };
-    c.lat = Number(lat.toFixed(6));
-    c.lng = Number(lng.toFixed(6));
-    c.geofenceEnabled = true;
-    c.radiusMeters = clamp(Number(c.radiusMeters || 25), 5, 500);
-    list[selectedMissionIdx] = { ...m, content: c };
-    setSuite({ ...suite, missions: list });
-    setStatus(`Moved mission #${selectedMissionIdx+1}`);
-  }
-  function setSelectedMissionRadius(r) {
-    if (selectedMissionIdx == null) return;
-    pushHistory();
-    const list = [...(suite?.missions || [])];
-    const m = list[selectedMissionIdx]; if (!m) return;
-    const c = { ...(m.content || {}) };
-    c.radiusMeters = clamp(Number(r || 0), 5, 500);
-    c.geofenceEnabled = true;
-    if (!isFinite(Number(c.lat)) || !isFinite(Number(c.lng))) {
-      c.lat = Number(config.map?.centerLat || 44.9778);
-      c.lng = Number(config.map?.centerLng || -93.2650);
-    }
-    list[selectedMissionIdx] = { ...m, content: c };
-    setSuite({ ...suite, missions: list });
-  }
-
-  // Address search (Devices tab)
+  // Address search
   async function devSearch(e) {
     e?.preventDefault();
     const q = devSearchQ.trim();
@@ -790,8 +634,10 @@ export default function Admin() {
     if (placingDev) {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
-      pushHistory();
       moveSelectedDevice(lat, lon);
+    } else {
+      setPlacingDev(true);
+      setDevDraft(d => ({ ...d, lat, lng: lon }));
     }
     setDevResults([]);
   }
@@ -800,62 +646,6 @@ export default function Admin() {
     navigator.geolocation.getCurrentPosition(pos => {
       applySearchResult({ lat: pos.coords.latitude, lon: pos.coords.longitude });
     });
-  }
-
-  // Settings → Map center search
-  async function searchMapCenter(e) {
-    e?.preventDefault?.();
-    const q = mapSearchQ.trim();
-    if (!q) return;
-    setMapSearching(true);
-    setMapResults([]);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=8&addressdetails=1`;
-      const r = await fetch(url);
-      const j = await r.json();
-      setMapResults(Array.isArray(j) ? j : []);
-    } catch { setMapResults([]); }
-    finally { setMapSearching(false); }
-  }
-  function useCenterResult(r) {
-    const lat = Number(r.lat), lng = Number(r.lon);
-    setConfig(c => ({ ...c, map: { ...(c.map||{}), centerLat: Number(lat.toFixed(6)), centerLng: Number(lng.toFixed(6)) } }));
-    setMapResults([]);
-  }
-
-  // Project Health scan
-  async function scanProject() {
-    const inv = await listInventory(['uploads','bundles','icons']);
-    const allUrls = new Set(inv.map(i => i.url));
-    const used = new Set();
-
-    const iconUrlByKey = {};
-    (config?.icons?.missions || []).forEach(i => { if (i.key && i.url) iconUrlByKey['missions:'+i.key]=i.url; });
-    (config?.icons?.devices  || []).forEach(i => { if (i.key && i.url) iconUrlByKey['devices:'+i.key]=i.url; });
-
-    (suite?.missions || []).forEach(m => {
-      if (m.iconUrl) used.add(m.iconUrl);
-      if (m.iconKey && iconUrlByKey['missions:'+m.iconKey]) used.add(iconUrlByKey['missions:'+m.iconKey]);
-      const c = m.content || {};
-      ['mediaUrl','imageUrl','videoUrl','assetUrl','markerUrl'].forEach(k => { if (c[k]) used.add(c[k]); });
-      if (m.correct?.mediaUrl) used.add(m.correct.mediaUrl);
-      if (m.wrong?.mediaUrl)   used.add(m.wrong.mediaUrl);
-    });
-    (getDevices() || []).forEach(d => {
-      if (d.iconKey && iconUrlByKey['devices:'+d.iconKey]) used.add(iconUrlByKey['devices:'+d.iconKey]);
-    });
-    (config?.media?.rewardsPool || []).forEach(x => x.url && used.add(x.url));
-    (config?.media?.penaltiesPool || []).forEach(x => x.url && used.add(x.url));
-
-    const unused = inv.filter(i => !used.has(i.url));
-    const usedCount = used.size;
-    const total = inv.length;
-
-    setStatus(`Scan complete: ${usedCount}/${total} media referenced; ${unused.length} unused.`);
-    alert(
-      `${usedCount}/${total} media referenced\n` +
-      (unused.length ? `Unused files:\n- `+unused.map(u=>u.url).join('\n- ') : 'No unused files detected')
-    );
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
@@ -886,37 +676,20 @@ export default function Admin() {
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
 
-  const missionRadiusDisabled = (selectedMissionIdx==null);
-  const missionRadiusValue = selectedMissionIdx!=null
-    ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
-    : 25;
-
-  const deviceRadiusDisabled = (selectedDevIdx==null && !placingDev);
-  const deviceRadiusValue = selectedDevIdx!=null
-    ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
-    : Number(devDraft.pickupRadius ?? 100);
-
-  const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
-
-  const tabsOrder = ['missions','devices','settings','text','media','test'];
-
-  const isDefault = !activeSlug || activeSlug === 'default';
-  const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
-
   return (
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {tabsOrder.map((t)=>(
+            {['settings','missions','text','devices','map','media','test'].map((t)=>(
               <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
                 {t.toUpperCase()}
               </button>
             ))}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8 }}>
               <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
+                <option value="">(legacy root)</option>
                 {games.map(g=>(
                   <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                 ))}
@@ -924,8 +697,8 @@ export default function Admin() {
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
             </div>
 
-            {/* Save & Publish with optional delay */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            {/* Combined Save + Publish with optional delay */}
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                 Deploy delay (sec):
                 <input
@@ -936,13 +709,7 @@ export default function Admin() {
                 />
               </label>
               <button
-                onClick={async ()=>{
-                  await saveAndPublish();
-                  // hard reload data after
-                  const isDefaultNow = !activeSlug || activeSlug === 'default';
-                  // re-pull suite/config for confidence
-                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
-                }}
+                onClick={saveAndPublish}
                 disabled={savePubBusy}
                 style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
               >
@@ -950,14 +717,10 @@ export default function Admin() {
               </button>
             </div>
 
-            <a
-              href={isDefault ? '/missions.json' : `/games/${encodeURIComponent(activeSlug)}/missions.json`}
-              target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a href={activeSlug?`/games/${encodeURIComponent(activeSlug)}/missions.json`:'/missions.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
-            <a
-              href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
-              target="_blank" rel="noreferrer" style={{ ...S.button }}>
+            <a href={activeSlug?`/api/config?slug=${encodeURIComponent(activeSlug)}`:'/config.json'} target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
           </div>
@@ -968,12 +731,10 @@ export default function Admin() {
       {/* MISSIONS */}
       {tab==='missions' && (
         <main style={S.wrapGrid2}>
-          {/* Left list */}
+          {/* Left list (new mission button here) */}
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:8, marginBottom:8 }}>
               <button onClick={startNew} style={S.button}>+ New Mission</button>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
             </div>
             <input
               placeholder="Search…"
@@ -1008,76 +769,146 @@ export default function Admin() {
             </div>
           </aside>
 
-          {/* Right: Missions Map */}
+          {/* Right: Overview Map + device controls + overlay editor */}
           <section style={{ position:'relative' }}>
             <div style={S.card}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8 }}>
                 <div>
-                  <h3 style={{ margin:0 }}>Missions Map</h3>
+                  <h3 style={{ margin:0 }}>Overview Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
+                    Click to place a device (when “Add Device” is active). If a device is selected, click to move it.
                   </div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                  </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
-                      disabled={selectedMissionIdx==null}
-                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
-                    />
-                    <code style={{ color:'#9fb0bf' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
-                  </label>
+                <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                </label>
+              </div>
+
+              {/* Device manager row */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, marginBottom:8, alignItems:'center' }}>
+                <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
+                  <input placeholder="Search address or place for device…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
+                  <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
+                  <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
+                </form>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button style={S.button} onClick={addDevice}>+ Add Device</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
+                  <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <input
+                    type="range" min={5} max={2000} step={5}
+                    value={selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius || 0) : (devDraft.pickupRadius || 0)}
+                    onChange={(e)=>{
+                      const r = Number(e.target.value);
+                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                      else setDevDraft(d=>({ ...d, pickupRadius: r }));
+                    }}
+                  />
+                  <code style={{ color:'#9fb0bf' }}>
+                    {(selectedDevIdx!=null ? (devices[selectedDevIdx]?.pickupRadius||0) : (devDraft.pickupRadius||0))} m
+                  </code>
                 </div>
               </div>
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
-                <input
-                  type="range" min={5} max={500} step={5}
-                  disabled={missionRadiusDisabled}
-                  value={missionRadiusValue}
-                  onChange={(e)=> setSelectedMissionRadius(Number(e.target.value)) }
-                />
-                <code style={{ color:'#9fb0bf' }}>
-                  {selectedMissionIdx==null ? 'Select a mission to adjust radius' : `M${selectedMissionIdx+1} radius: ${missionRadiusValue} m`}
-                </code>
+              {/* Search results */}
+              {devResults.length>0 && (
+                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginBottom:8, maxHeight:160, overflow:'auto' }}>
+                  {devResults.map((r,i)=>(
+                    <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Device chips with tiny preview */}
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                {(devices||[]).map((d,i)=>{
+                  const url = deviceIconUrlFromKey(d.iconKey);
+                  return (
+                    <button
+                      key={d.id||i}
+                      style={{
+                        ...S.button, padding:'6px 10px',
+                        background: selectedDevIdx===i ? '#1a2027' : '#0f1418',
+                        borderColor: selectedDevIdx===i ? '#2a5c8a' : '#2a323b',
+                        display:'flex', alignItems:'center', gap:6
+                      }}
+                      onClick={() => { setSelectedDevIdx(i); setPlacingDev(false); }}
+                      title={`${d.title||d.type} (#${i+1})`}
+                    >
+                      {url ? <img alt="" src={toDirectMediaURL(url)} style={{ width:16, height:16, objectFit:'cover', borderRadius:3 }}/> : null}
+                      D{i+1} {d.title ? `— ${d.title}` : ''}
+                    </button>
+                  );
+                })}
+                {placingDev && <span style={{ color:'#9fb0bf' }}>Placing new device: click map to set location, then “Save Device”.</span>}
               </div>
 
+              {/* Draft device editor with preview */}
+              {placingDev && (
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                    <div>
+                      {devDraft.iconKey
+                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+                    </div>
+                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
+                    <Field label="Type">
+                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
+                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
+                        <option value="">(default)</option>
+                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Effect (sec)">
+                      <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
+                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
+                    </Field>
+                  </div>
+                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
+                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
+                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
+                    <div style={{ color:'#9fb0bf' }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
+                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Map */}
               <MapOverview
                 missions={(suite?.missions)||[]}
                 devices={(config?.devices)||[]}
                 icons={config.icons || DEFAULT_ICONS}
                 showRings={showRings}
-                interactive={false}
-                draftDevice={null}
-                selectedDevIdx={null}
-                selectedMissionIdx={selectedMissionIdx}
-                onDraftChange={null}
-                onMoveSelected={null}
-                onMoveSelectedMission={(lat,lng)=>moveSelectedMission(lat,lng)}
-                onSelectDevice={null}
-                onSelectMission={(i)=>{ setSelectedMissionIdx(i); }}
+                interactive={placingDev}
+                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
+                selectedDevIdx={selectedDevIdx}
+                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
+                onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
                 mapCenter={mapCenter}
                 mapZoom={mapZoom}
-                defaultIconSizePx={defaultPinSize}
-                selectedIconSizePx={selectedPinSize}
-                readOnly={false}
-                lockToRegion={false}
               />
             </div>
 
             {/* Mission editor (overlay) */}
             {editing && (
               <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
-                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
-                    </div>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
+                  <h3 style={{ marginTop:0 }}>Edit Mission</h3>
+                  <div style={{ display:'flex', gap:8, marginBottom:8 }}>
+                    <button style={S.button} onClick={saveToList}>Save Mission</button>
+                    <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
 
                   <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
@@ -1091,7 +922,7 @@ export default function Admin() {
                     </select>
                   </Field>
 
-                  {/* Icon select with thumbnail (inventory-only) */}
+                  {/* Icon select with thumbnail (no free-form upload) */}
                   <Field label="Icon">
                     <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                       <select
@@ -1117,6 +948,7 @@ export default function Admin() {
 
                   <hr style={S.hr}/>
 
+                  {/* QUESTION-FIRST ORDERING */}
                   {editing.type === 'multiple_choice' && (
                     <>
                       <Field label="Question">
@@ -1178,24 +1010,26 @@ export default function Admin() {
                     </Field>
                   )}
 
+                  {/* Geofence types */}
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
-                        onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
+                        onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
                       />
                     </div>
                   )}
 
+                  {/* Optional geofence for others */}
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
                           onChange={(e)=>{ const on=e.target.checked;
                             const next={ ...editing.content, geofenceEnabled:on };
-                            if (on && (!isFinite(Number(next.lat)) || !isFinite(Number(next.lng)))) { next.lat=mapCenter.lat; next.lng=mapCenter.lng; }
+                            if (on && (!next.lat || !next.lng)) { next.lat=mapCenter.lat; next.lng=mapCenter.lng; }
                             setEditing({ ...editing, content:next }); setDirty(true);
                           }}/> Enable geofence for this mission
                       </label>
@@ -1204,7 +1038,7 @@ export default function Admin() {
                           <MapPicker
                             lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                             center={mapCenter}
-                            onChange={(l1,l2,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat:l1, lng:l2, radiusMeters:clamp(rad,5,500) } }); setDirty(true); }}
+                            onChange={(lat,lng,rad)=>{ setEditing({ ...editing, content:{ ...editing.content, lat, lng, radiusMeters:rad } }); setDirty(true); }}
                           />
                           <Field label="Cooldown (sec)">
                             <input type="number" min={0} max={3600} style={S.input}
@@ -1217,6 +1051,7 @@ export default function Admin() {
                     </div>
                   )}
 
+                  {/* Remaining generic fields (skip ones we rendered above) */}
                   {(TYPE_FIELDS[editing.type] || [])
                     .filter(f => !(editing.type === 'multiple_choice' && f.key === 'question'))
                     .filter(f => !(editing.type === 'short_answer' && (f.key === 'question' || f.key === 'answer' || f.key === 'acceptable')))
@@ -1236,8 +1071,7 @@ export default function Admin() {
                         <input type="number" min={f.min} max={f.max} style={S.input}
                           value={editing.content?.[f.key] ?? ''} onChange={(e)=>{
                             const v = e.target.value==='' ? '' : Number(e.target.value);
-                            const vClamped = (f.key==='radiusMeters') ? clamp(v,5,500) : v;
-                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:vClamped } }); setDirty(true);
+                            setEditing({ ...editing, content:{ ...editing.content, [f.key]:v } }); setDirty(true);
                           }}/>
                       )}
                       {f.type==='multiline' && (
@@ -1255,7 +1089,115 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
+                  {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
+                  <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <Field label="Mode">
+                      <select style={S.input}
+                        value={editing.correct?.mode || 'none'}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mode:e.target.value } }); setDirty(true); }}>
+                        <option value="none">None</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="gif">GIF</option>
+                        <option value="statement">Statement</option>
+                      </select>
+                    </Field>
+                    <Field label="Optional audio URL (mp3/wav)">
+                      <input style={S.input}
+                        value={editing.correct?.audioUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  </div>
+                  {(editing.correct?.mode === 'image' || editing.correct?.mode === 'video' || editing.correct?.mode === 'gif') && (
+                    <DropOrPick
+                      label="Reward media"
+                      dir="bundles"
+                      acceptKinds={editing.correct?.mode==='video' ? ['video'] : editing.correct?.mode==='gif' ? ['gif'] : ['image','gif']}
+                      url={editing.correct?.mediaUrl || ''}
+                      onChangeUrl={(u)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), mediaUrl:u } }); setDirty(true); }}
+                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                    />
+                  )}
+                  {editing.correct?.mode === 'statement' && (
+                    <Field label="Statement text">
+                      <textarea style={{ ...S.input, height: 90 }} value={editing.correct?.text || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), text:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Reward device (optional)">
+                      <select style={S.input}
+                        value={editing.correct?.deviceType || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), deviceType:e.target.value } }); setDirty(true); }}>
+                        <option value="">(none)</option>
+                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Clue (optional)">
+                      <input style={S.input}
+                        value={editing.correct?.clue || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), clue:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                    <div />
+                  </div>
+
+                  <h4 style={{ marginTop: 12, marginBottom: 6 }}>On Wrong Answer</h4>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <Field label="Mode">
+                      <select style={S.input}
+                        value={editing.wrong?.mode || 'none'}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mode:e.target.value } }); setDirty(true); }}>
+                        <option value="none">None</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="gif">GIF</option>
+                        <option value="statement">Statement</option>
+                      </select>
+                    </Field>
+                    <Field label="Optional audio URL (mp3/wav)">
+                      <input style={S.input}
+                        value={editing.wrong?.audioUrl || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), audioUrl:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  </div>
+                  {(editing.wrong?.mode === 'image' || editing.wrong?.mode === 'video' || editing.wrong?.mode === 'gif') && (
+                    <DropOrPick
+                      label="Penalty media"
+                      dir="bundles"
+                      acceptKinds={editing.wrong?.mode==='video' ? ['video'] : editing.wrong?.mode==='gif' ? ['gif'] : ['image','gif']}
+                      url={editing.wrong?.mediaUrl || ''}
+                      onChangeUrl={(u)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), mediaUrl:u } }); setDirty(true); }}
+                      uploadToRepo={async (file, folder)=>{ try { return await uploadToRepo(file, folder); } catch { return ''; } }}
+                    />
+                  )}
+                  {editing.wrong?.mode === 'statement' && (
+                    <Field label="Statement text">
+                      <textarea style={{ ...S.input, height: 90 }} value={editing.wrong?.text || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), text:e.target.value } }); setDirty(true); }}/>
+                    </Field>
+                  )}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    <Field label="Punishment device (optional)">
+                      <select style={S.input}
+                        value={editing.wrong?.deviceType || ''}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), deviceType:e.target.value } }); setDirty(true); }}>
+                        <option value="">(none)</option>
+                        {DEVICE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </Field>
+                    <Field label="Delay (seconds, optional)">
+                      <input type="number" min={0} max={3600} style={S.input}
+                        value={editing.wrong?.delaySec ?? 0}
+                        onChange={(e)=>{ setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), delaySec: Number(e.target.value||0) } }); setDirty(true); }}/>
+                    </Field>
+                    <div />
+                  </div>
+
+                  <hr style={S.hr}/>
+
+                  {/* NEW: Continue button flag */}
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input
                       type="checkbox"
@@ -1276,169 +1218,13 @@ export default function Admin() {
                   )}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                    <button style={S.button} onClick={saveToList}>Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
                 </div>
               </div>
             )}
-          </section>
-        </main>
-      )}
-
-      {/* DEVICES */}
-      {tab==='devices' && (
-        <main style={S.wrapGrid2}>
-          <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
-            </div>
-
-            <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
-              <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
-                <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
-                <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
-              </form>
-
-              <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
-                {devResults.map((r,i)=>(
-                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
-                    <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                    <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={S.button} onClick={addDevice}>+ Add Device</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
-              {(selectedDevIdx!=null) && (
-                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); }}>Clear selection</button>
-              )}
-            </div>
-
-            <ul style={{ paddingLeft: 18 }}>
-              {(devices||[]).map((x,i)=>(
-                <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
-                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
-                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
-                  <button
-                    style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
-                    onClick={()=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
-                  >
-                    Select
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
-          </aside>
-
-          <section style={{ position:'relative' }}>
-            <div style={S.card}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
-                <div>
-                  <h3 style={{ margin:0 }}>Devices Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
-                  </div>
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                  </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
-                      disabled={selectedDevIdx==null}
-                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
-                    />
-                    <code style={{ color:'#9fb0bf' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
-                <input
-                  type="range" min={5} max={2000} step={5}
-                  disabled={deviceRadiusDisabled}
-                  value={deviceRadiusValue}
-                  onChange={(e)=>{
-                    const r = Number(e.target.value);
-                    if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
-                    else setDevDraft(d=>({ ...d, pickupRadius: r }));
-                  }}
-                />
-                <code style={{ color:'#9fb0bf' }}>
-                  {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                   : placingDev ? `New device radius: ${deviceRadiusValue} m`
-                   : 'Select a device to adjust radius'}
-                </code>
-              </div>
-
-              {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
-                    <div>
-                      {devDraft.iconKey
-                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
-                    </div>
-                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
-                    <Field label="Type">
-                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
-                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
-                        <option value="">(default)</option>
-                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Effect (sec)">
-                      <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
-                    </Field>
-                  </div>
-                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
-                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
-                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
-                    <div style={{ color:'#9fb0bf' }}>
-                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
-                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <MapOverview
-                missions={(suite?.missions)||[]}
-                devices={devices}
-                icons={config.icons||DEFAULT_ICONS}
-                showRings={showRings}
-                mapCenter={mapCenter}
-                mapZoom={mapZoom}
-                defaultIconSizePx={defaultPinSize}
-                selectedIconSizePx={selectedPinSize}
-                interactive={placingDev}
-                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
-                selectedDevIdx={selectedDevIdx}
-                selectedMissionIdx={null}
-                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
-                onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
-                onMoveSelectedMission={null}
-                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
-                onSelectMission={null}
-                readOnly={false}
-                lockToRegion={true}
-              />
-            </div>
           </section>
         </main>
       )}
@@ -1465,6 +1251,7 @@ export default function Admin() {
             </Field>
           </div>
 
+          {/* NEW: Game Region & Geofence */}
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
@@ -1481,20 +1268,6 @@ export default function Admin() {
                   value={config.map?.centerLng ?? ''}
                   onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
                 />
-              </Field>
-              <Field label="Find center by address/city">
-                <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                  <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
-                  <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
-                </form>
-                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
-                  {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
-                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-                    </div>
-                  ))}
-                </div>
               </Field>
               <Field label="Default Zoom">
                 <input
@@ -1515,20 +1288,7 @@ export default function Admin() {
               </Field>
             </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click‑to‑enter in test vs GPS in live.
-            </div>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Maintenance</h3>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=> setConfirmDeleteOpen(true)}
-              >
-                🗑 Delete Game
-              </button>
-              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
+              These defaults ensure all pins open centered in the same region. The Game client can use <b>Geofence Mode</b> to allow “click‑to‑enter” in test, and real GPS entry in live.
             </div>
           </div>
 
@@ -1546,7 +1306,50 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab suite={suite} config={config} setConfig={setConfig} setStatus={setStatus}/>}
 
-      {/* MEDIA */}
+      {/* DEVICES (list) */}
+      {tab==='devices' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <h3 style={{ marginTop:0 }}>Devices</h3>
+            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” on the Missions tab or map-side manager.</div>}
+            <ul style={{ paddingLeft:18 }}>
+              {(devices||[]).map((x,i)=>(
+                <li key={x.id||i} style={{ marginBottom:8 }}>
+                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • radius {x.pickupRadius}m • effect {x.effectSeconds}s
+                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • lat {x.lat}, lng {x.lng}</> : ' • (not placed)'}
+                  {x.iconKey?<> • icon <code>{x.iconKey}</code></>:null}
+                  <button style={{ ...S.button, marginLeft:8, padding:'6px 10px' }}
+                    onClick={()=>{ const next=[...devices]; next.splice(i,1); setDevices(next); }}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </main>
+      )}
+
+      {/* MAP */}
+      {tab==='map' && (
+        <main style={S.wrap}>
+          <div style={S.card}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:8 }}>
+              <h3 style={{ margin:0 }}>Game Map</h3>
+              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+              </label>
+            </div>
+            <MapOverview
+              missions={(suite?.missions)||[]}
+              devices={devices}
+              icons={config.icons||DEFAULT_ICONS}
+              showRings={showRings}
+              mapCenter={mapCenter}
+              mapZoom={mapZoom}
+            />
+          </div>
+        </main>
+      )}
+
+      {/* MEDIA — Icons + Reward & Penalty pools */}
       {tab==='media' && (
         <MediaTab
           config={config}
@@ -1567,29 +1370,20 @@ export default function Admin() {
           <div style={S.card}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
               <h3 style={{ margin:0 }}>Play Test</h3>
-              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <label>Channel:&nbsp;
                   <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
                     <option value="draft">draft</option>
                     <option value="published">published</option>
                   </select>
                 </label>
-                <button style={S.button} onClick={()=>setPreviewNonce(n=>n+1)}>Reload preview</button>
-                <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
+                <TestLauncher slug={activeSlug||''} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
-              <iframe
-                key={previewNonce} // hard refresh on nonce change
-                src={`${gameBase}/?${new URLSearchParams({
-                  ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
-                  channel: testChannel,
-                  preview: '1',
-                  cb: String(Date.now())
-                }).toString()}`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
-              />
+              <iframe src={`${gameBase}/?slug=${activeSlug||''}&channel=${testChannel}&preview=1`}
+                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}/>
             )}
           </div>
         </main>
@@ -1629,32 +1423,12 @@ export default function Admin() {
                   method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
                   body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
                 });
-                const j = await r.json().catch(()=>({ ok:false }));
+                const j = await r.json();
                 if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
-                await reloadGamesList();
-                setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
+                const rr = await fetch('/api/games', { credentials:'include' }); const jj = await rr.json();
+                if (jj.ok) setGames(jj.games || []);
+                setActiveSlug(j.slug); setNewTitle(''); setShowNewGame(false);
               }}>Create</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirm modal */}
-      {confirmDeleteOpen && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'#e9eef2', marginBottom:12 }}>
-              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
-            </div>
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={reallyDeleteGame}
-              >
-                Delete
-              </button>
             </div>
           </div>
         </div>
@@ -1801,7 +1575,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
@@ -1819,31 +1593,25 @@ const S = {
 /* MapOverview — shows missions + devices */
 function MapOverview({
   missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
-  interactive = false, draftDevice = null,
-  selectedDevIdx = null, selectedMissionIdx = null,
-  onDraftChange = null, onMoveSelected = null, onMoveSelectedMission = null,
-  onSelectDevice = null, onSelectMission = null,
+  interactive = false, draftDevice = null, selectedDevIdx = null,
+  onDraftChange = null, onMoveSelected = null,
   mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13,
-  defaultIconSizePx = 24, selectedIconSizePx = 28,
-  readOnly = false,
-  lockToRegion = false,
 }) {
   const divRef = React.useRef(null);
   const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
 
-  function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
+  function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng);
+    if(!isFinite(lat)||!isFinite(lng))return null; if(!(c.geofenceEnabled||Number(c.radiusMeters)>0))return null; return [lat,lng]; }
   function getDevicePos(d){ const lat=Number(d?.lat),lng=Number(d?.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
   function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?toDirectMediaURL(it.url||''):''; }
-  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false, size=24){
-    const s = Math.max(12, Math.min(64, Number(size)||24));
+  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false){
     const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
-      : `<div style="width:${s-4}px;height:${s-4}px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
-    const font = Math.round(s*0.5);
+      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
+      : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
     return window.L.divIcon({
       className:'num-pin',
-      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-${Math.round(s*0.45)}px;left:50%;transform:translateX(-50%);font-weight:700;font-size:${font}px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
-      iconSize:[s, s+4], iconAnchor:[s/2, s/2]
+      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font-weight:700;font-size:12px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
+      iconSize:[24,28], iconAnchor:[12,12]
     });
   }
 
@@ -1875,50 +1643,28 @@ function MapOverview({
     const layer=map._layerGroup;
     const bounds=L.latLngBounds([]);
 
-    // Missions
     (missions||[]).forEach((m,idx)=>{
       const pos=getMissionPos(m); if(!pos) return;
       const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
-      const isSel = (selectedMissionIdx===idx);
-      const size = isSel ? selectedIconSizePx : defaultIconSizePx;
-      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,size), draggable:(!readOnly && isSel)}).addTo(layer);
+      L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',false)}).addTo(layer);
       const rad=Number(m.content?.radiusMeters||0);
-      let circle=null;
-      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer); }
-      if (onSelectMission) {
-        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectMission(idx); });
-      }
-      if(!readOnly && isSel && onMoveSelectedMission){
-        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
-        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      }
+      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
-    // Devices
     (devices||[]).forEach((d,idx)=>{
       const pos=getDevicePos(d); if(!pos) return;
       const url=iconUrl('devices', d.iconKey);
       const hl = (selectedDevIdx===idx);
-      const size = hl ? selectedIconSizePx : defaultIconSizePx;
-      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl && !!onMoveSelected)}).addTo(layer);
+      L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl)}).addTo(layer);
       const rad=Number(d.pickupRadius||0);
-      let circle=null;
-      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
-      if (onSelectDevice) {
-        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice(idx); });
-      }
-      if(!readOnly && hl && onMoveSelected){
-        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
-        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      }
+      if(showRings && rad>0) L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer);
       bounds.extend(pos);
     });
 
-    // Draft device (Devices tab)
-    if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
+    if(draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
       const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
+      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true), draggable:true }).addTo(layer);
       if(showRings && Number(draftDevice.radius)>0){
         const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
         mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
@@ -1927,29 +1673,19 @@ function MapOverview({
       bounds.extend(pos);
     }
 
-    // Click handler
+    // Click handler: place draft, or move selected device ONLY
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
-      if (readOnly) return;
       const lat=e.latlng.lat, lng=e.latlng.lng;
       if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
       if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
+      // else: do nothing (no accidental nearest-pin moves)
     };
     map.on('click', map._clickHandler);
 
-    if (lockToRegion) {
-      map.setView(initialCenter, initialZoom);
-    } else if(bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.2));
-    } else {
-      map.setView(initialCenter, initialZoom);
-    }
-  },[
-    leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
-    selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
-    onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly, lockToRegion
-  ]);
+    if(bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+    else map.setView(initialCenter, initialZoom);
+  },[leafletReady, missions, devices, icons, showRings, interactive, draftDevice, selectedDevIdx, onDraftChange, onMoveSelected, mapCenter, mapZoom]);
 
   return (
     <div>
@@ -1959,11 +1695,11 @@ function MapOverview({
   );
 }
 
-/* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
+/* MapPicker — geofence mini map with draggable marker + radius slider */
 function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
   const divRef = useRef(null);
   const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
-  const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
+  const [rad, setRad] = useState(Number(radius) || 25);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1975,7 +1711,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
     const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
   }, []);
 
-  useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
+  useEffect(() => { setRad(Number(radius) || 25); }, [radius]);
 
   useEffect(() => {
     if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
@@ -1993,13 +1729,13 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
       marker.on('dragend', () => {
         const p = marker.getLatLng();
-        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
+        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(rad));
       });
 
       map.on('click', (e) => {
         marker.setLatLng(e.latlng);
         circle.setLatLng(e.latlng);
-        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
+        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(rad));
       });
 
       divRef.current._leaflet_map = map;
@@ -2016,7 +1752,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       marker.setLatLng(pos);
       circle.setLatLng(pos);
       map.setView(pos, map.getZoom());
-      circle.setRadius(Number(clamp(rad,5,500)));
+      circle.setRadius(Number(rad) || 25);
     }
   }, [leafletReady, lat, lng, rad, onChange, center]);
 
@@ -2026,9 +1762,9 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
       <div ref={divRef} style={{ height:260, borderRadius:10, border:'1px solid #22303c', background:'#0b1116' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
-          type="range" min={5} max={500} step={5} value={rad}
+          type="range" min={5} max={2000} step={5} value={rad}
           onChange={(e) => {
-            const next = clamp(Number(e.target.value),5,500);
+            const next = Number(e.target.value);
             setRad(next);
             if (divRef.current?._circle) divRef.current._circle.setRadius(next);
             if (divRef.current?._marker) {
@@ -2128,7 +1864,9 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
 
   const [pool, setPool] = useState([]);
   useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['icons','bundles','uploads'])); } catch {}
+    try {
+      setPool(await listInventory(['icons','bundles','uploads']));
+    } catch {}
   })(); }, []);
 
   function setUrlAndMaybeName(idx, url) {
@@ -2194,7 +1932,9 @@ function IconsEditor({ config, setConfig, label, kind, uploadToRepo }) {
 function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
   const [pool, setPool] = useState([]);
   useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles'])); } catch {}
+    try {
+      setPool(await listInventory(['uploads','bundles']));
+    } catch {}
   })(); }, []);
 
   return (
@@ -2239,14 +1979,88 @@ function MediaPoolEditor({ title, items, onChange, uploadToRepo }) {
   );
 }
 
-/* Inventory modal (for pools & editors that allow picking) */
+/* Inventory + DropOrPick */
+function DropOrPick({ label, dir='bundles', url, onChangeUrl, uploadToRepo, acceptKinds = ['image','gif','video','audio'] }) {
+  const [pool, setPool] = React.useState([]);
+  const [hover, setHover] = React.useState(false);
+  const [showInv, setShowInv] = React.useState(false);
+
+  React.useEffect(()=>{ (async()=>{
+    try {
+      setPool(await listInventory([dir, 'uploads']));
+    } catch {}
+  })(); }, [dir]);
+
+  async function onDrop(e) {
+    e.preventDefault(); e.stopPropagation(); setHover(false);
+    const f = (e.dataTransfer?.files && e.dataTransfer.files[0]) || null;
+    if (!f) return;
+    const type = f.type.toLowerCase();
+    const ok =
+      (acceptKinds.includes('image') && type.startsWith('image/')) ||
+      (acceptKinds.includes('gif')   && f.name.toLowerCase().endsWith('.gif')) ||
+      (acceptKinds.includes('video') && type.startsWith('video/')) ||
+      (acceptKinds.includes('audio') && type.startsWith('audio/'));
+    if (!ok) return;
+    const u = await uploadToRepo(f, 'uploads');
+    if (u) onChangeUrl(u);
+  }
+
+  function hint() {
+    const kinds = acceptKinds.includes('video') ? '.mp4 / .webm / .mov'
+      : acceptKinds.includes('audio') ? '.mp3 / .wav / .ogg / .m4a'
+      : acceptKinds.includes('gif')   ? '.gif'
+      : '.png / .jpg / .jpeg / .webp';
+    const word = acceptKinds.includes('video') ? 'video'
+      : acceptKinds.includes('audio') ? 'audio'
+      : acceptKinds.includes('gif')   ? 'GIF'
+      : 'image';
+    return `Drop a ${word} (${kinds}) here, paste a URL, or open inventory ↓`;
+  }
+
+  const filtered = pool.filter(it => acceptKinds.includes(it.type));
+
+  return (
+    <Field label={label}>
+      <div
+        onDragEnter={(e)=>{e.preventDefault(); setHover(true);}}
+        onDragOver={(e)=>{e.preventDefault();}}
+        onDragLeave={(e)=>{e.preventDefault(); setHover(false);}}
+        onDrop={onDrop}
+        style={{ border:'1px dashed #2a323b', borderRadius:8, padding:8, background:hover?'#0e1116':'transparent' }}
+      >
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+          <input className="__url" style={S.input} value={url || ''} onChange={(e)=>onChangeUrl(e.target.value)} placeholder={hint()} />
+          <button type="button" style={S.button} onClick={()=>setShowInv(true)}>Open Media Inventory</button>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:6 }}>
+          <select style={S.input} onChange={(e)=>onChangeUrl(e.target.value)} value="">
+            <option value="">Quick pick from inventory…</option>
+            {filtered.map((it) => <option key={it.url} value={it.url}>{it.name}</option>)}
+          </select>
+        </div>
+        {url ? <div style={{ marginTop:6 }}><MediaPreview url={url} kind="preview" /></div> : null}
+      </div>
+
+      {showInv && (
+        <MediaInventoryModal
+          acceptKinds={acceptKinds}
+          onClose={()=>setShowInv(false)}
+          onPick={(u)=>{ onChangeUrl(u); setShowInv(false); }}
+        />
+      )}
+    </Field>
+  );
+}
 function MediaInventoryModal({ acceptKinds=['image','gif','video','audio'], onClose, onPick }) {
   const [pool, setPool] = useState([]);
   const [q, setQ] = useState('');
   const [tab, setTab] = useState(acceptKinds[0] || 'image');
 
   useEffect(()=>{ (async()=>{
-    try { setPool(await listInventory(['uploads','bundles','icons'])); } catch {}
+    try {
+      setPool(await listInventory(['uploads','bundles','icons']));
+    } catch {}
   })(); }, []);
 
   const groups = {
@@ -2308,7 +2122,7 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     const rules = [...(config?.textRules || []), { ...smsRule, delaySec: Number(smsRule.delaySec || 0) } ];
     setConfig({ ...config, textRules: rules });
     setSmsRule({ missionId: '', phoneSlot: 1, message: '', delaySec: 30 });
-    setStatus('✅ SMS rule added');
+    setStatus('✅ SMS rule added (remember Save All)');
   }
   function removeSmsRule(idx) {
     const rules = [...(config?.textRules || [])];
@@ -2358,6 +2172,7 @@ function TextTab({ suite, config, setConfig, setStatus }) {
     </main>
   );
 }
+
 function TestSMS() {
   const [to, setTo] = useState('');
   const [msg, setMsg] = useState('Test message from admin');

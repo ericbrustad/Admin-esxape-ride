@@ -1,90 +1,129 @@
 // pages/api/games.js
-import { ghEnv, ghHeaders, resolveBranch, getFileJSON, putFile, deleteFile } from './_gh-helpers';
+// ------------------
+// [1] GitHub API config + helpers
+const GH = 'https://api.github.com';
+const owner  = process.env.REPO_OWNER;
+const repo   = process.env.REPO_NAME;
+const token  = process.env.GITHUB_TOKEN;
+const branch = process.env.REPO_BRANCH || 'main';
 
-export default async function handler(req, res) {
-  try {
-    const { token, owner, repo, branch } = ghEnv();
-    const ref = await resolveBranch({ token, owner, repo, branch });
+const authHeaders = {
+  Authorization: `Bearer ${token}`,
+  'User-Agent': 'esx-admin',
+  Accept: 'application/vnd.github+json',
+};
 
-    // GET — list games (hydrate title/mode from each config.json)
-    if (req.method === 'GET') {
-      const r = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/contents/public/games?ref=${encodeURIComponent(ref)}`,
-        { headers: ghHeaders(token), cache: 'no-store' }
-      );
-      if (!r.ok) return res.json({ ok: true, games: [] });
+async function getFile(path) {
+  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
+  const res = await fetch(url, { headers: authHeaders });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const text = Buffer.from(json.content || '', 'base64').toString('utf8');
+  return { sha: json.sha, text };
+}
 
-      const items = await r.json();
-      const dirs = (Array.isArray(items) ? items : [])
-        .filter(i => i.type === 'dir')
-        .map(i => i.name);
+async function putFile(path, text, message) {
+  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+  const head = await getFile(path);
+  const body = {
+    message,
+    content: Buffer.from(text, 'utf8').toString('base64'),
+    branch,
+    ...(head ? { sha: head.sha } : {}),
+  };
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { ...authHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`GitHub PUT failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
 
-      const games = await Promise.all(dirs.map(async (slug) => {
-        const cfg = await getFileJSON({ token, owner, repo, ref, path: `public/games/${slug}/config.json` });
-        return {
-          slug,
-          title: cfg?.json?.game?.title || slug,
-          mode: cfg?.json?.splash?.mode || 'single',
-        };
-      }));
+const slugify = (s) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'game';
 
-      return res.json({ ok: true, games });
-    }
-
-    // POST — create a new game
-    if (req.method === 'POST') {
-      const { title, type, mode, timer } = req.body;
-      const slug = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'game';
-
-      const dir = `public/games/${slug}`;
-
-      await putFile({
-        token, owner, repo, ref,
-        path: `${dir}/config.json`,
-        contentString: JSON.stringify({
-          game: { title, type },
-          splash: { enabled: true, mode },
-          timer,
-          map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
-        }, null, 2),
-        message: `create ${dir}/config.json via Admin UI`,
-      });
-
-      await putFile({
-        token, owner, repo, ref,
-        path: `${dir}/missions.json`,
-        contentString: JSON.stringify({ version: '1.0.0', missions: [] }, null, 2),
-        message: `create ${dir}/missions.json via Admin UI`,
-      });
-
-      return res.json({ ok: true, slug });
-    }
-
-    // DELETE — delete entire game folder (delete each file inside)
-    if (req.method === 'DELETE') {
-      const slug = String(req.query.slug || '');
-      if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug' });
-
-      const list = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/contents/public/games/${slug}?ref=${encodeURIComponent(ref)}`,
-        { headers: ghHeaders(token), cache: 'no-store' }
-      );
-      if (!list.ok) return res.json({ ok: false, error: 'Folder not found' });
-      const files = await list.json();
-
-      for (const f of files) {
-        await deleteFile({
-          token, owner, repo, ref,
-          path: f.path,
-          sha: f.sha,
-          message: `delete ${f.path} via Admin UI`,
-        });
+// [2] Defaults for a brand-new game
+function defaultSuite(title, type) {
+  return {
+    version: '0.0.1',
+    missions: [
+      {
+        id: 'm01',
+        title: 'Welcome',
+        type: 'statement',
+        rewards: { points: 10 },
+        content: { text: `Welcome to ${title}! Ready to play?` }
       }
-      return res.json({ ok: true });
-    }
+    ],
+  };
+}
 
-    res.status(405).end();
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+function defaultConfig(title, gameType, mode = 'single') {
+  const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
+  return {
+    splash: { enabled: true, mode }, // single | head2head | multi
+    game: { title, type: gameType || 'Mystery' },
+    forms: { players },              // 1 | 2 | 4
+    textRules: []
+  };
+}
+
+// [3] Handler: GET (list), POST (create)
+export default async function handler(req, res) {
+  if (!token || !owner || !repo) {
+    return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
   }
+
+  const indexPath = 'public/games/index.json';
+
+  if (req.method === 'GET') {
+    const file = await getFile(indexPath);
+    const list = file ? JSON.parse(file.text || '[]') : [];
+    return res.json({ ok: true, games: list });
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const { title, type, mode = 'single' } = req.body || {};
+      if (!title) return res.status(400).json({ ok: false, error: 'title required' });
+
+      // load index & ensure unique slug
+      const file = await getFile(indexPath);
+      const list = file ? JSON.parse(file.text || '[]') : [];
+      const taken = new Set(list.map(g => g.slug));
+
+      let base = slugify(title);
+      let slug = base || 'game';
+      let i = 2;
+      while (taken.has(slug)) slug = `${base}-${i++}`;
+
+      // create suite + config
+      const suite  = defaultSuite(title, type);
+      const config = defaultConfig(title, type, mode);
+
+      await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
+        `feat: create game ${slug} missions.json`);
+      await putFile(`public/games/${slug}/config.json`, JSON.stringify(config, null, 2),
+        `feat: create game ${slug} config.json`);
+
+      // update index.json
+      const item = { slug, title, type: type || 'Mystery', mode, createdAt: new Date().toISOString() };
+      const next = [...list, item];
+      await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
+
+      return res.json({ ok: true, slug, game: item });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ ok: false, error: String(err.message || err) });
+    }
+  }
+
+  res.setHeader('Allow', 'GET, POST');
+  return res.status(405).end();
 }

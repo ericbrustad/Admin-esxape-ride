@@ -1,35 +1,57 @@
 // pages/api/upload.js
-import { ghEnv, resolveBranch, ghHeaders } from './_gh-helpers';
+// JSON body: { path: "public/media/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
+// Writes into your GitHub repo via Contents API. Creates folders as needed.
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
   try {
-    const { path, contentBase64, message = 'upload via Admin UI' } = req.body || {};
-    if (!path || !contentBase64) return res.status(400).json({ ok: false, error: 'Missing path or content' });
-    if (!String(path).startsWith('public/media/')) return res.status(400).json({ ok: false, error: 'Path must be under public/media/' });
+    if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'Use POST' });
 
-    const { token, owner, repo, branch } = ghEnv();
-    const ref = await resolveBranch({ token, owner, repo, branch });
+    const { path, contentBase64, message } = req.body || {};
+    if (!path || !contentBase64) return res.status(400).json({ ok:false, error:'Missing path or contentBase64' });
 
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const owner  = process.env.REPO_OWNER || process.env.GH_OWNER;
+    const repo   = process.env.REPO_NAME  || process.env.GITHUB_REPO || 'Admin-esxape-ride';
+    const token  = process.env.GITHUB_TOKEN;
+    const branch = process.env.GITHUB_BRANCH || 'main';
+    const baseDir = (process.env.GITHUB_BASE_DIR || '').replace(/^\/+|\/+$/g,'');
 
-    // include sha if file exists (update)
-    const head = await fetch(`${url}?ref=${encodeURIComponent(ref)}`, { headers: ghHeaders(token) });
+    if (!owner || !repo || !token) {
+      return res.status(500).json({ ok:false, error:'Missing GitHub env (REPO_OWNER, REPO_NAME, GITHUB_TOKEN)' });
+    }
+
+    const fullPath = baseDir ? `${baseDir}/${path}` : path;
+
+    // Lookup SHA if file exists
+    const headUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}?ref=${branch}`;
     let sha;
+    const head = await fetch(headUrl, {
+      headers:{ Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json' }
+    });
     if (head.ok) {
       const j = await head.json();
       sha = j.sha;
     }
 
-    const r = await fetch(url, {
-      method: 'PUT',
-      headers: ghHeaders(token, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ message, content: contentBase64, ...(sha ? { sha } : {}), branch: ref }),
+    // PUT the file
+    const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}`;
+    const put = await fetch(putUrl, {
+      method:'PUT',
+      headers:{ Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json' },
+      body: JSON.stringify({
+        message: message || `upload ${path}`,
+        content: contentBase64,
+        branch,
+        sha
+      }),
     });
-    if (!r.ok) return res.status(r.status).json({ ok: false, error: await r.text() });
 
-    return res.status(200).json({ ok: true, url: '/' + path.replace(/^public\//, '') });
+    const jr = await put.json();
+    if (!put.ok) {
+      return res.status(put.status).json({ ok:false, error: jr?.message || 'upload failed', response: jr });
+    }
+
+    return res.status(200).json({ ok:true, path, html_url: jr?.content?.html_url });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message });
+    return res.status(500).json({ ok:false, error: String(e) });
   }
 }
