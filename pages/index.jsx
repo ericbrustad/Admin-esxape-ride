@@ -22,7 +22,7 @@ function applyDefaultIcons(cfg) {
       autoDefaults: cfg?.icons?.autoDefaults ?? true, // default ON if missing
       ...(cfg.icons || {})
     }
-  };
+  
 
   // If auto-defaults is OFF, just return without merging any defaults
   if (next.icons.autoDefaults === false) return next;
