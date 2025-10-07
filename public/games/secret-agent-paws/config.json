@@ -15,8 +15,30 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.808635,
+      "lng": -93.364905
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "robot",
+      "type": "clone",
+      "iconKey": "roaming-robot",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.808635,
+      "lng": -93.364905
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
