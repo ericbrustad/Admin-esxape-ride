@@ -13,7 +13,7 @@ export default async function handler(req, res) {
 
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
 
-    // include sha if file exists
+    // include sha if file exists (update)
     const head = await fetch(`${url}?ref=${encodeURIComponent(ref)}`, { headers: ghHeaders(token) });
     let sha;
     if (head.ok) {

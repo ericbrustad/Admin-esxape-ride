@@ -13,12 +13,12 @@ export default async function handler(req, res) {
       ? 'public/missions.json'
       : `public/games/${slug}/missions.json`;
 
-    // Recommit identical content to create a "publish" commit & version stamp
+    // Recommit the same content to produce a publish commit (and version stamp)
     const read = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURI(path)}?ref=${encodeURIComponent(ref)}`,
       { headers: ghHeaders(token), cache: 'no-store' }
     );
-    if (!read.ok) return res.status(404).json({ ok: false, error: 'missions.json not found (save first)' });
+    if (!read.ok) return res.status(404).json({ ok: false, error: 'missions.json not found' });
     const file = await read.json();
 
     const put = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       headers: ghHeaders(token, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         message: `publish ${slug} → ${channel} via Admin UI`,
-        content: file.content,
+        content: file.content, // unchanged
         sha: file.sha,
         branch: ref,
       }),

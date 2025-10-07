@@ -3,7 +3,7 @@
 const nextConfig = {
   async rewrites() {
     return {
-      // Serve latest content from GitHub instead of static /public
+      // Serve latest content from GitHub instead of static /public on Vercel
       beforeFiles: [
         { source: '/missions.json', destination: '/api/file?path=public/missions.json' },
         { source: '/config.json', destination: '/api/file?path=public/config.json' },

@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${basePath}?ref=${encodeURIComponent(ref)}`;
     const r = await fetch(url, { headers: ghHeaders(token), cache: 'no-store' });
 
-    if (!r.ok) return res.status(200).json({ items: [] });
+    if (!r.ok) return res.status(200).json({ items: [] }); // empty ok
 
     const arr = await r.json();
     const items = (Array.isArray(arr) ? arr : [])
