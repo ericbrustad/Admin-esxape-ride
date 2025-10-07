@@ -123,7 +123,6 @@ function pathFromUrl(u) {
 }
 
 /** Delete via one of several endpoints; return detailed diagnostics */
-/** Delete a repo path, trying both POST and DELETE across known endpoints */
 async function deleteMediaPath(repoPath) {
   const attempts = [
     { ep: '/api/delete-media',   method: 'POST'   },
@@ -151,8 +150,6 @@ async function deleteMediaPath(repoPath) {
       const body = await r.text().catch(() => '');
       last = { endpoint: ep, method, status: r.status, body };
       if (r.ok) return { ok: true, ...last };
-      // If endpoint exists but wrong method (405), keep trying the next method/endpoint
-      // If not found (404), keep trying as well
     } catch (e) {
       last = { endpoint: ep, method, status: 0, body: String(e?.message || e) };
     }
@@ -911,6 +908,7 @@ export default function Admin() {
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
+    // kept for internal use by MediaPool delete diagnostics; no upload UI is exposed
     const array  = await file.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
     const safeName = file.name.replace(/[^\w.\-]+/g, '_');
@@ -950,10 +948,8 @@ export default function Admin() {
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
-  // Tabs (added: Media Pool & Assigned Media)
-// Tabs (ASSIGNED MEDIA now left of MEDIA POOL)
-const tabsOrder = ['missions','devices','settings','text','assigned','media-pool','test'];
-
+  // Tabs — switched order: MEDIA POOL now left of ASSIGNED MEDIA
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned','test'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -1155,7 +1151,7 @@ const tabsOrder = ['missions','devices','settings','text','assigned','media-pool
                     </select>
                   </Field>
 
-                  {/* Icon select with thumbnail (inventory-only) */}
+                  {/* Icon select with thumbnail (inventory-only, read-only list stays elsewhere) */}
                   <Field label="Icon">
                     <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
                       <select
@@ -1318,70 +1314,95 @@ const tabsOrder = ['missions','devices','settings','text','assigned','media-pool
                       onChange={(e)=>{ const v=e.target.value===''?0:Number(e.target.value);
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
-{/* ── Correct/Wrong responses using Assigned Media pools ── */}
-<div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12, marginTop:8 }}>
-  <div style={{ fontWeight:600, marginBottom:8 }}>Answer Responses</div>
 
-  <Field label="On Correct — Reward media (from ASSIGNED MEDIA)">
-    {((config.media?.rewardsPool || []).length === 0) ? (
-      <div style={{ color:'#9fb0bf' }}>
-        No Reward media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
-      </div>
-    ) : (
-      <>
-        <select
-          style={S.input}
-          value={editing.correct?.mediaUrl || ''}
-          onChange={(e)=>{
-            const url = e.target.value || '';
-            const mode = url ? 'reward' : 'none';
-            setEditing({
-              ...editing,
-              correct: { ...(editing.correct || {}), mode, mediaUrl: url }
-            });
-            setDirty(true);
-          }}
-        >
-          <option value="">(none)</option>
-          {(config.media.rewardsPool || []).map((it, i)=>(
-            <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
-          ))}
-        </select>
-        {editing.correct?.mediaUrl && <MediaPreview url={editing.correct.mediaUrl} kind="reward" />}
-      </>
-    )}
-  </Field>
+                  {/* ── Correct/Wrong responses — bring back with Ticker option ── */}
+                  <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12, marginTop:8 }}>
+                    <div style={{ fontWeight:600, marginBottom:8 }}>Answer Responses</div>
 
-  <Field label="On Wrong — Penalty media (from ASSIGNED MEDIA)">
-    {((config.media?.penaltiesPool || []).length === 0) ? (
-      <div style={{ color:'#9fb0bf' }}>
-        No Penalty media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
-      </div>
-    ) : (
-      <>
-        <select
-          style={S.input}
-          value={editing.wrong?.mediaUrl || ''}
-          onChange={(e)=>{
-            const url = e.target.value || '';
-            const mode = url ? 'penalty' : 'none';
-            setEditing({
-              ...editing,
-              wrong: { ...(editing.wrong || {}), mode, mediaUrl: url }
-            });
-            setDirty(true);
-          }}
-        >
-          <option value="">(none)</option>
-          {(config.media.penaltiesPool || []).map((it, i)=>(
-            <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
-          ))}
-        </select>
-        {editing.wrong?.mediaUrl && <MediaPreview url={editing.wrong.mediaUrl} kind="penalty" />}
-      </>
-    )}
-  </Field>
-</div>
+                    <Field label="On Correct — Reward media (from ASSIGNED MEDIA)">
+                      {((config.media?.rewardsPool || []).length === 0) ? (
+                        <div style={{ color:'#9fb0bf' }}>
+                          No Reward media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+                        </div>
+                      ) : (
+                        <>
+                          <select
+                            style={S.input}
+                            value={editing.correct?.mediaUrl || ''}
+                            onChange={(e)=>{
+                              const url = e.target.value || '';
+                              const mode = url ? 'reward' : 'none';
+                              setEditing({
+                                ...editing,
+                                correct: { ...(editing.correct || {}), mode, mediaUrl: url, ticker: !!editing?.correct?.ticker }
+                              });
+                              setDirty(true);
+                            }}
+                          >
+                            <option value="">(none)</option>
+                            {(config.media.rewardsPool || []).map((it, i)=>(
+                              <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+                            ))}
+                          </select>
+                          <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editing?.correct?.ticker}
+                              onChange={(e)=>{
+                                const ticker = e.target.checked;
+                                setEditing({ ...editing, correct:{ ...(editing.correct||{}), ticker }});
+                                setDirty(true);
+                              }}
+                            />
+                            Ticker (scrolling) for Correct
+                          </label>
+                          {editing.correct?.mediaUrl && <MediaPreview url={editing.correct.mediaUrl} kind="reward" />}
+                        </>
+                      )}
+                    </Field>
+
+                    <Field label="On Wrong — Penalty media (from ASSIGNED MEDIA)">
+                      {((config.media?.penaltiesPool || []).length === 0) ? (
+                        <div style={{ color:'#9fb0bf' }}>
+                          No Penalty media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+                        </div>
+                      ) : (
+                        <>
+                          <select
+                            style={S.input}
+                            value={editing.wrong?.mediaUrl || ''}
+                            onChange={(e)=>{
+                              const url = e.target.value || '';
+                              const mode = url ? 'penalty' : 'none';
+                              setEditing({
+                                ...editing,
+                                wrong: { ...(editing.wrong || {}), mode, mediaUrl: url, ticker: !!editing?.wrong?.ticker }
+                              });
+                              setDirty(true);
+                            }}
+                          >
+                            <option value="">(none)</option>
+                            {(config.media.penaltiesPool || []).map((it, i)=>(
+                              <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+                            ))}
+                          </select>
+                          <label style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editing?.wrong?.ticker}
+                              onChange={(e)=>{
+                                const ticker = e.target.checked;
+                                setEditing({ ...editing, wrong:{ ...(editing.wrong||{}), ticker }});
+                                setDirty(true);
+                              }}
+                            />
+                            Ticker (scrolling) for Wrong
+                          </label>
+                          {editing.wrong?.mediaUrl && <MediaPreview url={editing.wrong.mediaUrl} kind="penalty" />}
+                        </>
+                      )}
+                    </Field>
+                  </div>
 
                   <hr style={S.hr} />
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -1674,7 +1695,7 @@ const tabsOrder = ['missions','devices','settings','text','assigned','media-pool
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* MEDIA POOL — with sub-tabs, per-file usage counts, "Media Files in use" & Delete diagnostics */}
+      {/* MEDIA POOL — read-only (no select/add/icon/bundle/upload UI), still allows delete/diagnostics */}
       {tab==='media-pool' && (
         <MediaPoolTab
           suite={suite}
@@ -1689,15 +1710,15 @@ const tabsOrder = ['missions','devices','settings','text','assigned','media-pool
         />
       )}
 
-     {tab==='assigned' && (
-  <AssignedMediaTab
-    suite={suite}
-    config={config}
-    setConfig={setConfig}
-    onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
-  />
-)}
-
+      {/* ASSIGNED MEDIA — read-only (no selection/add/remove/reapply/defaults) */}
+      {tab==='assigned' && (
+        <AssignedMediaTab
+          suite={suite}
+          config={config}
+          setConfig={setConfig}
+          onReapplyDefaults={()=>{}}
+        />
+      )}
 
       {/* TEST */}
       {tab==='test' && (
@@ -1939,11 +1960,11 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
+  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' },
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
+  card: { background:'#12181d', border:'1px solid '#1f262d', borderRadius:14, padding:16 },
   missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
   input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
   button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
@@ -2222,7 +2243,7 @@ function TextTab({ config, setConfig }) {
   );
 }
 
-/* ───────────────────────── MEDIA POOL (with sub-tabs, usage chips, "in use" overlay & diagnostics) ───────────────────────── */
+/* ───────────────────────── MEDIA POOL (READ-ONLY) ───────────────────────── */
 function MediaPoolTab({
   suite,
   config,
@@ -2234,7 +2255,6 @@ function MediaPoolTab({
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  // Sub-tabs inside Media Pool. Default → 'image' (Images)
   const subTabs = [
     { key:'image', label:'Images' },
     { key:'video', label:'Videos' },
@@ -2248,7 +2268,7 @@ function MediaPoolTab({
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons']); // still discoverable
+      const items = await listInventory(['uploads','bundles','icons']);
       setInv(items || []);
     } finally { setBusy(false); }
   }
@@ -2256,13 +2276,11 @@ function MediaPoolTab({
   function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
   function same(a,b){ return norm(a) === norm(b); }
 
-  // Only used to warn at delete time (not to "tag")
   function usageCounts(url) {
     const nurl = norm(url);
     const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
     const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
 
-    // Missions referencing this URL via icons or response media
     const iconMission = (suite?.missions || []).reduce((acc, m) => {
       const direct = m?.iconUrl;
       if (direct && same(direct, nurl)) return acc + 1;
@@ -2280,21 +2298,12 @@ function MediaPoolTab({
 
     const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
 
-    // Response media
     const correctUse = (suite?.missions || []).reduce((acc, m)=> acc + (m?.correct?.mediaUrl && same(m.correct.mediaUrl, nurl) ? 1 : 0), 0);
     const wrongUse   = (suite?.missions || []).reduce((acc, m)=> acc + (m?.wrong?.mediaUrl   && same(m.wrong.mediaUrl,   nurl) ? 1 : 0), 0);
 
     return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, correctUse, wrongUse };
   }
 
-  async function onUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = await uploadToRepo(file, 'uploads');
-    if (url) refreshInventory();
-  }
-
-  // Delete single file with detailed status; warn if referenced
   async function deleteOne(url) {
     const use = usageCounts(url);
     const totalUse =
@@ -2318,7 +2327,6 @@ function MediaPoolTab({
     return res.ok;
   }
 
-  // Delete all in the active section (skips external/unknown)
   async function deleteAll(list) {
     if (!list?.length) return;
     if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
@@ -2340,7 +2348,6 @@ function MediaPoolTab({
     refreshInventory();
   }
 
-  // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
     const t = classifyByExt(it.url);
     if (!acc[t]) acc[t] = [];
@@ -2355,45 +2362,11 @@ function MediaPoolTab({
   ];
   const active = sections.find(s => s.key === subTab) || sections[0];
 
-  // Diagnostics: check mapping quality for current section
-  function runDeleteDiagnostics(items) {
-    const rows = items.map(x => ({ url: x.url, path: pathFromUrl(x.url) }));
-    const mapped = rows.filter(r => !!r.path);
-    const unmapped = rows.filter(r => !r.path);
-    const samples = mapped.slice(0, 3).map(r => `${r.url}  →  ${r.path}`).join('\n');
-    alert(
-      `Delete diagnostics:\n` +
-      `• Inventory total: ${rows.length}\n` +
-      `• Resolvable paths: ${mapped.length}\n` +
-      `• Unresolvable (external/cdn): ${unmapped.length}\n\n` +
-      (samples ? `Samples:\n${samples}` : `No resolvable samples.`)
-    );
-  }
-
   return (
     <main style={S.wrap}>
-      {/* Upload — simple file picker only */}
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Upload</h3>
-        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
-            Upload Media
-            <input
-              type="file"
-              onChange={onUpload}
-              accept="image/*,video/*,audio/*,.gif"
-              style={{ display:'none' }}
-            />
-          </label>
-          {uploadStatus && <div style={{ color:'#9fb0bf' }}>{uploadStatus}</div>}
-        </div>
-        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
-        </div>
-      </div>
+      {/* Upload UI removed by request */}
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Images default) */}
-      <div style={{ ...S.card, marginTop:16 }}>
+      <div style={{ ...S.card }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
           {subTabs.map(st => (
             <button
@@ -2406,13 +2379,24 @@ function MediaPoolTab({
           ))}
         </div>
 
-        {/* Active section */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
           <div style={{ display:'flex', gap:8 }}>
             <button
               style={S.button}
-              onClick={()=> runDeleteDiagnostics(active.items)}
+              onClick={()=> {
+                const rows = active.items.map(x => ({ url: x.url, path: pathFromUrl(x.url) }));
+                const mapped = rows.filter(r => !!r.path);
+                const unmapped = rows.filter(r => !r.path);
+                const samples = mapped.slice(0, 3).map(r => `${r.url}  →  ${r.path}`).join('\n');
+                alert(
+                  `Delete diagnostics:\n` +
+                  `• Inventory total: ${rows.length}\n` +
+                  `• Resolvable paths: ${mapped.length}\n` +
+                  `• Unresolvable (external/cdn): ${unmapped.length}\n\n` +
+                  (samples ? `Samples:\n${samples}` : `No resolvable samples.`)
+                );
+              }}
               title="Check path mapping"
             >
               Delete diagnostics
@@ -2429,7 +2413,7 @@ function MediaPoolTab({
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files.</div>
+          <div style={{ color:'#9fb0bf' }}>No files {busy ? '(loading…)':''}.</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
@@ -2459,64 +2443,15 @@ function MediaPoolTab({
             })}
           </div>
         )}
+        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+          Inventory {busy ? '(loading…)':''}: {inv.length} files • {uploadStatus}
+        </div>
       </div>
     </main>
   );
 }
 
-      {/* Overlay: Media Files in use (organized by type) */}
-      {showInUse && (
-        <div style={{
-          position:'fixed', inset:0, background:'rgba(0,0,0,0.55)',
-          display:'grid', placeItems:'center', zIndex:4000, padding:16
-        }}>
-          <div style={{ ...S.card, width:'min(1000px, 94vw)', maxHeight:'82vh', overflowY:'auto' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <h3 style={{ margin:0 }}>Media Files in use</h3>
-              <button style={S.button} onClick={()=>setShowInUse(false)}>Close</button>
-            </div>
-
-            {(['image','video','audio','gif']).map((k) => {
-              const list = usedByType[k] || [];
-              if (!list.length) return null;
-              const titles = { image:'Images', video:'Videos', audio:'Audio', gif:'GIFs' };
-              return (
-                <div key={k} style={{ marginBottom:16 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                    <h4 style={{ margin:0 }}>{titles[k]} ({list.length})</h4>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
-                    {list.map((row, i) => (
-                      <div key={row.url + i} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                        <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {row.label}
-                        </div>
-                        <MediaPreview url={row.url} kind={k} />
-                        <div style={{ ...S.chipRow, marginTop:8 }}>
-                          <span style={S.chip}>Rewards {row.use.rewardsPool}</span>
-                          <span style={S.chip}>Penalties {row.use.penaltiesPool}</span>
-                          <span style={S.chip}>Icon→Missions {row.use.iconMission}</span>
-                          <span style={S.chip}>Icon→Devices {row.use.iconDevice}</span>
-                          <span style={S.chip}>Icon→Rewards {row.use.iconReward}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-
-            {(['image','video','audio','gif'].every(k => (usedByType[k]||[]).length === 0)) && (
-              <div style={{ color:'#9fb0bf' }}>No media is currently referenced.</div>
-            )}
-          </div>
-        </div>
-      )}
-    </main>
- );
-}
-
-/* ───────────────────────── ASSIGNED MEDIA (now the place to assign) ───────────────────────── */
+/* ───────────────────────── ASSIGNED MEDIA (READ-ONLY) ───────────────────────── */
 function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
@@ -2524,119 +2459,27 @@ function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
 
-  const [inv, setInv]   = useState([]);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(()=>{ (async()=>{
-    setBusy(true);
-    try { setInv(await listInventory(['uploads','bundles','icons'])); }
-    finally { setBusy(false); }
-  })(); }, []);
-
-  function refreshInventory(){ (async()=>{
-    setBusy(true);
-    try { setInv(await listInventory(['uploads','bundles','icons'])); }
-    finally { setBusy(false); }
-  })(); }
-
-  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
-  function same(a,b){ return norm(a) === norm(b); }
-
-  function addPoolItem(kind, url) {
-    const label = baseNameFromUrl(url);
-    setConfig(c => {
-      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
-      if (kind === 'rewards') m.rewardsPool.push({ url, label });
-      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
-      return { ...c, media: m };
-    });
-  }
-  function addIcon(kind, url) {
-    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
-    const name = baseNameFromUrl(url);
-    setConfig(c => {
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      const list = icons[kind] || [];
-      // ensure unique key
-      let finalKey = key;
-      let suffix = 1;
-      while (list.find(i => i.key === finalKey)) {
-        suffix += 1;
-        finalKey = `${key}-${suffix}`;
-      }
-      list.push({ key: finalKey, name, url });
-      icons[kind] = list;
-      return { ...c, icons };
-    });
-  }
-
-  function removePoolItem(kind, idx) {
-    if (!window.confirm('Remove this item from the assigned list?')) return;
-    setConfig(c => {
-      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
-      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
-      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
-      return { ...c, media: m };
-    });
-  }
-  function removeIcon(kind, key) {
-    if (!window.confirm('Remove this icon from the assigned list?')) return;
-    setConfig(c => {
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      icons[kind] = icons[kind].filter(i => i.key !== key);
-      return { ...c, icons };
-    });
-  }
-
-  // Usage counts for display chips
-  const devicesList = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
-  function missionsUsingIconKey(key){ return (suite?.missions || []).reduce((a,m)=> a + (m.iconKey===key ? 1 : 0), 0); }
-  function devicesUsingIconKey(key){ return (devicesList || []).reduce((a,d)=> a + (d.iconKey===key ? 1 : 0), 0); }
-  function correctUsesOf(url){ const u=norm(url); return (suite?.missions || []).reduce((a,m)=> a + (m?.correct?.mediaUrl && same(m.correct.mediaUrl,u) ? 1 : 0), 0); }
-  function wrongUsesOf(url){ const u=norm(url); return (suite?.missions || []).reduce((a,m)=> a + (m?.wrong?.mediaUrl   && same(m.wrong.mediaUrl,  u) ? 1 : 0), 0); }
-
+  // read-only snapshot, no selection/adding/removing/reapply
   return (
     <main style={S.wrap}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-        <div style={{ color:'#9fb0bf', fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
-        </div>
-        <button style={S.button} onClick={refreshInventory}>Refresh inventory</button>
+      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:8 }}>
+        These are the currently assigned <b>Icons</b> and <b>Media Pools</b>. Manage content in other tabs; no selection or uploads here.
       </div>
 
       {/* Icons */}
       <div style={S.card}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
-        </div>
-
-        <IconGroup
+        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
+        <IconList
           title={`Mission Icons (${iconsM.length})`}
           items={iconsM}
-          usageLabel={(it)=>`Used by ${missionsUsingIconKey(it.key)} mission(s)`}
-          onRemove={(key)=>removeIcon('missions', key)}
-          onAdd={(url)=>addIcon('missions', url)}
-          inventory={inv}
-          allowTypes={['image','gif']}
         />
-        <IconGroup
+        <IconList
           title={`Device Icons (${iconsD.length})`}
           items={iconsD}
-          usageLabel={(it)=>`Used by ${devicesUsingIconKey(it.key)} device(s)`}
-          onRemove={(key)=>removeIcon('devices', key)}
-          onAdd={(url)=>addIcon('devices', url)}
-          inventory={inv}
-          allowTypes={['image','gif']}
         />
-        <IconGroup
+        <IconList
           title={`Reward Icons (${iconsR.length})`}
           items={iconsR}
-          usageLabel={()=>''}
-          onRemove={(key)=>removeIcon('rewards', key)}
-          onAdd={(url)=>addIcon('rewards', url)}
-          inventory={inv}
-          allowTypes={['image','gif']}
         />
       </div>
 
@@ -2644,60 +2487,20 @@ function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
       <div style={{ ...S.card, marginTop:16 }}>
         <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <Pool
-            title={`Rewards Pool (${rewards.length})`}
-            items={rewards}
-            usageLabel={(it)=>`Used in Correct: ${correctUsesOf(it.url)}`}
-            onRemove={(idx)=>removePoolItem('rewards', idx)}
-            onAdd={(url)=>addPoolItem('rewards', url)}
-            inventory={inv}
-            allowTypes={['image','video','audio','gif']}
-          />
-          <Pool
-            title={`Penalties Pool (${penalties.length})`}
-            items={penalties}
-            usageLabel={(it)=>`Used in Wrong: ${wrongUsesOf(it.url)}`}
-            onRemove={(idx)=>removePoolItem('penalties', idx)}
-            onAdd={(url)=>addPoolItem('penalties', url)}
-            inventory={inv}
-            allowTypes={['image','video','audio','gif']}
-          />
+          <PoolList title={`Rewards Pool (${rewards.length})`} items={rewards} />
+          <PoolList title={`Penalties Pool (${penalties.length})`} items={penalties} />
         </div>
       </div>
     </main>
   );
 }
 
-/* Shared pieces for Assigned Media */
-function IconGroup({ title, items, onRemove, onAdd, inventory, allowTypes = ['image','gif'], usageLabel }) {
-  const [selectedUrl, setSelectedUrl] = useState('');
-  const picks = (inventory || []).filter(it => allowTypes.includes(classifyByExt(it.url)));
+/* Shared read-only pieces for Assigned Media */
+function IconList({ title, items }) {
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-        <div style={{ fontWeight:600 }}>{title}</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, minWidth:320 }}>
-          <select
-            style={S.input}
-            value={selectedUrl}
-            onChange={(e)=>setSelectedUrl(e.target.value)}
-          >
-            <option value="">(choose from inventory)</option>
-            {picks.map((it, i)=>(
-              <option key={i} value={toDirectMediaURL(it.url)}>{baseNameFromUrl(it.url)}</option>
-            ))}
-          </select>
-          <button
-            style={S.button}
-            onClick={()=>{ if (selectedUrl) { onAdd(selectedUrl); setSelectedUrl(''); } }}
-            disabled={!selectedUrl}
-          >
-            + Add
-          </button>
-        </div>
-      </div>
-
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
           <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
@@ -2706,17 +2509,10 @@ function IconGroup({ title, items, onRemove, onAdd, inventory, allowTypes = ['im
               <div>
                 <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
                 <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
-                {usageLabel && <div style={{ fontSize:12, color:'#9fb0bf', marginTop:2 }}>{usageLabel(it)}</div>}
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=>onRemove(it.key)}
-              >
-                Remove
-              </button>
             </div>
           </div>
         ))}
@@ -2725,35 +2521,10 @@ function IconGroup({ title, items, onRemove, onAdd, inventory, allowTypes = ['im
   );
 }
 
-function Pool({ title, items, onRemove, onAdd, inventory, allowTypes = ['image','video','audio','gif'], usageLabel }) {
-  const [selectedUrl, setSelectedUrl] = useState('');
-  const picks = (inventory || []).filter(it => allowTypes.includes(classifyByExt(it.url)));
-
+function PoolList({ title, items }) {
   return (
     <div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-        <div style={{ fontWeight:600 }}>{title}</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, minWidth:320 }}>
-          <select
-            style={S.input}
-            value={selectedUrl}
-            onChange={(e)=>setSelectedUrl(e.target.value)}
-          >
-            <option value="">(choose from inventory)</option>
-            {picks.map((it, i)=>(
-              <option key={i} value={toDirectMediaURL(it.url)}>{baseNameFromUrl(it.url)}</option>
-            ))}
-          </select>
-          <button
-            style={S.button}
-            onClick={()=>{ if (selectedUrl) { onAdd(selectedUrl); setSelectedUrl(''); } }}
-            disabled={!selectedUrl}
-          >
-            + Add
-          </button>
-        </div>
-      </div>
-
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
         {items.map((it, idx)=>(
           <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
@@ -2761,15 +2532,8 @@ function Pool({ title, items, onRemove, onAdd, inventory, allowTypes = ['image',
               {it.label || baseNameFromUrl(it.url)}
             </div>
             <MediaPreview url={it.url} kind="pool item" />
-            {usageLabel && <div style={{ fontSize:12, color:'#9fb0bf', marginTop:6 }}>{usageLabel(it)}</div>}
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
-              >
-                Remove
-              </button>
             </div>
           </div>
         ))}
