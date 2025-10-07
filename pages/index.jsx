@@ -104,19 +104,32 @@ function qs(obj) {
   const s = p.toString();
   return s ? `?${s}` : '';
 }
-// From a /media/... URL back to repo path for deletion endpoints
+
+/** Robust mapping from URL → repo path for deletion (handles prefixed paths like /games/<slug>/media/...) */
 function pathFromUrl(u) {
   try {
     const url = new URL(u, typeof window !== 'undefined' ? window.location.origin : 'http://local');
     const p = url.pathname || '';
-    if (p.startsWith('/media/')) return `public${p}`;
+
+    // Normalize anything that CONTAINS /media/ back to public/media/...
+    const at = p.indexOf('/media/');
+    if (at >= 0) return `public${p.slice(at)}`;
+
+    // Already a public path?
     if (p.startsWith('/public/media/')) return p;
   } catch {}
+
+  // Fallback for raw strings
   const s = String(u || '');
-  if (s.startsWith('/media/')) return `public${s}`;
+  const j = s.indexOf('/media/');
+  if (j >= 0) return `public${s.slice(j)}`;
   if (s.startsWith('/public/media/')) return s;
+
+  // Unknown / external → not deletable from here
   return '';
 }
+
+/** Delete via one of several endpoints; return detailed diagnostics */
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -125,18 +138,24 @@ async function deleteMediaPath(repoPath) {
     '/api/repo-delete',
     '/api/github/delete',
   ];
+  let last = { endpoint: '', status: 0, body: '' };
+
   for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        credentials:'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ path: repoPath })
       });
-      if (r.ok) return true;
-    } catch {}
+      const body = await r.text().catch(()=> '');
+      last = { endpoint: ep, status: r.status, body };
+      if (r.ok) return { ok: true, ...last };
+    } catch (e) {
+      last = { endpoint: ep, status: 0, body: String(e?.message || e) };
+    }
   }
-  return false;
+  return { ok: false, ...last };
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
@@ -927,7 +946,7 @@ export default function Admin() {
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
-  // Tabs (include TEST to keep original behavior)
+  // Tabs (added: Media Pool & Assigned Media)
   const tabsOrder = ['missions','devices','settings','text','media-pool','assigned','test'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
@@ -1585,7 +1604,7 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* MEDIA POOL — with sub-tabs, per-file usage counts & "Media Files in use" */}
+      {/* MEDIA POOL — with sub-tabs, per-file usage counts, "Media Files in use" & Delete diagnostics */}
       {tab==='media-pool' && (
         <MediaPoolTab
           suite={suite}
@@ -2132,7 +2151,7 @@ function TextTab({ config, setConfig }) {
   );
 }
 
-/* ───────────────────────── MEDIA POOL (with sub-tabs, usage chips & "in use" overlay) ───────────────────────── */
+/* ───────────────────────── MEDIA POOL (with sub-tabs, usage chips, "in use" overlay & diagnostics) ───────────────────────── */
 function MediaPoolTab({
   suite,
   config,
@@ -2240,33 +2259,47 @@ function MediaPoolTab({
     }
   }
 
+  // Delete single file with detailed status; warn if referenced
   async function deleteOne(url) {
+    const use = usageCounts(url);
+    const totalUse = (use.rewardsPool||0)+(use.penaltiesPool||0)+(use.iconMission||0)+(use.iconDevice||0)+(use.iconReward||0);
+    const msg = totalUse > 0
+      ? `This file is referenced ${totalUse} time(s):\n  Rewards ${use.rewardsPool}, Penalties ${use.penaltiesPool}, Icon→Missions ${use.iconMission}, Icon→Devices ${use.iconDevice}, Icon→Rewards ${use.iconReward}\n\nDelete anyway?\n${url}`
+      : `Delete this media file?\n${url}`;
+    if (!window.confirm(msg)) return false;
+
     const path = pathFromUrl(url);
     if (!path) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
     }
-    if (!window.confirm(`Delete this media file?\n${url}`)) return false;
     setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(path);
-    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
-    if (ok) refreshInventory();
-    return ok;
+    const res = await deleteMediaPath(path);
+    setUploadStatus(res.ok ? '✅ Deleted' :
+      `❌ Delete failed via ${res.endpoint} [${res.status}] ${res.body?.slice(0,140) || ''}`);
+    if (res.ok) refreshInventory();
+    return res.ok;
   }
 
+  // Delete all in the active section (skips external/unknown)
   async function deleteAll(list) {
     if (!list?.length) return;
     if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
     setUploadStatus('Deleting group…');
-    let okCount = 0;
+    let okCount = 0, tried = 0, failures = [], skipped = 0;
     for (const it of list) {
       const path = pathFromUrl(it.url);
-      if (!path) continue;
+      if (!path) { skipped++; continue; }
+      tried++;
       // eslint-disable-next-line no-await-in-loop
-      const ok = await deleteMediaPath(path);
-      if (ok) okCount++;
+      const res = await deleteMediaPath(path);
+      if (res.ok) okCount++;
+      else failures.push({ url: it.url, endpoint: res.endpoint, status: res.status });
     }
-    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    setUploadStatus(
+      `✅ Deleted ${okCount}/${tried} (skipped ${skipped} external/unknown).` +
+      (failures.length ? ` Last error: ${failures[0].endpoint} [${failures[0].status}]` : '')
+    );
     refreshInventory();
   }
 
@@ -2311,6 +2344,21 @@ function MediaPoolTab({
     });
     return groups;
   }, [inv, suite, config]);
+
+  // Diagnostics: check mapping quality for current section
+  function runDeleteDiagnostics(items) {
+    const rows = items.map(x => ({ url: x.url, path: pathFromUrl(x.url) }));
+    const mapped = rows.filter(r => !!r.path);
+    const unmapped = rows.filter(r => !r.path);
+    const samples = mapped.slice(0, 3).map(r => `${r.url}  →  ${r.path}`).join('\n');
+    alert(
+      `Delete diagnostics:\n` +
+      `• Inventory total: ${rows.length}\n` +
+      `• Resolvable paths: ${mapped.length}\n` +
+      `• Unresolvable (external/cdn): ${unmapped.length}\n\n` +
+      (samples ? `Samples:\n${samples}` : `No resolvable samples.`)
+    );
+  }
 
   return (
     <main style={S.wrap}>
@@ -2359,6 +2407,13 @@ function MediaPoolTab({
               title="Show media that is currently referenced in the game"
             >
               Media Files in use
+            </button>
+            <button
+              style={S.button}
+              onClick={()=> runDeleteDiagnostics(active.items)}
+              title="Check how many files can be mapped to a repo path"
+            >
+              Delete diagnostics
             </button>
             <button
               style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
