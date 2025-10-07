@@ -10,16 +10,7 @@ async function fetchJsonSafe(url, fallback) {
   } catch {}
   return fallback;
 }
-async function fetchFirstJson(urls, fallback) {
-  for (const u of urls) {
-    try {
-      const r = await fetch(u, { cache: 'no-store', credentials: 'include' });
-      const ct = r.headers.get('content-type') || '';
-      if (r.ok && ct.includes('application/json')) return await r.json();
-    } catch {}
-  }
-  return fallback;
-}
+
 
 function applyDefaultIcons(cfg) {
   const next = {
@@ -32,6 +23,23 @@ function applyDefaultIcons(cfg) {
       ...(cfg.icons || {})
     }
   };
+
+  // If auto-defaults is OFF, just return without merging any defaults
+  if (next.icons.autoDefaults === false) return next;
+
+  function ensure(kind, arr) {
+    const list = [...(next.icons[kind] || [])];
+    const keys = new Set(list.map(x => (x.key||'').toLowerCase()));
+    for (const it of arr) {
+      if (!keys.has((it.key||'').toLowerCase())) list.push({ ...it });
+    }
+    next.icons[kind] = list;
+  }
+  ensure('missions', DEFAULT_BUNDLES.missions);
+  ensure('devices',  DEFAULT_BUNDLES.devices);
+  ensure('rewards',  DEFAULT_BUNDLES.rewards);
+  return next;
+}
 
   // If auto-defaults is OFF, just return without merging any defaults
   if (next.icons.autoDefaults === false) return next;
