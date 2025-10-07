@@ -526,13 +526,7 @@ export default function Admin() {
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
-    function defaultConfig() {
-  return {
-    // ...
-    icons: { missions: [], devices: [], rewards: [], autoDefaults: false }, // ⟵ add this
-    // ...
-  };
-}
+    
 
   }
   function defaultContentForType(t) {
