@@ -57,7 +57,8 @@ const EXTS = {
   image: /\.(png|jpg|jpeg|webp)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
+  // added aiff/aif support
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i,
 };
 function classifyByExt(u) {
   if (!u) return 'other';
@@ -431,6 +432,7 @@ export default function Admin() {
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
+          // IMPORTANT: preserve custom icons (defaults first, then user config)
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
           map: { ...dc.map, ...(c0.map || {}) },
@@ -927,7 +929,7 @@ export default function Admin() {
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
-  // Tabs: missions / devices / settings / text / media-pool / assigned
+  // Renamed + added tabs
   const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
@@ -1584,10 +1586,9 @@ export default function Admin() {
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
-      {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
+      {/* MEDIA POOL — new tab */}
       {tab==='media-pool' && (
         <MediaPoolTab
-          suite={suite}
           config={config}
           setConfig={setConfig}
           uploadStatus={uploadStatus}
@@ -1599,7 +1600,7 @@ export default function Admin() {
         />
       )}
 
-      {/* ASSIGNED MEDIA — renamed Media tab */}
+      {/* ASSIGNED MEDIA — renamed-from Media tab */}
       {tab==='assigned' && (
         <AssignedMediaTab
           config={config}
@@ -1628,7 +1629,7 @@ export default function Admin() {
             {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
               <iframe
-                key={previewNonce} // hard refresh on nonce change
+                key={previewNonce}
                 src={`${gameBase}/?${new URLSearchParams({
                   ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
                   channel: testChannel,
@@ -1861,8 +1862,6 @@ const S = {
   search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
   hr:{ border:'1px solid #1f262d', borderBottom:'none' },
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
-  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
-  chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
 };
 
 /* MapOverview — shows missions + devices */
@@ -2131,9 +2130,8 @@ function TextTab({ config, setConfig }) {
   );
 }
 
-/* ───────────────────────── MEDIA POOL (with sub-tabs & per-file usage) ───────────────────────── */
+/* ───────────────────────── MEDIA POOL (new) ───────────────────────── */
 function MediaPoolTab({
-  suite,
   config,
   setConfig,
   uploadStatus,
@@ -2145,18 +2143,18 @@ function MediaPoolTab({
   const [folder, setFolder] = useState('uploads');
   const [addUrl, setAddUrl] = useState('');
 
+  const counts = {
+    rewards: Number(config.media?.rewardsPool?.length || 0),
+    penalties: Number(config.media?.penaltiesPool?.length || 0),
+    iconM: Number(config.icons?.missions?.length || 0),
+    iconD: Number(config.icons?.devices?.length || 0),
+    iconR: Number(config.icons?.rewards?.length || 0),
+  };
 
-  
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
-  const subTabs = [
-    { key:'image', label:'Images' },
-    { key:'video', label:'Videos' },
-    { key:'audio', label:'Audio' },
-    { key:'gif',   label:'GIFs'  },
-  ];
-  const [subTab, setSubTab] = useState('audio');
-
-  useEffect(() => { refreshInventory(); }, []);
+  useEffect(() => {
+    refreshInventory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshInventory() {
     setBusy(true);
@@ -2164,39 +2162,6 @@ function MediaPoolTab({
       const items = await listInventory(['uploads','bundles','icons']);
       setInv(items || []);
     } finally { setBusy(false); }
-  }
-
-  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
-  function same(a,b){ return norm(a) === norm(b); }
-
-  // Per-file usage counts
-  function usageCounts(url) {
-    const nurl = norm(url);
-    const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
-    const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
-
-    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
-    const iconMission = (suite?.missions || []).reduce((acc, m) => {
-      const direct = m?.iconUrl;
-      if (direct && same(direct, nurl)) return acc + 1;
-      const key = m?.iconKey;
-      if (!key) return acc;
-      const found = (config?.icons?.missions || []).find(i => i.key === key);
-      return acc + (found && same(found.url, nurl) ? 1 : 0);
-    }, 0);
-
-    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
-    const iconDevice = (config?.devices || []).reduce((acc, d) => {
-      const key = d?.iconKey;
-      if (!key) return acc;
-      const found = (config?.icons?.devices || []).find(i => i.key === key);
-      return acc + (found && same(found.url, nurl) ? 1 : 0);
-    }, 0);
-
-    // Reward Icons entries that point to this URL
-    const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
-
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
   }
 
   function addPoolItem(kind, url) {
@@ -2214,14 +2179,7 @@ function MediaPoolTab({
     setConfig(c => {
       const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
       const list = icons[kind] || [];
-      // allow duplicates (keys must be unique)
-      let finalKey = key;
-      let suffix = 1;
-      while (list.find(i => i.key === finalKey)) {
-        suffix += 1;
-        finalKey = `${key}-${suffix}`;
-      }
-      list.push({ key: finalKey, name, url });
+      if (!list.find(i => i.key === key)) list.push({ key, name, url });
       icons[kind] = list;
       return { ...c, icons };
     });
@@ -2274,13 +2232,13 @@ function MediaPoolTab({
     acc[t].push(it);
     return acc;
   }, {});
+
   const sections = [
     { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
     { key:'gif',   title:'GIF',              items: itemsByType.gif   || [] },
+    { key:'video', title:'Video (mp4/mov)',  items: (itemsByType.video || []) },
+    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
 
   return (
     <main style={S.wrap}>
@@ -2305,85 +2263,61 @@ function MediaPoolTab({
         </div>
       </div>
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
-          {subTabs.map(st => (
+      {/* Sections by type */}
+      {sections.map((sec) => (
+        <div key={sec.key} style={{ ...S.card, marginTop:16 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <h3 style={{ margin:0 }}>{sec.title}</h3>
             <button
-              key={st.key}
-              onClick={()=>setSubTab(st.key)}
-              style={{ ...S.tab, ...(subTab===st.key?S.tabActive:{}) }}
+              style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+              onClick={()=>deleteAll(sec.items)}
+              disabled={!sec.items.length}
+              title="Delete all files in this type"
             >
-              {st.label.toUpperCase()}
+              Delete All
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Active section */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
-          <h3 style={{ margin:0 }}>{active.title}</h3>
-          <button
-            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-            onClick={()=>deleteAll(active.items)}
-            disabled={!active.items.length}
-            title="Delete all files in this type"
-          >
-            Delete All
-          </button>
-        </div>
-
-        {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files.</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
-            {active.items.map((it, idx)=>{
-              const url = toDirectMediaURL(it.url);
-              const use = usageCounts(url);
-              return (
-                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
-                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+          {sec.items.length === 0 ? (
+            <div style={{ color:'#9fb0bf' }}>No files.</div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:12 }}>
+              {sec.items.map((it, idx)=>{
+                const url = toDirectMediaURL(it.url);
+                return (
+                  <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
                       {baseNameFromUrl(url)}
                     </div>
-                    {/* Usage chips next to title (per-file, per service) */}
-                    <div style={S.chipRow}>
-                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
-                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
-                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
-                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
-                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
+                    <MediaPreview url={url} kind={sec.key} />
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+                      {/* Assign actions with live counts */}
+                      <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({counts.rewards})</button>
+                      <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({counts.penalties})</button>
+                      <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({counts.iconM})</button>
+                      <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({counts.iconD})</button>
+                      <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({counts.iconR})</button>
+
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                          Open
+                        </a>
+                        <button
+                          style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                          onClick={()=>deleteOne(url)}
+                          title="Delete this file"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <MediaPreview url={url} kind={active.key} />
-
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
-                    {/* Assign actions — labels include per-file counts */}
-                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
-                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
-                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
-                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
-                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
-
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
-                        Open
-                      </a>
-                      <button
-                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                        onClick={()=>deleteOne(url)}
-                        title="Delete this file"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
     </main>
   );
 }
