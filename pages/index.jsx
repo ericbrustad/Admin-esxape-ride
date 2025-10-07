@@ -2516,13 +2516,59 @@ function MediaPoolTab({
   );
 }
 
-/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+/* ───────────────────────── ASSIGNED MEDIA (now the place to assign) ───────────────────────── */
+function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
+
+  const [inv, setInv]   = useState([]);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(()=>{ (async()=>{
+    setBusy(true);
+    try { setInv(await listInventory(['uploads','bundles','icons'])); }
+    finally { setBusy(false); }
+  })(); }, []);
+
+  function refreshInventory(){ (async()=>{
+    setBusy(true);
+    try { setInv(await listInventory(['uploads','bundles','icons'])); }
+    finally { setBusy(false); }
+  })(); }
+
+  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
+  function same(a,b){ return norm(a) === norm(b); }
+
+  function addPoolItem(kind, url) {
+    const label = baseNameFromUrl(url);
+    setConfig(c => {
+      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
+      if (kind === 'rewards') m.rewardsPool.push({ url, label });
+      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
+      return { ...c, media: m };
+    });
+  }
+  function addIcon(kind, url) {
+    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
+    const name = baseNameFromUrl(url);
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      const list = icons[kind] || [];
+      // ensure unique key
+      let finalKey = key;
+      let suffix = 1;
+      while (list.find(i => i.key === finalKey)) {
+        suffix += 1;
+        finalKey = `${key}-${suffix}`;
+      }
+      list.push({ key: finalKey, name, url });
+      icons[kind] = list;
+      return { ...c, icons };
+    });
+  }
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2542,8 +2588,22 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
     });
   }
 
+  // Usage counts for display chips
+  const devicesList = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
+  function missionsUsingIconKey(key){ return (suite?.missions || []).reduce((a,m)=> a + (m.iconKey===key ? 1 : 0), 0); }
+  function devicesUsingIconKey(key){ return (devicesList || []).reduce((a,d)=> a + (d.iconKey===key ? 1 : 0), 0); }
+  function correctUsesOf(url){ const u=norm(url); return (suite?.missions || []).reduce((a,m)=> a + (m?.correct?.mediaUrl && same(m.correct.mediaUrl,u) ? 1 : 0), 0); }
+  function wrongUsesOf(url){ const u=norm(url); return (suite?.missions || []).reduce((a,m)=> a + (m?.wrong?.mediaUrl   && same(m.wrong.mediaUrl,  u) ? 1 : 0), 0); }
+
   return (
     <main style={S.wrap}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <div style={{ color:'#9fb0bf', fontSize:12 }}>
+          Inventory {busy ? '(loading…)':''}: {inv.length} files
+        </div>
+        <button style={S.button} onClick={refreshInventory}>Refresh inventory</button>
+      </div>
+
       {/* Icons */}
       <div style={S.card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -2554,17 +2614,29 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
         <IconGroup
           title={`Mission Icons (${iconsM.length})`}
           items={iconsM}
+          usageLabel={(it)=>`Used by ${missionsUsingIconKey(it.key)} mission(s)`}
           onRemove={(key)=>removeIcon('missions', key)}
+          onAdd={(url)=>addIcon('missions', url)}
+          inventory={inv}
+          allowTypes={['image','gif']}
         />
         <IconGroup
           title={`Device Icons (${iconsD.length})`}
           items={iconsD}
+          usageLabel={(it)=>`Used by ${devicesUsingIconKey(it.key)} device(s)`}
           onRemove={(key)=>removeIcon('devices', key)}
+          onAdd={(url)=>addIcon('devices', url)}
+          inventory={inv}
+          allowTypes={['image','gif']}
         />
         <IconGroup
           title={`Reward Icons (${iconsR.length})`}
           items={iconsR}
+          usageLabel={()=>''}
           onRemove={(key)=>removeIcon('rewards', key)}
+          onAdd={(url)=>addIcon('rewards', url)}
+          inventory={inv}
+          allowTypes={['image','gif']}
         />
       </div>
 
@@ -2575,12 +2647,20 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
           <Pool
             title={`Rewards Pool (${rewards.length})`}
             items={rewards}
+            usageLabel={(it)=>`Used in Correct: ${correctUsesOf(it.url)}`}
             onRemove={(idx)=>removePoolItem('rewards', idx)}
+            onAdd={(url)=>addPoolItem('rewards', url)}
+            inventory={inv}
+            allowTypes={['image','video','audio','gif']}
           />
           <Pool
             title={`Penalties Pool (${penalties.length})`}
             items={penalties}
+            usageLabel={(it)=>`Used in Wrong: ${wrongUsesOf(it.url)}`}
             onRemove={(idx)=>removePoolItem('penalties', idx)}
+            onAdd={(url)=>addPoolItem('penalties', url)}
+            inventory={inv}
+            allowTypes={['image','video','audio','gif']}
           />
         </div>
       </div>
@@ -2589,10 +2669,34 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
 }
 
 /* Shared pieces for Assigned Media */
-function IconGroup({ title, items, onRemove }) {
+function IconGroup({ title, items, onRemove, onAdd, inventory, allowTypes = ['image','gif'], usageLabel }) {
+  const [selectedUrl, setSelectedUrl] = useState('');
+  const picks = (inventory || []).filter(it => allowTypes.includes(classifyByExt(it.url)));
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <div style={{ fontWeight:600 }}>{title}</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, minWidth:320 }}>
+          <select
+            style={S.input}
+            value={selectedUrl}
+            onChange={(e)=>setSelectedUrl(e.target.value)}
+          >
+            <option value="">(choose from inventory)</option>
+            {picks.map((it, i)=>(
+              <option key={i} value={toDirectMediaURL(it.url)}>{baseNameFromUrl(it.url)}</option>
+            ))}
+          </select>
+          <button
+            style={S.button}
+            onClick={()=>{ if (selectedUrl) { onAdd(selectedUrl); setSelectedUrl(''); } }}
+            disabled={!selectedUrl}
+          >
+            + Add
+          </button>
+        </div>
+      </div>
+
       {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
@@ -2602,6 +2706,7 @@ function IconGroup({ title, items, onRemove }) {
               <div>
                 <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
                 <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+                {usageLabel && <div style={{ fontSize:12, color:'#9fb0bf', marginTop:2 }}>{usageLabel(it)}</div>}
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
@@ -2619,10 +2724,36 @@ function IconGroup({ title, items, onRemove }) {
     </div>
   );
 }
-function Pool({ title, items, onRemove }) {
+
+function Pool({ title, items, onRemove, onAdd, inventory, allowTypes = ['image','video','audio','gif'], usageLabel }) {
+  const [selectedUrl, setSelectedUrl] = useState('');
+  const picks = (inventory || []).filter(it => allowTypes.includes(classifyByExt(it.url)));
+
   return (
     <div>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+        <div style={{ fontWeight:600 }}>{title}</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, minWidth:320 }}>
+          <select
+            style={S.input}
+            value={selectedUrl}
+            onChange={(e)=>setSelectedUrl(e.target.value)}
+          >
+            <option value="">(choose from inventory)</option>
+            {picks.map((it, i)=>(
+              <option key={i} value={toDirectMediaURL(it.url)}>{baseNameFromUrl(it.url)}</option>
+            ))}
+          </select>
+          <button
+            style={S.button}
+            onClick={()=>{ if (selectedUrl) { onAdd(selectedUrl); setSelectedUrl(''); } }}
+            disabled={!selectedUrl}
+          >
+            + Add
+          </button>
+        </div>
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
         {items.map((it, idx)=>(
           <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
@@ -2630,6 +2761,7 @@ function Pool({ title, items, onRemove }) {
               {it.label || baseNameFromUrl(it.url)}
             </div>
             <MediaPreview url={it.url} kind="pool item" />
+            {usageLabel && <div style={{ fontSize:12, color:'#9fb0bf', marginTop:6 }}>{usageLabel(it)}</div>}
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
