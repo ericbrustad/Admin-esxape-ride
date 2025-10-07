@@ -130,33 +130,44 @@ function pathFromUrl(u) {
 }
 
 /** Delete via one of several endpoints; return detailed diagnostics */
+/** Delete a repo path, trying both POST and DELETE across known endpoints */
 async function deleteMediaPath(repoPath) {
-  const endpoints = [
-    '/api/delete-media',
-    '/api/delete',
-    '/api/media/delete',
-    '/api/repo-delete',
-    '/api/github/delete',
+  const attempts = [
+    { ep: '/api/delete-media',   method: 'POST'   },
+    { ep: '/api/delete-media',   method: 'DELETE' },
+    { ep: '/api/github/delete',  method: 'POST'   },
+    { ep: '/api/github/delete',  method: 'DELETE' },
+    { ep: '/api/delete',         method: 'POST'   },
+    { ep: '/api/delete',         method: 'DELETE' },
+    { ep: '/api/media/delete',   method: 'POST'   },
+    { ep: '/api/media/delete',   method: 'DELETE' },
+    { ep: '/api/repo-delete',    method: 'POST'   },
+    { ep: '/api/repo-delete',    method: 'DELETE' },
   ];
-  let last = { endpoint: '', status: 0, body: '' };
 
-  for (const ep of endpoints) {
+  let last = { endpoint: '', method: '', status: 0, body: '' };
+
+  for (const { ep, method } of attempts) {
     try {
       const r = await fetch(ep, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ path: repoPath })
+        body: JSON.stringify({ path: repoPath }),
       });
-      const body = await r.text().catch(()=> '');
-      last = { endpoint: ep, status: r.status, body };
+      const body = await r.text().catch(() => '');
+      last = { endpoint: ep, method, status: r.status, body };
       if (r.ok) return { ok: true, ...last };
+      // If endpoint exists but wrong method (405), keep trying the next method/endpoint
+      // If not found (404), keep trying as well
     } catch (e) {
-      last = { endpoint: ep, status: 0, body: String(e?.message || e) };
+      last = { endpoint: ep, method, status: 0, body: String(e?.message || e) };
     }
   }
+
   return { ok: false, ...last };
 }
+
 
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
