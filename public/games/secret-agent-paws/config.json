@@ -46,14 +46,9 @@
   "icons": {
     "missions": [
       {
-        "key": "trivia",
-        "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
-      },
-      {
-        "key": "trivia-2",
-        "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
+        "key": "1759695064697-3-ring-answer-03-mission-complete-",
+        "name": "1759695064697 3 ring answer 03 mISSION COMPLETE 32",
+        "url": "/media/uploads/1759695064697-3_ring_answer_03_mISSION_COMPLETE_32_.jpg"
       }
     ],
     "devices": [
@@ -66,18 +61,18 @@
         "key": "roaming-robot",
         "name": "Roaming Robot",
         "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "1759643890478-signal-jammer",
+        "name": "1759643890478 sIGNAL jAMMER",
+        "url": "/media/uploads/1759643890478-sIGNAL_jAMMER.jpg"
       }
     ],
     "rewards": [
       {
-        "key": "evidence",
-        "name": "Evidence",
-        "url": "/media/bundles/evidence%202.png"
-      },
-      {
-        "key": "gold-coin",
-        "name": "Gold Coin",
-        "url": "/media/bundles/GOLDEN%20COIN.png"
+        "key": "clue",
+        "name": "Clue",
+        "url": "/media/bundles/CLUEgreen.png"
       }
     ]
   },
