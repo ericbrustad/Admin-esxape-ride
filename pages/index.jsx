@@ -2513,7 +2513,7 @@ function MediaPoolTab({
         </div>
       )}
     </main>
-  );
+ );
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (now the place to assign) ───────────────────────── */
