@@ -951,7 +951,9 @@ export default function Admin() {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   // Tabs (added: Media Pool & Assigned Media)
-  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned','test'];
+// Tabs (ASSIGNED MEDIA now left of MEDIA POOL)
+const tabsOrder = ['missions','devices','settings','text','assigned','media-pool','test'];
+
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -1316,6 +1318,70 @@ export default function Admin() {
                       onChange={(e)=>{ const v=e.target.value===''?0:Number(e.target.value);
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
+{/* ── Correct/Wrong responses using Assigned Media pools ── */}
+<div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12, marginTop:8 }}>
+  <div style={{ fontWeight:600, marginBottom:8 }}>Answer Responses</div>
+
+  <Field label="On Correct — Reward media (from ASSIGNED MEDIA)">
+    {((config.media?.rewardsPool || []).length === 0) ? (
+      <div style={{ color:'#9fb0bf' }}>
+        No Reward media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+      </div>
+    ) : (
+      <>
+        <select
+          style={S.input}
+          value={editing.correct?.mediaUrl || ''}
+          onChange={(e)=>{
+            const url = e.target.value || '';
+            const mode = url ? 'reward' : 'none';
+            setEditing({
+              ...editing,
+              correct: { ...(editing.correct || {}), mode, mediaUrl: url }
+            });
+            setDirty(true);
+          }}
+        >
+          <option value="">(none)</option>
+          {(config.media.rewardsPool || []).map((it, i)=>(
+            <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+          ))}
+        </select>
+        {editing.correct?.mediaUrl && <MediaPreview url={editing.correct.mediaUrl} kind="reward" />}
+      </>
+    )}
+  </Field>
+
+  <Field label="On Wrong — Penalty media (from ASSIGNED MEDIA)">
+    {((config.media?.penaltiesPool || []).length === 0) ? (
+      <div style={{ color:'#9fb0bf' }}>
+        No Penalty media assigned yet. Add some in <b>ASSIGNED MEDIA</b>.
+      </div>
+    ) : (
+      <>
+        <select
+          style={S.input}
+          value={editing.wrong?.mediaUrl || ''}
+          onChange={(e)=>{
+            const url = e.target.value || '';
+            const mode = url ? 'penalty' : 'none';
+            setEditing({
+              ...editing,
+              wrong: { ...(editing.wrong || {}), mode, mediaUrl: url }
+            });
+            setDirty(true);
+          }}
+        >
+          <option value="">(none)</option>
+          {(config.media.penaltiesPool || []).map((it, i)=>(
+            <option key={i} value={it.url}>{it.label || baseNameFromUrl(it.url)}</option>
+          ))}
+        </select>
+        {editing.wrong?.mediaUrl && <MediaPreview url={editing.wrong.mediaUrl} kind="penalty" />}
+      </>
+    )}
+  </Field>
+</div>
 
                   <hr style={S.hr} />
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -1623,14 +1689,15 @@ export default function Admin() {
         />
       )}
 
-      {/* ASSIGNED MEDIA — previous Media tab renamed */}
-      {tab==='assigned' && (
-        <AssignedMediaTab
-          config={config}
-          setConfig={setConfig}
-          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
-        />
-      )}
+     {tab==='assigned' && (
+  <AssignedMediaTab
+    suite={suite}
+    config={config}
+    setConfig={setConfig}
+    onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
+  />
+)}
+
 
       {/* TEST */}
       {tab==='test' && (
@@ -2166,27 +2233,22 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
-  const [addUrl, setAddUrl] = useState('');
 
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
+  // Sub-tabs inside Media Pool. Default → 'image' (Images)
   const subTabs = [
     { key:'image', label:'Images' },
     { key:'video', label:'Videos' },
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('audio');
-
-  // "Media Files in use" overlay state
-  const [showInUse, setShowInUse] = useState(false);
+  const [subTab, setSubTab] = useState('image');
 
   useEffect(() => { refreshInventory(); }, []);
 
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons']);
+      const items = await listInventory(['uploads','bundles','icons']); // still discoverable
       setInv(items || []);
     } finally { setBusy(false); }
   }
@@ -2194,13 +2256,13 @@ function MediaPoolTab({
   function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
   function same(a,b){ return norm(a) === norm(b); }
 
-  // Per-file usage counts
+  // Only used to warn at delete time (not to "tag")
   function usageCounts(url) {
     const nurl = norm(url);
     const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
     const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
 
-    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
+    // Missions referencing this URL via icons or response media
     const iconMission = (suite?.missions || []).reduce((acc, m) => {
       const direct = m?.iconUrl;
       if (direct && same(direct, nurl)) return acc + 1;
@@ -2210,65 +2272,36 @@ function MediaPoolTab({
       return acc + (found && same(found.url, nurl) ? 1 : 0);
     }, 0);
 
-    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
     const devicesList = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
     const iconDevice = (devicesList || []).reduce((acc, d) => {
-      const key = d?.iconKey;
-      if (!key) return acc;
-      const found = (config?.icons?.devices || []).find(i => i.key === key);
+      const found = (config?.icons?.devices || []).find(i => i.key === d?.iconKey);
       return acc + (found && same(found.url, nurl) ? 1 : 0);
     }, 0);
 
-    // Reward Icons entries that point to this URL
     const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
 
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
-  }
+    // Response media
+    const correctUse = (suite?.missions || []).reduce((acc, m)=> acc + (m?.correct?.mediaUrl && same(m.correct.mediaUrl, nurl) ? 1 : 0), 0);
+    const wrongUse   = (suite?.missions || []).reduce((acc, m)=> acc + (m?.wrong?.mediaUrl   && same(m.wrong.mediaUrl,   nurl) ? 1 : 0), 0);
 
-  function addPoolItem(kind, url) {
-    const label = baseNameFromUrl(url);
-    setConfig(c => {
-      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
-      if (kind === 'rewards') m.rewardsPool.push({ url, label });
-      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
-      return { ...c, media: m };
-    });
-  }
-  function addIcon(kind, url) {
-    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
-    const name = baseNameFromUrl(url);
-    setConfig(c => {
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      const list = icons[kind] || [];
-      // ensure unique key
-      let finalKey = key;
-      let suffix = 1;
-      while (list.find(i => i.key === finalKey)) {
-        suffix += 1;
-        finalKey = `${key}-${suffix}`;
-      }
-      list.push({ key: finalKey, name, url });
-      icons[kind] = list;
-      return { ...c, icons };
-    });
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, correctUse, wrongUse };
   }
 
   async function onUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = await uploadToRepo(file, folder);
-    if (url) {
-      refreshInventory();
-      setAddUrl(url);
-    }
+    const url = await uploadToRepo(file, 'uploads');
+    if (url) refreshInventory();
   }
 
   // Delete single file with detailed status; warn if referenced
   async function deleteOne(url) {
     const use = usageCounts(url);
-    const totalUse = (use.rewardsPool||0)+(use.penaltiesPool||0)+(use.iconMission||0)+(use.iconDevice||0)+(use.iconReward||0);
+    const totalUse =
+      (use.rewardsPool||0)+(use.penaltiesPool||0)+(use.iconMission||0)+(use.iconDevice||0)+(use.iconReward||0)+(use.correctUse||0)+(use.wrongUse||0);
+
     const msg = totalUse > 0
-      ? `This file is referenced ${totalUse} time(s):\n  Rewards ${use.rewardsPool}, Penalties ${use.penaltiesPool}, Icon→Missions ${use.iconMission}, Icon→Devices ${use.iconDevice}, Icon→Rewards ${use.iconReward}\n\nDelete anyway?\n${url}`
+      ? `This file is referenced ${totalUse} time(s):\n  Rewards ${use.rewardsPool}, Penalties ${use.penaltiesPool}, Icon→Missions ${use.iconMission}, Icon→Devices ${use.iconDevice}, Icon→Rewards ${use.iconReward}, Correct ${use.correctUse}, Wrong ${use.wrongUse}\n\nDelete anyway?\n${url}`
       : `Delete this media file?\n${url}`;
     if (!window.confirm(msg)) return false;
 
@@ -2294,11 +2327,11 @@ function MediaPoolTab({
     for (const it of list) {
       const path = pathFromUrl(it.url);
       if (!path) { skipped++; continue; }
-      tried++;
       // eslint-disable-next-line no-await-in-loop
       const res = await deleteMediaPath(path);
       if (res.ok) okCount++;
       else failures.push({ url: it.url, endpoint: res.endpoint, status: res.status });
+      tried++;
     }
     setUploadStatus(
       `✅ Deleted ${okCount}/${tried} (skipped ${skipped} external/unknown).` +
@@ -2315,39 +2348,12 @@ function MediaPoolTab({
     return acc;
   }, {});
   const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',              items: itemsByType.gif   || [] },
+    { key:'image', title:'Images (jpg/png/webp/gif)', items: [...(itemsByType.image||[]), ...(itemsByType.gif||[])] },
+    { key:'video', title:'Video (mp4/webm/mov)',      items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/ogg/m4a)',   items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',                       items: itemsByType.gif   || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
-
-  // Build "in use" map grouped by type (only files that are referenced)
-  const usedByType = React.useMemo(() => {
-    const groups = { image: [], video: [], audio: [], gif: [] };
-    (inv || []).forEach((it) => {
-      const url = toDirectMediaURL(it.url);
-      const use = usageCounts(url);
-      const total =
-        (use?.rewardsPool || 0) +
-        (use?.penaltiesPool || 0) +
-        (use?.iconMission || 0) +
-        (use?.iconDevice || 0) +
-        (use?.iconReward || 0);
-
-      if (total > 0) {
-        const t = classifyByExt(url);
-        if (groups[t]) {
-          groups[t].push({
-            url,
-            label: baseNameFromUrl(url),
-            use
-          });
-        }
-      }
-    });
-    return groups;
-  }, [inv, suite, config]);
+  const active = sections.find(s => s.key === subTab) || sections[0];
 
   // Diagnostics: check mapping quality for current section
   function runDeleteDiagnostics(items) {
@@ -2366,28 +2372,27 @@ function MediaPoolTab({
 
   return (
     <main style={S.wrap}>
-      {/* Upload */}
+      {/* Upload — simple file picker only */}
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Upload</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
-          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
-          </select>
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
-            Upload
-            <input type="file" onChange={onUpload} style={{ display:'none' }} />
+            Upload Media
+            <input
+              type="file"
+              onChange={onUpload}
+              accept="image/*,video/*,audio/*,.gif"
+              style={{ display:'none' }}
+            />
           </label>
+          {uploadStatus && <div style={{ color:'#9fb0bf' }}>{uploadStatus}</div>}
         </div>
-        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
         <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
       </div>
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      {/* Sub-tabs: Images • Videos • Audio • GIFs (Images default) */}
       <div style={{ ...S.card, marginTop:16 }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
           {subTabs.map(st => (
@@ -2407,15 +2412,8 @@ function MediaPoolTab({
           <div style={{ display:'flex', gap:8 }}>
             <button
               style={S.button}
-              onClick={()=> setShowInUse(true)}
-              title="Show media that is currently referenced in the game"
-            >
-              Media Files in use
-            </button>
-            <button
-              style={S.button}
               onClick={()=> runDeleteDiagnostics(active.items)}
-              title="Check how many files can be mapped to a repo path"
+              title="Check path mapping"
             >
               Delete diagnostics
             </button>
@@ -2436,45 +2434,25 @@ function MediaPoolTab({
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
-              const use = usageCounts(url);
               return (
                 <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
-                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {baseNameFromUrl(url)}
-                    </div>
-                    {/* Usage chips next to title (per-file, per service) */}
-                    <div style={S.chipRow}>
-                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
-                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
-                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
-                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
-                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
-                    </div>
+                  <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+                    {baseNameFromUrl(url)}
                   </div>
 
                   <MediaPreview url={url} kind={active.key} />
 
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
-                    {/* Assign actions — labels include per-file counts */}
-                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
-                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
-                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
-                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
-                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
-
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
-                        Open
-                      </a>
-                      <button
-                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                        onClick={()=>deleteOne(url)}
-                        title="Delete this file"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
+                    <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                      Open
+                    </a>
+                    <button
+                      style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                      onClick={()=>deleteOne(url)}
+                      title="Delete this file"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               );
@@ -2482,6 +2460,9 @@ function MediaPoolTab({
           </div>
         )}
       </div>
+    </main>
+  );
+}
 
       {/* Overlay: Media Files in use (organized by type) */}
       {showInUse && (
