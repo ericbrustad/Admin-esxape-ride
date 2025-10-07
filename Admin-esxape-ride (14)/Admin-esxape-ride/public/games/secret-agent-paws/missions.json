@@ -1,0 +1,74 @@
+{
+  "version": "1.0.5",
+  "missions": [
+    {
+      "id": "m01",
+      "title": "Welcome to The Case of The Missing Sqeakers",
+      "type": "statement",
+      "iconKey": "1759695064697-3-ring-answer-03-mission-complete-",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "text": "A lighthearted spy-thriller where the dog is the star agent and the owner is their trusted handler. \nObjective: To find the hidden stash of stolen squeakers and foil the plans of the notorious (and fluffy) villain, Baron von Squirrely.",
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.802416,
+        "lng": -93.36364,
+        "radiusMeters": 45,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "showContinue": true
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "content": {
+        "question": "ddd",
+        "choices": [
+          "d",
+          "ds"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": true,
+        "lat": 44.802759,
+        "lng": -93.3629,
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "showContinue": true,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      }
+    }
+  ]
+}
