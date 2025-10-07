@@ -1321,6 +1321,17 @@ export default function Admin() {
                   {/* Outcomes: Correct / Wrong */}
                   <hr style={S.hr} />
                   <h4 style={{ marginBottom: 6 }}>On Correct Answer</h4>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, margin:'4px 0 8px' }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(editing.correct?.awardEnabled)}
+                        onChange={(e)=>{ setEditing({ ...editing, correct:{ ...(editing.correct||{}), awardEnabled:e.target.checked } }); setDirty(true); }}
+                      />
+                      <span style={{ fontSize:12, color:'#9fb0bf' }}>Enable Award (ticker yes/no)</span>
+                    </label>
+                  </div>
+    
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                     <Field label="Mode">
                       <select style={S.input}
@@ -2555,57 +2566,6 @@ function PoolList({ title, items }) {
 }
 
 
-{/* ── On Correct → Award Controls ── */}
-<div style={{ borderTop: '1px solid #1e2a36', paddingTop: 12, marginTop: 12 }}>
-  <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>On Correct — Award</div>
-  <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <input
-        type="checkbox"
-        checked={Boolean(m?.onCorrect?.awardEnabled)}
-        onChange={e => onEditMission(m.id, {
-          ...m,
-          onCorrect: { ...(m.onCorrect||{}), awardEnabled: e.target.checked }
-        })}
-      />
-      <span style={{ fontSize: 13 }}>Enable Award (ticker yes/no)</span>
-    </label>
-
-    {Boolean(m?.onCorrect?.awardEnabled) && (
-      <>
-        <div>
-          <select
-            value={m?.onCorrect?.awardKind || ''}
-            onChange={e => onEditMission(m.id, {
-              ...m,
-              onCorrect: { ...(m.onCorrect||{}), awardKind: e.target.value }
-            })}
-            style={{ background: '#0b1621', border: '1px solid #243341', color: '#e3eef8', padding: '6px 8px', borderRadius: 8 }}
-          >
-            <option value="">Select Type</option>
-            <option value="image">Image</option>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-            <option value="gif">GIF</option>
-          </select>
-        </div>
-
-        <button
-          onClick={() => openMediaPicker({ kind: m?.onCorrect?.awardKind || '', target: { missionId: m.id, path: 'onCorrect' } })}
-          style={{ background: '#132334', border: '1px solid #2a3b4d', color: '#cfe6ff', padding: '6px 10px', borderRadius: 8 }}
-        >
-          Choose from Media Pool
-        </button>
-
-        {(m?.onCorrect?.awardKind) && (m?.onCorrect?.mediaLabel || m?.onCorrect?.mediaUrl) && (
-          <div style={{ fontSize: 12, opacity: 0.85 }}>
-            Selected: {m?.onCorrect?.mediaLabel || m?.onCorrect?.mediaUrl}
-          </div>
-        )}
-      </>
-    )}
-  </div>
-</div>
 
 
 
