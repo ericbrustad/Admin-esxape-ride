@@ -19,9 +19,9 @@
         "text": "A lighthearted spy-thriller where the dog is the star agent and the owner is their trusted handler. \nObjective: To find the hidden stash of stolen squeakers and foil the plans of the notorious (and fluffy) villain, Baron von Squirrely.",
         "mediaUrl": "",
         "geofenceEnabled": true,
-        "lat": 28.616099,
-        "lng": -92.617555,
-        "radiusMeters": 25,
+        "lat": 44.802416,
+        "lng": -93.36364,
+        "radiusMeters": 45,
         "cooldownSeconds": 30
       },
       "appearanceOverrideEnabled": false,
@@ -62,8 +62,8 @@
         "correctIndex": 0,
         "mediaUrl": "",
         "geofenceEnabled": true,
-        "lat": "",
-        "lng": "",
+        "lat": 44.802759,
+        "lng": -93.3629,
         "radiusMeters": 25,
         "cooldownSeconds": 30
       },
