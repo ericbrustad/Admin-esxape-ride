@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.24",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -25,17 +25,21 @@
         "cooldownSeconds": 30
       },
       "appearanceOverrideEnabled": false,
-      "appearance": {
-        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        "fontSizePx": 22,
-        "fontColor": "#ffffff",
-        "textBgColor": "#000000",
-        "textBgOpacity": 0,
-        "screenBgColor": "#000000",
-        "screenBgOpacity": 0,
-        "screenBgImage": "",
-        "textAlign": "center",
-        "textVertical": "top"
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "trivia",
+      "rewards": {
+        "points": 25
       },
       "correct": {
         "mode": "none"
@@ -43,6 +47,22 @@
       "wrong": {
         "mode": "none"
       },
+      "content": {
+        "question": "S S S",
+        "choices": [
+          "SS",
+          "SS",
+          "SS"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
