@@ -1107,7 +1107,15 @@ export default function Admin() {
             </div>
 
             {/* Mission editor (overlay) */}
-            /* ======================== SECTION A: AnswerResponseEditor ========================
+           
+}{editing && (
+              <div style={S.overlay}>
+                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                      /* ======================== SECTION A: AnswerResponseEditor ========================
    Drop-in editor for "Correct / Wrong" outcomes:
    - statement (text)
    - mediaUrl (image/video) from your pool
@@ -1224,14 +1232,8 @@ export function AnswerResponseEditor({ editing, setEditing, inventory }) {
       </div>
     </div>
   );
-}{editing && (
-              <div style={S.overlay}>
-                <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
-                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                      
+                  <button style={S.button} onClick={cancelEdit}>Close</button>
                     </div>
                   </div>
 
@@ -2636,5 +2638,6 @@ function Pool({ title, items, onRemove }) {
     </div>
   );
 }
+
 
 
