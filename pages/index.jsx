@@ -1126,9 +1126,7 @@ export default function Admin() {
                   <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
-                                        
-
-<button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
                       <button style={S.button} onClick={cancelEdit}>Close</button>
                     </div>
                   </div>
@@ -1243,9 +1241,7 @@ export default function Admin() {
                   )}
 
                   {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
-                                          <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={inventory} />
-
-<div style={{ marginBottom:12 }}>
+                    <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
                           onChange={(e)=>{ const on=e.target.checked;
