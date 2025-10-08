@@ -2516,65 +2516,127 @@ return (
   );
 }
 
-/* Shared pieces for Assigned Media */
-function IconGroup({ title, items, onRemove }) {
-  return (
-    <div style={{ marginTop:8 }}>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
-        {items.map((it)=>(
-          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
-              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-              <div>
-                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
-              </div>
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=>onRemove(it.key)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-function Pool({ title, items, onRemove }) {
-  return (
-    <div>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
-        {items.map((it, idx)=>(
-          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-            <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {it.label || baseNameFromUrl(it.url)}
-            </div>
-            <MediaPreview url={it.url} kind="pool item" />
-            <div style={{ display:'flex', gap:8, marginTop:8 }}>
-              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
-      </div>
-    </div>
-  );
-}
+/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
+function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
+  const rewards = config.media?.rewardsPool || [];
+  const penalties = config.media?.penaltiesPool || [];
+  const iconsM = config.icons?.missions || [];
+  const iconsD = config.icons?.devices  || [];
+  const iconsR = config.icons?.rewards  || [];
 
+  // Build per-URL usage map across icons, pools, and mission outcomes
+  function buildUsageMap() {
+    const map = new Map();
+    function add(url, key) {
+      if (!url) return;
+      const u = String(url);
+      if (!map.has(u)) map.set(u, { url:u, rewardsPool:0, penaltiesPool:0, iconMission:0, iconDevice:0, iconReward:0, onCorrect:0, onWrong:0 });
+      map.get(u)[key] = (map.get(u)[key] || 0) + 1;
+    }
+    (config.icons?.missions||[]).forEach(it => add(it.url, 'iconMission'));
+    (config.icons?.devices ||[]).forEach(it => add(it.url, 'iconDevice'));
+    (config.icons?.rewards ||[]).forEach(it => add(it.url, 'iconReward'));
+    (config.media?.rewardsPool||[]).forEach(it => add(it.url, 'rewardsPool'));
+    (config.media?.penaltiesPool||[]).forEach(it => add(it.url, 'penaltiesPool'));
+    (suite?.missions||[]).forEach(m => {
+      add(m?.onCorrect?.mediaUrl, 'onCorrect');
+      add(m?.onWrong?.mediaUrl,   'onWrong');
+    });
+    return [...map.values()];
+  }
+
+  function removePoolItem(kind, idx) {
+    if (!window.confirm('Remove this item from the assigned list?')) return;
+    setConfig(c => {
+      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
+      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
+      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
+      return { ...c, media: m };
+    });
+  }
+  function removeIcon(kind, key) {
+    if (!window.confirm('Remove this icon from the assigned list?')) return;
+    setConfig(c => {
+      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      icons[kind] = icons[kind].filter(i => i.key !== key);
+      return { ...c, icons };
+    });
+  }
+
+  const overview = buildUsageMap();
+
+  return (
+    <main style={S.wrap}>
+      {/* Overview grid with tallies per file */}
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Assigned Media — Overview (by media file)</h3>
+        {overview.length === 0 ? (
+          <div style={{ color:'#9fb0bf' }}>No assigned media yet.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10 }}>
+            {overview.map((it, idx) => (
+              <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+                  {it.url.replace(/^.*\//,'')}
+                </div>
+                <MediaPreview url={it.url} kind={'image'} />
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                  <span style={S.chip} title="Rewards Pool uses">R {it.rewardsPool||0}</span>
+                  <span style={S.chip} title="Penalties Pool uses">P {it.penaltiesPool||0}</span>
+                  <span style={S.chip} title="Missions using as Icon">IM {it.iconMission||0}</span>
+                  <span style={S.chip} title="Devices using as Icon">ID {it.iconDevice||0}</span>
+                  <span style={S.chip} title="Reward Icons entries">IR {it.iconReward||0}</span>
+                  <span style={S.chip} title="Outcomes: On Correct">OC {it.onCorrect||0}</span>
+                  <span style={S.chip} title="Outcomes: On Wrong">OW {it.onWrong||0}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Icons */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
+          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
+        </div>
+        <IconGroup
+          title={`Mission Icons (${iconsM.length})`}
+          items={iconsM}
+          onRemove={(key)=>removeIcon('missions', key)}
+        />
+        <IconGroup
+          title={`Device Icons (${iconsD.length})`}
+          items={iconsD}
+          onRemove={(key)=>removeIcon('devices', key)}
+        />
+        <IconGroup
+          title={`Reward Icons (${iconsR.length})`}
+          items={iconsR}
+          onRemove={(key)=>removeIcon('rewards', key)}
+        />
+      </div>
+
+      {/* Pools */}
+      <div style={{ ...S.card, marginTop:16 }}>
+        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+          <Pool
+            title={`Rewards Pool (${rewards.length})`}
+            items={rewards}
+            onRemove={(idx)=>removePoolItem('rewards', idx)}
+          />
+          <Pool
+            title={`Penalties Pool (${penalties.length})`}
+            items={penalties}
+            onRemove={(idx)=>removePoolItem('penalties', idx)}
+          />
+        </div>
+      </div>
+    </main>
+  );
+}
 /* ───────────────────────── AnswerResponseEditor ───────────────────────── */
 /** Props:
  *  - editing (mission object)
@@ -2665,3 +2727,4 @@ function AnswerResponseEditor({ editing, setEditing, inventory }) {
     </div>
   );
 }
+
