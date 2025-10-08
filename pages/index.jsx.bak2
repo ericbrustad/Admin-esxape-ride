@@ -941,7 +941,7 @@ export default function Admin() {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -2167,7 +2167,7 @@ function MediaPoolTab({
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('image');
+  const [subTab, setSubTab] = useState('audio');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -2370,9 +2370,27 @@ function MediaPoolTab({
 
                   <MediaPreview url={url} kind={active.key} />
 
-                  
-                  {/* Assign actions removed — Media Pool is upload-only */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+                    {/* Assign actions — labels include per-file counts */}
+                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
+                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
+                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
+                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
+                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
 
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
+                        Open
+                      </a>
+                      <button
+                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                        onClick={()=>deleteOne(url)}
+                        title="Delete this file"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
               );
             })}
