@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.24",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -8,13 +8,13 @@
   "missions": [
     {
       "id": "m01",
-      "title": "New Mission",
+      "title": "fly",
       "type": "short_answer",
       "rewards": {
         "points": 25
       },
       "content": {
-        "question": "hi",
+        "question": "what isup?",
         "answer": "hello",
         "acceptable": "yes",
         "mediaUrl": "",
@@ -25,23 +25,50 @@
         "cooldownSeconds": 30
       },
       "appearanceOverrideEnabled": false,
-      "appearance": {
-        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        "fontSizePx": 22,
-        "fontColor": "#ffffff",
-        "textBgColor": "#000000",
-        "textBgOpacity": 0,
-        "screenBgColor": "#000000",
-        "screenBgOpacity": 0,
-        "screenBgImage": "",
-        "textAlign": "center",
-        "textVertical": "top"
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true,
+      "iconKey": "trivia"
+    },
+    {
+      "id": "m02",
+      "title": "New Mission",
+      "type": "video",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
       },
       "correct": {
         "mode": "none"
       },
       "wrong": {
         "mode": "none"
+      },
+      "content": {
+        "videoUrl": "https://youtu.be/uPx5YKweMVs?si=A-xC9wQGnPaKouLc",
+        "overlayText": "heck yes",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": true,
+      "appearance": {
+        "fontFamily": "Courier New, Courier, monospace",
+        "fontSizePx": 45,
+        "fontColor": "#c7e147",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#e60a0a",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
       },
       "showContinue": true
     }
