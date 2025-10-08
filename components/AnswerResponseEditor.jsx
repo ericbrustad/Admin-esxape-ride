@@ -5,6 +5,8 @@ import React, { useEffect, useState } from 'react';
  *
  * - Two independent overlays: Correct and Wrong.
  * - Overlays open ONLY when user clicks the corresponding "Edit" button.
+ * - Inline "Open Correct" and "Open Wrong" buttons rendered at the bottom of the component
+ *   (so when the component is placed near the modal's bottom they appear on the mission window).
  * - Enable checkbox toggles whether the response exists on the editing object.
  * - Overlays are fixed, high z-index, and disable background scrolling while open.
  * - Thumbnail preview in overlay for image/video; audio player for audio.
@@ -64,10 +66,8 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
 
   function enableCorrect(enabled) {
     if (enabled) {
-      // create default if missing
       setEditing(prev => ({ ...prev, onCorrect: prev.onCorrect ? prev.onCorrect : { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK' } }));
     } else {
-      // remove
       setEditing(prev => { const copy = { ...prev }; delete copy.onCorrect; return copy; });
     }
   }
@@ -134,7 +134,7 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
   }
 
   // Modal overlay renderer
-  function ResponseModal({ title, local, setLocal, onSave, onCancel, onDisable, mediaList, audioList, open, setOpen }) {
+  function ResponseModal({ title, local, setLocal, onSave, onCancel, onDisable, mediaList, audioList, open }) {
     if (!open) return null;
     return (
       <div role="dialog" aria-modal="true" style={{
@@ -210,6 +210,23 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     );
   }
 
+  // Inline open handlers - ensure response exists before opening
+  function openCorrectInline() {
+    if (!editing.onCorrect) {
+      enableCorrect(true);
+    }
+    // sync local copy immediately from editing (use effect will also pick up)
+    setLocalCorrect(normalizeResponse(editing.onCorrect));
+    setOpenCorrect(true);
+  }
+  function openWrongInline() {
+    if (!editing.onWrong) {
+      enableWrong(true);
+    }
+    setLocalWrong(normalizeResponse(editing.onWrong));
+    setOpenWrong(true);
+  }
+
   return (
     <div style={{ ...box }}>
       <div style={{ fontWeight:700, marginBottom:10, color:'#e9eef2' }}>Answer Responses (Correct / Wrong)</div>
@@ -268,6 +285,12 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         </div>
       </div>
 
+      {/* Inline bottom buttons (non-floating) - place near modal bottom by inserting this component near bottom */}
+      <div style={{ display:'flex', gap:8, marginTop:12 }}>
+        <button style={smallBtn} onClick={openCorrectInline}>Open Correct Response</button>
+        <button style={smallBtn} onClick={openWrongInline}>Open Wrong Response</button>
+      </div>
+
       {/* Modals */}
       <ResponseModal
         title="Edit Correct Response"
@@ -279,7 +302,6 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         mediaList={imagesVideos}
         audioList={audios}
         open={openCorrect}
-        setOpen={setOpenCorrect}
       />
 
       <ResponseModal
@@ -292,7 +314,6 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         mediaList={imagesVideos}
         audioList={audios}
         open={openWrong}
-        setOpen={setOpenWrong}
       />
     </div>
   );
