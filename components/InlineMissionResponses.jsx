@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { MediaPreview } from './ui-kit';
 
 /**
  * InlineMissionResponses.jsx
@@ -97,6 +98,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   <option key={i} value={m.url}>{m.name || (m.url||'').split('/').pop()}</option>
                 ))}
               </select>
+            {/* Thumbnail preview */}
+            <div style={{ gridColumn:'1 / span 2' }}>
+              <MediaPreview url={editing.onCorrect?.mediaUrl} />
+            </div>
             </div>
 
             <div style={S.row}>
@@ -111,6 +116,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   <option key={i} value={m.url}>{m.name || (m.url||'').split('/').pop()}</option>
                 ))}
               </select>
+            {/* Audio preview */}
+            <div style={{ gridColumn:'1 / span 2' }}>
+              {editing.onCorrect?.audioUrl ? (<audio controls src={editing.onCorrect?.audioUrl} style={ width:'100%' } />) : null}
+            </div>
             </div>
 
             <div style={S.row}>
@@ -137,7 +146,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         ) : null}
       </div>
 
-      {/* Wrong */}
+      {/* Wrong */
+
+}
       <div style={S.sec('#110b0b')}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <div style={{ fontWeight:600, color:'#e9eef2' }}>On Wrong Answer</div>
@@ -173,6 +184,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   <option key={i} value={m.url}>{m.name || (m.url||'').split('/').pop()}</option>
                 ))}
               </select>
+            {/* Thumbnail preview */}
+            <div style={{ gridColumn:'1 / span 2' }}>
+              <MediaPreview url={editing.onWrong?.mediaUrl} />
+            </div>
             </div>
 
             <div style={S.row}>
@@ -187,6 +202,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   <option key={i} value={m.url}>{m.name || (m.url||'').split('/').pop()}</option>
                 ))}
               </select>
+            {/* Audio preview */}
+            <div style={{ gridColumn:'1 / span 2' }}>
+              {editing.onWrong?.audioUrl ? (<audio controls src={editing.onWrong?.audioUrl} style={ width:'100%' } />) : null}
+            </div>
             </div>
 
             <div style={S.row}>

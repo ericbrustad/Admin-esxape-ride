@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
+import InlineMissionResponses from '../components/InlineMissionResponses';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -289,13 +290,17 @@ export default function Admin() {
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
   useEffect(()=>{
-    let mounted = true;
-    fetch('/api/list-media', { credentials:'include' })
-      .then(r=>r.ok ? r.json() : [])
-      .then(d=>{ if (mounted) setInventory(Array.isArray(d) ? d : []); })
-      .catch(()=>{ if (mounted) setInventory([]); });
-    return ()=> mounted = false;
-  },[]);
+  let mounted = true;
+  (async ()=>{
+    try {
+      const items = await listInventory(['uploads','bundles','icons','mediapool']);
+      if (mounted) setInventory(Array.isArray(items) ? items : []);
+    } catch {
+      if (mounted) setInventory([]);
+    }
+  })();
+  return ()=> { mounted = false; };
+},[]);;
 
   
   const [dirty, setDirty]       = useState(false);
@@ -1306,6 +1311,10 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
+                  
+                  {/* Mission Response (Correct/Wrong): below map, above Continue */}
+                  <InlineMissionResponses editing={editing} setEditing={setEditing} inventory={inventory} />
+
                   <hr style={S.hr} />
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                     <input
@@ -2209,7 +2218,12 @@ function MediaPoolTab({
     // Reward Icons entries that point to this URL
     const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
 
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward };
+    // Mission Response media & audio usage
+    const outcomeCorrect = (suite?.missions || []).reduce((acc, m) => acc + (m?.onCorrect?.mediaUrl && same(m.onCorrect.mediaUrl, nurl) ? 1 : 0), 0);
+    const outcomeWrong   = (suite?.missions || []).reduce((acc, m) => acc + (m?.onWrong?.mediaUrl   && same(m.onWrong.mediaUrl,   nurl) ? 1 : 0), 0);
+    const outcomeAudio   = (suite?.missions || []).reduce((acc, m) => acc + ((m?.onCorrect?.audioUrl && same(m.onCorrect.audioUrl, nurl)) || (m?.onWrong?.audioUrl && same(m.onWrong.audioUrl, nurl)) ? 1 : 0), 0);
+
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, outcomeCorrect, outcomeWrong, outcomeAudio };
   }
 
   function addPoolItem(kind, url) {
@@ -2365,6 +2379,9 @@ function MediaPoolTab({
                       <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
                       <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
                       <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
+                      <span style={S.chip} title="On-Correct media uses">OC {use.outcomeCorrect}</span>
+                      <span style={S.chip} title="On-Wrong media uses">OW {use.outcomeWrong}</span>
+                      <span style={S.chip} title="Outcome audio uses (either)">OA {use.outcomeAudio}</span>
                     </div>
                   </div>
 
