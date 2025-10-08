@@ -1,25 +1,23 @@
 import React from 'react';
 
-export default function OutcomeModal({ open=false, title='Outcome', children=null, onClose=()=>{} }) {
+/**
+ * Minimal OutcomeModal component used by pages/index.jsx
+ * Provides a basic modal wrapper. Keeps it dependency-free and safe for build.
+ */
+
+export default function OutcomeModal({ open = false, title = '', children = null, onClose = () => {} }) {
   if (!open) return null;
   return (
     <div style={{
-      position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',
-      background: 'rgba(0,0,0,0.55)', zIndex: 4000, padding: 16
+      position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', zIndex: 4000,
+      background: 'rgba(0,0,0,0.6)'
     }}>
-      <div style={{
-        width: 'min(720px, 96vw)', borderRadius: 12, background: '#0f1418',
-        border: '1px solid #22303c', padding: 16, color: '#e9eef2'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>{title}</h3>
-          <div>
-            <button onClick={onClose} style={{
-              padding: '6px 10px', borderRadius: 8, border: '1px solid #2a323b', background: '#1a2027', color: '#e9eef2'
-            }}>Close</button>
-          </div>
+      <div style={{ background:'#0b0f12', padding: 16, borderRadius: 10, width: 'min(760px, 94vw)', border: '1px solid #22303c' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <h3 style={{ margin:0 }}>{title}</h3>
+          <button onClick={onClose} style={{ padding:8, borderRadius:8, background:'#1a2027', color:'#e9eef2', border:'1px solid #2a323b' }}>Close</button>
         </div>
-        <div style={{ maxHeight: '60vh', overflow: 'auto' }}>{children}</div>
+        <div>{children}</div>
       </div>
     </div>
   );
