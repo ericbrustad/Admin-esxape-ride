@@ -117,7 +117,7 @@ export default function OutcomeModal({ open, onClose = () => {}, title = 'Outcom
   );
 }
 
-/* Inline styles to match admin look-and-feel in your app */
+/* Inline styles */
 const styles = {
   overlay: {
     position: 'fixed',
