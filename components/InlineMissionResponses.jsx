@@ -4,11 +4,11 @@ import React, { useEffect, useState } from 'react';
 /**
  * InlineMissionResponses
  *
+ * Lightweight, syntax-validated component.
+ *
  * Props:
  *  - value: { onCorrect, onWrong }
  *  - onChange(updated)
- *
- * This file has been carefully balanced for JSX braces/parentheses.
  */
 export default function InlineMissionResponses({ value = {}, onChange = () => {} }) {
   const blank = {
@@ -22,8 +22,8 @@ export default function InlineMissionResponses({ value = {}, onChange = () => {}
   };
 
   const [state, setState] = useState({
-    onCorrect: { ...(value.onCorrect || blank) },
-    onWrong: { ...(value.onWrong || blank) },
+    onCorrect: value.onCorrect ? { ...blank, ...value.onCorrect } : { ...blank },
+    onWrong: value.onWrong ? { ...blank, ...value.onWrong } : { ...blank },
   });
 
   useEffect(() => {
@@ -38,24 +38,13 @@ export default function InlineMissionResponses({ value = {}, onChange = () => {}
     const resp = state[side] || blank;
 
     return (
-      <div
-        style={{
-          marginBottom: 18,
-          border: '1px solid #2b3238',
-          borderRadius: 8,
-          padding: 12,
-          background: '#0f1619',
-        }}
-      >
+      <div style={{ marginBottom: 18, border: '1px solid #2b3238', borderRadius: 8, padding: 12, background: '#0f1619' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div style={{ fontWeight: 700 }}>{title}</div>
-          <div style={{ fontSize: 12, color: '#9fb0bf' }}>
-            {resp.isTrigger ? 'Trigger Response' : 'Standard Response'}
-          </div>
+          <div style={{ fontSize: 12, color: '#9fb0bf' }}>{resp.isTrigger ? 'Trigger Response' : 'Standard Response'}</div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 12 }}>
-          {/* Left column */}
           <div>
             <div style={{ marginBottom: 8 }}>
               <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Type</div>
@@ -193,13 +182,14 @@ export default function InlineMissionResponses({ value = {}, onChange = () => {}
             </div>
           </div>
         </div>
-      );
-    } // end ResponseEditor
-
-    return (
-      <div>
-        <ResponseEditor side="onCorrect" title="On Correct" />
-        <ResponseEditor side="onWrong" title="On Wrong" />
       </div>
     );
-    }
+  } // end ResponseEditor
+
+  return (
+    <div>
+      <ResponseEditor side="onCorrect" title="On Correct" />
+      <ResponseEditor side="onWrong" title="On Wrong" />
+    </div>
+  );
+}
