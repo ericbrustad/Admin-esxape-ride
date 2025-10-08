@@ -116,11 +116,17 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   <option key={i} value={m.url}>{m.name || (m.url||'').split('/').pop()}</option>
                 ))}
               </select>
-            {/* Audio preview */}
-            <div style={{ gridColumn:'1 / span 2' }}>
-              {editing.onCorrect?.audioUrl ? (<audio controls src={editing.onCorrect?.audioUrl} style={ width:'100%' } />) : null}
-            </div>
-            </div>
+           {/* Audio preview */}
+<div style={{ gridColumn: '1 / span 2' }}>
+  {editing.onCorrect?.audioUrl ? (
+    <audio
+      controls
+      src={editing.onCorrect.audioUrl}
+      style={{ width: '100%' }}
+    />
+  ) : null}
+</div>
+
 
             <div style={S.row}>
               <div style={S.lab}>Auto-close after (seconds)</div>
