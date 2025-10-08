@@ -321,6 +321,10 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Response media inventory (for AnswerResponseEditor)
+  const [rspInv, setRspInv] = useState([]);
+  useEffect(() => { (async ()=>{ try { const items = await listInventory(['uploads','bundles','icons']); setRspInv(items||[]); } catch { setRspInv([]); } })(); }, []);
+
 
   useEffect(() => {
     try {
@@ -928,7 +932,7 @@ export default function Admin() {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
+  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -940,7 +944,7 @@ export default function Admin() {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             {tabsOrder.map((t)=>{
               const labelMap = {
-                'missions':'MISSIONS',
+                'missions':'MISSION MAKER',
                 'devices':'DEVICES',
                 'settings':'SETTINGS',
                 'text':'TEXT',
@@ -1313,6 +1317,8 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
+                  <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={rspInv} />
+
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
@@ -1601,8 +1607,7 @@ export default function Admin() {
 
       {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
-        <AssignedMediaTab
-          config={config}
+        <AssignedMediaTab suite={suite} config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
@@ -1668,7 +1673,9 @@ export default function Admin() {
               <input type="number" min={1} max={120} style={S.input} value={newAlertMin}
                 onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}/>
             </Field>
-            <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={rspInv} />
+
+                  <div style={{ display:'flex', gap:8, marginTop:12 }}>
               <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
               <button style={S.button} onClick={async ()=>{
                 if (!newTitle.trim()) return;
@@ -2154,7 +2161,7 @@ function MediaPoolTab({
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('audio');
+  const [subTab, setSubTab] = useState('image');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -2359,12 +2366,6 @@ function MediaPoolTab({
 
                   <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
                     {/* Assign actions — labels include per-file counts */}
-                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
-                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
-                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
-                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
-                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
-
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                       <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
                         Open
@@ -2389,12 +2390,33 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
+
+  // Build per-URL usage map across icons, pools, and mission outcomes
+  function buildUsageMap() {
+    const map = new Map();
+    function add(url, key) {
+      if (!url) return;
+      const u = String(url);
+      if (!map.has(u)) map.set(u, { url:u, rewardsPool:0, penaltiesPool:0, iconMission:0, iconDevice:0, iconReward:0, onCorrect:0, onWrong:0 });
+      map.get(u)[key] = (map.get(u)[key] || 0) + 1;
+    }
+    (config.icons?.missions||[]).forEach(it => add(it.url, 'iconMission'));
+    (config.icons?.devices ||[]).forEach(it => add(it.url, 'iconDevice'));
+    (config.icons?.rewards ||[]).forEach(it => add(it.url, 'iconReward'));
+    (config.media?.rewardsPool||[]).forEach(it => add(it.url, 'rewardsPool'));
+    (config.media?.penaltiesPool||[]).forEach(it => add(it.url, 'penaltiesPool'));
+    (suite?.missions||[]).forEach(m => {
+      add(m?.onCorrect?.mediaUrl, 'onCorrect');
+      add(m?.onWrong?.mediaUrl,   'onWrong');
+    });
+    return [...map.values()];
+  }
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2414,7 +2436,41 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
     });
   }
 
+  
+  const overview = buildUsageMap();
+
   return (
+    <main style={S.wrap}>
+      {/* Overview grid with tallies per file */}
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Assigned Media — Overview (by media file)</h3>
+        {overview.length === 0 ? (
+          <div style={{ color:'#9fb0bf' }}>No assigned media yet.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10 }}>
+            {overview.map((it, idx) => (
+              <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
+                  {it.url.replace(/^.*\//,'')}
+                </div>
+                <MediaPreview url={it.url} kind={'image'} />
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                  <span style={S.chip} title="Rewards Pool uses">R {it.rewardsPool||0}</span>
+                  <span style={S.chip} title="Penalties Pool uses">P {it.penaltiesPool||0}</span>
+                  <span style={S.chip} title="Missions using as Icon">IM {it.iconMission||0}</span>
+                  <span style={S.chip} title="Devices using as Icon">ID {it.iconDevice||0}</span>
+                  <span style={S.chip} title="Reward Icons entries">IR {it.iconReward||0}</span>
+                  <span style={S.chip} title="Outcomes: On Correct">OC {it.onCorrect||0}</span>
+                  <span style={S.chip} title="Outcomes: On Wrong">OW {it.onWrong||0}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Existing sections preserved below */}
+return (
     <main style={S.wrap}>
       {/* Icons */}
       <div style={S.card}>
@@ -2514,6 +2570,97 @@ function Pool({ title, items, onRemove }) {
           </div>
         ))}
         {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── AnswerResponseEditor ───────────────────────── */
+/** Props:
+ *  - editing (mission object)
+ *  - setEditing (setter)
+ *  - inventory (array from /api/list-media across uploads/bundles/icons)
+ *  Behavior:
+ *   - lets author define onCorrect / onWrong responses with:
+ *       statement, media (image/video), optional audio, durationSeconds or buttonText
+ *   - buttonText defaults to 'OK'
+ *   - durationSeconds: if > 0 the outcome auto-closes; otherwise shows a button
+ */
+function AnswerResponseEditor({ editing, setEditing, inventory }) {
+  const inv = Array.isArray(inventory) ? inventory : [];
+  const imagesVideos = inv.filter(it => /^(image|gif|video)$/i.test(it.type||''));
+  const audios = inv.filter(it => /^audio$/i.test(it.type||''));
+
+  const oC = editing.onCorrect || {};
+  const oW = editing.onWrong   || {};
+
+  function setOC(next) { setEditing({ ...editing, onCorrect: { buttonText:'OK', ...oC, ...next } }); }
+  function setOW(next) { setEditing({ ...editing, onWrong:   { buttonText:'OK', ...oW, ...next } }); }
+
+  const box = { border:'1px solid #2a323b', borderRadius:10, padding:10, margin:'12px 0', background:'#0c0f12' };
+  const row = { display:'grid', gridTemplateColumns:'160px 1fr', gap:8, alignItems:'center', margin:'6px 0' };
+  const lab = { fontSize:12, color:'#9fb0bf' };
+  const inp = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
+
+  function MediaPicker({ value, onChange, list }) {
+    return (
+      <select value={value||''} onChange={e=>onChange(e.target.value||'')} style={inp}>
+        <option value="">(none)</option>
+        {list.map((m,i)=>(
+          <option key={i} value={m.url}>{m.name || m.url.replace(/^.*\//,'')}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <div style={box}>
+      <h4 style={{ margin:'4px 0 10px 0' }}>Answer Responses (Correct / Wrong)</h4>
+
+      {/* Correct */}
+      <div style={{ ...box, background:'#0b1115', margin:0 }}>
+        <div style={{ fontWeight:600, marginBottom:8 }}>On Correct Answer</div>
+        <div style={row}><div style={lab}>Statement</div>
+          <textarea style={{...inp, height:72}} value={oC.statement||''} onChange={e=>setOC({ statement:e.target.value })} />
+        </div>
+        <div style={row}><div style={lab}>Media (image/video)</div>
+          <MediaPicker value={oC.mediaUrl} onChange={v=>setOC({ mediaUrl:v })} list={imagesVideos} />
+        </div>
+        <div style={row}><div style={lab}>Audio (optional)</div>
+          <MediaPicker value={oC.audioUrl} onChange={v=>setOC({ audioUrl:v })} list={audios} />
+        </div>
+        <div style={row}><div style={lab}>Auto-close after (sec)</div>
+          <input type="number" min={0} max={1200} style={inp} value={Number(oC.durationSeconds||0)}
+                 onChange={e=>setOC({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
+        </div>
+        <div style={row}><div style={lab}>Button text</div>
+          <input style={inp} value={oC.buttonText || 'OK'} onChange={e=>setOC({ buttonText: e.target.value || 'OK' })} />
+        </div>
+      </div>
+
+      {/* Wrong */}
+      <div style={{ ...box, background:'#110b0b', marginTop:10 }}>
+        <div style={{ fontWeight:600, marginBottom:8 }}>On Wrong Answer</div>
+        <div style={row}><div style={lab}>Statement</div>
+          <textarea style={{...inp, height:72}} value={oW.statement||''} onChange={e=>setOW({ statement:e.target.value })} />
+        </div>
+        <div style={row}><div style={lab}>Media (image/video)</div>
+          <MediaPicker value={oW.mediaUrl} onChange={v=>setOW({ mediaUrl:v })} list={imagesVideos} />
+        </div>
+        <div style={row}><div style={lab}>Audio (optional)</div>
+          <MediaPicker value={oW.audioUrl} onChange={v=>setOW({ audioUrl:v })} list={audios} />
+        </div>
+        <div style={row}><div style={lab}>Auto-close after (sec)</div>
+          <input type="number" min={0} max={1200} style={inp} value={Number(oW.durationSeconds||0)}
+                 onChange={e=>setOW({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
+        </div>
+        <div style={row}><div style={lab}>Button text</div>
+          <input style={inp} value={oW.buttonText || 'OK'} onChange={e=>setOW({ buttonText: e.target.value || 'OK' })} />
+        </div>
+      </div>
+
+      <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
+        Tip: Leave <b>Auto-close</b> at 0 to require a button click. Button text defaults to “OK”.
       </div>
     </div>
   );
