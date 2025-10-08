@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
-import AnswerResponseWrapper from '../components/AnswerResponseWrapper';
-
+import AnswerResponseEditor from '../components/AnswerResponseEditor';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -287,6 +286,18 @@ export default function Admin() {
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
+  // media inventory for editors
+  const [inventory, setInventory] = useState([]);
+  useEffect(()=>{
+    let mounted = true;
+    fetch('/api/list-media', { credentials:'include' })
+      .then(r=>r.ok ? r.json() : [])
+      .then(d=>{ if (mounted) setInventory(Array.isArray(d) ? d : []); })
+      .catch(()=>{ if (mounted) setInventory([]); });
+    return ()=> mounted = false;
+  },[]);
+
+  
   const [dirty, setDirty]       = useState(false);
 
   // selections
@@ -323,35 +334,6 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-
-// createResponseMission: insert a response mission after the current editing mission
-async function createResponseMission(type, responsePayload) {
-  try {
-    const targetGame = suite || config || (games && games[0]);
-    if (!targetGame) return null;
-    const missions = Array.isArray(targetGame.missions) ? targetGame.missions : [];
-    const id = 'm' + String(Date.now()).slice(-6);
-    const newMission = {
-      id,
-      title: type === 'correct' ? 'Correct Response' : 'Wrong Response',
-      type: 'statement',
-      content: { text: (responsePayload && responsePayload.statement) || '' },
-      meta: { responseType: type, responsePayload: responsePayload || {} }
-    };
-    // insert after current editing mission if possible
-    const idx = missions.findIndex(m => (m.id || m._id) === (editing && (editing.id || editing._id)));
-    const insertAt = idx >= 0 ? idx + 1 : missions.length;
-    missions.splice(insertAt, 0, newMission);
-    // update state
-    if (suite) setSuite(prev => ({ ...prev, missions: missions }));
-    else if (config) setConfig(prev => ({ ...prev, missions: missions }));
-    else setGames(prev => { const next = [...(prev || [])]; if (next[0]) next[0].missions = missions; return next; });
-    return newMission;
-  } catch (e) {
-    console.error('createResponseMission error', e);
-    return null;
-  }
-}
 
   useEffect(() => {
     try {
@@ -959,7 +941,7 @@ async function createResponseMission(type, responsePayload) {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
+  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -1318,13 +1300,7 @@ async function createResponseMission(type, responsePayload) {
                     </Field>
                   ))}
 
-                  
-                  {/* Answer Response buttons: opens floating modals for Correct/Wrong */}
-                  <div style={{ marginTop:8 }}>
-                    <AnswerResponseWrapper editing={editing} setEditing={setEditing} inventory={inventory} createResponseMission={createResponseMission} />
-                  </div>
-
-<Field label="Points (Reward)">
+                  <Field label="Points (Reward)">
                     <input type="number" style={S.input} value={editing.rewards?.points ?? 0}
                       onChange={(e)=>{ const v=e.target.value===''?0:Number(e.target.value);
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
@@ -2191,7 +2167,7 @@ function MediaPoolTab({
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('audio');
+  const [subTab, setSubTab] = useState('image');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -2394,27 +2370,9 @@ function MediaPoolTab({
 
                   <MediaPreview url={url} kind={active.key} />
 
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
-                    {/* Assign actions — labels include per-file counts */}
-                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
-                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
-                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
-                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
-                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
+                  
+                  {/* Assign actions removed — Media Pool is upload-only */}
 
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                      <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
-                        Open
-                      </a>
-                      <button
-                        style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                        onClick={()=>deleteOne(url)}
-                        title="Delete this file"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
                 </div>
               );
             })}
