@@ -1107,7 +1107,124 @@ export default function Admin() {
             </div>
 
             {/* Mission editor (overlay) */}
-            {editing && (
+            /* ======================== SECTION A: AnswerResponseEditor ========================
+   Drop-in editor for "Correct / Wrong" outcomes:
+   - statement (text)
+   - mediaUrl (image/video) from your pool
+   - audioUrl (optional) from your pool
+   - durationSeconds (0 = require button to continue)
+   - buttonText (defaults to "OK")
+   Props:
+     editing:     current mission object (must be mutable via setEditing)
+     setEditing:  setter for mission draft
+     inventory?:  optional list [{ url, name, type }]  (if omitted, we fetch /api/list-media)
+   ================================================================================ */
+
+import React, { useEffect, useMemo, useState } from 'react';
+
+export function AnswerResponseEditor({ editing, setEditing, inventory }) {
+  const [inv, setInv] = useState(Array.isArray(inventory) ? inventory : []);
+
+  // Fallback fetch if inventory not provided
+  useEffect(() => {
+    if (Array.isArray(inventory)) { setInv(inventory); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/list-media');
+        const items = await res.json();
+        if (!cancelled) setInv(Array.isArray(items) ? items : []);
+      } catch { if (!cancelled) setInv([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [inventory]);
+
+  const oC = useMemo(() => editing?.onCorrect || {}, [editing]);
+  const oW = useMemo(() => editing?.onWrong   || {}, [editing]);
+
+  // Helper to robustly infer type from url if missing
+  const ext = (u='') => (u.split('?')[0].split('#')[0].split('.').pop() || '').toLowerCase();
+  const inferType = (u) => {
+    const e = ext(u);
+    if (['png','jpg','jpeg','gif','webp','avif'].includes(e)) return 'image';
+    if (['mp4','webm','mov','m4v','ogg'].includes(e)) return 'video';
+    if (['mp3','wav','aac','m4a','ogg'].includes(e)) return 'audio';
+    return 'file';
+  };
+
+  const all = (inv || []).map(x => ({ ...x, type: x?.type || inferType(x?.url || '') }));
+  const imagesVideos = all.filter(x => x.type === 'image' || x.type === 'video');
+  const audios       = all.filter(x => x.type === 'audio');
+
+  const S = {
+    wrap: { border:'1px solid #2a323b', borderRadius:10, padding:12, margin:'12px 0', background:'#0c0f12' },
+    box:  { border:'1px solid #2a323b', borderRadius:10, padding:10, margin:'8px 0' },
+    row:  { display:'grid', gridTemplateColumns:'160px 1fr', gap:8, alignItems:'center', margin:'8px 0' },
+    lab:  { fontSize:12, color:'#9fb0bf' },
+    inp:  { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' },
+    title:{ fontWeight:600, marginBottom:8 }
+  };
+
+  function setOC(next) { setEditing(prev => ({ ...prev, onCorrect: { buttonText:'OK', ...(prev?.onCorrect||{}), ...next } })); }
+  function setOW(next) { setEditing(prev => ({ ...prev, onWrong:   { buttonText:'OK', ...(prev?.onWrong  ||{}), ...next } })); }
+
+  const MediaPicker = ({ value, onChange, list }) => (
+    <select value={value||''} onChange={e => onChange(e.target.value || '')} style={S.inp}>
+      <option value="">(none)</option>
+      {list.map((m,i) => <option key={i} value={m.url}>{m.name || m.url.replace(/^.*\//,'')}</option>)}
+    </select>
+  );
+
+  return (
+    <div style={S.wrap}>
+      <h4 style={{ margin:'4px 0 10px 0' }}>Answer Responses (Correct / Wrong)</h4>
+
+      <div style={{ ...S.box, background:'#0b1115' }}>
+        <div style={S.title}>On Correct Answer</div>
+        <div style={S.row}><div style={S.lab}>Statement</div>
+          <textarea style={{...S.inp, height:72}} value={oC.statement||''} onChange={e=>setOC({ statement:e.target.value })}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Media (image/video)</div>
+          <MediaPicker value={oC.mediaUrl} onChange={v=>setOC({ mediaUrl:v })} list={imagesVideos}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Audio (optional)</div>
+          <MediaPicker value={oC.audioUrl} onChange={v=>setOC({ audioUrl:v })} list={audios}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Auto-close after (sec)</div>
+          <input type="number" min={0} max={1200} style={S.inp} value={Number(oC.durationSeconds||0)}
+                 onChange={e=>setOC({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Button text</div>
+          <input style={S.inp} value={oC.buttonText || 'OK'} onChange={e=>setOC({ buttonText: e.target.value || 'OK' })}/>
+        </div>
+      </div>
+
+      <div style={{ ...S.box, background:'#110b0b' }}>
+        <div style={S.title}>On Wrong Answer</div>
+        <div style={S.row}><div style={S.lab}>Statement</div>
+          <textarea style={{...S.inp, height:72}} value={oW.statement||''} onChange={e=>setOW({ statement:e.target.value })}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Media (image/video)</div>
+          <MediaPicker value={oW.mediaUrl} onChange={v=>setOW({ mediaUrl:v })} list={imagesVideos}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Audio (optional)</div>
+          <MediaPicker value={oW.audioUrl} onChange={v=>setOW({ audioUrl:v })} list={audios}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Auto-close after (sec)</div>
+          <input type="number" min={0} max={1200} style={S.inp} value={Number(oW.durationSeconds||0)}
+                 onChange={e=>setOW({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
+        </div>
+        <div style={S.row}><div style={S.lab}>Button text</div>
+          <input style={S.inp} value={oW.buttonText || 'OK'} onChange={e=>setOW({ buttonText: e.target.value || 'OK' })}/>
+        </div>
+      </div>
+
+      <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
+        Tip: Leave <b>Auto-close</b> at 0 to require a button tap. Button text defaults to “OK”.
+      </div>
+    </div>
+  );
+}{editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
                   <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
@@ -1312,124 +1429,7 @@ export default function Admin() {
                     <AppearanceEditor value={editing.appearance||defaultAppearance()}
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
-/* ======================== SECTION A: AnswerResponseEditor ========================
-   Drop-in editor for "Correct / Wrong" outcomes:
-   - statement (text)
-   - mediaUrl (image/video) from your pool
-   - audioUrl (optional) from your pool
-   - durationSeconds (0 = require button to continue)
-   - buttonText (defaults to "OK")
-   Props:
-     editing:     current mission object (must be mutable via setEditing)
-     setEditing:  setter for mission draft
-     inventory?:  optional list [{ url, name, type }]  (if omitted, we fetch /api/list-media)
-   ================================================================================ */
 
-import React, { useEffect, useMemo, useState } from 'react';
-
-export function AnswerResponseEditor({ editing, setEditing, inventory }) {
-  const [inv, setInv] = useState(Array.isArray(inventory) ? inventory : []);
-
-  // Fallback fetch if inventory not provided
-  useEffect(() => {
-    if (Array.isArray(inventory)) { setInv(inventory); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/list-media');
-        const items = await res.json();
-        if (!cancelled) setInv(Array.isArray(items) ? items : []);
-      } catch { if (!cancelled) setInv([]); }
-    })();
-    return () => { cancelled = true; };
-  }, [inventory]);
-
-  const oC = useMemo(() => editing?.onCorrect || {}, [editing]);
-  const oW = useMemo(() => editing?.onWrong   || {}, [editing]);
-
-  // Helper to robustly infer type from url if missing
-  const ext = (u='') => (u.split('?')[0].split('#')[0].split('.').pop() || '').toLowerCase();
-  const inferType = (u) => {
-    const e = ext(u);
-    if (['png','jpg','jpeg','gif','webp','avif'].includes(e)) return 'image';
-    if (['mp4','webm','mov','m4v','ogg'].includes(e)) return 'video';
-    if (['mp3','wav','aac','m4a','ogg'].includes(e)) return 'audio';
-    return 'file';
-  };
-
-  const all = (inv || []).map(x => ({ ...x, type: x?.type || inferType(x?.url || '') }));
-  const imagesVideos = all.filter(x => x.type === 'image' || x.type === 'video');
-  const audios       = all.filter(x => x.type === 'audio');
-
-  const S = {
-    wrap: { border:'1px solid #2a323b', borderRadius:10, padding:12, margin:'12px 0', background:'#0c0f12' },
-    box:  { border:'1px solid #2a323b', borderRadius:10, padding:10, margin:'8px 0' },
-    row:  { display:'grid', gridTemplateColumns:'160px 1fr', gap:8, alignItems:'center', margin:'8px 0' },
-    lab:  { fontSize:12, color:'#9fb0bf' },
-    inp:  { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' },
-    title:{ fontWeight:600, marginBottom:8 }
-  };
-
-  function setOC(next) { setEditing(prev => ({ ...prev, onCorrect: { buttonText:'OK', ...(prev?.onCorrect||{}), ...next } })); }
-  function setOW(next) { setEditing(prev => ({ ...prev, onWrong:   { buttonText:'OK', ...(prev?.onWrong  ||{}), ...next } })); }
-
-  const MediaPicker = ({ value, onChange, list }) => (
-    <select value={value||''} onChange={e => onChange(e.target.value || '')} style={S.inp}>
-      <option value="">(none)</option>
-      {list.map((m,i) => <option key={i} value={m.url}>{m.name || m.url.replace(/^.*\//,'')}</option>)}
-    </select>
-  );
-
-  return (
-    <div style={S.wrap}>
-      <h4 style={{ margin:'4px 0 10px 0' }}>Answer Responses (Correct / Wrong)</h4>
-
-      <div style={{ ...S.box, background:'#0b1115' }}>
-        <div style={S.title}>On Correct Answer</div>
-        <div style={S.row}><div style={S.lab}>Statement</div>
-          <textarea style={{...S.inp, height:72}} value={oC.statement||''} onChange={e=>setOC({ statement:e.target.value })}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Media (image/video)</div>
-          <MediaPicker value={oC.mediaUrl} onChange={v=>setOC({ mediaUrl:v })} list={imagesVideos}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Audio (optional)</div>
-          <MediaPicker value={oC.audioUrl} onChange={v=>setOC({ audioUrl:v })} list={audios}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Auto-close after (sec)</div>
-          <input type="number" min={0} max={1200} style={S.inp} value={Number(oC.durationSeconds||0)}
-                 onChange={e=>setOC({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Button text</div>
-          <input style={S.inp} value={oC.buttonText || 'OK'} onChange={e=>setOC({ buttonText: e.target.value || 'OK' })}/>
-        </div>
-      </div>
-
-      <div style={{ ...S.box, background:'#110b0b' }}>
-        <div style={S.title}>On Wrong Answer</div>
-        <div style={S.row}><div style={S.lab}>Statement</div>
-          <textarea style={{...S.inp, height:72}} value={oW.statement||''} onChange={e=>setOW({ statement:e.target.value })}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Media (image/video)</div>
-          <MediaPicker value={oW.mediaUrl} onChange={v=>setOW({ mediaUrl:v })} list={imagesVideos}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Audio (optional)</div>
-          <MediaPicker value={oW.audioUrl} onChange={v=>setOW({ audioUrl:v })} list={audios}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Auto-close after (sec)</div>
-          <input type="number" min={0} max={1200} style={S.inp} value={Number(oW.durationSeconds||0)}
-                 onChange={e=>setOW({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
-        </div>
-        <div style={S.row}><div style={S.lab}>Button text</div>
-          <input style={S.inp} value={oW.buttonText || 'OK'} onChange={e=>setOW({ buttonText: e.target.value || 'OK' })}/>
-        </div>
-      </div>
-
-      <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
-        Tip: Leave <b>Auto-close</b> at 0 to require a button tap. Button text defaults to “OK”.
-      </div>
-    </div>
-  );
-}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -2636,4 +2636,5 @@ function Pool({ title, items, onRemove }) {
     </div>
   );
 }
+
 
