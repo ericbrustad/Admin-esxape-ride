@@ -12,7 +12,7 @@ import OutcomeModal from "./OutcomeModal";
  *   insert a mission stub beneath the current mission.
  */
 
-export default function AnswerResponseEditor({ editing, setEditing, inventory = [], createResponseMission }) {
+export default function AnswerResponseEditor({ editing, setEditing, inventory = [], createResponseMission , openInitial}) {
   if (!editing || !setEditing) return null;
 
   const imagesVideos = inventory.filter((it) => {
@@ -50,7 +50,27 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory = 
     };
   }, [openCorrect, openWrong]);
 
-  const styles = {
+  
+
+// If parent passes openInitial='correct' or 'wrong', auto-open that modal on mount
+useEffect(() => {
+  if (!openInitial) return;
+  if (openInitial === 'correct') {
+    // ensure the correct response is enabled, then open the editor/modal
+    if (!editing.onCorrect) {
+      setEditing(prev => ({ ...prev, onCorrect: prev.onCorrect ? prev.onCorrect : { statement: '', mediaUrl: '', audioUrl: '', durationSeconds: 0, buttonText: 'OK' } }));
+    }
+    // small timeout to allow state to settle then open
+    setTimeout(() => { try { openCorrectViaCreator(); } catch (e) {} }, 50);
+  } else if (openInitial === 'wrong') {
+    if (!editing.onWrong) {
+      setEditing(prev => ({ ...prev, onWrong: prev.onWrong ? prev.onWrong : { statement: '', mediaUrl: '', audioUrl: '', durationSeconds: 0, buttonText: 'OK' } }));
+    }
+    setTimeout(() => { try { openWrongViaCreator(); } catch (e) {} }, 50);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [openInitial]);
+const styles = {
     row: { display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, alignItems: "center", margin: "6px 0" },
     lab: { fontSize: 13, color: "#9fb0bf" },
     inp: { padding: "10px 12px", borderRadius: 8, border: "1px solid #2a323b", background: "#0b0c10", color: "#e9eef2", width: "100%" },

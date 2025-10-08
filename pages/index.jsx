@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
+import AnswerResponseWrapper from '../components/AnswerResponseWrapper';
+
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -321,6 +323,35 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+// createResponseMission: insert a response mission after the current editing mission
+async function createResponseMission(type, responsePayload) {
+  try {
+    const targetGame = suite || config || (games && games[0]);
+    if (!targetGame) return null;
+    const missions = Array.isArray(targetGame.missions) ? targetGame.missions : [];
+    const id = 'm' + String(Date.now()).slice(-6);
+    const newMission = {
+      id,
+      title: type === 'correct' ? 'Correct Response' : 'Wrong Response',
+      type: 'statement',
+      content: { text: (responsePayload && responsePayload.statement) || '' },
+      meta: { responseType: type, responsePayload: responsePayload || {} }
+    };
+    // insert after current editing mission if possible
+    const idx = missions.findIndex(m => (m.id || m._id) === (editing && (editing.id || editing._id)));
+    const insertAt = idx >= 0 ? idx + 1 : missions.length;
+    missions.splice(insertAt, 0, newMission);
+    // update state
+    if (suite) setSuite(prev => ({ ...prev, missions: missions }));
+    else if (config) setConfig(prev => ({ ...prev, missions: missions }));
+    else setGames(prev => { const next = [...(prev || [])]; if (next[0]) next[0].missions = missions; return next; });
+    return newMission;
+  } catch (e) {
+    console.error('createResponseMission error', e);
+    return null;
+  }
+}
 
   useEffect(() => {
     try {
@@ -1287,7 +1318,13 @@ export default function Admin() {
                     </Field>
                   ))}
 
-                  <Field label="Points (Reward)">
+                  
+                  {/* Answer Response buttons: opens floating modals for Correct/Wrong */}
+                  <div style={{ marginTop:8 }}>
+                    <AnswerResponseWrapper editing={editing} setEditing={setEditing} inventory={inventory} createResponseMission={createResponseMission} />
+                  </div>
+
+<Field label="Points (Reward)">
                     <input type="number" style={S.input} value={editing.rewards?.points ?? 0}
                       onChange={(e)=>{ const v=e.target.value===''?0:Number(e.target.value);
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
