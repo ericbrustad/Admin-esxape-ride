@@ -227,8 +227,8 @@ const TYPE_LABELS = {
   short_answer:     'Question (Short Answer)',
   statement:        'Statement',
   video:            'Video',
-  geofence_image:   'Geo Fence Image',
-  geofence_video:   'Geo Fence Video',
+  geofence_image:   'Geofence Image',
+  geofence_video:   'Geofence Video',
   ar_image:         'AR Image',
   ar_video:         'AR Video',
   stored_statement: 'Stored Statement',
@@ -321,10 +321,6 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  // Response media inventory (for AnswerResponseEditor)
-  const [rspInv, setRspInv] = useState([]);
-  useEffect(() => { (async ()=>{ try { const items = await listInventory(['uploads','bundles','icons']); setRspInv(items||[]); } catch { setRspInv([]); } })(); }, []);
-
 
   useEffect(() => {
     try {
@@ -910,7 +906,7 @@ export default function Admin() {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid #1f262d', background: '#12181d' }}>
-          Loading… (pulling config & missions)
+          Loading… (fetching config and missions)
         </div>
       </main>
     );
@@ -932,7 +928,7 @@ export default function Admin() {
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
+  const tabsOrder = ['missions','devices','settings','text','media-pool','assigned'];
 
   const isDefault = !activeSlug || activeSlug === 'default';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
@@ -944,7 +940,7 @@ export default function Admin() {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             {tabsOrder.map((t)=>{
               const labelMap = {
-                'missions':'MISSION MAKER',
+                'missions':'MISSIONS',
                 'devices':'DEVICES',
                 'settings':'SETTINGS',
                 'text':'TEXT',
@@ -971,7 +967,7 @@ export default function Admin() {
             {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
+                Deploy delay (seconds):
                 <input
                   type="number" min={0} max={120}
                   value={deployDelaySec}
@@ -1057,7 +1053,7 @@ export default function Admin() {
                 <div>
                   <h3 style={{ margin:0 }}>Missions Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
+                    Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable..
                   </div>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
@@ -1304,7 +1300,7 @@ export default function Admin() {
                       checked={editing.showContinue !== false}
                       onChange={(e)=>{ setEditing({ ...editing, showContinue: e.target.checked }); setDirty(true); }}
                     />
-                    Show “Continue” button to close this mission
+                    Show a “Continue” button to close this mission
                   </label>
 
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -1316,8 +1312,6 @@ export default function Admin() {
                     <AppearanceEditor value={editing.appearance||defaultAppearance()}
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
-
-                  <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={rspInv} />
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
                     <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -1342,8 +1336,8 @@ export default function Admin() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
               <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
-                <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
-                <button type="button" style={S.button} onClick={useMyLocation}>📍 My location</button>
+                <input placeholder="Search an address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
+                <button type="button" style={S.button} onClick={useMyLocation}>📍 My Location</button>
                 <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
               </form>
 
@@ -1389,7 +1383,7 @@ export default function Admin() {
                 <div>
                   <h3 style={{ margin:0 }}>Devices Map</h3>
                   <div style={{ color:'#9fb0bf', fontSize:12 }}>
-                    Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
+                    Select a <b>device</b> pin to move it. Map uses your <b>Game Region</b> center/zoom.
                   </div>
                 </div>
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
@@ -1504,7 +1498,7 @@ export default function Admin() {
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input type="checkbox" checked={config.splash.enabled}
                   onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
-                Enable Splash (game code & Stripe)
+                Enable splash (game code & Stripe)
               </label>
             </Field>
           </div>
@@ -1526,7 +1520,7 @@ export default function Admin() {
                   onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
                 />
               </Field>
-              <Field label="Find center by address/city">
+              <Field label="Find Center by Address/City">
                 <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
                   <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
                   <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
@@ -1559,7 +1553,7 @@ export default function Admin() {
               </Field>
             </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
+              These defaults keep pins in the same region. Geofence mode lets the game client allow click‑to‑enter in test mode and GPS in live mode.
             </div>
           </div>
 
@@ -1581,7 +1575,7 @@ export default function Admin() {
             <AppearanceEditor value={config.appearance||defaultAppearance()}
               onChange={(next)=>setConfig({ ...config, appearance:next })}/>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
-              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+              Tip: Keep vertical alignment at <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
         </main>
@@ -1607,7 +1601,8 @@ export default function Admin() {
 
       {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
-        <AssignedMediaTab suite={suite} config={config}
+        <AssignedMediaTab
+          config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
@@ -1661,11 +1656,11 @@ export default function Admin() {
             <Field label="Mode">
               <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
                 <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
-                <option value="multi">Multiple (4)</option>
+                <option value="head2head">Head-to-Head (2)</option>
+                <option value="multi">Multiplayer (4)</option>
               </select>
             </Field>
-            <Field label="Duration (minutes — 0 = infinite; count UP)">
+            <Field label="Duration (minutes—0 = infinite; counts up)">
               <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin}
                 onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}/>
             </Field>
@@ -1673,9 +1668,7 @@ export default function Admin() {
               <input type="number" min={1} max={120} style={S.input} value={newAlertMin}
                 onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}/>
             </Field>
-            <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={rspInv} />
-
-                  <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <div style={{ display:'flex', gap:8, marginTop:12 }}>
               <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
               <button style={S.button} onClick={async ()=>{
                 if (!newTitle.trim()) return;
@@ -2107,9 +2100,9 @@ function TextTab({ config, setConfig }) {
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
+        <h3 style={{ marginTop:0 }}>Text Rules & Instructions</h3>
         <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
-          One rule per line. This saves into <code>config.textRules</code>.
+          One rule per line. This saves to <code>config.textRules</code>.
         </div>
         <textarea
           style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
@@ -2154,14 +2147,14 @@ function MediaPoolTab({
 
 
   
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
+  // Sub-tabs inside Media Pool. Default → 'image'.
   const subTabs = [
     { key:'image', label:'Images' },
     { key:'video', label:'Videos' },
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
   ];
-  const [subTab, setSubTab] = useState('image');
+  const [subTab, setSubTab] = useState('audio');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -2333,7 +2326,7 @@ function MediaPoolTab({
             style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
             onClick={()=>deleteAll(active.items)}
             disabled={!active.items.length}
-            title="Delete all files in this type"
+            title="Delete all files in this category"
           >
             Delete All
           </button>
@@ -2366,6 +2359,12 @@ function MediaPoolTab({
 
                   <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
                     {/* Assign actions — labels include per-file counts */}
+                    <button style={S.button} onClick={()=>addPoolItem('rewards', url)}>+ Add to Rewards ({use.rewardsPool})</button>
+                    <button style={S.button} onClick={()=>addPoolItem('penalties', url)}>+ Add to Penalties ({use.penaltiesPool})</button>
+                    <button style={S.button} onClick={()=>addIcon('missions', url)}>+ Icon → Missions ({use.iconMission})</button>
+                    <button style={S.button} onClick={()=>addIcon('devices', url)}>+ Icon → Devices ({use.iconDevice})</button>
+                    <button style={S.button} onClick={()=>addIcon('rewards', url)}>+ Icon → Rewards ({use.iconReward})</button>
+
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                       <a href={url} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>
                         Open
@@ -2390,33 +2389,12 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
-
-  // Build per-URL usage map across icons, pools, and mission outcomes
-  function buildUsageMap() {
-    const map = new Map();
-    function add(url, key) {
-      if (!url) return;
-      const u = String(url);
-      if (!map.has(u)) map.set(u, { url:u, rewardsPool:0, penaltiesPool:0, iconMission:0, iconDevice:0, iconReward:0, onCorrect:0, onWrong:0 });
-      map.get(u)[key] = (map.get(u)[key] || 0) + 1;
-    }
-    (config.icons?.missions||[]).forEach(it => add(it.url, 'iconMission'));
-    (config.icons?.devices ||[]).forEach(it => add(it.url, 'iconDevice'));
-    (config.icons?.rewards ||[]).forEach(it => add(it.url, 'iconReward'));
-    (config.media?.rewardsPool||[]).forEach(it => add(it.url, 'rewardsPool'));
-    (config.media?.penaltiesPool||[]).forEach(it => add(it.url, 'penaltiesPool'));
-    (suite?.missions||[]).forEach(m => {
-      add(m?.onCorrect?.mediaUrl, 'onCorrect');
-      add(m?.onWrong?.mediaUrl,   'onWrong');
-    });
-    return [...map.values()];
-  }
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2436,41 +2414,7 @@ function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
     });
   }
 
-  
-  const overview = buildUsageMap();
-
   return (
-    <main style={S.wrap}>
-      {/* Overview grid with tallies per file */}
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Assigned Media — Overview (by media file)</h3>
-        {overview.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No assigned media yet.</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10 }}>
-            {overview.map((it, idx) => (
-              <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
-                  {it.url.replace(/^.*\//,'')}
-                </div>
-                <MediaPreview url={it.url} kind={'image'} />
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
-                  <span style={S.chip} title="Rewards Pool uses">R {it.rewardsPool||0}</span>
-                  <span style={S.chip} title="Penalties Pool uses">P {it.penaltiesPool||0}</span>
-                  <span style={S.chip} title="Missions using as Icon">IM {it.iconMission||0}</span>
-                  <span style={S.chip} title="Devices using as Icon">ID {it.iconDevice||0}</span>
-                  <span style={S.chip} title="Reward Icons entries">IR {it.iconReward||0}</span>
-                  <span style={S.chip} title="Outcomes: On Correct">OC {it.onCorrect||0}</span>
-                  <span style={S.chip} title="Outcomes: On Wrong">OW {it.onWrong||0}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Existing sections preserved below */}
-return (
     <main style={S.wrap}>
       {/* Icons */}
       <div style={S.card}>
@@ -2516,215 +2460,61 @@ return (
   );
 }
 
-/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ suite, config, setConfig, onReapplyDefaults }) {
-  const rewards = config.media?.rewardsPool || [];
-  const penalties = config.media?.penaltiesPool || [];
-  const iconsM = config.icons?.missions || [];
-  const iconsD = config.icons?.devices  || [];
-  const iconsR = config.icons?.rewards  || [];
-
-  // Build per-URL usage map across icons, pools, and mission outcomes
-  function buildUsageMap() {
-    const map = new Map();
-    function add(url, key) {
-      if (!url) return;
-      const u = String(url);
-      if (!map.has(u)) map.set(u, { url:u, rewardsPool:0, penaltiesPool:0, iconMission:0, iconDevice:0, iconReward:0, onCorrect:0, onWrong:0 });
-      map.get(u)[key] = (map.get(u)[key] || 0) + 1;
-    }
-    (config.icons?.missions||[]).forEach(it => add(it.url, 'iconMission'));
-    (config.icons?.devices ||[]).forEach(it => add(it.url, 'iconDevice'));
-    (config.icons?.rewards ||[]).forEach(it => add(it.url, 'iconReward'));
-    (config.media?.rewardsPool||[]).forEach(it => add(it.url, 'rewardsPool'));
-    (config.media?.penaltiesPool||[]).forEach(it => add(it.url, 'penaltiesPool'));
-    (suite?.missions||[]).forEach(m => {
-      add(m?.onCorrect?.mediaUrl, 'onCorrect');
-      add(m?.onWrong?.mediaUrl,   'onWrong');
-    });
-    return [...map.values()];
-  }
-
-  function removePoolItem(kind, idx) {
-    if (!window.confirm('Remove this item from the assigned list?')) return;
-    setConfig(c => {
-      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
-      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
-      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
-      return { ...c, media: m };
-    });
-  }
-  function removeIcon(kind, key) {
-    if (!window.confirm('Remove this icon from the assigned list?')) return;
-    setConfig(c => {
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      icons[kind] = icons[kind].filter(i => i.key !== key);
-      return { ...c, icons };
-    });
-  }
-
-  const overview = buildUsageMap();
-
+/* Shared pieces for Assigned Media */
+function IconGroup({ title, items, onRemove }) {
   return (
-    <main style={S.wrap}>
-      {/* Overview grid with tallies per file */}
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Assigned Media — Overview (by media file)</h3>
-        {overview.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No assigned media yet.</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:10 }}>
-            {overview.map((it, idx) => (
-              <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
-                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:6 }}>
-                  {it.url.replace(/^.*\//,'')}
-                </div>
-                <MediaPreview url={it.url} kind={'image'} />
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
-                  <span style={S.chip} title="Rewards Pool uses">R {it.rewardsPool||0}</span>
-                  <span style={S.chip} title="Penalties Pool uses">P {it.penaltiesPool||0}</span>
-                  <span style={S.chip} title="Missions using as Icon">IM {it.iconMission||0}</span>
-                  <span style={S.chip} title="Devices using as Icon">ID {it.iconDevice||0}</span>
-                  <span style={S.chip} title="Reward Icons entries">IR {it.iconReward||0}</span>
-                  <span style={S.chip} title="Outcomes: On Correct">OC {it.onCorrect||0}</span>
-                  <span style={S.chip} title="Outcomes: On Wrong">OW {it.onWrong||0}</span>
-                </div>
+    <div style={{ marginTop:8 }}>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
+        {items.map((it)=>(
+          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <div>
+                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
+                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
               </div>
-            ))}
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>onRemove(it.key)}
+              >
+                Remove
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Icons */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
-        </div>
-        <IconGroup
-          title={`Mission Icons (${iconsM.length})`}
-          items={iconsM}
-          onRemove={(key)=>removeIcon('missions', key)}
-        />
-        <IconGroup
-          title={`Device Icons (${iconsD.length})`}
-          items={iconsD}
-          onRemove={(key)=>removeIcon('devices', key)}
-        />
-        <IconGroup
-          title={`Reward Icons (${iconsR.length})`}
-          items={iconsR}
-          onRemove={(key)=>removeIcon('rewards', key)}
-        />
-      </div>
-
-      {/* Pools */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <Pool
-            title={`Rewards Pool (${rewards.length})`}
-            items={rewards}
-            onRemove={(idx)=>removePoolItem('rewards', idx)}
-          />
-          <Pool
-            title={`Penalties Pool (${penalties.length})`}
-            items={penalties}
-            onRemove={(idx)=>removePoolItem('penalties', idx)}
-          />
-        </div>
-      </div>
-    </main>
-  );
-}
-/* ───────────────────────── AnswerResponseEditor ───────────────────────── */
-/** Props:
- *  - editing (mission object)
- *  - setEditing (setter)
- *  - inventory (array from /api/list-media across uploads/bundles/icons)
- *  Behavior:
- *   - lets author define onCorrect / onWrong responses with:
- *       statement, media (image/video), optional audio, durationSeconds or buttonText
- *   - buttonText defaults to 'OK'
- *   - durationSeconds: if > 0 the outcome auto-closes; otherwise shows a button
- */
-function AnswerResponseEditor({ editing, setEditing, inventory }) {
-  const inv = Array.isArray(inventory) ? inventory : [];
-  const imagesVideos = inv.filter(it => /^(image|gif|video)$/i.test(it.type||''));
-  const audios = inv.filter(it => /^audio$/i.test(it.type||''));
-
-  const oC = editing.onCorrect || {};
-  const oW = editing.onWrong   || {};
-
-  function setOC(next) { setEditing({ ...editing, onCorrect: { buttonText:'OK', ...oC, ...next } }); }
-  function setOW(next) { setEditing({ ...editing, onWrong:   { buttonText:'OK', ...oW, ...next } }); }
-
-  const box = { border:'1px solid #2a323b', borderRadius:10, padding:10, margin:'12px 0', background:'#0c0f12' };
-  const row = { display:'grid', gridTemplateColumns:'160px 1fr', gap:8, alignItems:'center', margin:'6px 0' };
-  const lab = { fontSize:12, color:'#9fb0bf' };
-  const inp = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
-
-  function MediaPicker({ value, onChange, list }) {
-    return (
-      <select value={value||''} onChange={e=>onChange(e.target.value||'')} style={inp}>
-        <option value="">(none)</option>
-        {list.map((m,i)=>(
-          <option key={i} value={m.url}>{m.name || m.url.replace(/^.*\//,'')}</option>
         ))}
-      </select>
-    );
-  }
-
-  return (
-    <div style={box}>
-      <h4 style={{ margin:'4px 0 10px 0' }}>Answer Responses (Correct / Wrong)</h4>
-
-      {/* Correct */}
-      <div style={{ ...box, background:'#0b1115', margin:0 }}>
-        <div style={{ fontWeight:600, marginBottom:8 }}>On Correct Answer</div>
-        <div style={row}><div style={lab}>Statement</div>
-          <textarea style={{...inp, height:72}} value={oC.statement||''} onChange={e=>setOC({ statement:e.target.value })} />
-        </div>
-        <div style={row}><div style={lab}>Media (image/video)</div>
-          <MediaPicker value={oC.mediaUrl} onChange={v=>setOC({ mediaUrl:v })} list={imagesVideos} />
-        </div>
-        <div style={row}><div style={lab}>Audio (optional)</div>
-          <MediaPicker value={oC.audioUrl} onChange={v=>setOC({ audioUrl:v })} list={audios} />
-        </div>
-        <div style={row}><div style={lab}>Auto-close after (sec)</div>
-          <input type="number" min={0} max={1200} style={inp} value={Number(oC.durationSeconds||0)}
-                 onChange={e=>setOC({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
-        </div>
-        <div style={row}><div style={lab}>Button text</div>
-          <input style={inp} value={oC.buttonText || 'OK'} onChange={e=>setOC({ buttonText: e.target.value || 'OK' })} />
-        </div>
-      </div>
-
-      {/* Wrong */}
-      <div style={{ ...box, background:'#110b0b', marginTop:10 }}>
-        <div style={{ fontWeight:600, marginBottom:8 }}>On Wrong Answer</div>
-        <div style={row}><div style={lab}>Statement</div>
-          <textarea style={{...inp, height:72}} value={oW.statement||''} onChange={e=>setOW({ statement:e.target.value })} />
-        </div>
-        <div style={row}><div style={lab}>Media (image/video)</div>
-          <MediaPicker value={oW.mediaUrl} onChange={v=>setOW({ mediaUrl:v })} list={imagesVideos} />
-        </div>
-        <div style={row}><div style={lab}>Audio (optional)</div>
-          <MediaPicker value={oW.audioUrl} onChange={v=>setOW({ audioUrl:v })} list={audios} />
-        </div>
-        <div style={row}><div style={lab}>Auto-close after (sec)</div>
-          <input type="number" min={0} max={1200} style={inp} value={Number(oW.durationSeconds||0)}
-                 onChange={e=>setOW({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
-        </div>
-        <div style={row}><div style={lab}>Button text</div>
-          <input style={inp} value={oW.buttonText || 'OK'} onChange={e=>setOW({ buttonText: e.target.value || 'OK' })} />
-        </div>
-      </div>
-
-      <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
-        Tip: Leave <b>Auto-close</b> at 0 to require a button click. Button text defaults to “OK”.
       </div>
     </div>
   );
 }
-
+function Pool({ title, items, onRemove }) {
+  return (
+    <div>
+      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
+        {items.map((it, idx)=>(
+          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+            <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {it.label || baseNameFromUrl(it.url)}
+            </div>
+            <MediaPreview url={it.url} kind="pool item" />
+            <div style={{ display:'flex', gap:8, marginTop:8 }}>
+              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
+              <button
+                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+      </div>
+    </div>
+  );
+}
