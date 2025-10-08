@@ -3,17 +3,15 @@ import React, { useEffect, useState } from 'react';
 /**
  * AnswerResponseEditor.jsx
  *
- * - Two independent overlays: Correct and Wrong.
- * - Overlays open ONLY when user clicks the corresponding "Edit" button.
- * - Inline "Open Correct" and "Open Wrong" buttons rendered at the bottom of the component
- *   (so when the component is placed near the modal's bottom they appear on the mission window).
- * - Enable checkbox toggles whether the response exists on the editing object.
- * - Overlays are fixed, high z-index, and disable background scrolling while open.
- * - Thumbnail preview in overlay for image/video; audio player for audio.
- * - Save / Cancel / Disable actions. Save writes into editing.onCorrect / editing.onWrong.
+ * Behavior:
+ * - DOES NOT auto-open overlays when mission is selected.
+ * - Shows Enable checkboxes and a small summary for Correct/Wrong.
+ * - **ONLY** two non-floating buttons at the BOTTOM: "Open Correct Response" and "Open Wrong Response".
+ *   These buttons open the respective overlays and nothing else does.
+ * - Overlays are fixed, centered, high z-index, and block background scroll while open.
+ * - Save/Cancel/Disable inside overlay. Save writes into editing.onCorrect / editing.onWrong.
  *
- * Usage:
- *   <AnswerResponseEditor editing={editing} setEditing={setEditing} inventory={inventory} />
+ * Important: place this component near the bottom of the mission modal (above Save/Close).
  */
 export default function AnswerResponseEditor({ editing, setEditing, inventory }) {
   if (!editing || !setEditing) return null;
@@ -28,18 +26,18 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/i.test((it.url || ''))
   );
 
-  // Overlay open states (always closed initially)
+  // overlays closed by default and never auto-open
   const [openCorrect, setOpenCorrect] = useState(false);
   const [openWrong, setOpenWrong] = useState(false);
 
-  // Local copies for editing to allow cancel
+  // local editable copies (for cancel)
   const [localCorrect, setLocalCorrect] = useState(normalizeResponse(editing.onCorrect));
   const [localWrong, setLocalWrong] = useState(normalizeResponse(editing.onWrong));
 
   useEffect(() => { setLocalCorrect(normalizeResponse(editing.onCorrect)); }, [editing.onCorrect]);
   useEffect(() => { setLocalWrong(normalizeResponse(editing.onWrong)); }, [editing.onWrong]);
 
-  // Prevent background scroll while any overlay is open
+  // block background scroll while overlay open
   useEffect(() => {
     const opened = openCorrect || openWrong;
     const prev = document.body.style.overflow;
@@ -79,7 +77,6 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     }
   }
 
-  // Save/cancel for correct
   function saveCorrect() {
     const payload = {
       statement: String(localCorrect.statement || ''),
@@ -100,7 +97,6 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     setOpenCorrect(false);
   }
 
-  // Save/cancel for wrong
   function saveWrong() {
     const payload = {
       statement: String(localWrong.statement || ''),
@@ -121,19 +117,13 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     setOpenWrong(false);
   }
 
-  // Small thumbnail component
   function Thumb({ url }) {
     if (!url) return null;
-    if (/\.(mp4|webm|mov|m4v|ogg)(\?|#|$)/i.test(url)) {
-      return <video src={url} style={{ maxWidth:120, maxHeight:80, borderRadius:6 }} />;
-    }
-    if (/\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/i.test(url)) {
-      return <div style={{ color:'#9fb0bf', fontSize:12 }}>Audio selected</div>;
-    }
+    if (/\.(mp4|webm|mov|m4v|ogg)(\?|#|$)/i.test(url)) return <video src={url} style={{ maxWidth:120, maxHeight:80, borderRadius:6 }} />;
+    if (/\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/i.test(url)) return <div style={{ color:'#9fb0bf', fontSize:12 }}>Audio selected</div>;
     return <img src={url} alt="thumb" style={{ maxWidth:120, maxHeight:80, objectFit:'cover', borderRadius:6 }} />;
   }
 
-  // Modal overlay renderer
   function ResponseModal({ title, local, setLocal, onSave, onCancel, onDisable, mediaList, audioList, open }) {
     if (!open) return null;
     return (
@@ -142,12 +132,12 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         background:'rgba(0,0,0,0.65)', zIndex:2147483647,
         display:'flex', alignItems:'center', justifyContent:'center', padding:20
       }}>
-        <div style={{ width: '880px', maxWidth:'100%', maxHeight:'92vh', overflow:'auto', background:'#0b0f12', border:'1px solid #2a323b', borderRadius:12, padding:16 }}>
+        <div style={{ width: '820px', maxWidth:'100%', maxHeight:'92vh', overflow:'auto', background:'#0b0f12', border:'1px solid #2a323b', borderRadius:12, padding:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
             <div style={{ color:'#e9eef2', fontWeight:700, fontSize:16 }}>{title}</div>
             <div style={{ display:'flex', gap:8 }}>
-              <button style={smallBtn} onClick={() => { onCancel(); }}>Cancel</button>
-              <button style={smallBtn} onClick={() => { onSave(); }}>Save</button>
+              <button style={smallBtn} onClick={() => onCancel()}>Cancel</button>
+              <button style={smallBtn} onClick={() => onSave()}>Save</button>
               <button style={dangerBtn} onClick={() => { if (confirm('Disable this response?')) onDisable(); }}>Disable</button>
             </div>
           </div>
@@ -171,9 +161,7 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
                   </select>
                   {local.mediaUrl ? <button style={smallBtn} onClick={()=>window.open(local.mediaUrl, '_blank')}>Open</button> : null}
                 </div>
-                <div style={{ marginTop:8 }}>
-                  <Thumb url={local.mediaUrl} />
-                </div>
+                <div style={{ marginTop:8 }}><Thumb url={local.mediaUrl} /></div>
               </div>
             </div>
           </div>
@@ -210,12 +198,12 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
     );
   }
 
-  // Inline open handlers - ensure response exists before opening
+  // bottom inline open buttons - THESE are the only triggers to open overlays
   function openCorrectInline() {
     if (!editing.onCorrect) {
       enableCorrect(true);
     }
-    // sync local copy immediately from editing (use effect will also pick up)
+    // sync local copy from editing (in case it was just created)
     setLocalCorrect(normalizeResponse(editing.onCorrect));
     setOpenCorrect(true);
   }
@@ -235,14 +223,9 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         <div style={{ padding:10, border:'1px solid #2a323b', borderRadius:8, background:'#0b1115' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
             <div style={{ fontWeight:600, color:'#e9eef2' }}>On Correct Answer</div>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <label style={{ color:'#9fb0bf', fontSize:13 }}>
-                <input type="checkbox" checked={!!editing.onCorrect} onChange={e=>enableCorrect(e.target.checked)} /> Enable
-              </label>
-              <button style={smallBtn} onClick={()=>{ if (editing.onCorrect) setOpenCorrect(true); else { enableCorrect(true); setOpenCorrect(true); } }}>
-                Edit
-              </button>
-            </div>
+            <label style={{ color:'#9fb0bf', fontSize:13 }}>
+              <input type="checkbox" checked={!!editing.onCorrect} onChange={e=>enableCorrect(e.target.checked)} /> Enable
+            </label>
           </div>
 
           <div style={{ color:'#9fb0bf', fontSize:13 }}>
@@ -261,14 +244,9 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         <div style={{ padding:10, border:'1px solid #2a323b', borderRadius:8, background:'#110b0b' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
             <div style={{ fontWeight:600, color:'#e9eef2' }}>On Wrong Answer</div>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <label style={{ color:'#9fb0bf', fontSize:13 }}>
-                <input type="checkbox" checked={!!editing.onWrong} onChange={e=>enableWrong(e.target.checked)} /> Enable
-              </label>
-              <button style={smallBtn} onClick={()=>{ if (editing.onWrong) setOpenWrong(true); else { enableWrong(true); setOpenWrong(true); } }}>
-                Edit
-              </button>
-            </div>
+            <label style={{ color:'#9fb0bf', fontSize:13 }}>
+              <input type="checkbox" checked={!!editing.onWrong} onChange={e=>enableWrong(e.target.checked)} /> Enable
+            </label>
           </div>
 
           <div style={{ color:'#9fb0bf', fontSize:13 }}>
@@ -285,13 +263,13 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         </div>
       </div>
 
-      {/* Inline bottom buttons (non-floating) - place near modal bottom by inserting this component near bottom */}
+      {/* IMPORTANT: non-floating bottom buttons. Place this component so these buttons appear under the map and above the points field */}
       <div style={{ display:'flex', gap:8, marginTop:12 }}>
         <button style={smallBtn} onClick={openCorrectInline}>Open Correct Response</button>
         <button style={smallBtn} onClick={openWrongInline}>Open Wrong Response</button>
       </div>
 
-      {/* Modals */}
+      {/* Modals (only open via bottom buttons) */}
       <ResponseModal
         title="Edit Correct Response"
         local={localCorrect}
