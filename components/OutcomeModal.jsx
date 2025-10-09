@@ -7,6 +7,7 @@ export default function OutcomeModal({ open, onClose = () => {}, title = 'Outcom
     message: '',
     mediaUrl: '',
     targetId: '',
+    transcript: '',
     ...outcome,
   });
 
@@ -89,6 +90,16 @@ export default function OutcomeModal({ open, onClose = () => {}, title = 'Outcom
                 onChange={(e) => update('mediaUrl', e.target.value)}
               />
               <div style={{ marginTop: 8 }}>{renderPreview()}</div>
+              <label style={styles.label}>Transcript / caption</label>
+              <textarea
+                style={{ ...styles.input, height: 96 }}
+                value={local.transcript || ''}
+                placeholder="Describe the media for players who can't hear or see it"
+                onChange={(e) => update('transcript', e.target.value)}
+              />
+              <div style={{ fontSize: 12, color: '#9fb0bf' }}>
+                Shown alongside the media in the game so everyone understands the response.
+              </div>
             </>
           )}
 
