@@ -1,0 +1,157 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "DEFAULT",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
+  "media": {
+    "rewards": [
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": "/media/bundles/GOLDEN%20COIN.png"
+      }
+    ],
+    "pool": [
+      "/media/bundles/ROBOT1small.png",
+      "/media/bundles/SMOKE%20BOMB.png",
+      "/media/bundles/evidence%202.png",
+      "/media/bundles/CLUEgreen.png",
+      "/media/bundles/GOLDEN%20COIN.png",
+      "/media/bundles/trivia%20icon.png",
+      "/media/bundles/trivia%20yellow.png"
+    ]
+  },
+  "icons": {
+    "missions": [
+      {
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "/media/bundles/trivia%20icon.png"
+      },
+      {
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "/media/bundles/trivia%20yellow.png"
+      }
+    ],
+    "devices": [
+      {
+        "key": "dev-clone",
+        "name": "Roaming Robot",
+        "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-smoke",
+        "name": "Smoke Shield",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "/media/bundles/evidence%202.png"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "/media/bundles/CLUEgreen.png"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "/media/bundles/GOLDEN%20COIN.png"
+      }
+    ]
+  },
+  "appearance": {
+    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    "fontSizePx": 22,
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top"
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#100f10",
+      "align": "left",
+      "backgroundColor": "#e6eaf9",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#ffffff",
+      "align": "center",
+      "backgroundColor": "#0b0c10",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
+}

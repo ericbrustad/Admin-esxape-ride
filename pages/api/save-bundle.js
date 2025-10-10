@@ -59,13 +59,20 @@ async function putFile(path, content, message) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
   try {
-    const slug = (req.query.slug || '').toString().trim();
+    let slug = (req.query.slug || '').toString().trim();
     const { missions, config } = req.body || {};
-    if (!slug) return res.status(400).json({ error: 'Missing slug' });
     if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
 
+    if (!slug) slug = 'default';
+    const isDefault = slug === 'default';
+
     const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
-    const paths = {
+    const paths = isDefault ? {
+      mAdmin: 'public/draft/missions.json',
+      cAdmin: 'public/draft/config.json',
+      mGame:  'game/public/draft/missions.json',
+      cGame:  'game/public/draft/config.json',
+    } : {
       mAdmin: `public/games/${slug}/draft/missions.json`,
       cAdmin: `public/games/${slug}/draft/config.json`,
       mGame:  `game/public/games/${slug}/draft/missions.json`,
@@ -77,7 +84,7 @@ export default async function handler(req, res) {
     await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
     await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
 
-    res.status(200).json({ ok: true, wrote: Object.values(paths) });
+    res.status(200).json({ ok: true, wrote: Object.values(paths), slug });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }

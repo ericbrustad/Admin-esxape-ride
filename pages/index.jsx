@@ -278,21 +278,30 @@ function createDeviceDraft(overrides = {}) {
 const APPEARANCE_SKINS = [
   {
     key: 'default',
-    label: 'Default (Agent Dark)',
-    description: 'Classic dark interface used by agents.',
-    appearance: defaultAppearance(),
+    label: 'Default Control',
+    description: 'Baseline agent interface with balanced contrast.',
+    uiKey: 'default',
+    appearance: {
+      ...defaultAppearance(),
+      fontColor: '#e9eef2',
+      textBgColor: '#141b20',
+      textBgOpacity: 0.35,
+      screenBgColor: '#05090f',
+      screenBgOpacity: 0.78,
+    },
   },
   {
-    key: 'night-ops',
-    label: 'Night Ops',
-    description: 'Deep greens with luminous text for stealth missions.',
+    key: 'space-military',
+    label: 'Space Military Command',
+    description: 'Metallic chrome cockpit with holographic HUD glow.',
+    uiKey: 'space-military',
     appearance: {
-      fontFamily: FONT_FAMILIES[0].v,
-      fontSizePx: 24,
-      fontColor: '#eafff2',
-      textBgColor: '#0a2a1a',
-      textBgOpacity: 0.55,
-      screenBgColor: '#04100b',
+      fontFamily: '"Orbitron", "Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 26,
+      fontColor: '#c7f6ff',
+      textBgColor: '#0b1d2b',
+      textBgOpacity: 0.72,
+      screenBgColor: '#040b12',
       screenBgOpacity: 0.85,
       screenBgImage: '',
       textAlign: 'center',
@@ -300,50 +309,35 @@ const APPEARANCE_SKINS = [
     },
   },
   {
-    key: 'blueprint',
-    label: 'Blueprint',
-    description: 'Cool blues inspired by heist planning boards.',
+    key: 'military-desert',
+    label: 'Desert Ops',
+    description: 'Sun-baked armor plating with tactical sand textures.',
+    uiKey: 'military-desert',
     appearance: {
-      fontFamily: 'Courier New, Courier, monospace',
-      fontSizePx: 20,
-      fontColor: '#c5e1ff',
-      textBgColor: '#021d3a',
-      textBgOpacity: 0.6,
-      screenBgColor: '#03122a',
-      screenBgOpacity: 0.9,
-      screenBgImage: '',
-      textAlign: 'left',
-      textVertical: 'top',
-    },
-  },
-  {
-    key: 'neon-grid',
-    label: 'Neon Grid',
-    description: 'Vibrant neon glow with futuristic contrast.',
-    appearance: {
-      fontFamily: 'Arial, Helvetica, sans-serif',
-      fontSizePx: 22,
-      fontColor: '#ffe3ff',
-      textBgColor: '#3b0f4e',
-      textBgOpacity: 0.5,
-      screenBgColor: '#0a0216',
-      screenBgOpacity: 0.82,
+      fontFamily: '"Copperplate", "Trebuchet MS", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#ffe8b8',
+      textBgColor: '#543d24',
+      textBgOpacity: 0.62,
+      screenBgColor: '#3a2815',
+      screenBgOpacity: 0.83,
       screenBgImage: '',
       textAlign: 'center',
       textVertical: 'top',
     },
   },
   {
-    key: 'sunset-agent',
-    label: 'Sunset Agent',
-    description: 'Warm cinematic hues with serif typography.',
+    key: 'forest-outpost',
+    label: 'Forest Outpost',
+    description: 'Leaf canopy, bark fibers, and moss lighting.',
+    uiKey: 'forest-outpost',
     appearance: {
-      fontFamily: 'Georgia, serif',
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
       fontSizePx: 24,
-      fontColor: '#ffe8d2',
-      textBgColor: '#7a341a',
-      textBgOpacity: 0.65,
-      screenBgColor: '#2b1309',
+      fontColor: '#e6f8e0',
+      textBgColor: '#17331c',
+      textBgOpacity: 0.68,
+      screenBgColor: '#0d1d12',
       screenBgOpacity: 0.88,
       screenBgImage: '',
       textAlign: 'left',
@@ -351,24 +345,53 @@ const APPEARANCE_SKINS = [
     },
   },
   {
-    key: 'terminal-green',
-    label: 'Terminal Green',
-    description: 'Retro terminal look with glowing matrix text.',
+    key: 'starfield',
+    label: 'Starfield Observatory',
+    description: 'Deep space with constellations and thruster flares.',
+    uiKey: 'starfield',
     appearance: {
-      fontFamily: 'Courier New, Courier, monospace',
-      fontSizePx: 21,
-      fontColor: '#8dff8d',
-      textBgColor: '#021e0c',
-      textBgOpacity: 0.75,
-      screenBgColor: '#010702',
-      screenBgOpacity: 0.95,
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 22,
+      fontColor: '#d5e8ff',
+      textBgColor: '#0d1c3a',
+      textBgOpacity: 0.7,
+      screenBgColor: '#050a1f',
+      screenBgOpacity: 0.88,
       screenBgImage: '',
-      textAlign: 'left',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'cartoon-bubbles',
+    label: 'Cartoon Bubbles',
+    description: 'High-def balloons, candy gloss, and playful fonts.',
+    uiKey: 'cartoon-bubbles',
+    appearance: {
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 28,
+      fontColor: '#fff3fe',
+      textBgColor: '#5f2a7a',
+      textBgOpacity: 0.6,
+      screenBgColor: '#321353',
+      screenBgOpacity: 0.86,
+      screenBgImage: '',
+      textAlign: 'center',
       textVertical: 'top',
     },
   },
 ];
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
+const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
+const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
+
+function applyAdminUiThemeForDocument(skinKey) {
+  if (typeof document === 'undefined') return;
+  const body = document.body;
+  if (!body) return;
+  const uiKey = ADMIN_SKIN_TO_UI.get(skinKey) || DEFAULT_UI_SKIN;
+  body.dataset.skin = uiKey;
+}
 
 function isAppearanceEqual(a, b) {
   if (!a || !b) return false;
@@ -429,7 +452,7 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
-  useEffect(()=>{
+useEffect(()=>{
   let mounted = true;
   (async ()=>{
     try {
@@ -440,7 +463,53 @@ export default function Admin() {
     }
   })();
   return ()=> { mounted = false; };
-},[]);;
+},[]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin-protection?mode=ui', { cache: 'no-store', credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+          setProtectionError('');
+        } else {
+          throw new Error(data?.error || 'Failed to load protection status');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setProtectionState(prev => ({ ...prev, loading: false }));
+        setProtectionError('Unable to read protection status');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!config) {
+      applyAdminUiThemeForDocument('default');
+      return;
+    }
+    const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+      ? config.appearanceSkin
+      : null;
+    const detected = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+    applyAdminUiThemeForDocument(stored || detected);
+  }, [
+    config?.appearanceSkin,
+    config?.appearance?.fontFamily,
+    config?.appearance?.fontSizePx,
+    config?.appearance?.fontColor,
+    config?.appearance?.textBgColor,
+    config?.appearance?.textBgOpacity,
+    config?.appearance?.screenBgColor,
+    config?.appearance?.screenBgOpacity,
+    config?.appearance?.screenBgImage,
+    config?.appearance?.textAlign,
+    config?.appearance?.textVertical,
+  ]);
 
   
   const [dirty, setDirty]       = useState(false);
@@ -458,6 +527,8 @@ export default function Admin() {
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
 
   const [uploadStatus, setUploadStatus] = useState('');
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionError, setProtectionError] = useState('');
 
   // Combined Save & Publish
   const [deployDelaySec, setDeployDelaySec] = useState(5);
@@ -596,7 +667,10 @@ export default function Admin() {
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
-        merged.appearanceSkin = detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
+        const storedSkin = c0.appearanceSkin && ADMIN_SKIN_TO_UI.has(c0.appearanceSkin)
+          ? c0.appearanceSkin
+          : null;
+        merged.appearanceSkin = storedSkin || detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
 
         merged = applyDefaultIcons(merged);
 
@@ -1023,8 +1097,34 @@ export default function Admin() {
   function applyAppearanceSkin(key) {
     const preset = APPEARANCE_SKIN_MAP.get(key);
     if (!preset) return;
+    applyAdminUiThemeForDocument(key);
     setConfig(prev => ({ ...prev, appearance: { ...preset.appearance }, appearanceSkin: key }));
     setStatus(`✅ Applied theme: ${preset.label}`);
+  }
+
+  async function toggleProtection() {
+    const target = !protectionState.enabled;
+    setProtectionError('');
+    setProtectionState(prev => ({ ...prev, saving: true }));
+    try {
+      const res = await fetch('/api/admin-protection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ protected: target }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || res.statusText || 'Toggle failed');
+      }
+      setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+      setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+      setProtectionState(prev => ({ ...prev, saving: false }));
+      const msg = err?.message || 'Toggle failed';
+      setProtectionError(msg);
+      setStatus('❌ Failed to toggle admin protection');
+    }
   }
 
   // Missions selection operations (Missions tab only)
@@ -1164,8 +1264,8 @@ export default function Admin() {
 
   if (!suite || !config) {
     return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #1f262d', background: '#12181d' }}>
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--admin-panel-bg)', boxShadow: 'var(--admin-panel-shadow)' }}>
           Loading… (pulling config & missions)
         </div>
       </main>
@@ -1186,10 +1286,18 @@ export default function Admin() {
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
 
-  const selectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
-  const selectedAppearanceSkinLabel = selectedAppearanceSkin === 'custom'
-    ? 'Custom (manual edits)'
-    : (APPEARANCE_SKIN_MAP.get(selectedAppearanceSkin)?.label || 'Custom');
+  const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+    ? config.appearanceSkin
+    : null;
+  const detectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const selectedAppearanceSkin = storedAppearanceSkin || detectedAppearanceSkin;
+  const selectedAppearanceSkinLabel = storedAppearanceSkin
+    ? `${APPEARANCE_SKIN_MAP.get(storedAppearanceSkin)?.label || storedAppearanceSkin}${detectedAppearanceSkin === 'custom' ? ' (modified)' : ''}`
+    : detectedAppearanceSkin === 'custom'
+      ? 'Custom (manual edits)'
+      : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
+  const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
+  const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
@@ -1203,6 +1311,49 @@ export default function Admin() {
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:16 }}>
+            <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
+              Admin Control Deck
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <div
+                style={{
+                  display:'flex',
+                  alignItems:'center',
+                  gap:8,
+                  padding:'6px 14px',
+                  borderRadius:999,
+                  border:`1px solid ${protectionIndicatorColor}`,
+                  background:'var(--admin-panel-bg)',
+                  color: protectionIndicatorColor,
+                  fontWeight:700,
+                  letterSpacing:1,
+                  textTransform:'uppercase',
+                  boxShadow:'0 0 12px currentColor',
+                }}
+              >
+                <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', background:'currentColor', boxShadow:'0 0 12px currentColor' }} />
+                {protectionState.loading ? 'Checking…' : protectionState.enabled ? 'Protected' : 'Not Protected'}
+              </div>
+              <button
+                onClick={toggleProtection}
+                disabled={protectionState.saving || protectionState.loading}
+                style={{
+                  ...S.button,
+                  ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                  minWidth: 180,
+                  opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
+                }}
+              >
+                {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+              </button>
+            </div>
+          </div>
+          {protectionError && (
+            <div style={{ color: 'var(--admin-danger-color)', fontSize: 12, marginBottom: 12 }}>
+              {protectionError}
+            </div>
+          )}
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             {tabsOrder.map((t)=>{
               const labelMap = {
@@ -1220,7 +1371,7 @@ export default function Admin() {
               );
             })}
             <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
+              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                 <option value="default">(Default Game)</option>
                 {games.map(g=>(
@@ -1232,7 +1383,7 @@ export default function Admin() {
 
             {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                 Deploy delay (sec):
                 <input
                   type="number" min={0} max={120}
@@ -1248,7 +1399,7 @@ export default function Admin() {
                   setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
                 disabled={savePubBusy}
-                style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
+                style={{ ...S.button, ...S.buttonSuccess, opacity: savePubBusy ? 0.7 : 1 }}
               >
                 {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
               </button>
@@ -1265,7 +1416,7 @@ export default function Admin() {
               View config.json
             </a>
           </div>
-          <div style={{ color:'#9fb0bf', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
 
@@ -1299,7 +1450,7 @@ export default function Admin() {
                       <div style={{ fontWeight:600 }}>
                         <span style={{ opacity:.65, marginRight:6 }}>#{idx+1}</span>{m.title||m.id}
                       </div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
+                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
                     </div>
                     <div style={{ display:'flex', gap:6 }}>
                       <button title="Move up"   style={{ ...S.button, padding:'6px 10px' }} onClick={()=>moveMission(idx,-1)}>▲</button>
@@ -1318,7 +1469,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Missions Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
                 </div>
@@ -1332,7 +1483,7 @@ export default function Admin() {
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1344,7 +1495,7 @@ export default function Admin() {
                   value={missionRadiusValue}
                   onChange={(e)=> setSelectedMissionRadius(Number(e.target.value)) }
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'var(--admin-muted)' }}>
                   {selectedMissionIdx==null ? 'Select a mission to adjust radius' : `M${selectedMissionIdx+1} radius: ${missionRadiusValue} m`}
                 </code>
               </div>
@@ -1376,7 +1527,7 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--admin-panel-bg)', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
                       <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -1412,8 +1563,8 @@ export default function Admin() {
                         {(() => {
                           const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
                           return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
                         })()}
                       </div>
                     </div>
@@ -1484,7 +1635,7 @@ export default function Admin() {
 
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
+                      <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
@@ -1611,11 +1762,11 @@ export default function Admin() {
                 <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
               </form>
 
-              <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
+              <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
                 {devResults.map((r,i)=>(
-                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                    <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                   </div>
                 ))}
               </div>
@@ -1644,20 +1795,20 @@ export default function Admin() {
                       alignItems:'center',
                       padding:12,
                       borderRadius:12,
-                      border:`1px solid ${selected ? '#2dd4bf55' : '#1f262d'}`,
-                      background:selected ? '#162028' : '#12181d',
+                      border:`1px solid ${selected ? 'rgba(45, 212, 191, 0.35)' : 'var(--admin-border-soft)'}`,
+                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--admin-panel-bg)',
                       cursor:'pointer',
                     }}
                   >
-                    <div style={{ width:52, height:52, borderRadius:10, background:'#0b0f11', border:'1px solid #22303c', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--admin-panel-bg)', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
                       {iconUrl
                         ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
-                        : <div style={{ color:'#7a8a99', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
+                        : <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
                     </div>
                     <div>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                         <div style={{ fontWeight:600 }}>{`D${i+1}`} — {x.title || '(untitled)'}</div>
-                        <div style={{ fontSize:12, color:'#9fb0bf' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
                       </div>
                       <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
                         <span style={S.chip}>{x.type}</span>
@@ -1672,14 +1823,14 @@ export default function Admin() {
                       </div>
                       <div style={{ display:'flex', gap:6 }}>
                         <button title="Duplicate" style={{ ...S.button, padding:'6px 10px' }} onClick={()=>duplicateDevice(i)}>⧉</button>
-                        <button title="Delete" style={{ ...S.button, padding:'6px 10px', borderColor:'#7a1f1f', background:'#2a1313' }} onClick={()=>deleteDevice(i)}>🗑</button>
+                        <button title="Delete" style={{ ...S.button, ...S.buttonDanger, padding:'6px 10px' }} onClick={()=>deleteDevice(i)}>🗑</button>
                       </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
+            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
           <section style={{ position:'relative' }}>
@@ -1687,7 +1838,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Devices Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
@@ -1701,7 +1852,7 @@ export default function Admin() {
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1717,7 +1868,7 @@ export default function Admin() {
                     else setDevDraft(d=>({ ...d, pickupRadius: r }));
                   }}
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'var(--admin-muted)' }}>
                   {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
                    : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
                    : 'Select a device to adjust radius'}
@@ -1725,12 +1876,12 @@ export default function Admin() {
               </div>
 
               {isDeviceEditorOpen && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12, marginBottom:12 }}>
+                <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12 }}>
                     <div>
                       <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
                       {deviceEditorMode === 'edit' && devDraft.id && (
-                        <div style={{ fontSize:12, color:'#9fb0bf' }}>ID: {devDraft.id}</div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                       )}
                     </div>
                     <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
@@ -1738,8 +1889,8 @@ export default function Admin() {
                   <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                     <div>
                       {devDraft.iconKey
-                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
+                        : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>}
                     </div>
                     <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                     <Field label="Type">
@@ -1760,7 +1911,7 @@ export default function Admin() {
                   </div>
                   <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                     <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
-                    <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                    <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                       {devDraft.lat==null ? 'Click the map or search an address to set location'
                         : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
@@ -1838,11 +1989,11 @@ export default function Admin() {
                   <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
                   <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
                 </form>
-                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
                   {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
                       <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                     </div>
                   ))}
                 </div>
@@ -1865,7 +2016,7 @@ export default function Admin() {
                 </select>
               </Field>
             </div>
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
             </div>
           </div>
@@ -1874,7 +2025,7 @@ export default function Admin() {
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=> setConfirmDeleteOpen(true)}
               >
                 🗑 Delete Game
@@ -1886,7 +2037,7 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
             <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:8 }}>Theme skins</div>
+              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
                 {APPEARANCE_SKINS.map((skin)=>{
                   const active = selectedAppearanceSkin === skin.key;
@@ -1900,18 +2051,18 @@ export default function Admin() {
                       onClick={()=>applyAppearanceSkin(skin.key)}
                       style={{
                         borderRadius:12,
-                        border:`1px solid ${active ? '#2dd4bf' : '#1f262d'}`,
-                        background: active ? '#162028' : '#0f1418',
+                        border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
+                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
                         padding:12,
                         textAlign:'left',
-                        color:'#e9eef2',
+                        color:'var(--admin-body-color)',
                         cursor:'pointer',
                       }}
                     >
                       <div style={{ fontWeight:600 }}>{skin.label}</div>
-                      <div style={{ fontSize:12, color:'#9fb0bf', margin:'4px 0 8px 0' }}>{skin.description}</div>
+                      <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
                       <div style={{
-                        border:'1px dashed #2a323b',
+                        border:'1px dashed var(--admin-border-soft)',
                         borderRadius:8,
                         padding:10,
                         background: previewBg,
@@ -1926,7 +2077,7 @@ export default function Admin() {
                   );
                 })}
               </div>
-              <div style={{ marginTop:8, fontSize:12, color:'#9fb0bf' }}>
+              <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
                 Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
               </div>
             </div>
@@ -1935,10 +2086,12 @@ export default function Admin() {
               onChange={(next)=>setConfig(prev => ({
                 ...prev,
                 appearance: next,
-                appearanceSkin: detectAppearanceSkin(next, prev.appearanceSkin),
+                appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
+                  ? prev.appearanceSkin
+                  : detectAppearanceSkin(next, prev.appearanceSkin),
               }))}
             />
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
@@ -1989,7 +2142,7 @@ export default function Admin() {
                 <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
-            {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
+            {!gameBase && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
               <iframe
                 key={previewNonce} // hard refresh on nonce change
@@ -1999,7 +2152,7 @@ export default function Admin() {
                   preview: '1',
                   cb: String(Date.now())
                 }).toString()}`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
+                style={{ width:'100%', height:'70vh', border:'1px solid var(--admin-border-soft)', borderRadius:12 }}
               />
             )}
           </div>
@@ -2055,13 +2208,13 @@ export default function Admin() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'#e9eef2', marginBottom:12 }}>
+            <div style={{ color:'var(--admin-body-color)', marginBottom:12 }}>
               Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={reallyDeleteGame}
               >
                 Delete
@@ -2078,7 +2231,7 @@ export default function Admin() {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--admin-muted)', marginBottom: 6 }}>{label}</div>
       {children}
     </div>
   );
@@ -2096,13 +2249,13 @@ function ColorField({ label, value, onChange }) {
 function AppearanceEditor({ value, onChange }) {
   const a = value || defaultAppearance();
   return (
-    <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
           <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
             {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
+          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed var(--admin-border-soft)', borderRadius:8, fontFamily:a.fontFamily }}>
             Aa — preview text with this font
           </div>
         </Field>
@@ -2115,19 +2268,19 @@ function AppearanceEditor({ value, onChange }) {
         <Field label="Text background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
         <Field label="Screen background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <Field label="Screen background image (URL)">
           <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
           {a.screenBgImage && (
             <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
@@ -2143,7 +2296,7 @@ function AppearanceEditor({ value, onChange }) {
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
+        marginTop:12, border:'1px dashed var(--admin-border-soft)', borderRadius:10, overflow:'hidden',
         background:a.screenBgImage
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
@@ -2173,7 +2326,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
     onChange({ choices: trimmed, correctIndex: ci });
   }
   return (
-    <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>Choices (A–E)</div>
       {[0,1,2,3,4].map((i)=>(
         <div key={i} style={{ display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -2182,7 +2335,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
             onChange={(e)=>{ const next=[...local]; next[i]=e.target.value; setLocal(next); sync(next, correct); }}/>
         </div>
       ))}
-      <div style={{ color:'#9fb0bf', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
+      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
     </div>
   );
 }
@@ -2195,15 +2348,15 @@ function MediaPreview({ url, kind }) {
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
+      <div style={{ color:'var(--admin-muted)', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
       {isVideo ? (
-        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
+        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isImage ? (
-        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isAudio ? (
         <audio src={u} controls style={{ width:'100%' }} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color:'var(--admin-muted)', textDecoration:'underline' }}>Open media</a>
       )}
     </div>
   );
@@ -2211,22 +2364,96 @@ function MediaPreview({ url, kind }) {
 
 /* Styles */
 const S = {
-  body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
-  wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
-  wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
-  sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
-  missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
-  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
-  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
-  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0f1418', color:'#e9eef2', cursor:'pointer' },
-  tabActive:{ background:'#1a2027' },
-  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
-  hr:{ border:'1px solid #1f262d', borderBottom:'none' },
-  overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
-  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
-  chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
+  body: {
+    background: 'var(--admin-body-bg)',
+    color: 'var(--admin-body-color)',
+    minHeight: '100vh',
+    fontFamily: 'var(--admin-font-family)',
+  },
+  header: {
+    padding: 16,
+    background: 'var(--admin-header-bg)',
+    borderBottom: 'var(--admin-header-border)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 40,
+  },
+  wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
+  wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  sidebarTall: {
+    background: 'var(--admin-panel-bg)',
+    border: 'var(--admin-panel-border)',
+    borderRadius: 18,
+    padding: 14,
+    position: 'sticky',
+    top: 20,
+    height: 'calc(100vh - 140px)',
+    overflow: 'auto',
+    boxShadow: 'var(--admin-panel-shadow)',
+  },
+  card: {
+    position: 'relative',
+    background: 'var(--admin-panel-bg)',
+    border: 'var(--admin-panel-border)',
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: 'var(--admin-panel-shadow)',
+  },
+  missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  button: {
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: 'var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-color)',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  buttonDanger: {
+    border: 'var(--admin-danger-border)',
+    background: 'var(--admin-danger-bg)',
+    color: 'var(--admin-body-color)',
+  },
+  buttonSuccess: {
+    border: 'var(--admin-success-border)',
+    background: 'var(--admin-success-bg)',
+    color: 'var(--admin-body-color)',
+  },
+  tab: {
+    padding: '8px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-button-border)',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease',
+  },
+  tabActive: { background: 'var(--admin-tab-active-bg)', boxShadow: '0 0 0 1px rgba(255,255,255,0.06)' },
+  search: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    marginBottom: 10,
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
+  overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
+  chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
+  muted: { color: 'var(--admin-muted)' },
 };
 
 /* MapOverview — shows missions + devices */
@@ -2366,8 +2593,8 @@ function MapOverview({
 
   return (
     <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+      {!leafletReady && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }}/>
     </div>
   );
 }
@@ -2435,7 +2662,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
           type="range" min={5} max={500} step={5}
@@ -2450,7 +2677,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
             }
           }}
         />
-        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
+        <code style={{ color:'var(--admin-muted)' }}>{rad} m</code>
       </div>
     </div>
   );
@@ -2465,7 +2692,7 @@ function TextTab({ config, setConfig }) {
     <main style={S.wrap}>
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
+        <div style={{ color:'var(--admin-muted)', marginBottom:8, fontSize:12 }}>
           One rule per line. This saves into <code>config.textRules</code>.
         </div>
         <textarea
@@ -2668,8 +2895,8 @@ function MediaPoolTab({
             <input type="file" onChange={onUpload} style={{ display:'none' }} />
           </label>
         </div>
-        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
-        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+        {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
+        <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
       </div>
@@ -2692,7 +2919,7 @@ function MediaPoolTab({
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
           <button
-            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+            style={{ ...S.button, ...S.buttonDanger }}
             onClick={()=>deleteAll(active.items)}
             disabled={!active.items.length}
             title="Delete all files in this type"
@@ -2702,14 +2929,14 @@ function MediaPoolTab({
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files.</div>
+          <div style={{ color:'var(--admin-muted)' }}>No files.</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
               const use = usageCounts(url);
               return (
-                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {baseNameFromUrl(url)}
@@ -2819,21 +3046,21 @@ function IconGroup({ title, items, onRemove }) {
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      {items.length === 0 && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
-          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+          <div key={it.key} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10, display:'grid', gap:6 }}>
             <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
-              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
               <div>
                 <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{it.key}</div>
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=>onRemove(it.key)}
               >
                 Remove
@@ -2851,7 +3078,7 @@ function Pool({ title, items, onRemove }) {
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
         {items.map((it, idx)=>(
-          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+          <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
             <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {it.label || baseNameFromUrl(it.url)}
             </div>
@@ -2859,7 +3086,7 @@ function Pool({ title, items, onRemove }) {
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
               >
                 Remove
@@ -2867,7 +3094,7 @@ function Pool({ title, items, onRemove }) {
             </div>
           </div>
         ))}
-        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+        {items.length===0 && <div style={{ color:'var(--admin-muted)' }}>No items.</div>}
       </div>
     </div>
   );
