@@ -15,30 +15,8 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "..",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.9778,
-      "lng": -93.265
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "..",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "lat": 44.9778,
-      "lng": -93.265
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -87,18 +65,29 @@
     ]
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
-    "textBgOpacity": 0,
-    "screenBgColor": "#000000",
-    "screenBgOpacity": 0,
+    "fontFamily": "\"Copperplate\", \"Trebuchet MS\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 24,
+    "fontColor": "#ffe8b8",
+    "textBgColor": "#543d24",
+    "textBgOpacity": 0.62,
+    "screenBgColor": "#3a2815",
+    "screenBgOpacity": 0.83,
     "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top"
   },
-  "appearanceSkin": "custom",
+  "appearanceSkin": "military-desert",
+  "mediaTriggers": {
+    "enabled": false,
+    "actionType": "media",
+    "actionTarget": "",
+    "actionLabel": "",
+    "actionThumbnail": "",
+    "triggerDeviceId": "",
+    "triggerDeviceLabel": "",
+    "triggeredResponseKey": "",
+    "triggeredMissionId": ""
+  },
   "map": {
     "centerLat": 44.9778,
     "centerLng": -93.265,
