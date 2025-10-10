@@ -36,7 +36,14 @@
         "screenBgImage": "",
         "textAlign": "center",
         "textVertical": "top"
-      }
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
     }
   ]
 }
