@@ -37,12 +37,24 @@ function classifyByExt(u) {
   return "other";
 }
 
+function baseNameFromUrl(url) {
+  try {
+    const u = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://local");
+    const file = (u.pathname.split("/").pop() || "").replace(/\.[^.]+$/, "");
+    return file.replace(/[-_]+/g, " ").trim();
+  } catch {
+    const file = (String(url).split("/").pop() || "").replace(/\.[^.]+$/, "");
+    return file.replace(/[-_]+/g, " ").trim();
+  }
+}
+
 export default function InlineMissionResponses({ editing, setEditing, inventory = [] }) {
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
+  const [openPicker, setOpenPicker] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -86,7 +98,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
       const array = await file.arrayBuffer();
       const b64 = btoa(String.fromCharCode(...new Uint8Array(array)));
       const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      const path = f"public/media/{subfolder}/{int(Date.now())}-{safeName}";
+      const path = `public/media/${subfolder}/${Date.now()}-${safeName}`;
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,34 +174,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
   function toggleEngage(side, on) {
     updateSide(side, { enabled: !!on });
+    if (!on) setOpenPicker('');
   }
 
-  function renderMediaTile(it) {
-    const url = toDirectMediaURL(it.url || it.path || it);
-    const kind = classifyByExt(url);
-    return (
-      <div key={url} style={{ border:'1px solid #233036', borderRadius:8, padding:8, display:'grid', gap:6 }}>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <div style={{ width:64, height:48, borderRadius:6, overflow:'hidden', background:'#0b0c10', display:'grid', placeItems:'center' }}>
-            {kind === "image" || kind === "gif" ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-             : kind === "video" ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline /> 
-             : kind === "audio" ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-             : <div style={{ fontSize:12, color:'#9fb0bf' }}>File</div>}
-          </div>
-          <div style={{ flex:1, overflow:'hidden' }}>
-            <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-            <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-          <button style={styles.smallButton} onClick={()=>{ setSelectedPreviewUrl(url); }}>Preview</button>
-          <button style={styles.smallButton} onClick={()=>chooseMediaForSide(currentSideRef.current, url)}>Select</button>
-        </div>
-      </div>
-    );
-  }
-
-  const currentSideRef = useRef("onCorrect"); // used by select buttons inside tiles
 
   function ResponseEditor({ sideKey = "onCorrect", title = "On Correct" }) {
     const side = ensureSide(sideKey);
@@ -277,7 +264,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
             <div style={{ fontWeight:600 }}>{title} — Media</div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <select style={styles.selectSmall} value={mediaFilter} onChange={(e)=>setMediaFilter(e.target.value)}>
+              <select style={styles.selectSmall} value={mediaFilter} onChange={(e)=>setMediaFilter(e.target.value)} disabled={!enabled}>
                 <option value="auto">Auto (all)</option>
                 <option value="image">Images</option>
                 <option value="video">Videos</option>
@@ -285,79 +272,122 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <option value="gif">GIFs</option>
                 <option value="other">Other</option>
               </select>
-              <input placeholder="Paste URL to assign…" style={styles.inputSmall} onKeyDown={async (e)=>{
-                if (e.key === 'Enter') {
-                  const url = e.target.value.trim();
-                  if (!url) return;
-                  chooseMediaForSide(sideKey, url);
-                  e.target.value = "";
-                }
-              }} />
+              <input
+                placeholder="Paste URL to assign…"
+                style={styles.inputSmall}
+                disabled={!enabled}
+                onKeyDown={async (e)=>{
+                  if (e.key === 'Enter') {
+                    const url = e.target.value.trim();
+                    if (!url) return;
+                    chooseMediaForSide(sideKey, url);
+                    e.target.value = "";
+                  }
+                }}
+              />
             </div>
           </div>
 
-          {/* media grid */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:8 }}>
-            {filteredInventory().map((it, idx)=>{
-              const url = toDirectMediaURL(it.url || it);
-              const isSelected = (url === (mediaUrl || audioUrl));
-              return (
-                <div key={idx} style={{ border: isSelected ? '2px solid #1aa654' : '1px solid #153033', borderRadius:8, padding:6, background: isSelected ? 'rgba(34,197,94,0.04)' : 'transparent' }}>
-                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    <div style={{ width:56, height:44, borderRadius:6, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
-                      {(classifyByExt(url) === 'image' || classifyByExt(url) === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        : (classifyByExt(url) === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
-                        : (classifyByExt(url) === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-                        : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(it.label||'file').slice(0,8)}</div>
-                      }
+          {enabled ? (
+            <>
+              <div style={{ display:'flex', gap:12, alignItems:'stretch', flexWrap:'wrap' }}>
+                <div style={{ flex:'1 1 260px', position:'relative' }}>
+                  <button
+                    type="button"
+                    style={{ ...styles.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
+                    onClick={()=>setOpenPicker(prev => prev === sideKey ? '' : sideKey)}
+                  >
+                    <span>{(() => {
+                      const selectedUrl = mediaUrl || audioUrl || '';
+                      if (!selectedUrl) return 'Select media…';
+                      const match = filteredInventory().find(it => toDirectMediaURL(it.url || it.path || it) === selectedUrl);
+                      return match?.label || baseNameFromUrl(selectedUrl);
+                    })()}</span>
+                    <span style={{ opacity:0.6 }}>▾</span>
+                  </button>
+                  {openPicker === sideKey && (
+                    <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid #123033', borderRadius:10, background:'#050d11', boxShadow:'0 18px 30px rgba(0,0,0,0.5)' }}>
+                      {filteredInventory().length === 0 ? (
+                        <div style={{ padding:12, color:'#9fb0bf' }}>No media available. Upload a file below.</div>
+                      ) : filteredInventory().map((it, idx) => {
+                        const raw = it.url || it.path || it;
+                        const url = toDirectMediaURL(raw);
+                        const kind = classifyByExt(url);
+                        return (
+                          <div
+                            key={idx}
+                            onClick={()=>{
+                              chooseMediaForSide(sideKey, url);
+                              setOpenPicker('');
+                            }}
+                            style={{ display:'grid', gridTemplateColumns:'56px 1fr', gap:10, alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid #123033' }}
+                          >
+                            <div style={{ width:56, height:42, borderRadius:8, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
+                              {(kind === 'image' || kind === 'gif') && <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />}
+                              {kind === 'video' && <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />}
+                              {kind === 'audio' && <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>}
+                              {kind === 'other' && <div style={{ fontSize:12, color:'#9fb0bf' }}>{(it.label||'file').slice(0,8)}</div>}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.label || baseNameFromUrl(url)}</div>
+                              <div style={{ fontSize:12, color:'#9fb0bf' }}>{kind}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div style={{ flex:1, overflow:'hidden' }}>
-                      <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-                      <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
-                    <button style={styles.smallButton} onClick={()=>{ setSelectedPreviewUrl(url); }}>Preview</button>
-                    <button style={styles.smallButton} onClick={()=>chooseMediaForSide(sideKey, url)}>Choose</button>
-                  </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
 
-          {/* selected preview */}
-          {selectedPreviewUrl && (
-            <div style={{ marginTop:10 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Preview</div>
-              {classifyByExt(selectedPreviewUrl) === 'image' || classifyByExt(selectedPreviewUrl) === 'gif' ? (
-                <img src={selectedPreviewUrl} alt="preview" style={{ width:'100%', maxHeight:220, objectFit:'contain', borderRadius:8 }} />
-              ) : classifyByExt(selectedPreviewUrl) === 'video' ? (
-                <video src={selectedPreviewUrl} controls style={{ width:'100%', maxHeight:260, borderRadius:8 }} />
-              ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
-                <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
-              ) : (
-                <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
+                {(mediaUrl || audioUrl) && (
+                  <div style={{ flex:'0 0 140px', border:'1px solid #123033', borderRadius:10, overflow:'hidden', background:'#050d11', display:'grid', placeItems:'center' }}>
+                    {(() => {
+                      const current = mediaUrl || audioUrl || '';
+                      const kind = classifyByExt(current);
+                      if (kind === 'image' || kind === 'gif') return <img src={current} alt="selected" style={{ width:'100%', height:'100%', objectFit:'cover' }} />;
+                      if (kind === 'video') return <video src={current} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />;
+                      if (kind === 'audio') return <div style={{ fontSize:12, color:'#9fb0bf', padding:8 }}>Audio attached</div>;
+                      return <div style={{ fontSize:12, color:'#9fb0bf', padding:8 }}>{baseNameFromUrl(current)}</div>;
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {selectedPreviewUrl && (
+                <div style={{ marginTop:10 }}>
+                  <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Preview</div>
+                  {classifyByExt(selectedPreviewUrl) === 'image' || classifyByExt(selectedPreviewUrl) === 'gif' ? (
+                    <img src={selectedPreviewUrl} alt="preview" style={{ width:'100%', maxHeight:220, objectFit:'contain', borderRadius:8 }} />
+                  ) : classifyByExt(selectedPreviewUrl) === 'video' ? (
+                    <video src={selectedPreviewUrl} controls style={{ width:'100%', maxHeight:260, borderRadius:8 }} />
+                  ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
+                    <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
+                  ) : (
+                    <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
+                  )}
+                </div>
               )}
-            </div>
+
+              <div style={{ marginTop:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <label style={{ ...styles.button, display:'inline-grid', placeItems:'center' }}>
+                  Choose file
+                  <input type="file" style={{ display:'none' }} onChange={async (e)=>{
+                    const f = e.target.files?.[0]; if (!f) return;
+                    const url = await uploadFileAsMedia(f, 'uploads');
+                    if (url) {
+                      chooseMediaForSide(sideKey, url);
+                    }
+                  }} />
+                </label>
+
+                <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  Or drag & drop a file onto this box to upload and assign.
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ marginTop:8, color:'#9fb0bf', fontSize:12 }}>Enable Engage Response to attach media options.</div>
           )}
-
-          <div style={{ marginTop:10, display:'flex', gap:8, alignItems:'center' }}>
-            <label style={{ ...styles.button, display:'inline-grid', placeItems:'center' }}>
-              Choose file
-              <input type="file" style={{ display:'none' }} onChange={async (e)=>{
-                const f = e.target.files?.[0]; if (!f) return;
-                const url = await uploadFileAsMedia(f, 'uploads');
-                if (url) {
-                  // add new inventory item locally (won't reload global pool automatically)
-                  chooseMediaForSide(sideKey, url);
-                }
-              }} />
-            </label>
-
-            <div style={{ color:'#9fb0bf', fontSize:12 }}>
-              Or drag & drop a file onto this box to upload and assign.
-            </div>
-          </div>
         </div>
       </div>
     );

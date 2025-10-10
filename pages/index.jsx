@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
@@ -242,6 +242,35 @@ const DEVICE_TYPES = [
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
 ];
+const DEFAULT_TRIGGER_CONFIG = {
+  enabled: false,
+  actionType: 'media',
+  actionTarget: '',
+  actionLabel: '',
+  actionThumbnail: '',
+  triggerDeviceId: '',
+  triggerDeviceLabel: '',
+  triggeredResponseKey: '',
+  triggeredMissionId: '',
+};
+function sanitizeTriggerConfig(input = {}) {
+  const src = input || {};
+  const validType = ['media', 'devices', 'missions'].includes(src.actionType) ? src.actionType : 'media';
+  return {
+    enabled: !!src.enabled,
+    actionType: validType,
+    actionTarget: src.actionTarget || '',
+    actionLabel: src.actionLabel || '',
+    actionThumbnail: src.actionThumbnail || '',
+    triggerDeviceId: src.triggerDeviceId || '',
+    triggerDeviceLabel: src.triggerDeviceLabel || '',
+    triggeredResponseKey: src.triggeredResponseKey || '',
+    triggeredMissionId: src.triggeredMissionId || '',
+  };
+}
+function mergeTriggerState(current, partial = {}) {
+  return { ...DEFAULT_TRIGGER_CONFIG, ...(current || {}), ...(partial || {}) };
+}
 const FONT_FAMILIES = [
   { v:'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', label:'System' },
   { v:'Georgia, serif',                      label:'Georgia' },
@@ -262,6 +291,172 @@ function defaultAppearance() {
     textAlign: 'center',
     textVertical: 'top',
   };
+}
+function createDeviceDraft(overrides = {}) {
+  const base = {
+    title: '',
+    type: 'smoke',
+    iconKey: '',
+    pickupRadius: 100,
+    effectSeconds: 120,
+    lat: null,
+    lng: null,
+    trigger: { ...DEFAULT_TRIGGER_CONFIG },
+  };
+  const merged = { ...base, ...overrides };
+  merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
+  return merged;
+}
+const APPEARANCE_SKINS = [
+  {
+    key: 'default',
+    label: 'Default Control',
+    description: 'Baseline agent interface with balanced contrast.',
+    uiKey: 'default',
+    appearance: {
+      ...defaultAppearance(),
+      fontColor: '#e9eef2',
+      textBgColor: '#141b20',
+      textBgOpacity: 0.35,
+      screenBgColor: '#05090f',
+      screenBgOpacity: 0.78,
+    },
+  },
+  {
+    key: 'space-military',
+    label: 'Space Military Command',
+    description: 'Metallic chrome cockpit with holographic HUD glow.',
+    uiKey: 'space-military',
+    appearance: {
+      fontFamily: '"Orbitron", "Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 26,
+      fontColor: '#c7f6ff',
+      textBgColor: '#0b1d2b',
+      textBgOpacity: 0.72,
+      screenBgColor: '#040b12',
+      screenBgOpacity: 0.85,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'military-desert',
+    label: 'Desert Ops',
+    description: 'Sun-baked armor plating with tactical sand textures.',
+    uiKey: 'military-desert',
+    appearance: {
+      fontFamily: '"Copperplate", "Trebuchet MS", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#ffe8b8',
+      textBgColor: '#543d24',
+      textBgOpacity: 0.62,
+      screenBgColor: '#3a2815',
+      screenBgOpacity: 0.83,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'forest-outpost',
+    label: 'Forest Outpost',
+    description: 'Leaf canopy, bark fibers, and moss lighting.',
+    uiKey: 'forest-outpost',
+    appearance: {
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#e6f8e0',
+      textBgColor: '#17331c',
+      textBgOpacity: 0.68,
+      screenBgColor: '#0d1d12',
+      screenBgOpacity: 0.88,
+      screenBgImage: '',
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'starfield',
+    label: 'Starfield Observatory',
+    description: 'Deep space with constellations and thruster flares.',
+    uiKey: 'starfield',
+    appearance: {
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 22,
+      fontColor: '#d5e8ff',
+      textBgColor: '#0d1c3a',
+      textBgOpacity: 0.7,
+      screenBgColor: '#050a1f',
+      screenBgOpacity: 0.88,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'cartoon-bubbles',
+    label: 'Cartoon Bubbles',
+    description: 'High-def balloons, candy gloss, and playful fonts.',
+    uiKey: 'cartoon-bubbles',
+    appearance: {
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 28,
+      fontColor: '#fff3fe',
+      textBgColor: '#5f2a7a',
+      textBgOpacity: 0.6,
+      screenBgColor: '#321353',
+      screenBgOpacity: 0.86,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+];
+const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
+const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
+const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
+
+function applyAdminUiThemeForDocument(skinKey) {
+  if (typeof document === 'undefined') return;
+  const body = document.body;
+  if (!body) return;
+  const uiKey = ADMIN_SKIN_TO_UI.get(skinKey) || DEFAULT_UI_SKIN;
+  body.dataset.skin = uiKey;
+}
+
+function isAppearanceEqual(a, b) {
+  if (!a || !b) return false;
+  const keys = [
+    'fontFamily',
+    'fontSizePx',
+    'fontColor',
+    'textBgColor',
+    'textBgOpacity',
+    'screenBgColor',
+    'screenBgOpacity',
+    'screenBgImage',
+    'textAlign',
+    'textVertical',
+  ];
+  return keys.every((key) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === 'number' || typeof bv === 'number') {
+      return Math.abs(Number(av ?? 0) - Number(bv ?? 0)) < 0.0001;
+    }
+    return String(av ?? '') === String(bv ?? '');
+  });
+}
+function detectAppearanceSkin(appearance, fallbackKey) {
+  if (fallbackKey && APPEARANCE_SKIN_MAP.has(fallbackKey)) {
+    const preset = APPEARANCE_SKIN_MAP.get(fallbackKey);
+    if (preset && isAppearanceEqual(appearance, preset.appearance)) return fallbackKey;
+  }
+  for (const skin of APPEARANCE_SKINS) {
+    if (isAppearanceEqual(appearance, skin.appearance)) return skin.key;
+  }
+  return 'custom';
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
 
@@ -289,7 +484,7 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
-  useEffect(()=>{
+useEffect(()=>{
   let mounted = true;
   (async ()=>{
     try {
@@ -300,10 +495,65 @@ export default function Admin() {
     }
   })();
   return ()=> { mounted = false; };
-},[]);;
+},[]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin-protection?mode=ui', { cache: 'no-store', credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok) {
+          setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+          setProtectionError('');
+        } else {
+          throw new Error(data?.error || 'Failed to load protection status');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setProtectionState(prev => ({ ...prev, loading: false }));
+        setProtectionError('Unable to read protection status');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!config) {
+      applyAdminUiThemeForDocument('default');
+      return;
+    }
+    const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+      ? config.appearanceSkin
+      : null;
+    const detected = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+    applyAdminUiThemeForDocument(stored || detected);
+  }, [
+    config?.appearanceSkin,
+    config?.appearance?.fontFamily,
+    config?.appearance?.fontSizePx,
+    config?.appearance?.fontColor,
+    config?.appearance?.textBgColor,
+    config?.appearance?.textBgOpacity,
+    config?.appearance?.screenBgColor,
+    config?.appearance?.screenBgOpacity,
+    config?.appearance?.screenBgImage,
+    config?.appearance?.textAlign,
+    config?.appearance?.textVertical,
+  ]);
 
   
   const [dirty, setDirty]       = useState(false);
+  const [missionTriggerPicker, setMissionTriggerPicker] = useState('');
+  const missionTriggerState = mergeTriggerState(editing?.trigger);
+  function updateMissionTrigger(partial) {
+    setEditing(cur => {
+      if (!cur) return cur;
+      return { ...cur, trigger: mergeTriggerState(cur.trigger, partial) };
+    });
+    setDirty(true);
+  }
 
   // selections
   const [selectedDevIdx, setSelectedDevIdx] = useState(null);
@@ -313,10 +563,14 @@ export default function Admin() {
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
-  const [placingDev, setPlacingDev] = useState(false);
-  const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
+  const [isDeviceEditorOpen, setIsDeviceEditorOpen] = useState(false);
+  const [deviceEditorMode, setDeviceEditorMode] = useState('new');
+  const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
+  const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionError, setProtectionError] = useState('');
 
   // Combined Save & Publish
   const [deployDelaySec, setDeployDelaySec] = useState(5);
@@ -453,7 +707,13 @@ export default function Admin() {
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
+          mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG, ...(c0.mediaTriggers || {}) },
         };
+
+        const storedSkin = c0.appearanceSkin && ADMIN_SKIN_TO_UI.has(c0.appearanceSkin)
+          ? c0.appearanceSkin
+          : null;
+        merged.appearanceSkin = storedSkin || detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
 
         merged = applyDefaultIcons(merged);
 
@@ -480,6 +740,8 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      appearanceSkin: 'default',
+      mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
@@ -651,6 +913,7 @@ export default function Admin() {
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
       showContinue: true,
+      trigger: { ...DEFAULT_TRIGGER_CONFIG },
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
@@ -661,6 +924,7 @@ export default function Admin() {
     if (!e.correct) e.correct = { mode: 'none' };
     if (!e.wrong)   e.wrong   = { mode: 'none' };
     if (e.showContinue === undefined) e.showContinue = true;
+    e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
@@ -683,6 +947,7 @@ export default function Admin() {
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
+    obj.trigger = sanitizeTriggerConfig(editing.trigger);
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
 
     const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
@@ -723,65 +988,237 @@ export default function Admin() {
     const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
     return it?.url || '';
   }
+  function missionIconUrlFromKey(key) {
+    if (!key) return '';
+    const it = (config?.icons?.missions || []).find(x => (x.key||'') === key);
+    return it?.url || '';
+  }
+  const triggerOptionSets = useMemo(() => {
+    const mediaOptions = (inventory || []).map((it, idx) => {
+      const rawUrl = it?.url || it?.path || it;
+      const url = toDirectMediaURL(rawUrl);
+      if (!url) return null;
+      const label = it?.label || baseNameFromUrl(url) || `Media ${idx + 1}`;
+      return { id: url, label, thumbnail: url, meta: it };
+    }).filter(Boolean);
+    const deviceOptions = (devices || []).map((d, idx) => {
+      const id = d?.id || d?.key || `device-${idx}`;
+      const label = d?.title || d?.name || id;
+      const thumbnail = toDirectMediaURL(d?.iconUrl || deviceIconUrlFromKey(d?.iconKey) || '');
+      return { id, label, thumbnail, meta: d };
+    });
+    const missionOptions = ((suite?.missions) || []).map((m, idx) => {
+      const id = m?.id || `mission-${idx}`;
+      const label = m?.title || id;
+      const thumbnail = toDirectMediaURL(missionIconUrlFromKey(m?.iconKey) || '');
+      return { id, label, thumbnail, meta: m };
+    });
+    const responseOptions = [];
+    ((suite?.missions) || []).forEach((m) => {
+      if (!m) return;
+      const baseLabel = m.title || m.id || 'Mission';
+      const correctUrl = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      responseOptions.push({
+        id: `${m.id || baseLabel}::correct`,
+        label: `${baseLabel} — Correct`,
+        thumbnail: correctUrl,
+        meta: { mission: m, side: 'correct', url: correctUrl },
+      });
+      const wrongUrl = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      responseOptions.push({
+        id: `${m.id || baseLabel}::wrong`,
+        label: `${baseLabel} — Wrong`,
+        thumbnail: wrongUrl,
+        meta: { mission: m, side: 'wrong', url: wrongUrl },
+      });
+    });
+    return { media: mediaOptions, devices: deviceOptions, missions: missionOptions, responses: responseOptions };
+  }, [inventory, devices, suite?.missions, config?.icons?.devices, config?.icons?.missions]);
+  function suggestDeviceId(existing = devices) {
+    const ids = new Set((existing || []).map(d => String(d?.id || '').toLowerCase()));
+    let i = 1;
+    while (ids.has(`d${String(i).padStart(2, '0')}`)) i += 1;
+    return `d${String(i).padStart(2, '0')}`;
+  }
   function addDevice() {
-    setPlacingDev(true);
+    setDeviceEditorMode('new');
+    setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
     setSelectedMissionIdx(null);
-    setDevDraft({
-      title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120,
-      lat:Number((config.map?.centerLat ?? 44.9778)),
-      lng:Number((config.map?.centerLng ?? -93.2650))
-    });
+    const baseLat = Number(config.map?.centerLat ?? 44.9778);
+    const baseLng = Number(config.map?.centerLng ?? -93.2650);
+    setDevDraft(createDeviceDraft({
+      lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
+      lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
+    }));
+  }
+  function openDeviceEditor(idx) {
+    if (idx == null) return;
+    const item = devices?.[idx];
+    if (!item) return;
+    setDeviceEditorMode('edit');
+    setIsDeviceEditorOpen(true);
+    setSelectedDevIdx(idx);
+    setSelectedMissionIdx(null);
+    setDevDraft(createDeviceDraft({ ...item }));
+  }
+  function closeDeviceEditor() {
+    setIsDeviceEditorOpen(false);
+    setDeviceEditorMode('new');
+    setDevDraft(createDeviceDraft());
   }
   function saveDraftDevice() {
-    if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
-    pushHistory();
-    const item = {
-      id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
-      title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
-      type: devDraft.type,
+    const normalized = {
+      title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
+      type: devDraft.type || 'smoke',
       iconKey: devDraft.iconKey || '',
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
-      lat: Number(Number(devDraft.lat).toFixed(6)),
-      lng: Number(Number(devDraft.lng).toFixed(6)),
+      trigger: sanitizeTriggerConfig(devDraft.trigger),
     };
-    setDevices([...(devices || []), item]);
-    setPlacingDev(false);
-    setSelectedDevIdx((devices?.length || 0));
-    setSelectedMissionIdx(null);
-    setStatus('✅ Device added');
+    if (deviceEditorMode === 'new') {
+      if (devDraft.lat == null || devDraft.lng == null) {
+        setStatus('❌ Click the map or search an address to set device location');
+        return;
+      }
+      const lat = Number(Number(devDraft.lat).toFixed(6));
+      const lng = Number(Number(devDraft.lng).toFixed(6));
+      const list = [...(devices || [])];
+      const item = { id: suggestDeviceId(list), ...normalized, lat, lng };
+      pushHistory();
+      const next = [...list, item];
+      setDevices(next);
+      setSelectedDevIdx(next.length - 1);
+      setSelectedMissionIdx(null);
+      setStatus('✅ Device added');
+      closeDeviceEditor();
+      return;
+    }
+    if (deviceEditorMode === 'edit' && selectedDevIdx != null) {
+      const index = selectedDevIdx;
+      const list = [...(devices || [])];
+      const existing = list[index];
+      if (!existing) return;
+      const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
+      const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
+      pushHistory();
+      list[index] = { ...existing, ...normalized, lat, lng };
+      setDevices(list);
+      setStatus('✅ Device updated');
+      closeDeviceEditor();
+    }
   }
-  function deleteSelectedDevice() {
-    if (selectedDevIdx == null) return;
+  function duplicateDevice(idx) {
+    const list = [...(devices || [])];
+    const src = list[idx];
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = suggestDeviceId(list);
+    copy.title = (src.title || src.id || 'Device') + ' (copy)';
     pushHistory();
-    const list = [...devices];
-    list.splice(selectedDevIdx, 1);
+    list.splice(idx + 1, 0, copy);
     setDevices(list);
-    setSelectedDevIdx(null);
+    const newIndex = idx + 1;
+    setSelectedDevIdx(newIndex);
+    setSelectedMissionIdx(null);
+    setStatus('✅ Device duplicated');
+    setDeviceEditorMode('edit');
+    setIsDeviceEditorOpen(true);
+    setDevDraft(createDeviceDraft({ ...copy }));
   }
-  function duplicateSelectedDevice() {
-    if (selectedDevIdx == null) return;
+  function deleteDevice(idx) {
+    const list = [...(devices || [])];
+    if (idx == null || idx < 0 || idx >= list.length) return;
+    const currentSelected = selectedDevIdx;
     pushHistory();
-    const src = devices[selectedDevIdx]; if (!src) return;
-    const copy = { ...JSON.parse(JSON.stringify(src)) };
-    copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
-    setDevices([...(devices || []), copy]);
-    setSelectedDevIdx((devices?.length || 0));
+    list.splice(idx, 1);
+    setDevices(list);
+    if (currentSelected === idx) {
+      setSelectedDevIdx(null);
+      if (isDeviceEditorOpen && deviceEditorMode === 'edit') closeDeviceEditor();
+    } else if (currentSelected != null && currentSelected > idx) {
+      setSelectedDevIdx(currentSelected - 1);
+    }
+    setStatus('✅ Device deleted');
+  }
+  function moveDevice(idx, dir) {
+    const list = [...(devices || [])];
+    if (idx == null || idx < 0 || idx >= list.length) return;
+    const target = idx + dir;
+    if (target < 0 || target >= list.length) return;
+    const [row] = list.splice(idx, 1);
+    list.splice(target, 0, row);
+    pushHistory();
+    setDevices(list);
+    const currentSelected = selectedDevIdx;
+    if (currentSelected === idx) {
+      setSelectedDevIdx(target);
+      if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+        setDevDraft(createDeviceDraft({ ...list[target] }));
+      }
+    } else if (currentSelected === target) {
+      setSelectedDevIdx(idx);
+    }
   }
   function moveSelectedDevice(lat, lng) {
     if (selectedDevIdx == null) return;
+    const list = [...(devices || [])];
+    const existing = list[selectedDevIdx];
+    if (!existing) return;
+    const latFixed = Number(lat.toFixed(6));
+    const lngFixed = Number(lng.toFixed(6));
     pushHistory();
-    const list = [...devices];
-    list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+    list[selectedDevIdx] = { ...existing, lat: latFixed, lng: lngFixed };
     setDevices(list);
+    if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+      setDevDraft(d => ({ ...d, lat: latFixed, lng: lngFixed }));
+    }
   }
   function setSelectedDeviceRadius(r) {
     if (selectedDevIdx == null) return;
+    const list = [...(devices || [])];
+    const existing = list[selectedDevIdx];
+    if (!existing) return;
+    const nextRadius = clamp(Number(r || 0), 1, 2000);
     pushHistory();
-    const list = [...devices];
-    list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
+    list[selectedDevIdx] = { ...existing, pickupRadius: nextRadius };
     setDevices(list);
+    if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+      setDevDraft(d => ({ ...d, pickupRadius: nextRadius }));
+    }
+  }
+
+  function applyAppearanceSkin(key) {
+    const preset = APPEARANCE_SKIN_MAP.get(key);
+    if (!preset) return;
+    applyAdminUiThemeForDocument(key);
+    setConfig(prev => ({ ...prev, appearance: { ...preset.appearance }, appearanceSkin: key }));
+    setStatus(`✅ Applied theme: ${preset.label}`);
+  }
+
+  async function toggleProtection() {
+    const target = !protectionState.enabled;
+    setProtectionError('');
+    setProtectionState(prev => ({ ...prev, saving: true }));
+    try {
+      const res = await fetch('/api/admin-protection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ protected: target }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || res.statusText || 'Toggle failed');
+      }
+      setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+      setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+      setProtectionState(prev => ({ ...prev, saving: false }));
+      const msg = err?.message || 'Toggle failed';
+      setProtectionError(msg);
+      setStatus('❌ Failed to toggle admin protection');
+    }
   }
 
   // Missions selection operations (Missions tab only)
@@ -835,10 +1272,9 @@ export default function Admin() {
   }
   function applySearchResult(r) {
     const lat = Number(r.lat), lon = Number(r.lon);
-    if (placingDev) {
+    if (isDeviceEditorOpen && deviceEditorMode === 'new') {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
-      pushHistory();
       moveSelectedDevice(lat, lon);
     }
     setDevResults([]);
@@ -922,8 +1358,8 @@ export default function Admin() {
 
   if (!suite || !config) {
     return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid #1f262d', background: '#12181d' }}>
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--admin-panel-bg)', boxShadow: 'var(--admin-panel-shadow)' }}>
           Loading… (pulling config & missions)
         </div>
       </main>
@@ -938,10 +1374,24 @@ export default function Admin() {
     ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
 
-  const deviceRadiusDisabled = (selectedDevIdx==null && !placingDev);
+  const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
+  const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
+
+  const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+    ? config.appearanceSkin
+    : null;
+  const detectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const selectedAppearanceSkin = storedAppearanceSkin || detectedAppearanceSkin;
+  const selectedAppearanceSkinLabel = storedAppearanceSkin
+    ? `${APPEARANCE_SKIN_MAP.get(storedAppearanceSkin)?.label || storedAppearanceSkin}${detectedAppearanceSkin === 'custom' ? ' (modified)' : ''}`
+    : detectedAppearanceSkin === 'custom'
+      ? 'Custom (manual edits)'
+      : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
+  const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
+  const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
@@ -955,6 +1405,49 @@ export default function Admin() {
     <div style={S.body}>
       <header style={S.header}>
         <div style={S.wrap}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:16 }}>
+            <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
+              Admin Control Deck
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <div
+                style={{
+                  display:'flex',
+                  alignItems:'center',
+                  gap:8,
+                  padding:'6px 14px',
+                  borderRadius:999,
+                  border:`1px solid ${protectionIndicatorColor}`,
+                  background:'var(--admin-panel-bg)',
+                  color: protectionIndicatorColor,
+                  fontWeight:700,
+                  letterSpacing:1,
+                  textTransform:'uppercase',
+                  boxShadow:'0 0 12px currentColor',
+                }}
+              >
+                <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', background:'currentColor', boxShadow:'0 0 12px currentColor' }} />
+                {protectionState.loading ? 'Checking…' : protectionState.enabled ? 'Protected' : 'Not Protected'}
+              </div>
+              <button
+                onClick={toggleProtection}
+                disabled={protectionState.saving || protectionState.loading}
+                style={{
+                  ...S.button,
+                  ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                  minWidth: 180,
+                  opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
+                }}
+              >
+                {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+              </button>
+            </div>
+          </div>
+          {protectionError && (
+            <div style={{ color: 'var(--admin-danger-color)', fontSize: 12, marginBottom: 12 }}>
+              {protectionError}
+            </div>
+          )}
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             {tabsOrder.map((t)=>{
               const labelMap = {
@@ -972,7 +1465,7 @@ export default function Admin() {
               );
             })}
             <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
+              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                 <option value="default">(Default Game)</option>
                 {games.map(g=>(
@@ -984,7 +1477,7 @@ export default function Admin() {
 
             {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                 Deploy delay (sec):
                 <input
                   type="number" min={0} max={120}
@@ -1000,7 +1493,7 @@ export default function Admin() {
                   setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
                 disabled={savePubBusy}
-                style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
+                style={{ ...S.button, ...S.buttonSuccess, opacity: savePubBusy ? 0.7 : 1 }}
               >
                 {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
               </button>
@@ -1017,7 +1510,7 @@ export default function Admin() {
               View config.json
             </a>
           </div>
-          <div style={{ color:'#9fb0bf', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
 
@@ -1051,7 +1544,7 @@ export default function Admin() {
                       <div style={{ fontWeight:600 }}>
                         <span style={{ opacity:.65, marginRight:6 }}>#{idx+1}</span>{m.title||m.id}
                       </div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
+                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
                     </div>
                     <div style={{ display:'flex', gap:6 }}>
                       <button title="Move up"   style={{ ...S.button, padding:'6px 10px' }} onClick={()=>moveMission(idx,-1)}>▲</button>
@@ -1070,7 +1563,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Missions Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
                 </div>
@@ -1084,7 +1577,7 @@ export default function Admin() {
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1096,7 +1589,7 @@ export default function Admin() {
                   value={missionRadiusValue}
                   onChange={(e)=> setSelectedMissionRadius(Number(e.target.value)) }
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'var(--admin-muted)' }}>
                   {selectedMissionIdx==null ? 'Select a mission to adjust radius' : `M${selectedMissionIdx+1} radius: ${missionRadiusValue} m`}
                 </code>
               </div>
@@ -1128,7 +1621,7 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--admin-panel-bg)', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
                       <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -1164,8 +1657,8 @@ export default function Admin() {
                         {(() => {
                           const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
                           return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
                         })()}
                       </div>
                     </div>
@@ -1236,7 +1729,7 @@ export default function Admin() {
 
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
+                      <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
@@ -1312,6 +1805,150 @@ export default function Admin() {
                   </Field>
 
                   
+                  <div style={{ marginTop:16, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
+                    <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
+                    <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <input
+                        type="checkbox"
+                        checked={missionTriggerState.enabled}
+                        onChange={(e)=>{
+                          setMissionTriggerPicker('');
+                          updateMissionTrigger({ enabled: e.target.checked });
+                        }}
+                      />
+                      <span>Trigger Device — when this device is breached or deployed it will create an action.</span>
+                    </label>
+
+                    {missionTriggerState.enabled ? (() => {
+                      const trigger = missionTriggerState;
+                      const actionOptions = triggerOptionSets[trigger.actionType] || [];
+                      const selectedAction = actionOptions.find(opt => opt.id === trigger.actionTarget) || null;
+                      const actionPreview = trigger.actionThumbnail || selectedAction?.thumbnail || '';
+                      const resolvedActionPreview = actionPreview ? toDirectMediaURL(actionPreview) : '';
+                      const deviceOptions = triggerOptionSets.devices || [];
+                      const selectedDevice = deviceOptions.find(opt => opt.id === trigger.triggerDeviceId) || null;
+                      const responseOptions = triggerOptionSets.responses || [];
+                      const selectedResponse = responseOptions.find(opt => opt.id === trigger.triggeredResponseKey) || null;
+                      const missionOptions = triggerOptionSets.missions || [];
+                      const selectedMission = missionOptions.find(opt => opt.id === trigger.triggeredMissionId) || null;
+                      const responsePreview = selectedResponse?.thumbnail ? toDirectMediaURL(selectedResponse.thumbnail) : '';
+                      const devicePreview = selectedDevice?.thumbnail ? toDirectMediaURL(selectedDevice.thumbnail) : '';
+                      const missionPreview = selectedMission?.thumbnail ? toDirectMediaURL(selectedMission.thumbnail) : '';
+                      return (
+                        <>
+                          <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                            <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
+                            <select
+                              style={S.input}
+                              value={trigger.actionType}
+                              onChange={(e)=>{
+                                setMissionTriggerPicker('');
+                                updateMissionTrigger({ actionType: e.target.value, actionTarget:'', actionLabel:'', actionThumbnail:'' });
+                              }}
+                            >
+                              <option value="media">Media</option>
+                              <option value="devices">Devices</option>
+                              <option value="missions">Missions</option>
+                            </select>
+                          </div>
+
+                          <TriggerDropdown
+                            label="Action target"
+                            openKey={missionTriggerPicker}
+                            setOpenKey={setMissionTriggerPicker}
+                            dropdownKey="mission-action"
+                            options={actionOptions}
+                            selected={selectedAction}
+                            onSelect={(opt)=>{
+                              updateMissionTrigger({
+                                actionTarget: opt?.id || '',
+                                actionLabel: opt?.label || '',
+                                actionThumbnail: opt?.thumbnail || '',
+                              });
+                            }}
+                          />
+                          {resolvedActionPreview && (
+                            <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
+                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Selected action preview</div>
+                              <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                <img src={resolvedActionPreview} alt="action preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              </div>
+                            </div>
+                          )}
+
+                          <TriggerDropdown
+                            label="Trigger Device"
+                            openKey={missionTriggerPicker}
+                            setOpenKey={setMissionTriggerPicker}
+                            dropdownKey="mission-device"
+                            options={deviceOptions}
+                            selected={selectedDevice}
+                            onSelect={(opt)=>{
+                              updateMissionTrigger({
+                                triggerDeviceId: opt?.id || '',
+                                triggerDeviceLabel: opt?.label || '',
+                              });
+                            }}
+                          />
+                          {devicePreview && (
+                            <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
+                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Device preview</div>
+                              <div style={{ width:72, height:56, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                <img src={devicePreview} alt="device preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              </div>
+                            </div>
+                          )}
+
+                          <TriggerDropdown
+                            label="Triggered Response"
+                            openKey={missionTriggerPicker}
+                            setOpenKey={setMissionTriggerPicker}
+                            dropdownKey="mission-response"
+                            options={responseOptions}
+                            selected={selectedResponse}
+                            onSelect={(opt)=>{
+                              updateMissionTrigger({
+                                triggeredResponseKey: opt?.id || '',
+                              });
+                            }}
+                          />
+                          {responsePreview && (
+                            <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
+                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Response preview</div>
+                              <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                <img src={responsePreview} alt="response preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              </div>
+                            </div>
+                          )}
+
+                          <TriggerDropdown
+                            label="Triggered Mission"
+                            openKey={missionTriggerPicker}
+                            setOpenKey={setMissionTriggerPicker}
+                            dropdownKey="mission-mission"
+                            options={missionOptions}
+                            selected={selectedMission}
+                            onSelect={(opt)=>{
+                              updateMissionTrigger({
+                                triggeredMissionId: opt?.id || '',
+                              });
+                            }}
+                          />
+                          {missionPreview && (
+                            <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
+                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Triggered mission preview</div>
+                              <div style={{ width:72, height:56, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                <img src={missionPreview} alt="mission preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })() : (
+                      <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Enable Trigger Device to configure trigger actions.</div>
+                    )}
+                  </div>
+
                   {/* Mission Response (Correct/Wrong): below map, above Continue */}
                   <InlineMissionResponses editing={editing} setEditing={setEditing} inventory={inventory} />
 
@@ -1363,11 +2000,11 @@ export default function Admin() {
                 <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
               </form>
 
-              <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
+              <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
                 {devResults.map((r,i)=>(
-                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                  <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                    <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                   </div>
                 ))}
               </div>
@@ -1375,28 +2012,63 @@ export default function Admin() {
 
             <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
               <button style={S.button} onClick={addDevice}>+ Add Device</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
-              {(selectedDevIdx!=null) && (
-                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); }}>Clear selection</button>
+              {selectedDevIdx!=null && (
+                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}>Clear selection</button>
               )}
             </div>
 
-            <ul style={{ paddingLeft: 18 }}>
-              {(devices||[]).map((x,i)=>(
-                <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
-                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
-                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
-                  <button
-                    style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
-                    onClick={()=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(devices||[]).map((x,i)=>{
+                const iconUrl = x.iconKey ? deviceIconUrlFromKey(x.iconKey) : '';
+                const selected = selectedDevIdx === i;
+                const hasCoords = typeof x.lat === 'number' && typeof x.lng === 'number';
+                return (
+                  <div
+                    key={x.id||i}
+                    onClick={()=>openDeviceEditor(i)}
+                    style={{
+                      display:'grid',
+                      gridTemplateColumns:'56px 1fr auto',
+                      gap:12,
+                      alignItems:'center',
+                      padding:12,
+                      borderRadius:12,
+                      border:`1px solid ${selected ? 'rgba(45, 212, 191, 0.35)' : 'var(--admin-border-soft)'}`,
+                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--admin-panel-bg)',
+                      cursor:'pointer',
+                    }}
                   >
-                    Select
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
+                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--admin-panel-bg)', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                      {iconUrl
+                        ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
+                        : <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
+                    </div>
+                    <div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                        <div style={{ fontWeight:600 }}>{`D${i+1}`} — {x.title || '(untitled)'}</div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
+                      </div>
+                      <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+                        <span style={S.chip}>{x.type}</span>
+                        <span style={S.chip}>Radius {x.pickupRadius} m</span>
+                        <span style={S.chip}>Effect {x.effectSeconds}s</span>
+                      </div>
+                    </div>
+                    <div onClick={(e)=>e.stopPropagation()} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Move up" style={{ ...S.button, padding:'6px 10px' }} disabled={i===0} onClick={()=>moveDevice(i,-1)}>▲</button>
+                        <button title="Move down" style={{ ...S.button, padding:'6px 10px' }} disabled={i===(devices?.length||0)-1} onClick={()=>moveDevice(i,+1)}>▼</button>
+                      </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Duplicate" style={{ ...S.button, padding:'6px 10px' }} onClick={()=>duplicateDevice(i)}>⧉</button>
+                        <button title="Delete" style={{ ...S.button, ...S.buttonDanger, padding:'6px 10px' }} onClick={()=>deleteDevice(i)}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
           <section style={{ position:'relative' }}>
@@ -1404,7 +2076,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Devices Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
@@ -1418,7 +2090,7 @@ export default function Admin() {
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1434,48 +2106,170 @@ export default function Admin() {
                     else setDevDraft(d=>({ ...d, pickupRadius: r }));
                   }}
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'var(--admin-muted)' }}>
                   {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                   : placingDev ? `New device radius: ${deviceRadiusValue} m`
+                   : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
                    : 'Select a device to adjust radius'}
                 </code>
               </div>
 
-              {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
-                    <div>
-                      {devDraft.iconKey
-                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+              {isDeviceEditorOpen && (() => {
+                const trigger = mergeTriggerState(devDraft.trigger);
+                const actionOptions = triggerOptionSets[trigger.actionType] || [];
+                const selectedAction = actionOptions.find(opt => opt.id === trigger.actionTarget) || null;
+                const previewThumb = trigger.actionThumbnail || selectedAction?.thumbnail || '';
+                const resolvedPreview = previewThumb ? toDirectMediaURL(previewThumb) : '';
+                return (
+                  <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12 }}>
+                      <div>
+                        <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
+                        {deviceEditorMode === 'edit' && devDraft.id && (
+                          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
+                        )}
+                      </div>
+                      <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
                     </div>
-                    <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
-                    <Field label="Type">
-                      <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
-                        {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Icon">
-                      <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
-                        <option value="">(default)</option>
-                        {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Effect (sec)">
-                      <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
-                        onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
-                    </Field>
-                  </div>
-                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
-                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
-                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
-                    <div style={{ color:'#9fb0bf' }}>
-                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
-                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
+                    <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
+                      <div>
+                        {devDraft.iconKey
+                          ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
+                          : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>}
+                      </div>
+                      <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
+                      <Field label="Type">
+                        <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                          {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Icon">
+                        <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
+                          <option value="">(default)</option>
+                          {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Effect (sec)">
+                        <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
+                          onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
+                      </Field>
+                    </div>
+
+                    <div style={{ marginTop:14, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
+                      <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
+                      <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <input
+                          type="checkbox"
+                          checked={trigger.enabled}
+                          onChange={(e)=>{
+                            const checked = e.target.checked;
+                            setDeviceTriggerPicker('');
+                            setDevDraft(d=>({ ...d, trigger: mergeTriggerState(d.trigger, { enabled: checked }) }));
+                          }}
+                        />
+                        <span>
+                          Trigger Device — when this device is breached or deployed it will create an action.
+                        </span>
+                      </label>
+
+                      {trigger.enabled ? (
+                        <>
+                          <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                            <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
+                            <select
+                              style={S.input}
+                              value={trigger.actionType}
+                              onChange={(e)=>{
+                                const nextType = e.target.value;
+                                setDeviceTriggerPicker('');
+                                setDevDraft(d=>({
+                                  ...d,
+                                  trigger: mergeTriggerState(d.trigger, {
+                                    actionType: nextType,
+                                    actionTarget: '',
+                                    actionLabel: '',
+                                    actionThumbnail: '',
+                                  }),
+                                }));
+                              }}
+                            >
+                              <option value="media">Media</option>
+                              <option value="devices">Devices</option>
+                              <option value="missions">Missions</option>
+                            </select>
+                          </div>
+
+                          <div style={{ marginTop:12 }}>
+                            <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Action target</div>
+                            <div style={{ position:'relative' }}>
+                              <button
+                                type="button"
+                                style={{ ...S.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
+                                onClick={()=>setDeviceTriggerPicker(prev => prev === 'action' ? '' : 'action')}
+                              >
+                                <span>{selectedAction ? selectedAction.label : 'Select action target'}</span>
+                                <span style={{ opacity:0.6 }}>▾</span>
+                              </button>
+                              {deviceTriggerPicker === 'action' && (
+                                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:30, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 16px 32px rgba(0,0,0,0.4)' }}>
+                                  {actionOptions.length === 0 ? (
+                                    <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
+                                  ) : actionOptions.map(opt => (
+                                    <div
+                                      key={opt.id}
+                                      onClick={()=>{
+                                        setDevDraft(d=>({
+                                          ...d,
+                                          trigger: mergeTriggerState(d.trigger, {
+                                            actionTarget: opt.id,
+                                            actionLabel: opt.label,
+                                            actionThumbnail: opt.thumbnail,
+                                          }),
+                                        }));
+                                        setDeviceTriggerPicker('');
+                                      }}
+                                      style={{ display:'grid', gridTemplateColumns:'56px 1fr', gap:10, alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}
+                                    >
+                                      <div style={{ width:56, height:42, borderRadius:8, overflow:'hidden', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                        {opt.thumbnail ? (
+                                          <img src={toDirectMediaURL(opt.thumbnail)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                                        ) : (
+                                          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>No preview</div>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontWeight:600 }}>{opt.label}</div>
+                                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{opt.id}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {resolvedPreview && (
+                              <div style={{ marginTop:12, display:'flex', gap:12, alignItems:'center' }}>
+                                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Selected preview</div>
+                                <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                                  <img src={resolvedPreview} alt="preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Enable Trigger Device to configure actions.</div>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                      <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
+                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
+                        {devDraft.lat==null ? 'Click the map or search an address to set location'
+                          : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               <MapOverview
                 missions={(suite?.missions)||[]}
@@ -1486,14 +2280,14 @@ export default function Admin() {
                 mapZoom={mapZoom}
                 defaultIconSizePx={defaultPinSize}
                 selectedIconSizePx={selectedPinSize}
-                interactive={placingDev}
-                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
+                interactive={isAddingDevice}
+                draftDevice={isAddingDevice ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
                 selectedDevIdx={selectedDevIdx}
                 selectedMissionIdx={null}
-                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
+                onDraftChange={isAddingDevice ? ((lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))) : null}
                 onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
                 onMoveSelectedMission={null}
-                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
+                onSelectDevice={(i)=>{ openDeviceEditor(i); }}
                 onSelectMission={null}
                 readOnly={false}
                 lockToRegion={true}
@@ -1547,11 +2341,11 @@ export default function Admin() {
                   <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
                   <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
                 </form>
-                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
                   {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
+                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
                       <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                     </div>
                   ))}
                 </div>
@@ -1574,7 +2368,7 @@ export default function Admin() {
                 </select>
               </Field>
             </div>
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
             </div>
           </div>
@@ -1583,7 +2377,7 @@ export default function Admin() {
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=> setConfirmDeleteOpen(true)}
               >
                 🗑 Delete Game
@@ -1594,9 +2388,62 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
-            <AppearanceEditor value={config.appearance||defaultAppearance()}
-              onChange={(next)=>setConfig({ ...config, appearance:next })}/>
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
+                {APPEARANCE_SKINS.map((skin)=>{
+                  const active = selectedAppearanceSkin === skin.key;
+                  const previewBg = skin.appearance.screenBgImage
+                    ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
+                    : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
+                  return (
+                    <button
+                      key={skin.key}
+                      type="button"
+                      onClick={()=>applyAppearanceSkin(skin.key)}
+                      style={{
+                        borderRadius:12,
+                        border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
+                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                        padding:12,
+                        textAlign:'left',
+                        color:'var(--admin-body-color)',
+                        cursor:'pointer',
+                      }}
+                    >
+                      <div style={{ fontWeight:600 }}>{skin.label}</div>
+                      <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
+                      <div style={{
+                        border:'1px dashed var(--admin-border-soft)',
+                        borderRadius:8,
+                        padding:10,
+                        background: previewBg,
+                        color: skin.appearance.fontColor,
+                        fontFamily: skin.appearance.fontFamily,
+                        fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
+                        textAlign: skin.appearance.textAlign,
+                      }}>
+                        Preview text
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
+                Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
+              </div>
+            </div>
+            <AppearanceEditor
+              value={config.appearance||defaultAppearance()}
+              onChange={(next)=>setConfig(prev => ({
+                ...prev,
+                appearance: next,
+                appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
+                  ? prev.appearanceSkin
+                  : detectAppearanceSkin(next, prev.appearanceSkin),
+              }))}
+            />
+            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
@@ -1627,6 +2474,9 @@ export default function Admin() {
           config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
+          inventory={inventory}
+          devices={devices}
+          missions={suite?.missions || []}
         />
       )}
 
@@ -1647,7 +2497,7 @@ export default function Admin() {
                 <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
-            {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
+            {!gameBase && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
               <iframe
                 key={previewNonce} // hard refresh on nonce change
@@ -1657,7 +2507,7 @@ export default function Admin() {
                   preview: '1',
                   cb: String(Date.now())
                 }).toString()}`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
+                style={{ width:'100%', height:'70vh', border:'1px solid var(--admin-border-soft)', borderRadius:12 }}
               />
             )}
           </div>
@@ -1713,13 +2563,13 @@ export default function Admin() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'#e9eef2', marginBottom:12 }}>
+            <div style={{ color:'var(--admin-body-color)', marginBottom:12 }}>
               Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
               <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={reallyDeleteGame}
               >
                 Delete
@@ -1736,7 +2586,7 @@ export default function Admin() {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--admin-muted)', marginBottom: 6 }}>{label}</div>
       {children}
     </div>
   );
@@ -1754,13 +2604,13 @@ function ColorField({ label, value, onChange }) {
 function AppearanceEditor({ value, onChange }) {
   const a = value || defaultAppearance();
   return (
-    <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
           <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
             {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
+          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed var(--admin-border-soft)', borderRadius:8, fontFamily:a.fontFamily }}>
             Aa — preview text with this font
           </div>
         </Field>
@@ -1773,19 +2623,19 @@ function AppearanceEditor({ value, onChange }) {
         <Field label="Text background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
         <Field label="Screen background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <Field label="Screen background image (URL)">
           <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
           {a.screenBgImage && (
             <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
@@ -1801,7 +2651,7 @@ function AppearanceEditor({ value, onChange }) {
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
+        marginTop:12, border:'1px dashed var(--admin-border-soft)', borderRadius:10, overflow:'hidden',
         background:a.screenBgImage
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
@@ -1831,7 +2681,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
     onChange({ choices: trimmed, correctIndex: ci });
   }
   return (
-    <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>Choices (A–E)</div>
       {[0,1,2,3,4].map((i)=>(
         <div key={i} style={{ display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -1840,7 +2690,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
             onChange={(e)=>{ const next=[...local]; next[i]=e.target.value; setLocal(next); sync(next, correct); }}/>
         </div>
       ))}
-      <div style={{ color:'#9fb0bf', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
+      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
     </div>
   );
 }
@@ -1853,15 +2703,15 @@ function MediaPreview({ url, kind }) {
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
+      <div style={{ color:'var(--admin-muted)', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
       {isVideo ? (
-        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
+        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isImage ? (
-        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isAudio ? (
         <audio src={u} controls style={{ width:'100%' }} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color:'var(--admin-muted)', textDecoration:'underline' }}>Open media</a>
       )}
     </div>
   );
@@ -1869,22 +2719,96 @@ function MediaPreview({ url, kind }) {
 
 /* Styles */
 const S = {
-  body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
-  header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
-  wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
-  wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
-  sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
-  card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
-  missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
-  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
-  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
-  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0f1418', color:'#e9eef2', cursor:'pointer' },
-  tabActive:{ background:'#1a2027' },
-  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
-  hr:{ border:'1px solid #1f262d', borderBottom:'none' },
-  overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
-  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
-  chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
+  body: {
+    background: 'var(--admin-body-bg)',
+    color: 'var(--admin-body-color)',
+    minHeight: '100vh',
+    fontFamily: 'var(--admin-font-family)',
+  },
+  header: {
+    padding: 16,
+    background: 'var(--admin-header-bg)',
+    borderBottom: 'var(--admin-header-border)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 40,
+  },
+  wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
+  wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  sidebarTall: {
+    background: 'var(--admin-panel-bg)',
+    border: 'var(--admin-panel-border)',
+    borderRadius: 18,
+    padding: 14,
+    position: 'sticky',
+    top: 20,
+    height: 'calc(100vh - 140px)',
+    overflow: 'auto',
+    boxShadow: 'var(--admin-panel-shadow)',
+  },
+  card: {
+    position: 'relative',
+    background: 'var(--admin-panel-bg)',
+    border: 'var(--admin-panel-border)',
+    borderRadius: 18,
+    padding: 18,
+    boxShadow: 'var(--admin-panel-shadow)',
+  },
+  missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  button: {
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: 'var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-color)',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  buttonDanger: {
+    border: 'var(--admin-danger-border)',
+    background: 'var(--admin-danger-bg)',
+    color: 'var(--admin-body-color)',
+  },
+  buttonSuccess: {
+    border: 'var(--admin-success-border)',
+    background: 'var(--admin-success-bg)',
+    color: 'var(--admin-body-color)',
+  },
+  tab: {
+    padding: '8px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-button-border)',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease',
+  },
+  tabActive: { background: 'var(--admin-tab-active-bg)', boxShadow: '0 0 0 1px rgba(255,255,255,0.06)' },
+  search: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    marginBottom: 10,
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
+  overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
+  chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
+  muted: { color: 'var(--admin-muted)' },
 };
 
 /* MapOverview — shows missions + devices */
@@ -2024,8 +2948,8 @@ function MapOverview({
 
   return (
     <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+      {!leafletReady && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }}/>
     </div>
   );
 }
@@ -2093,7 +3017,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
           type="range" min={5} max={500} step={5}
@@ -2108,7 +3032,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
             }
           }}
         />
-        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
+        <code style={{ color:'var(--admin-muted)' }}>{rad} m</code>
       </div>
     </div>
   );
@@ -2123,7 +3047,7 @@ function TextTab({ config, setConfig }) {
     <main style={S.wrap}>
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
+        <div style={{ color:'var(--admin-muted)', marginBottom:8, fontSize:12 }}>
           One rule per line. This saves into <code>config.textRules</code>.
         </div>
         <textarea
@@ -2326,8 +3250,8 @@ function MediaPoolTab({
             <input type="file" onChange={onUpload} style={{ display:'none' }} />
           </label>
         </div>
-        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
-        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+        {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
+        <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
       </div>
@@ -2350,7 +3274,7 @@ function MediaPoolTab({
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
           <button
-            style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+            style={{ ...S.button, ...S.buttonDanger }}
             onClick={()=>deleteAll(active.items)}
             disabled={!active.items.length}
             title="Delete all files in this type"
@@ -2360,14 +3284,14 @@ function MediaPoolTab({
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files.</div>
+          <div style={{ color:'var(--admin-muted)' }}>No files.</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
               const use = usageCounts(url);
               return (
-                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {baseNameFromUrl(url)}
@@ -2401,12 +3325,71 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+  const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
+  const triggerConfig = mergeTriggerState(config.mediaTriggers);
+
+  function updateMediaTrigger(partial) {
+    setConfig(c => ({
+      ...c,
+      mediaTriggers: mergeTriggerState(c.mediaTriggers, partial),
+    }));
+  }
+
+  const iconsDevices = config.icons?.devices || [];
+  const iconsMissions = config.icons?.missions || [];
+  const mediaOptions = (inventory || []).map((it, idx) => {
+    const rawUrl = it?.url || it?.path || it;
+    const url = toDirectMediaURL(rawUrl);
+    if (!url) return null;
+    return { id: url, label: it?.label || baseNameFromUrl(url) || `Media ${idx + 1}`, thumbnail: url };
+  }).filter(Boolean);
+  const deviceOptions = (devices || []).map((d, idx) => {
+    const id = d?.id || d?.key || `device-${idx}`;
+    const label = d?.title || d?.name || id;
+    const iconKey = d?.iconKey;
+    const iconEntry = iconsDevices.find(x => (x.key||'') === iconKey);
+    const thumbnail = toDirectMediaURL(d?.iconUrl || iconEntry?.url || '');
+    return { id, label, thumbnail, meta: d };
+  });
+  const missionOptions = (missions || []).map((m, idx) => {
+    const id = m?.id || `mission-${idx}`;
+    const label = m?.title || id;
+    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const thumbnail = toDirectMediaURL(iconEntry?.url || '');
+    return { id, label, thumbnail, meta: m };
+  });
+  const responseOptions = [];
+  (missions || []).forEach((m) => {
+    if (!m) return;
+    const baseLabel = m.title || m.id || 'Mission';
+    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const correctThumb = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || iconEntry?.url || '');
+    responseOptions.push({ id: `${m.id || baseLabel}::correct`, label: `${baseLabel} — Correct`, thumbnail: correctThumb });
+    const wrongThumb = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || iconEntry?.url || '');
+    responseOptions.push({ id: `${m.id || baseLabel}::wrong`, label: `${baseLabel} — Wrong`, thumbnail: wrongThumb });
+  });
+  const actionOptionsByType = {
+    media: mediaOptions,
+    devices: deviceOptions,
+    missions: missionOptions,
+  };
+  const selectedActionList = actionOptionsByType[triggerConfig.actionType] || mediaOptions;
+  const selectedAction = selectedActionList.find(opt => opt.id === triggerConfig.actionTarget) || null;
+  const resolvedActionPreview = triggerConfig.actionThumbnail || selectedAction?.thumbnail || '';
+  const selectedDevice = deviceOptions.find(opt => opt.id === triggerConfig.triggerDeviceId) || null;
+  const selectedResponse = responseOptions.find(opt => opt.id === triggerConfig.triggeredResponseKey) || null;
+  const selectedMission = missionOptions.find(opt => opt.id === triggerConfig.triggeredMissionId) || null;
+  const triggeredDeviceSummaries = (devices || []).filter(d => d?.trigger?.enabled).map(d => ({
+    id: d?.id || d?.key,
+    label: d?.title || d?.name || d?.id || 'Device',
+    trigger: sanitizeTriggerConfig(d?.trigger),
+  }));
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2428,6 +3411,109 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
 
   return (
     <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop:0 }}>Trigger Automation</h3>
+        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <input
+            type="checkbox"
+            checked={triggerConfig.enabled}
+            onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ enabled: e.target.checked }); }}
+          />
+          <span>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
+        </label>
+
+        {triggerConfig.enabled ? (
+          <>
+            <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
+              <select
+                style={S.input}
+                value={triggerConfig.actionType}
+                onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ actionType:e.target.value, actionTarget:'', actionLabel:'', actionThumbnail:'' }); }}
+              >
+                <option value="media">Media</option>
+                <option value="devices">Devices</option>
+                <option value="missions">Missions</option>
+              </select>
+            </div>
+
+            <TriggerDropdown
+              label="Action target"
+              openKey={mediaTriggerPicker}
+              setOpenKey={setMediaTriggerPicker}
+              dropdownKey="media-action"
+              options={selectedActionList}
+              selected={selectedAction}
+              onSelect={(opt)=>{ updateMediaTrigger({ actionTarget: opt?.id || '', actionLabel: opt?.label || '', actionThumbnail: opt?.thumbnail || '' }); }}
+            />
+            {resolvedActionPreview && (
+              <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
+                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action preview</div>
+                <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                  <img src={toDirectMediaURL(resolvedActionPreview)} alt="action preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                </div>
+              </div>
+            )}
+
+            <TriggerDropdown
+              label="Trigger Device"
+              openKey={mediaTriggerPicker}
+              setOpenKey={setMediaTriggerPicker}
+              dropdownKey="media-device"
+              options={deviceOptions}
+              selected={selectedDevice}
+              onSelect={(opt)=>{ updateMediaTrigger({ triggerDeviceId: opt?.id || '', triggerDeviceLabel: opt?.label || '' }); }}
+            />
+
+            <TriggerDropdown
+              label="Triggered Response"
+              openKey={mediaTriggerPicker}
+              setOpenKey={setMediaTriggerPicker}
+              dropdownKey="media-response"
+              options={responseOptions}
+              selected={selectedResponse}
+              onSelect={(opt)=>{ updateMediaTrigger({ triggeredResponseKey: opt?.id || '' }); }}
+            />
+
+            <TriggerDropdown
+              label="Triggered Mission"
+              openKey={mediaTriggerPicker}
+              setOpenKey={setMediaTriggerPicker}
+              dropdownKey="media-mission"
+              options={missionOptions}
+              selected={selectedMission}
+              onSelect={(opt)=>{ updateMediaTrigger({ triggeredMissionId: opt?.id || '' }); }}
+            />
+          </>
+        ) : (
+          <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Toggle on to coordinate triggers across media, devices, and missions.</div>
+        )}
+
+        <div style={{ marginTop:16 }}>
+          <div style={{ fontWeight:600, marginBottom:6 }}>Trigger Device Assignments</div>
+          {triggeredDeviceSummaries.length === 0 ? (
+            <div style={{ color:'var(--admin-muted)', fontSize:12 }}>No trigger-enabled devices yet.</div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:10 }}>
+              {triggeredDeviceSummaries.map((it)=>{
+                const preview = it.trigger.actionThumbnail || '';
+                return (
+                  <div key={it.id} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10, display:'grid', gap:8 }}>
+                    <div style={{ fontWeight:600 }}>{it.label}</div>
+                    <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action: {it.trigger.actionLabel || it.trigger.actionTarget || '(none)'}</div>
+                    {preview && (
+                      <div style={{ width:'100%', height:64, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                        <img src={toDirectMediaURL(preview)} alt="trigger preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Icons */}
       <div style={S.card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -2477,21 +3563,21 @@ function IconGroup({ title, items, onRemove }) {
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      {items.length === 0 && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
-          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+          <div key={it.key} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10, display:'grid', gap:6 }}>
             <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
-              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
               <div>
                 <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{it.key}</div>
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=>onRemove(it.key)}
               >
                 Remove
@@ -2509,7 +3595,7 @@ function Pool({ title, items, onRemove }) {
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
         {items.map((it, idx)=>(
-          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+          <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
             <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {it.label || baseNameFromUrl(it.url)}
             </div>
@@ -2517,7 +3603,7 @@ function Pool({ title, items, onRemove }) {
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
               >
                 Remove
@@ -2525,7 +3611,51 @@ function Pool({ title, items, onRemove }) {
             </div>
           </div>
         ))}
-        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+        {items.length===0 && <div style={{ color:'var(--admin-muted)' }}>No items.</div>}
+      </div>
+    </div>
+  );
+}
+
+function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownKey, options = [], selected = null, onSelect = () => {} }) {
+  const isOpen = openKey === dropdownKey;
+  return (
+    <div style={{ marginTop:12 }}>
+      <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>{label}</div>
+      <div style={{ position:'relative' }}>
+        <button
+          type="button"
+          style={{ ...S.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
+          onClick={()=>setOpenKey(isOpen ? '' : dropdownKey)}
+        >
+          <span>{selected ? selected.label : 'Select option'}</span>
+          <span style={{ opacity:0.6 }}>▾</span>
+        </button>
+        {isOpen && (
+          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
+            {options.length === 0 ? (
+              <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
+            ) : options.map(opt => (
+              <div
+                key={opt.id}
+                onClick={()=>{ onSelect(opt); setOpenKey(''); }}
+                style={{ display:'grid', gridTemplateColumns:'56px 1fr', gap:10, alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}
+              >
+                <div style={{ width:56, height:42, borderRadius:8, overflow:'hidden', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
+                  {opt.thumbnail ? (
+                    <img src={toDirectMediaURL(opt.thumbnail)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  ) : (
+                    <div style={{ fontSize:12, color:'var(--admin-muted)' }}>No preview</div>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontWeight:600 }}>{opt.label}</div>
+                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{opt.id}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
