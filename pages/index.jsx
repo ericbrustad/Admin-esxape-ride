@@ -263,6 +263,146 @@ function defaultAppearance() {
     textVertical: 'top',
   };
 }
+function createDeviceDraft(overrides = {}) {
+  return {
+    title: '',
+    type: 'smoke',
+    iconKey: '',
+    pickupRadius: 100,
+    effectSeconds: 120,
+    lat: null,
+    lng: null,
+    ...overrides,
+  };
+}
+const APPEARANCE_SKINS = [
+  {
+    key: 'default',
+    label: 'Default (Agent Dark)',
+    description: 'Classic dark interface used by agents.',
+    appearance: defaultAppearance(),
+  },
+  {
+    key: 'night-ops',
+    label: 'Night Ops',
+    description: 'Deep greens with luminous text for stealth missions.',
+    appearance: {
+      fontFamily: FONT_FAMILIES[0].v,
+      fontSizePx: 24,
+      fontColor: '#eafff2',
+      textBgColor: '#0a2a1a',
+      textBgOpacity: 0.55,
+      screenBgColor: '#04100b',
+      screenBgOpacity: 0.85,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'blueprint',
+    label: 'Blueprint',
+    description: 'Cool blues inspired by heist planning boards.',
+    appearance: {
+      fontFamily: 'Courier New, Courier, monospace',
+      fontSizePx: 20,
+      fontColor: '#c5e1ff',
+      textBgColor: '#021d3a',
+      textBgOpacity: 0.6,
+      screenBgColor: '#03122a',
+      screenBgOpacity: 0.9,
+      screenBgImage: '',
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'neon-grid',
+    label: 'Neon Grid',
+    description: 'Vibrant neon glow with futuristic contrast.',
+    appearance: {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSizePx: 22,
+      fontColor: '#ffe3ff',
+      textBgColor: '#3b0f4e',
+      textBgOpacity: 0.5,
+      screenBgColor: '#0a0216',
+      screenBgOpacity: 0.82,
+      screenBgImage: '',
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'sunset-agent',
+    label: 'Sunset Agent',
+    description: 'Warm cinematic hues with serif typography.',
+    appearance: {
+      fontFamily: 'Georgia, serif',
+      fontSizePx: 24,
+      fontColor: '#ffe8d2',
+      textBgColor: '#7a341a',
+      textBgOpacity: 0.65,
+      screenBgColor: '#2b1309',
+      screenBgOpacity: 0.88,
+      screenBgImage: '',
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'terminal-green',
+    label: 'Terminal Green',
+    description: 'Retro terminal look with glowing matrix text.',
+    appearance: {
+      fontFamily: 'Courier New, Courier, monospace',
+      fontSizePx: 21,
+      fontColor: '#8dff8d',
+      textBgColor: '#021e0c',
+      textBgOpacity: 0.75,
+      screenBgColor: '#010702',
+      screenBgOpacity: 0.95,
+      screenBgImage: '',
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+];
+const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
+
+function isAppearanceEqual(a, b) {
+  if (!a || !b) return false;
+  const keys = [
+    'fontFamily',
+    'fontSizePx',
+    'fontColor',
+    'textBgColor',
+    'textBgOpacity',
+    'screenBgColor',
+    'screenBgOpacity',
+    'screenBgImage',
+    'textAlign',
+    'textVertical',
+  ];
+  return keys.every((key) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === 'number' || typeof bv === 'number') {
+      return Math.abs(Number(av ?? 0) - Number(bv ?? 0)) < 0.0001;
+    }
+    return String(av ?? '') === String(bv ?? '');
+  });
+}
+function detectAppearanceSkin(appearance, fallbackKey) {
+  if (fallbackKey && APPEARANCE_SKIN_MAP.has(fallbackKey)) {
+    const preset = APPEARANCE_SKIN_MAP.get(fallbackKey);
+    if (preset && isAppearanceEqual(appearance, preset.appearance)) return fallbackKey;
+  }
+  for (const skin of APPEARANCE_SKINS) {
+    if (isAppearanceEqual(appearance, skin.appearance)) return skin.key;
+  }
+  return 'custom';
+}
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
 
 /* ───────────────────────── Root ───────────────────────── */
@@ -313,8 +453,9 @@ export default function Admin() {
   const [devSearchQ, setDevSearchQ] = useState('');
   const [devSearching, setDevSearching] = useState(false);
   const [devResults, setDevResults] = useState([]);
-  const [placingDev, setPlacingDev] = useState(false);
-  const [devDraft, setDevDraft] = useState({ title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120, lat:null, lng:null });
+  const [isDeviceEditorOpen, setIsDeviceEditorOpen] = useState(false);
+  const [deviceEditorMode, setDeviceEditorMode] = useState('new');
+  const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
 
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -455,6 +596,8 @@ export default function Admin() {
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
+        merged.appearanceSkin = detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
+
         merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
@@ -480,6 +623,7 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      appearanceSkin: 'default',
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
@@ -723,65 +867,164 @@ export default function Admin() {
     const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
     return it?.url || '';
   }
+  function suggestDeviceId(existing = devices) {
+    const ids = new Set((existing || []).map(d => String(d?.id || '').toLowerCase()));
+    let i = 1;
+    while (ids.has(`d${String(i).padStart(2, '0')}`)) i += 1;
+    return `d${String(i).padStart(2, '0')}`;
+  }
   function addDevice() {
-    setPlacingDev(true);
+    setDeviceEditorMode('new');
+    setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
     setSelectedMissionIdx(null);
-    setDevDraft({
-      title:'', type:'smoke', iconKey:'', pickupRadius:100, effectSeconds:120,
-      lat:Number((config.map?.centerLat ?? 44.9778)),
-      lng:Number((config.map?.centerLng ?? -93.2650))
-    });
+    const baseLat = Number(config.map?.centerLat ?? 44.9778);
+    const baseLng = Number(config.map?.centerLng ?? -93.2650);
+    setDevDraft(createDeviceDraft({
+      lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
+      lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
+    }));
+  }
+  function openDeviceEditor(idx) {
+    if (idx == null) return;
+    const item = devices?.[idx];
+    if (!item) return;
+    setDeviceEditorMode('edit');
+    setIsDeviceEditorOpen(true);
+    setSelectedDevIdx(idx);
+    setSelectedMissionIdx(null);
+    setDevDraft(createDeviceDraft({ ...item }));
+  }
+  function closeDeviceEditor() {
+    setIsDeviceEditorOpen(false);
+    setDeviceEditorMode('new');
+    setDevDraft(createDeviceDraft());
   }
   function saveDraftDevice() {
-    if (devDraft.lat == null || devDraft.lng == null) { setStatus('❌ Click the map or search an address to set device location'); return; }
-    pushHistory();
-    const item = {
-      id: 'd' + String((devices?.length || 0) + 1).padStart(2, '0'),
-      title: devDraft.title || (devDraft.type.charAt(0).toUpperCase()+devDraft.type.slice(1)),
-      type: devDraft.type,
+    const normalized = {
+      title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
+      type: devDraft.type || 'smoke',
       iconKey: devDraft.iconKey || '',
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
-      lat: Number(Number(devDraft.lat).toFixed(6)),
-      lng: Number(Number(devDraft.lng).toFixed(6)),
     };
-    setDevices([...(devices || []), item]);
-    setPlacingDev(false);
-    setSelectedDevIdx((devices?.length || 0));
-    setSelectedMissionIdx(null);
-    setStatus('✅ Device added');
+    if (deviceEditorMode === 'new') {
+      if (devDraft.lat == null || devDraft.lng == null) {
+        setStatus('❌ Click the map or search an address to set device location');
+        return;
+      }
+      const lat = Number(Number(devDraft.lat).toFixed(6));
+      const lng = Number(Number(devDraft.lng).toFixed(6));
+      const list = [...(devices || [])];
+      const item = { id: suggestDeviceId(list), ...normalized, lat, lng };
+      pushHistory();
+      const next = [...list, item];
+      setDevices(next);
+      setSelectedDevIdx(next.length - 1);
+      setSelectedMissionIdx(null);
+      setStatus('✅ Device added');
+      closeDeviceEditor();
+      return;
+    }
+    if (deviceEditorMode === 'edit' && selectedDevIdx != null) {
+      const index = selectedDevIdx;
+      const list = [...(devices || [])];
+      const existing = list[index];
+      if (!existing) return;
+      const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
+      const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
+      pushHistory();
+      list[index] = { ...existing, ...normalized, lat, lng };
+      setDevices(list);
+      setStatus('✅ Device updated');
+      closeDeviceEditor();
+    }
   }
-  function deleteSelectedDevice() {
-    if (selectedDevIdx == null) return;
+  function duplicateDevice(idx) {
+    const list = [...(devices || [])];
+    const src = list[idx];
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = suggestDeviceId(list);
+    copy.title = (src.title || src.id || 'Device') + ' (copy)';
     pushHistory();
-    const list = [...devices];
-    list.splice(selectedDevIdx, 1);
+    list.splice(idx + 1, 0, copy);
     setDevices(list);
-    setSelectedDevIdx(null);
+    const newIndex = idx + 1;
+    setSelectedDevIdx(newIndex);
+    setSelectedMissionIdx(null);
+    setStatus('✅ Device duplicated');
+    setDeviceEditorMode('edit');
+    setIsDeviceEditorOpen(true);
+    setDevDraft(createDeviceDraft({ ...copy }));
   }
-  function duplicateSelectedDevice() {
-    if (selectedDevIdx == null) return;
+  function deleteDevice(idx) {
+    const list = [...(devices || [])];
+    if (idx == null || idx < 0 || idx >= list.length) return;
+    const currentSelected = selectedDevIdx;
     pushHistory();
-    const src = devices[selectedDevIdx]; if (!src) return;
-    const copy = { ...JSON.parse(JSON.stringify(src)) };
-    copy.id = 'd' + String((devices?.length || 0) + 1).padStart(2, '0');
-    setDevices([...(devices || []), copy]);
-    setSelectedDevIdx((devices?.length || 0));
+    list.splice(idx, 1);
+    setDevices(list);
+    if (currentSelected === idx) {
+      setSelectedDevIdx(null);
+      if (isDeviceEditorOpen && deviceEditorMode === 'edit') closeDeviceEditor();
+    } else if (currentSelected != null && currentSelected > idx) {
+      setSelectedDevIdx(currentSelected - 1);
+    }
+    setStatus('✅ Device deleted');
+  }
+  function moveDevice(idx, dir) {
+    const list = [...(devices || [])];
+    if (idx == null || idx < 0 || idx >= list.length) return;
+    const target = idx + dir;
+    if (target < 0 || target >= list.length) return;
+    const [row] = list.splice(idx, 1);
+    list.splice(target, 0, row);
+    pushHistory();
+    setDevices(list);
+    const currentSelected = selectedDevIdx;
+    if (currentSelected === idx) {
+      setSelectedDevIdx(target);
+      if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+        setDevDraft(createDeviceDraft({ ...list[target] }));
+      }
+    } else if (currentSelected === target) {
+      setSelectedDevIdx(idx);
+    }
   }
   function moveSelectedDevice(lat, lng) {
     if (selectedDevIdx == null) return;
+    const list = [...(devices || [])];
+    const existing = list[selectedDevIdx];
+    if (!existing) return;
+    const latFixed = Number(lat.toFixed(6));
+    const lngFixed = Number(lng.toFixed(6));
     pushHistory();
-    const list = [...devices];
-    list[selectedDevIdx] = { ...list[selectedDevIdx], lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+    list[selectedDevIdx] = { ...existing, lat: latFixed, lng: lngFixed };
     setDevices(list);
+    if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+      setDevDraft(d => ({ ...d, lat: latFixed, lng: lngFixed }));
+    }
   }
   function setSelectedDeviceRadius(r) {
     if (selectedDevIdx == null) return;
+    const list = [...(devices || [])];
+    const existing = list[selectedDevIdx];
+    if (!existing) return;
+    const nextRadius = clamp(Number(r || 0), 1, 2000);
     pushHistory();
-    const list = [...devices];
-    list[selectedDevIdx] = { ...list[selectedDevIdx], pickupRadius: clamp(Number(r||0), 1, 2000) };
+    list[selectedDevIdx] = { ...existing, pickupRadius: nextRadius };
     setDevices(list);
+    if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
+      setDevDraft(d => ({ ...d, pickupRadius: nextRadius }));
+    }
+  }
+
+  function applyAppearanceSkin(key) {
+    const preset = APPEARANCE_SKIN_MAP.get(key);
+    if (!preset) return;
+    setConfig(prev => ({ ...prev, appearance: { ...preset.appearance }, appearanceSkin: key }));
+    setStatus(`✅ Applied theme: ${preset.label}`);
   }
 
   // Missions selection operations (Missions tab only)
@@ -835,10 +1078,9 @@ export default function Admin() {
   }
   function applySearchResult(r) {
     const lat = Number(r.lat), lon = Number(r.lon);
-    if (placingDev) {
+    if (isDeviceEditorOpen && deviceEditorMode === 'new') {
       setDevDraft(d => ({ ...d, lat, lng: lon }));
     } else if (selectedDevIdx != null) {
-      pushHistory();
       moveSelectedDevice(lat, lon);
     }
     setDevResults([]);
@@ -938,10 +1180,16 @@ export default function Admin() {
     ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
 
-  const deviceRadiusDisabled = (selectedDevIdx==null && !placingDev);
+  const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
+  const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
+
+  const selectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const selectedAppearanceSkinLabel = selectedAppearanceSkin === 'custom'
+    ? 'Custom (manual edits)'
+    : (APPEARANCE_SKIN_MAP.get(selectedAppearanceSkin)?.label || 'Custom');
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
@@ -1375,27 +1623,62 @@ export default function Admin() {
 
             <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
               <button style={S.button} onClick={addDevice}>+ Add Device</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={duplicateSelectedDevice}>⧉ Duplicate</button>
-              <button style={S.button} disabled={selectedDevIdx==null} onClick={deleteSelectedDevice}>🗑 Delete</button>
-              {(selectedDevIdx!=null) && (
-                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); }}>Clear selection</button>
+              {selectedDevIdx!=null && (
+                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}>Clear selection</button>
               )}
             </div>
 
-            <ul style={{ paddingLeft: 18 }}>
-              {(devices||[]).map((x,i)=>(
-                <li key={x.id||i} style={{ marginBottom:8, display:'flex', alignItems:'center', gap:8 }}>
-                  <code>D{i+1}</code> — {x.title||'(untitled)'} • {x.type} • r {x.pickupRadius}m
-                  {typeof x.lat==='number' && typeof x.lng==='number' ? <> • {x.lat},{x.lng}</> : ' • (not placed)'}
-                  <button
-                    style={{ ...S.button, padding:'6px 10px', marginLeft:'auto', background: selectedDevIdx===i ? '#1a2027' : '#0f1418' }}
-                    onClick={()=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); }}
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(devices||[]).map((x,i)=>{
+                const iconUrl = x.iconKey ? deviceIconUrlFromKey(x.iconKey) : '';
+                const selected = selectedDevIdx === i;
+                const hasCoords = typeof x.lat === 'number' && typeof x.lng === 'number';
+                return (
+                  <div
+                    key={x.id||i}
+                    onClick={()=>openDeviceEditor(i)}
+                    style={{
+                      display:'grid',
+                      gridTemplateColumns:'56px 1fr auto',
+                      gap:12,
+                      alignItems:'center',
+                      padding:12,
+                      borderRadius:12,
+                      border:`1px solid ${selected ? '#2dd4bf55' : '#1f262d'}`,
+                      background:selected ? '#162028' : '#12181d',
+                      cursor:'pointer',
+                    }}
                   >
-                    Select
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <div style={{ width:52, height:52, borderRadius:10, background:'#0b0f11', border:'1px solid #22303c', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                      {iconUrl
+                        ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
+                        : <div style={{ color:'#7a8a99', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
+                    </div>
+                    <div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                        <div style={{ fontWeight:600 }}>{`D${i+1}`} — {x.title || '(untitled)'}</div>
+                        <div style={{ fontSize:12, color:'#9fb0bf' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
+                      </div>
+                      <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+                        <span style={S.chip}>{x.type}</span>
+                        <span style={S.chip}>Radius {x.pickupRadius} m</span>
+                        <span style={S.chip}>Effect {x.effectSeconds}s</span>
+                      </div>
+                    </div>
+                    <div onClick={(e)=>e.stopPropagation()} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Move up" style={{ ...S.button, padding:'6px 10px' }} disabled={i===0} onClick={()=>moveDevice(i,-1)}>▲</button>
+                        <button title="Move down" style={{ ...S.button, padding:'6px 10px' }} disabled={i===(devices?.length||0)-1} onClick={()=>moveDevice(i,+1)}>▼</button>
+                      </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Duplicate" style={{ ...S.button, padding:'6px 10px' }} onClick={()=>duplicateDevice(i)}>⧉</button>
+                        <button title="Delete" style={{ ...S.button, padding:'6px 10px', borderColor:'#7a1f1f', background:'#2a1313' }} onClick={()=>deleteDevice(i)}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
@@ -1436,13 +1719,22 @@ export default function Admin() {
                 />
                 <code style={{ color:'#9fb0bf' }}>
                   {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                   : placingDev ? `New device radius: ${deviceRadiusValue} m`
+                   : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
                    : 'Select a device to adjust radius'}
                 </code>
               </div>
 
-              {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+              {isDeviceEditorOpen && (
+                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12, marginBottom:12 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div>
+                      <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
+                      {deviceEditorMode === 'edit' && devDraft.id && (
+                        <div style={{ fontSize:12, color:'#9fb0bf' }}>ID: {devDraft.id}</div>
+                      )}
+                    </div>
+                    <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
+                  </div>
                   <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                     <div>
                       {devDraft.iconKey
@@ -1466,12 +1758,11 @@ export default function Admin() {
                         onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
                     </Field>
                   </div>
-                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
-                    <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
-                    <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
-                    <div style={{ color:'#9fb0bf' }}>
-                      {devDraft.lat==null ? 'Click the map or search an address to set location' :
-                        <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
+                  <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                    <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
+                    <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location'
+                        : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
                   </div>
                 </div>
@@ -1486,14 +1777,14 @@ export default function Admin() {
                 mapZoom={mapZoom}
                 defaultIconSizePx={defaultPinSize}
                 selectedIconSizePx={selectedPinSize}
-                interactive={placingDev}
-                draftDevice={placingDev ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
+                interactive={isAddingDevice}
+                draftDevice={isAddingDevice ? { lat:devDraft.lat, lng:devDraft.lng, radius:devDraft.pickupRadius } : null}
                 selectedDevIdx={selectedDevIdx}
                 selectedMissionIdx={null}
-                onDraftChange={(lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))}
+                onDraftChange={isAddingDevice ? ((lat,lng)=>setDevDraft(d=>({ ...d, lat, lng }))) : null}
                 onMoveSelected={(lat,lng)=>moveSelectedDevice(lat,lng)}
                 onMoveSelectedMission={null}
-                onSelectDevice={(i)=>{ setSelectedDevIdx(i); setSelectedMissionIdx(null); setPlacingDev(false); }}
+                onSelectDevice={(i)=>{ openDeviceEditor(i); }}
                 onSelectMission={null}
                 readOnly={false}
                 lockToRegion={true}
@@ -1594,8 +1885,59 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
-            <AppearanceEditor value={config.appearance||defaultAppearance()}
-              onChange={(next)=>setConfig({ ...config, appearance:next })}/>
+            <div style={{ marginBottom:12 }}>
+              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:8 }}>Theme skins</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
+                {APPEARANCE_SKINS.map((skin)=>{
+                  const active = selectedAppearanceSkin === skin.key;
+                  const previewBg = skin.appearance.screenBgImage
+                    ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
+                    : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
+                  return (
+                    <button
+                      key={skin.key}
+                      type="button"
+                      onClick={()=>applyAppearanceSkin(skin.key)}
+                      style={{
+                        borderRadius:12,
+                        border:`1px solid ${active ? '#2dd4bf' : '#1f262d'}`,
+                        background: active ? '#162028' : '#0f1418',
+                        padding:12,
+                        textAlign:'left',
+                        color:'#e9eef2',
+                        cursor:'pointer',
+                      }}
+                    >
+                      <div style={{ fontWeight:600 }}>{skin.label}</div>
+                      <div style={{ fontSize:12, color:'#9fb0bf', margin:'4px 0 8px 0' }}>{skin.description}</div>
+                      <div style={{
+                        border:'1px dashed #2a323b',
+                        borderRadius:8,
+                        padding:10,
+                        background: previewBg,
+                        color: skin.appearance.fontColor,
+                        fontFamily: skin.appearance.fontFamily,
+                        fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
+                        textAlign: skin.appearance.textAlign,
+                      }}>
+                        Preview text
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:8, fontSize:12, color:'#9fb0bf' }}>
+                Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
+              </div>
+            </div>
+            <AppearanceEditor
+              value={config.appearance||defaultAppearance()}
+              onChange={(next)=>setConfig(prev => ({
+                ...prev,
+                appearance: next,
+                appearanceSkin: detectAppearanceSkin(next, prev.appearanceSkin),
+              }))}
+            />
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
