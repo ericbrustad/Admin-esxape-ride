@@ -26,6 +26,9 @@ export default function Game() {
   const [backpackOpen, setBackpackOpen] = useState(false);
 
   const { slug, channel } = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { slug: '', channel: 'published' };
+    }
     const u = new URL(window.location.href);
     return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
   }, []);
@@ -76,7 +79,8 @@ export default function Game() {
       title: wasCorrect ? 'Correct!' : 'Try Again',
       message: o.message,
       mediaUrl: o.mediaUrl ? toDirect(o.mediaUrl) : '',
-      audioUrl: o.audioUrl ? toDirect(o.audioUrl) : ''
+      audioUrl: o.audioUrl ? toDirect(o.audioUrl) : '',
+      transcript: (o.transcript || '').trim()
     });
   }
 

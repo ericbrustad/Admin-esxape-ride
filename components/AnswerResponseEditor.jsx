@@ -45,6 +45,15 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         <div style={row}><div style={lab}>Audio (optional)</div>
           <MediaPicker value={oC.audioUrl} onChange={v=>setOC({ audioUrl:v })} list={audios}/>
         </div>
+        <div style={{ ...row, alignItems:'start' }}>
+          <div style={lab}>Transcript / caption</div>
+          <textarea
+            style={{ ...inp, height:72 }}
+            placeholder="Describe the spoken audio or important sounds…"
+            value={oC.transcript || ''}
+            onChange={(e)=>setOC({ transcript: e.target.value })}
+          />
+        </div>
         <div style={row}><div style={lab}>Auto-close after (seconds)</div>
           <input type="number" min={0} max={1200} style={inp} value={Number(oC.durationSeconds||0)}
                  onChange={e=>setOC({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
@@ -65,6 +74,15 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         <div style={row}><div style={lab}>Audio (optional)</div>
           <MediaPicker value={oW.audioUrl} onChange={v=>setOW({ audioUrl:v })} list={audios}/>
         </div>
+        <div style={{ ...row, alignItems:'start' }}>
+          <div style={lab}>Transcript / caption</div>
+          <textarea
+            style={{ ...inp, height:72 }}
+            placeholder="Describe the spoken audio or important sounds…"
+            value={oW.transcript || ''}
+            onChange={(e)=>setOW({ transcript: e.target.value })}
+          />
+        </div>
         <div style={row}><div style={lab}>Auto-close after (seconds)</div>
           <input type="number" min={0} max={1200} style={inp} value={Number(oW.durationSeconds||0)}
                  onChange={e=>setOW({ durationSeconds: Math.max(0, Number(e.target.value||0)) })}/>
@@ -75,7 +93,8 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
       </div>
 
       <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
-        Tip: leave <b>Auto‑close</b> at 0 to require a button click. Button label defaults to “OK”.
+        Tip: leave <b>Auto‑close</b> at 0 to require a button click. Button label defaults to “OK”. Add a transcript so players who
+        cannot hear the audio still understand the response.
       </div>
     </div>
   );

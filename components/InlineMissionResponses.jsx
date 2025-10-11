@@ -86,7 +86,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
       const array = await file.arrayBuffer();
       const b64 = btoa(String.fromCharCode(...new Uint8Array(array)));
       const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      const path = f"public/media/{subfolder}/{int(Date.now())}-{safeName}";
+      const path = `public/media/${subfolder}/${Date.now()}-${safeName}`;
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -198,6 +198,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     const deviceLabel = side.deviceLabel;
     const mediaUrl = side.mediaUrl;
     const audioUrl = side.audioUrl;
+    const transcript = side.transcript || '';
 
     // device options from devices state
     const hasDevices = devices && devices.length > 0;
@@ -358,6 +359,17 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               Or drag & drop a file onto this box to upload and assign.
             </div>
           </div>
+        </div>
+
+        <div style={{ marginTop:12 }}>
+          <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Transcript / caption</div>
+          <textarea
+            style={{ width:'100%', minHeight:72, padding:'8px 10px', borderRadius:8, border:'1px solid #233236', background:'#061217', color:'#e9eef2', resize:'vertical' }}
+            placeholder="Describe what players should know if they cannot hear the audio or see the media."
+            value={transcript}
+            onChange={(e)=>updateSide(sideKey, { transcript: e.target.value })}
+          />
+          <div style={{ fontSize:11, color:'#9fb0bf', marginTop:4 }}>Shown to players as a text alternative for the response.</div>
         </div>
       </div>
     );

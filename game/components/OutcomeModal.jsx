@@ -30,6 +30,15 @@ export default function OutcomeModal({ open, outcome, onClose }) {
         )}
 
         {o.audioUrl && <audio ref={audioRef} src={o.audioUrl} />}
+
+        {o.transcript && (
+          <div style={{ marginTop:12 }}>
+            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:4 }}>Transcript</div>
+            <div style={{ whiteSpace:'pre-wrap', background:'#0b1115', border:'1px solid #1f2329', borderRadius:8, padding:10, color:'#d7e2e6' }}>
+              {o.transcript}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
