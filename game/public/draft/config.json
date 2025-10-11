@@ -65,19 +65,19 @@
     ]
   },
   "appearance": {
-    "fontFamily": "Georgia, serif",
+    "fontFamily": "\"Copperplate\", \"Trebuchet MS\", \"Segoe UI\", sans-serif",
     "fontSizePx": 24,
-    "fontColor": "#2ebd1f",
-    "textBgColor": "#f2faed",
-    "textBgOpacity": 0,
-    "screenBgColor": "#dcedd2",
-    "screenBgOpacity": 1,
-    "screenBgImage": "/media/skins/forest-meadow.svg",
+    "fontColor": "#3b2a16",
+    "textBgColor": "#fff4de",
+    "textBgOpacity": 0.45,
+    "screenBgColor": "#f1ddbc",
+    "screenBgOpacity": 0.2,
+    "screenBgImage": "/media/skins/forest-foliage.svg",
     "screenBgImageEnabled": true,
-    "textAlign": "left",
+    "textAlign": "center",
     "textVertical": "top"
   },
-  "appearanceSkin": "forest-meadow",
+  "appearanceSkin": "military-desert",
   "mediaTriggers": {
     "enabled": false,
     "actionType": "media",
