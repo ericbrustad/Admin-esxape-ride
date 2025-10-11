@@ -1,47 +1,60 @@
 
 :root{
-  --admin-body-bg:#0b0f15;
-  --admin-body-texture:none;
-  --admin-body-texture-size:auto;
-  --admin-body-blend:normal;
-  --admin-body-color:#e9eef2;
-  --admin-muted:#9fb0bf;
-  --admin-accent:#2dd4bf;
-  --admin-font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;
-  --admin-header-bg:#11161a;
-  --admin-header-border:1px solid #1f2329;
-  --admin-panel-bg:#12181d;
-  --admin-panel-border:1px solid rgba(34,48,60,0.9);
-  --admin-panel-shadow:0 0 22px rgba(4,9,14,0.55);
-  --admin-panel-highlight:rgba(45,212,191,0.2);
-  --admin-input-bg:#0b0f15;
-  --admin-input-border:1px solid #22303c;
-  --admin-input-color:#e9eef2;
-  --admin-button-bg:#1a2027;
-  --admin-button-border:1px solid #2a323b;
-  --admin-button-color:#e9eef2;
-  --admin-button-hover:rgba(45,212,191,0.18);
-  --admin-tab-bg:#0f1418;
-  --admin-tab-active-bg:#1a2027;
-  --admin-chip-bg:#0f1418;
-  --admin-chip-border:1px solid #2a323b;
-  --admin-danger-bg:#2a1313;
-  --admin-danger-border:1px solid #7a1f1f;
-  --admin-success-bg:#103217;
-  --admin-success-border:1px solid #1d5c2a;
-  --admin-success-color:#34f5c5;
-  --admin-danger-color:#ff6b6b;
-  --admin-border-soft:#1f262d;
-  --admin-divider:#1f262d;
-  --admin-glass-sheen:inset 0 0 0 1px rgba(255,255,255,0.05);
+  --admin-body-bg:#e8eff7;
+  --admin-body-texture:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.85), transparent 65%),
+    linear-gradient(135deg, rgba(230,239,249,0.8), rgba(208,220,234,0.6)),
+    url('/media/skins/control-fabric.svg');
+  --admin-body-texture-size:cover,cover,320px 320px;
+  --admin-body-repeat:no-repeat,no-repeat,repeat;
+  --admin-body-position:center,center,center;
+  --admin-body-blend:overlay,soft-light,normal;
+  --admin-body-color:#162433;
+  --admin-muted:#5e7186;
+  --admin-accent:#3c82ff;
+  --admin-font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,Helvetica,sans-serif;
+  --admin-header-bg:rgba(248,250,253,0.92);
+  --admin-header-border:1px solid rgba(158,180,204,0.5);
+  --admin-panel-bg:rgba(252,253,255,0.95);
+  --admin-panel-border:1px solid rgba(168,188,210,0.6);
+  --admin-panel-shadow:0 18px 32px rgba(28,48,74,0.16);
+  --admin-panel-highlight:rgba(255,255,255,0.75);
+  --admin-panel-surface:linear-gradient(140deg, rgba(255,255,255,0.95), rgba(220,230,244,0.75)), url('/media/skins/control-fabric.svg');
+  --admin-panel-texture-size:auto,280px 280px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(188,206,228,0.9), rgba(255,255,255,0.95));
+  --admin-piping-shadow:0 16px 26px rgba(27,46,72,0.18);
+  --admin-input-bg:rgba(255,255,255,0.92);
+  --admin-input-border:1px solid rgba(158,180,204,0.6);
+  --admin-input-color:#162433;
+  --admin-button-bg:linear-gradient(135deg, rgba(84,132,196,0.95), rgba(54,94,156,0.95));
+  --admin-button-border:1px solid rgba(106,152,210,0.8);
+  --admin-button-color:#f7faff;
+  --admin-button-hover:rgba(84,132,196,0.22);
+  --admin-tab-bg:rgba(235,242,250,0.9);
+  --admin-tab-active-bg:rgba(214,226,241,0.95);
+  --admin-chip-bg:rgba(234,240,249,0.92);
+  --admin-chip-border:1px solid rgba(160,182,208,0.55);
+  --admin-danger-bg:rgba(255,230,230,0.95);
+  --admin-danger-border:1px solid rgba(214,128,128,0.6);
+  --admin-success-bg:rgba(224,245,236,0.95);
+  --admin-success-border:1px solid rgba(132,200,168,0.6);
+  --admin-success-color:#13624a;
+  --admin-danger-color:#a83232;
+  --admin-border-soft:rgba(156,180,204,0.55);
+  --admin-divider:rgba(156,180,204,0.45);
+  --admin-glass-sheen:inset 0 0 0 1px rgba(255,255,255,0.4);
 }
 *{box-sizing:border-box}
 html,body,#__next{height:100%}
 body{
   margin:0;
-  background:var(--admin-body-bg);
+  background-color:var(--admin-body-bg);
   background-image:var(--admin-body-texture);
   background-size:var(--admin-body-texture-size);
+  background-repeat:var(--admin-body-repeat,repeat);
+  background-position:var(--admin-body-position,center);
   background-blend-mode:var(--admin-body-blend);
   color:var(--admin-body-color);
   font-family:var(--admin-font-family);
@@ -50,10 +63,26 @@ body{
 .card{
   position:relative;
   background:var(--admin-panel-bg);
+  background-image:var(--admin-panel-surface);
+  background-size:var(--admin-panel-texture-size,auto);
+  background-repeat:var(--admin-panel-repeat,no-repeat);
+  background-blend-mode:var(--admin-panel-blend,normal);
   border:var(--admin-panel-border);
   border-radius:14px;
   padding:16px;
   box-shadow:var(--admin-panel-shadow);
+  z-index:0;
+}
+.card::before{
+  content:"";
+  position:absolute;
+  inset:-6px;
+  border-radius:calc(14px + 8px);
+  background:var(--admin-piping);
+  opacity:var(--admin-piping-opacity,0.85);
+  box-shadow:var(--admin-piping-shadow);
+  pointer-events:none;
+  z-index:-1;
 }
 .card::after{
   content:"";
@@ -61,7 +90,8 @@ body{
   inset:1px;
   border-radius:inherit;
   border:1px solid var(--admin-panel-highlight);
-  opacity:0.3;
+  opacity:0.55;
+  mix-blend-mode:screen;
   pointer-events:none;
 }
 .hint{color:var(--admin-muted);font-size:14px}
@@ -96,165 +126,232 @@ h1,h2,h3{margin:0 0 8px 0}
 .sample{margin-top:6px;padding:8px;border:1px dashed var(--admin-chip-border-color,#2a323b);border-radius:6px}
 
 body[data-skin="space-military"]{
-  --admin-body-bg:#06090f;
+  --admin-body-bg:#eef3fb;
   --admin-body-texture:
-    radial-gradient(circle at 20% 20%, rgba(120,160,190,0.12), transparent 55%),
-    radial-gradient(circle at 80% 10%, rgba(50,100,160,0.25), transparent 60%),
-    repeating-linear-gradient(45deg, rgba(80,100,120,0.18) 0, rgba(80,100,120,0.18) 2px, transparent 2px, transparent 6px);
-  --admin-body-texture-size:cover;
-  --admin-body-blend:screen;
-  --admin-body-color:#e6f3ff;
-  --admin-muted:#96b4d2;
-  --admin-accent:#6cf2ff;
+    linear-gradient(140deg, rgba(255,255,255,0.92), rgba(212,224,240,0.7)),
+    url('/media/skins/space-metal.svg');
+  --admin-body-texture-size:cover,340px 340px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#14253a;
+  --admin-muted:#4a607c;
+  --admin-accent:#2da8ff;
   --admin-font-family:'Orbitron','Rajdhani','Segoe UI',sans-serif;
-  --admin-header-bg:rgba(10,18,26,0.92);
-  --admin-header-border:1px solid rgba(120,200,255,0.35);
-  --admin-panel-bg:rgba(8,14,20,0.88);
-  --admin-panel-border:1px solid rgba(90,140,190,0.6);
-  --admin-panel-highlight:rgba(180,240,255,0.4);
-  --admin-panel-shadow:0 0 28px rgba(20,40,70,0.7);
-  --admin-input-bg:rgba(4,10,16,0.8);
-  --admin-input-border:1px solid rgba(100,170,210,0.45);
-  --admin-button-bg:linear-gradient(135deg, rgba(40,70,110,0.85), rgba(20,34,52,0.9));
-  --admin-button-border:1px solid rgba(120,200,255,0.6);
-  --admin-button-hover:rgba(120,200,255,0.2);
-  --admin-chip-bg:rgba(10,22,36,0.85);
-  --admin-chip-border:1px solid rgba(108,180,220,0.5);
-  --admin-danger-bg:rgba(70,20,24,0.88);
-  --admin-danger-border:1px solid rgba(255,92,92,0.6);
-  --admin-success-bg:rgba(20,68,60,0.88);
-  --admin-success-border:1px solid rgba(92,255,211,0.55);
-  --admin-border-soft:rgba(70,110,150,0.55);
-  --admin-divider:rgba(90,130,170,0.45);
+  --admin-header-bg:rgba(245,249,255,0.94);
+  --admin-header-border:1px solid rgba(140,174,216,0.55);
+  --admin-panel-bg:rgba(248,251,255,0.96);
+  --admin-panel-border:1px solid rgba(136,172,218,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.8);
+  --admin-panel-shadow:0 20px 34px rgba(36,62,96,0.22);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.95), rgba(208,222,240,0.75)), url('/media/skins/space-metal.svg');
+  --admin-panel-texture-size:auto,320px 320px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(120,178,232,0.9), rgba(255,255,255,0.95));
+  --admin-piping-shadow:0 18px 34px rgba(34,58,90,0.2);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(138,176,216,0.65);
+  --admin-input-color:#14253a;
+  --admin-button-bg:linear-gradient(138deg, rgba(86,136,204,0.96), rgba(42,84,154,0.96));
+  --admin-button-border:1px solid rgba(118,174,226,0.8);
+  --admin-button-color:#f3f9ff;
+  --admin-button-hover:rgba(116,176,232,0.28);
+  --admin-tab-bg:rgba(228,238,250,0.92);
+  --admin-tab-active-bg:rgba(210,226,244,0.96);
+  --admin-chip-bg:rgba(228,238,250,0.92);
+  --admin-chip-border:1px solid rgba(140,180,224,0.6);
+  --admin-danger-bg:rgba(255,230,236,0.94);
+  --admin-danger-border:1px solid rgba(206,120,150,0.6);
+  --admin-success-bg:rgba(222,246,236,0.95);
+  --admin-success-border:1px solid rgba(130,200,170,0.6);
+  --admin-success-color:#0f6a52;
+  --admin-danger-color:#b64456;
+  --admin-border-soft:rgba(136,172,218,0.55);
+  --admin-divider:rgba(136,172,218,0.45);
 }
 
 body[data-skin="military-desert"]{
-  --admin-body-bg:#2b2316;
+  --admin-body-bg:#f8edd4;
   --admin-body-texture:
-    linear-gradient(rgba(91,74,46,0.35), rgba(91,74,46,0.35)),
-    repeating-linear-gradient(25deg, rgba(210,180,120,0.25) 0, rgba(210,180,120,0.25) 8px, transparent 8px, transparent 14px),
-    radial-gradient(circle at 30% 70%, rgba(240,210,150,0.18), transparent 55%);
-  --admin-body-texture-size:cover;
-  --admin-body-color:#f4e4c0;
-  --admin-muted:#d9c9a2;
-  --admin-accent:#ffbf60;
+    linear-gradient(160deg, rgba(255,250,236,0.9), rgba(241,218,168,0.7)),
+    url('/media/skins/desert-canvas.svg');
+  --admin-body-texture-size:cover,360px 360px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#3c2b14;
+  --admin-muted:#876a3d;
+  --admin-accent:#c98f37;
   --admin-font-family:'Copperplate','Trebuchet MS','Segoe UI',sans-serif;
-  --admin-header-bg:rgba(54,45,30,0.92);
-  --admin-header-border:1px solid rgba(255,188,104,0.4);
-  --admin-panel-bg:rgba(63,51,33,0.92);
-  --admin-panel-border:1px solid rgba(226,190,120,0.55);
-  --admin-panel-highlight:rgba(255,235,185,0.3);
-  --admin-panel-shadow:0 0 24px rgba(48,36,22,0.85);
-  --admin-input-bg:rgba(45,35,20,0.8);
-  --admin-input-border:1px solid rgba(226,190,120,0.45);
-  --admin-button-bg:linear-gradient(135deg, rgba(138,105,60,0.85), rgba(90,62,26,0.9));
-  --admin-button-border:1px solid rgba(255,208,132,0.55);
-  --admin-button-hover:rgba(255,199,120,0.25);
-  --admin-chip-bg:rgba(68,52,30,0.85);
-  --admin-chip-border:1px solid rgba(255,210,150,0.45);
-  --admin-danger-bg:rgba(112,42,26,0.9);
-  --admin-danger-border:1px solid rgba(255,128,96,0.6);
-  --admin-success-bg:rgba(66,92,54,0.88);
-  --admin-success-border:1px solid rgba(198,255,156,0.55);
-  --admin-border-soft:rgba(226,190,120,0.4);
-  --admin-divider:rgba(226,190,120,0.35);
+  --admin-header-bg:rgba(255,248,230,0.94);
+  --admin-header-border:1px solid rgba(206,168,108,0.55);
+  --admin-panel-bg:rgba(255,249,236,0.96);
+  --admin-panel-border:1px solid rgba(210,176,118,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 34px rgba(120,92,52,0.25);
+  --admin-panel-surface:linear-gradient(155deg, rgba(255,255,255,0.96), rgba(244,224,180,0.78)), url('/media/skins/desert-canvas.svg');
+  --admin-panel-texture-size:auto,340px 340px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(220,182,116,0.9), rgba(255,242,210,0.95));
+  --admin-piping-shadow:0 18px 32px rgba(120,88,52,0.22);
+  --admin-input-bg:rgba(255,252,239,0.94);
+  --admin-input-border:1px solid rgba(206,168,108,0.65);
+  --admin-input-color:#3c2b14;
+  --admin-button-bg:linear-gradient(140deg, rgba(198,146,74,0.96), rgba(158,104,44,0.96));
+  --admin-button-border:1px solid rgba(214,172,102,0.75);
+  --admin-button-color:#fffaf1;
+  --admin-button-hover:rgba(210,164,94,0.3);
+  --admin-tab-bg:rgba(246,232,204,0.92);
+  --admin-tab-active-bg:rgba(236,220,194,0.95);
+  --admin-chip-bg:rgba(246,232,204,0.92);
+  --admin-chip-border:1px solid rgba(210,176,118,0.6);
+  --admin-danger-bg:rgba(255,228,218,0.94);
+  --admin-danger-border:1px solid rgba(206,120,80,0.6);
+  --admin-success-bg:rgba(232,246,222,0.94);
+  --admin-success-border:1px solid rgba(156,204,132,0.6);
+  --admin-success-color:#2f6a42;
+  --admin-danger-color:#a54a2c;
+  --admin-border-soft:rgba(210,176,118,0.55);
+  --admin-divider:rgba(210,176,118,0.45);
 }
 
 body[data-skin="forest-outpost"]{
-  --admin-body-bg:#111d14;
+  --admin-body-bg:#e5f3e2;
   --admin-body-texture:
-    radial-gradient(circle at 10% 20%, rgba(64,110,65,0.25), transparent 60%),
-    radial-gradient(circle at 80% 50%, rgba(130,180,110,0.2), transparent 55%),
-    repeating-linear-gradient(120deg, rgba(60,45,30,0.18) 0, rgba(60,45,30,0.18) 5px, transparent 5px, transparent 12px);
-  --admin-body-texture-size:cover;
-  --admin-body-color:#e4f2dd;
-  --admin-muted:#b7d1b0;
-  --admin-accent:#8df28b;
+    linear-gradient(160deg, rgba(255,255,255,0.9), rgba(206,232,201,0.75)),
+    url('/media/skins/forest-foliage.svg');
+  --admin-body-texture-size:cover,320px 320px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#1f2e1c;
+  --admin-muted:#5a7a55;
+  --admin-accent:#4fa460;
   --admin-font-family:'Merriweather Sans','Gill Sans','Segoe UI',sans-serif;
-  --admin-header-bg:rgba(16,32,20,0.9);
-  --admin-header-border:1px solid rgba(140,220,150,0.35);
-  --admin-panel-bg:rgba(20,36,24,0.92);
-  --admin-panel-border:1px solid rgba(110,170,110,0.55);
-  --admin-panel-highlight:rgba(180,255,190,0.35);
-  --admin-panel-shadow:0 0 26px rgba(20,45,24,0.7);
-  --admin-input-bg:rgba(12,24,15,0.85);
-  --admin-input-border:1px solid rgba(120,190,120,0.45);
-  --admin-button-bg:linear-gradient(140deg, rgba(60,110,60,0.85), rgba(34,68,40,0.9));
-  --admin-button-border:1px solid rgba(170,255,190,0.5);
-  --admin-button-hover:rgba(150,255,170,0.22);
-  --admin-chip-bg:rgba(28,48,30,0.88);
-  --admin-chip-border:1px solid rgba(150,220,150,0.45);
-  --admin-danger-bg:rgba(96,38,38,0.88);
-  --admin-danger-border:1px solid rgba(255,120,120,0.55);
-  --admin-success-bg:rgba(42,90,52,0.9);
-  --admin-success-border:1px solid rgba(140,255,160,0.55);
-  --admin-border-soft:rgba(110,170,120,0.5);
-  --admin-divider:rgba(120,180,120,0.4);
+  --admin-header-bg:rgba(244,252,240,0.94);
+  --admin-header-border:1px solid rgba(154,200,140,0.55);
+  --admin-panel-bg:rgba(246,253,242,0.96);
+  --admin-panel-border:1px solid rgba(152,198,138,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 34px rgba(58,92,58,0.24);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.96), rgba(214,236,206,0.78)), url('/media/skins/forest-foliage.svg');
+  --admin-panel-texture-size:auto,300px 300px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(158,202,140,0.9), rgba(255,255,255,0.95));
+  --admin-piping-shadow:0 18px 32px rgba(56,90,56,0.22);
+  --admin-input-bg:rgba(250,255,248,0.94);
+  --admin-input-border:1px solid rgba(150,198,138,0.65);
+  --admin-input-color:#1f2e1c;
+  --admin-button-bg:linear-gradient(140deg, rgba(104,162,108,0.96), rgba(70,120,78,0.96));
+  --admin-button-border:1px solid rgba(136,198,132,0.75);
+  --admin-button-color:#f6fff4;
+  --admin-button-hover:rgba(130,200,130,0.32);
+  --admin-tab-bg:rgba(224,242,220,0.92);
+  --admin-tab-active-bg:rgba(212,232,206,0.95);
+  --admin-chip-bg:rgba(224,242,220,0.92);
+  --admin-chip-border:1px solid rgba(152,198,138,0.6);
+  --admin-danger-bg:rgba(255,226,222,0.94);
+  --admin-danger-border:1px solid rgba(198,104,92,0.6);
+  --admin-success-bg:rgba(218,244,220,0.94);
+  --admin-success-border:1px solid rgba(128,196,120,0.6);
+  --admin-success-color:#2f6e42;
+  --admin-danger-color:#a04538;
+  --admin-border-soft:rgba(152,198,138,0.55);
+  --admin-divider:rgba(152,198,138,0.45);
 }
 
 body[data-skin="starfield"]{
-  --admin-body-bg:#030516;
+  --admin-body-bg:#f1f3ff;
   --admin-body-texture:
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.22) 0, transparent 50%),
-    radial-gradient(circle at 80% 40%, rgba(120,180,255,0.18) 0, transparent 55%),
-    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="none"/%3E%3Ccircle cx="40" cy="70" r="1.8" fill="rgba(255,255,255,0.65)"/%3E%3Ccircle cx="120" cy="20" r="1.2" fill="rgba(188,210,255,0.8)"/%3E%3Ccircle cx="170" cy="150" r="1.4" fill="rgba(255,255,255,0.75)"/%3E%3Ccircle cx="60" cy="160" r="1.1" fill="rgba(150,200,255,0.65)"/%3E%3Ccircle cx="180" cy="60" r="1.6" fill="rgba(255,255,255,0.6)"/%3E%3C/svg%3E');
-  --admin-body-texture-size:auto,auto,200px 200px;
-  --admin-body-blend:screen;
-  --admin-body-color:#dbe9ff;
-  --admin-muted:#9ab6ff;
-  --admin-accent:#86f0ff;
+    linear-gradient(150deg, rgba(255,255,255,0.92), rgba(214,220,246,0.75)),
+    url('/media/skins/starfield-soft.svg');
+  --admin-body-texture-size:cover,360px 360px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#1f2646;
+  --admin-muted:#53608a;
+  --admin-accent:#5c82ff;
   --admin-font-family:'Exo 2','Segoe UI',sans-serif;
-  --admin-header-bg:rgba(7,10,28,0.9);
-  --admin-header-border:1px solid rgba(140,200,255,0.45);
-  --admin-panel-bg:rgba(6,12,34,0.9);
-  --admin-panel-border:1px solid rgba(110,150,255,0.55);
-  --admin-panel-highlight:rgba(180,220,255,0.45);
-  --admin-panel-shadow:0 0 30px rgba(20,40,120,0.65);
-  --admin-input-bg:rgba(8,12,24,0.85);
-  --admin-input-border:1px solid rgba(130,170,255,0.45);
-  --admin-button-bg:linear-gradient(150deg, rgba(40,60,140,0.85), rgba(24,32,88,0.9));
-  --admin-button-border:1px solid rgba(160,210,255,0.55);
-  --admin-button-hover:rgba(140,200,255,0.25);
-  --admin-chip-bg:rgba(10,18,42,0.9);
-  --admin-chip-border:1px solid rgba(150,190,255,0.45);
-  --admin-danger-bg:rgba(92,30,50,0.9);
-  --admin-danger-border:1px solid rgba(255,120,160,0.55);
-  --admin-success-bg:rgba(32,90,110,0.9);
-  --admin-success-border:1px solid rgba(132,230,240,0.55);
-  --admin-border-soft:rgba(130,170,255,0.5);
-  --admin-divider:rgba(130,170,255,0.4);
+  --admin-header-bg:rgba(248,249,255,0.94);
+  --admin-header-border:1px solid rgba(158,176,224,0.55);
+  --admin-panel-bg:rgba(250,251,255,0.96);
+  --admin-panel-border:1px solid rgba(156,178,226,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 34px rgba(54,72,128,0.22);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.95), rgba(214,222,248,0.78)), url('/media/skins/starfield-soft.svg');
+  --admin-panel-texture-size:auto,340px 340px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(168,184,240,0.92), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 32px rgba(48,62,110,0.22);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(160,180,228,0.65);
+  --admin-input-color:#1f2646;
+  --admin-button-bg:linear-gradient(140deg, rgba(102,132,220,0.96), rgba(70,94,170,0.96));
+  --admin-button-border:1px solid rgba(148,176,238,0.75);
+  --admin-button-color:#f5f8ff;
+  --admin-button-hover:rgba(138,168,232,0.3);
+  --admin-tab-bg:rgba(228,234,252,0.92);
+  --admin-tab-active-bg:rgba(214,224,248,0.95);
+  --admin-chip-bg:rgba(228,234,252,0.92);
+  --admin-chip-border:1px solid rgba(160,184,236,0.6);
+  --admin-danger-bg:rgba(255,228,236,0.94);
+  --admin-danger-border:1px solid rgba(206,124,154,0.6);
+  --admin-success-bg:rgba(226,240,252,0.94);
+  --admin-success-border:1px solid rgba(132,194,226,0.6);
+  --admin-success-color:#1f5c74;
+  --admin-danger-color:#a24354;
+  --admin-border-soft:rgba(160,184,236,0.55);
+  --admin-divider:rgba(160,184,236,0.45);
 }
 
 body[data-skin="cartoon-bubbles"]{
-  --admin-body-bg:#251036;
+  --admin-body-bg:#fdf3ff;
   --admin-body-texture:
-    radial-gradient(circle at 15% 20%, rgba(255,182,253,0.35), transparent 55%),
-    radial-gradient(circle at 80% 25%, rgba(140,210,255,0.28), transparent 60%),
-    radial-gradient(circle at 40% 75%, rgba(255,230,150,0.3), transparent 62%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.25) 0 8px, transparent 8px 20px);
-  --admin-body-texture-size:cover,cover,cover,120px 120px;
-  --admin-body-blend:screen;
-  --admin-body-color:#ffeefe;
-  --admin-muted:#ffd7ff;
-  --admin-accent:#ff99f5;
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.9), rgba(255,240,255,0.6)),
+    radial-gradient(circle at 80% 10%, rgba(240,224,255,0.6), rgba(224,208,255,0.4)),
+    url('/media/skins/cartoon-balloons.svg');
+  --admin-body-texture-size:cover,cover,360px 360px;
+  --admin-body-repeat:no-repeat,no-repeat,repeat;
+  --admin-body-position:center,center,center;
+  --admin-body-blend:screen,screen,normal;
+  --admin-body-color:#4a2a6c;
+  --admin-muted:#7a569f;
+  --admin-accent:#ff71d3;
   --admin-font-family:'Baloo 2','Comic Sans MS','Segoe UI',sans-serif;
-  --admin-header-bg:rgba(48,18,72,0.92);
-  --admin-header-border:1px solid rgba(255,200,255,0.45);
-  --admin-panel-bg:rgba(60,22,88,0.92);
-  --admin-panel-border:1px solid rgba(255,180,255,0.6);
-  --admin-panel-highlight:rgba(255,255,255,0.5);
-  --admin-panel-shadow:0 0 26px rgba(74,20,114,0.75);
-  --admin-input-bg:rgba(48,20,72,0.9);
-  --admin-input-border:1px solid rgba(255,200,255,0.5);
-  --admin-button-bg:linear-gradient(150deg, rgba(255,156,219,0.9), rgba(158,108,255,0.9));
-  --admin-button-border:1px solid rgba(255,220,255,0.6);
-  --admin-button-hover:rgba(255,255,255,0.35);
-  --admin-chip-bg:rgba(74,30,110,0.9);
-  --admin-chip-border:1px solid rgba(255,210,255,0.6);
-  --admin-danger-bg:rgba(150,34,60,0.9);
-  --admin-danger-border:1px solid rgba(255,130,170,0.55);
-  --admin-success-bg:rgba(70,140,120,0.9);
-  --admin-success-border:1px solid rgba(170,255,230,0.55);
-  --admin-border-soft:rgba(255,200,255,0.5);
-  --admin-divider:rgba(255,210,255,0.45);
+  --admin-header-bg:rgba(255,246,255,0.94);
+  --admin-header-border:1px solid rgba(214,168,244,0.55);
+  --admin-panel-bg:rgba(255,248,255,0.96);
+  --admin-panel-border:1px solid rgba(210,168,244,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.85);
+  --admin-panel-shadow:0 20px 32px rgba(110,78,150,0.22);
+  --admin-panel-surface:linear-gradient(160deg, rgba(255,255,255,0.96), rgba(242,210,255,0.78)), url('/media/skins/cartoon-balloons.svg');
+  --admin-panel-texture-size:auto,340px 340px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:screen,normal;
+  --admin-piping:linear-gradient(135deg, rgba(238,176,255,0.92), rgba(255,255,255,0.98));
+  --admin-piping-shadow:0 18px 30px rgba(114,72,150,0.2);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(214,168,244,0.65);
+  --admin-input-color:#4a2a6c;
+  --admin-button-bg:linear-gradient(145deg, rgba(255,158,226,0.96), rgba(162,132,255,0.96));
+  --admin-button-border:1px solid rgba(238,186,255,0.8);
+  --admin-button-color:#fff6ff;
+  --admin-button-hover:rgba(255,210,255,0.32);
+  --admin-tab-bg:rgba(244,226,255,0.92);
+  --admin-tab-active-bg:rgba(234,214,255,0.95);
+  --admin-chip-bg:rgba(244,226,255,0.92);
+  --admin-chip-border:1px solid rgba(214,168,244,0.6);
+  --admin-danger-bg:rgba(255,220,232,0.94);
+  --admin-danger-border:1px solid rgba(214,108,154,0.6);
+  --admin-success-bg:rgba(234,250,244,0.94);
+  --admin-success-border:1px solid rgba(172,214,192,0.6);
+  --admin-success-color:#2f7a62;
+  --admin-danger-color:#b44a6c;
+  --admin-border-soft:rgba(214,168,244,0.55);
+  --admin-divider:rgba(214,168,244,0.45);
 }
