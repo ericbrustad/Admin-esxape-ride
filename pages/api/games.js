@@ -64,11 +64,13 @@ function defaultSuite(title, type) {
   };
 }
 
-function defaultConfig(title, gameType, mode = 'single') {
+function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
+  const normSlug = (slugTag || slugify(title)).toLowerCase();
+  const tags = normSlug ? [normSlug] : [];
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
-    game: { title, type: gameType || 'Mystery' },
+    game: { title, type: gameType || 'Mystery', tags, coverImage: '' },
     forms: { players },              // 1 | 2 | 4
     textRules: []
   };
@@ -105,7 +107,7 @@ export default async function handler(req, res) {
 
       // create suite + config
       const suite  = defaultSuite(title, type);
-      const config = defaultConfig(title, type, mode);
+      const config = defaultConfig(title, type, mode, slug);
 
       await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
         `feat: create game ${slug} missions.json`);
