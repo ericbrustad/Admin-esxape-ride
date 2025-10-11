@@ -1,4 +1,6 @@
 // pages/api/save-publish.js
+import { GAME_ENABLED } from '../../lib/game-switch.js';
+
 export const config = { api: { bodyParser: true } };
 
 const {
@@ -92,18 +94,20 @@ export default async function handler(req, res) {
     wrote.push(rootDraftM, rootDraftC);
 
     // Draft (Game) for TEST channel
-    const gameDraftM = joinPath(`game/public/games/${slug}/draft/missions.json`);
-    const gameDraftC = joinPath(`game/public/games/${slug}/draft/config.json`);
-    await putFileWithRetry(gameDraftM, missionsText, `save+publish(game draft missions): ${slug}`);
-    await putFileWithRetry(gameDraftC, configText, `save+publish(game draft config): ${slug}`);
-    wrote.push(gameDraftM, gameDraftC);
+    if (GAME_ENABLED) {
+      const gameDraftM = joinPath(`game/public/games/${slug}/draft/missions.json`);
+      const gameDraftC = joinPath(`game/public/games/${slug}/draft/config.json`);
+      await putFileWithRetry(gameDraftM, missionsText, `save+publish(game draft missions): ${slug}`);
+      await putFileWithRetry(gameDraftC, configText, `save+publish(game draft config): ${slug}`);
+      wrote.push(gameDraftM, gameDraftC);
 
-    // PUBLISHED (Game live)
-    const gamePubM = joinPath(`game/public/games/${slug}/missions.json`);
-    const gamePubC = joinPath(`game/public/games/${slug}/config.json`);
-    await putFileWithRetry(gamePubM, missionsText, `publish(${slug}): game missions.json`);
-    await putFileWithRetry(gamePubC, configText, `publish(${slug}): game config.json`);
-    wrote.push(gamePubM, gamePubC);
+      // PUBLISHED (Game live)
+      const gamePubM = joinPath(`game/public/games/${slug}/missions.json`);
+      const gamePubC = joinPath(`game/public/games/${slug}/config.json`);
+      await putFileWithRetry(gamePubM, missionsText, `publish(${slug}): game missions.json`);
+      await putFileWithRetry(gamePubC, configText, `publish(${slug}): game config.json`);
+      wrote.push(gamePubM, gamePubC);
+    }
 
     let version = '';
     try { version = JSON.parse(missionsText)?.version || ''; } catch {}

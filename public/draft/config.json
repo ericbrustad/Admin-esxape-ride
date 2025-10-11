@@ -67,19 +67,19 @@
   "appearance": {
     "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
     "fontSizePx": 24,
-    "fontColor": "#1f2d1f",
-    "textBgColor": "#edf8e6",
-    "textBgOpacity": 0.74,
-    "screenBgColor": "#d4ebcc",
-    "screenBgOpacity": 0.54,
+    "fontColor": "#f8fafc",
+    "textBgColor": "#0f172a",
+    "textBgOpacity": 0.88,
+    "screenBgColor": "#020617",
+    "screenBgOpacity": 0.9,
     "screenBgImage": "/media/skins/forest-foliage.svg",
-    "screenBgImageEnabled": true,
+    "screenBgImageEnabled": false,
     "textAlign": "left",
     "textVertical": "top",
     "panelDepth": true
   },
   "appearanceSkin": "forest-outpost",
-  "appearanceTone": "light",
+  "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
     "actionType": "media",
@@ -103,18 +103,18 @@
     "splash": {
       "fontFamily": "Georgia, serif",
       "fontSize": 24,
-      "textColor": "#100f10",
+      "textColor": "#f1f5f9",
       "align": "left",
-      "backgroundColor": "#e6eaf9",
+      "backgroundColor": "#0f172a",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     },
     "missionDefault": {
       "fontFamily": "system-ui, Arial, sans-serif",
       "fontSize": 18,
-      "textColor": "#ffffff",
+      "textColor": "#f8fafc",
       "align": "center",
-      "backgroundColor": "#0b0c10",
+      "backgroundColor": "#111827",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }

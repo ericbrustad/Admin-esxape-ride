@@ -1,6 +1,7 @@
 // pages/api/save-bundle.js
 // Safely write missions.json + config.json (admin + game copies) in sequence
 // to avoid GitHub 409 "expected <sha>" conflicts.
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
@@ -72,12 +73,21 @@ export default async function handler(req, res) {
       cGame:  `game/public/games/${slug}/draft/config.json`,
     };
 
-    await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
-    await putFile(paths.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin)`);
-    await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
-    await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
+    const wrote = [];
 
-    res.status(200).json({ ok: true, wrote: Object.values(paths) });
+    await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
+    wrote.push(paths.mAdmin);
+    await putFile(paths.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin)`);
+    wrote.push(paths.cAdmin);
+
+    if (GAME_ENABLED) {
+      await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
+      wrote.push(paths.mGame);
+      await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
+      wrote.push(paths.cGame);
+    }
+
+    res.status(200).json({ ok: true, wrote });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }

@@ -20,18 +20,18 @@
     "splash": {
       "fontFamily": "Georgia, serif",
       "fontSize": 24,
-      "textColor": "#100f10",
+      "textColor": "#f1f5f9",
       "align": "left",
-      "backgroundColor": "#e6eaf9",
+      "backgroundColor": "#0f172a",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     },
     "missionDefault": {
       "fontFamily": "system-ui, Arial, sans-serif",
       "fontSize": 18,
-      "textColor": "#ffffff",
+      "textColor": "#f8fafc",
       "align": "center",
-      "backgroundColor": "#0b0c10",
+      "backgroundColor": "#111827",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }

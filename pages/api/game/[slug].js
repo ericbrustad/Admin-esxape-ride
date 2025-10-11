@@ -1,4 +1,6 @@
 // pages/api/game/[slug].js
+import { GAME_ENABLED } from '../../../lib/game-switch.js';
+
 export const config = { api: { bodyParser: true } };
 
 const {
@@ -54,6 +56,9 @@ async function putFileWithRetry(path, contentText, message, attempts = 3) {
 
 export default async function handler(req, res) {
   try {
+    if (!GAME_ENABLED) {
+      return res.status(403).json({ ok: false, error: 'Game project disabled' });
+    }
     if (req.method !== 'POST') return res.status(405).send('POST only');
 
     const slug = String(req.query.slug || '').trim();

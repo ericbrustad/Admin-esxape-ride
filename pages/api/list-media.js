@@ -5,6 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp)$/i,
@@ -36,14 +37,14 @@ export default async function handler(req, res) {
   try {
     const dir = (req.query.dir || 'bundles').toString(); // 'bundles' | 'overlays'
     const cwd = process.cwd();
-    const gameOrigin = process.env.NEXT_PUBLIC_GAME_ORIGIN || '';
+    const gameOrigin = GAME_ENABLED ? (process.env.NEXT_PUBLIC_GAME_ORIGIN || '') : '';
 
     // Priority: 1) Admin public (canonical), 2) Game public (fallback if Admin missing)
     const adminRoot = path.join(cwd, 'public', 'media', dir);
-    const gameRoot  = path.join(cwd, 'game', 'public', 'media', dir);
+    const gameRoot  = GAME_ENABLED ? path.join(cwd, 'game', 'public', 'media', dir) : null;
 
     const adminNames = listFiles(adminRoot);
-    const gameNames  = listFiles(gameRoot);
+    const gameNames  = gameRoot ? listFiles(gameRoot) : [];
 
     const seenByName = new Set(); // case-insensitive
     const out = [];
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
     }
 
     // 2) Game (fallback only for names not present in Admin)
-    if (gameOrigin) {
+    if (GAME_ENABLED && gameOrigin) {
       for (const name of gameNames) {
         const type = classify(name);
         if (type === 'other') continue;

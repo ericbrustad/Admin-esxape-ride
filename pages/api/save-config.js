@@ -1,6 +1,7 @@
 // pages/api/save-config.js
 // Save draft config to Admin root + mirror to Game draft (for TEST channel).
 // No extra Basic-Auth check — middleware already protects everything.
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'POST only' });
@@ -17,7 +18,10 @@ export default async function handler(req, res) {
     if (!owner || !repo || !token) return res.status(500).json({ ok:false, error:'Missing GitHub env' });
 
     const targets = slug
-      ? [`public/games/${slug}/draft/config.json`, `game/public/games/${slug}/draft/config.json`]
+      ? [
+          `public/games/${slug}/draft/config.json`,
+          ...(GAME_ENABLED ? [`game/public/games/${slug}/draft/config.json`] : []),
+        ]
       : [`public/draft/config.json`];
 
     const content = Buffer.from(JSON.stringify(config, null, 2)).toString('base64');
