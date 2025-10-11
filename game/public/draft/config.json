@@ -15,52 +15,8 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "dd",
-      "type": "clone",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.9778,
-      "lng": -93.265
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "dd",
-      "type": "clone",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.9778,
-      "lng": -93.265
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -110,19 +66,19 @@
   },
   "appearance": {
     "fontFamily": "\"Orbitron\", \"Rajdhani\", sans-serif",
-    "fontSizePx": 24,
-    "fontColor": "#3f2d18",
-    "textBgColor": "#fff6e6",
-    "textBgOpacity": 0.74,
-    "screenBgColor": "#f3dfc1",
-    "screenBgOpacity": 0.48,
-    "screenBgImage": "/media/skins/desert-horizon.svg",
+    "fontSizePx": 22,
+    "fontColor": "#1f2a35",
+    "textBgColor": "#f4f8fb",
+    "textBgOpacity": 0.76,
+    "screenBgColor": "#dbe4f1",
+    "screenBgOpacity": 0.45,
+    "screenBgImage": "/media/skins/control-fabric.svg",
     "screenBgImageEnabled": true,
-    "textAlign": "center",
+    "textAlign": "left",
     "textVertical": "top",
     "panelDepth": true
   },
-  "appearanceSkin": "desert-horizon",
+  "appearanceSkin": "default",
   "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
