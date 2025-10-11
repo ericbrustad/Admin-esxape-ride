@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
-import { BACKGROUND_TEXTURES } from '../lib/admin-shared';
+import { BACKGROUND_TEXTURES, normalizeTone, appearanceBackgroundStyle } from '../lib/admin-shared';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -541,12 +541,21 @@ const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, sk
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
 const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
 
-function applyAdminUiThemeForDocument(skinKey) {
+function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   if (typeof document === 'undefined') return;
   const body = document.body;
   if (!body) return;
   const uiKey = ADMIN_SKIN_TO_UI.get(skinKey) || DEFAULT_UI_SKIN;
+  const normalizedTone = normalizeTone(tone);
+  const background = appearanceBackgroundStyle(appearance, normalizedTone);
   body.dataset.skin = uiKey;
+  body.dataset.tone = normalizedTone;
+  body.style.backgroundColor = background.backgroundColor || '';
+  body.style.backgroundImage = background.backgroundImage || 'none';
+  body.style.backgroundSize = background.backgroundSize || '';
+  body.style.backgroundRepeat = background.backgroundRepeat || '';
+  body.style.backgroundPosition = background.backgroundPosition || '';
+  body.style.backgroundBlendMode = background.backgroundBlendMode || '';
 }
 
 function isAppearanceEqual(a, b) {
@@ -646,14 +655,15 @@ useEffect(()=>{
 
   useEffect(() => {
     if (!config) {
-      applyAdminUiThemeForDocument('default');
+      applyAdminUiThemeForDocument('default', defaultAppearance(), 'light');
       return;
     }
     const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
       ? config.appearanceSkin
       : null;
     const detected = detectAppearanceSkin(config.appearance, config.appearanceSkin);
-    applyAdminUiThemeForDocument(stored || detected);
+    const tone = normalizeTone(config.appearanceTone);
+    applyAdminUiThemeForDocument(stored || detected, config.appearance, tone);
   }, [
     config?.appearanceSkin,
     config?.appearance?.fontFamily,
@@ -667,6 +677,7 @@ useEffect(()=>{
     config?.appearance?.screenBgImageEnabled,
     config?.appearance?.textAlign,
     config?.appearance?.textVertical,
+    config?.appearanceTone,
   ]);
 
   
@@ -867,6 +878,7 @@ useEffect(()=>{
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
       appearanceSkin: 'default',
+      appearanceTone: 'light',
       mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
@@ -1317,9 +1329,24 @@ useEffect(()=>{
   function applyAppearanceSkin(key) {
     const preset = APPEARANCE_SKIN_MAP.get(key);
     if (!preset) return;
-    applyAdminUiThemeForDocument(key);
+    const tone = normalizeTone(config?.appearanceTone);
+    applyAdminUiThemeForDocument(key, preset.appearance, tone);
     setConfig(prev => ({ ...prev, appearance: { ...preset.appearance }, appearanceSkin: key }));
+    setDirty(true);
     setStatus(`✅ Applied theme: ${preset.label}`);
+  }
+
+  function updateInterfaceTone(nextTone) {
+    const normalized = normalizeTone(nextTone);
+    if (normalized === normalizeTone(config?.appearanceTone)) return;
+    const appearance = config?.appearance || defaultAppearance();
+    const skinKey = config?.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+      ? config.appearanceSkin
+      : detectAppearanceSkin(appearance, config?.appearanceSkin);
+    applyAdminUiThemeForDocument(skinKey, appearance, normalized);
+    setConfig(prev => ({ ...prev, appearanceTone: normalized }));
+    setDirty(true);
+    setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
   async function toggleProtection() {
@@ -1516,6 +1543,7 @@ useEffect(()=>{
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
+  const interfaceTone = normalizeTone(config.appearanceTone);
   const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
@@ -2095,6 +2123,7 @@ useEffect(()=>{
                   </label>
                   {editing.appearanceOverrideEnabled && (
                     <AppearanceEditor value={editing.appearance||defaultAppearance()}
+                      tone={interfaceTone}
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
@@ -2514,6 +2543,39 @@ useEffect(()=>{
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {[
+                  { key:'light', label:'☀️ Light — dark text' },
+                  { key:'dark', label:'🌙 Dark — light text' },
+                ].map((option) => {
+                  const active = interfaceTone === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={()=>updateInterfaceTone(option.key)}
+                      style={{
+                        borderRadius:12,
+                        padding:'8px 14px',
+                        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                        color:'var(--admin-body-color)',
+                        cursor:'pointer',
+                        fontWeight: active ? 600 : 500,
+                        boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
+                Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
+              </div>
+            </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
@@ -2561,6 +2623,7 @@ useEffect(()=>{
             </div>
             <AppearanceEditor
               value={config.appearance||defaultAppearance()}
+              tone={interfaceTone}
               onChange={(next)=>setConfig(prev => ({
                 ...prev,
                 appearance: next,
@@ -2911,7 +2974,7 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: {
-    background: 'var(--admin-body-bg)',
+    background: 'transparent',
     color: 'var(--admin-body-color)',
     minHeight: '100vh',
     fontFamily: 'var(--admin-font-family)',

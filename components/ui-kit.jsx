@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   clamp, hexToRgb, toDirectMediaURL,
-  FONT_FAMILIES, BACKGROUND_TEXTURES, defaultAppearance
+  FONT_FAMILIES, BACKGROUND_TEXTURES, defaultAppearance,
+  normalizeTone, appearanceBackgroundStyle,
 } from '../lib/admin-shared';
 
 /* -------- Field wrappers -------- */
@@ -26,8 +27,24 @@ export function ColorField({ label, value, onChange }) {
 }
 
 /* -------- Appearance Editor -------- */
-export function AppearanceEditor({ value, onChange }) {
+export function AppearanceEditor({ value, onChange, tone = 'light' }) {
   const a = value || defaultAppearance();
+  const normalizedTone = normalizeTone(tone);
+  const previewSurface = appearanceBackgroundStyle(a, normalizedTone);
+  const previewStyle = {
+    backgroundColor: previewSurface.backgroundColor,
+    backgroundImage: previewSurface.backgroundImage || undefined,
+    backgroundSize: previewSurface.backgroundSize || 'cover',
+    backgroundRepeat: previewSurface.backgroundRepeat || 'no-repeat',
+    backgroundPosition: previewSurface.backgroundPosition || 'center',
+    backgroundBlendMode: previewSurface.backgroundBlendMode || undefined,
+  };
+  const previewTextColor = normalizedTone === 'dark'
+    ? '#f4f7ff'
+    : (a.fontColor || '#ffffff');
+  const previewTextBg = normalizedTone === 'dark'
+    ? `rgba(8, 12, 20, ${Math.max(a.textBgOpacity ?? 0.6, 0.45)})`
+    : `rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity ?? 0})`;
   return (
     <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
@@ -95,11 +112,13 @@ export function AppearanceEditor({ value, onChange }) {
                 >
                   <div style={{
                     height:70,
-                    background:`linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.4)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`,
+                    background: normalizedTone === 'dark'
+                      ? `linear-gradient(rgba(4,9,16,0.65), rgba(0,0,0,0.45)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`
+                      : `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.35)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`,
                   }}/>
                   <div style={{ padding:'6px 8px', fontSize:12, textAlign:'left' }}>
                     <div style={{ fontWeight:600 }}>{tex.label}</div>
-                    <div style={{ color:'#9fb0bf', fontSize:11 }}>{tex.description}</div>
+                    <div style={{ color: normalizedTone === 'dark' ? '#c9d6ed' : '#9fb0bf', fontSize:11 }}>{tex.description}</div>
                   </div>
                 </button>
               );
@@ -138,16 +157,20 @@ export function AppearanceEditor({ value, onChange }) {
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
-        background: a.screenBgImage && a.screenBgImageEnabled !== false
-          ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
-          : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
-        padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',
+        marginTop:12,
+        border:'1px dashed #2a323b',
+        borderRadius:10,
+        overflow:'hidden',
+        ...previewStyle,
+        padding:12,
+        height:120,
+        display:'grid',
+        placeItems: a.textVertical==='center' ? 'center' : 'start',
       }}>
         <div style={{
           maxWidth:'100%',
-          background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
+          background: previewTextBg,
+          padding:'6px 10px', borderRadius:8, color:previewTextColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
           textAlign:a.textAlign, width:'fit-content',
           justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
         }}>
