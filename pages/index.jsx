@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import AssignedMediaTab from '../components/AssignedMediaTab';
 import { BACKGROUND_TEXTURES, normalizeTone, appearanceBackgroundStyle } from '../lib/admin-shared';
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -2659,7 +2660,7 @@ useEffect(()=>{
 
       {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
-        <AssignedMediaTab
+        <AssignedMediaPageTab
           config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
@@ -3579,7 +3580,7 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
@@ -3645,6 +3646,62 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
     trigger: sanitizeTriggerConfig(d?.trigger),
   }));
 
+  const mediaPool = useMemo(() => {
+    return (inventory || []).map((item, idx) => {
+      const rawUrl = item?.url || item?.path || item;
+      const directUrl = toDirectMediaURL(rawUrl);
+      if (!directUrl) return null;
+      const thumb = toDirectMediaURL(item?.thumbUrl || directUrl);
+      return {
+        id: directUrl,
+        name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
+        type: item?.type || item?.kind || '',
+        tags: Array.isArray(item?.tags) ? item.tags : [],
+        thumbUrl: thumb,
+        url: directUrl,
+        openUrl: rawUrl || directUrl,
+      };
+    }).filter(Boolean);
+  }, [inventory]);
+
+  const assignedState = useMemo(() => ({
+    missionIcons: (config.icons?.missions || []).map(icon => icon.key),
+    deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
+    rewardMedia: (config.media?.rewardsPool || []).map(item => item.url),
+    penaltyMedia: (config.media?.penaltiesPool || []).map(item => item.url),
+    actionMedia: config.media?.actionMedia || [],
+  }), [config]);
+
+  const arraysEqual = useCallback((a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }, []);
+
+  const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
+    const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
+    setConfig(current => {
+      const prevAction = current.media?.actionMedia || [];
+      if (arraysEqual(prevAction, nextAction)) return current;
+      return {
+        ...current,
+        media: {
+          ...(current.media || {}),
+          actionMedia: [...nextAction],
+        },
+      };
+    });
+  }, [arraysEqual, setConfig]);
+
+  const triggerEnabled = !!triggerConfig.enabled;
+
+  const handleTriggerToggle = useCallback((enabled) => {
+    setMediaTriggerPicker('');
+    updateMediaTrigger({ enabled });
+  }, [updateMediaTrigger]);
+
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
     setConfig(c => {
@@ -3666,18 +3723,18 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Trigger Automation</h3>
-        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <input
-            type="checkbox"
-            checked={triggerConfig.enabled}
-            onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ enabled: e.target.checked }); }}
-          />
-          <span>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
-        </label>
+        <AssignedMediaTab
+          mediaPool={mediaPool}
+          assigned={assignedState}
+          onChange={handleAssignedStateChange}
+          triggerEnabled={triggerEnabled}
+          setTriggerEnabled={handleTriggerToggle}
+        />
 
-        {triggerConfig.enabled ? (
+        {triggerEnabled && (
           <>
+            <div style={{ fontWeight:600, margin:'8px 0 12px', fontSize:18 }}>Automation Routing</div>
+
             <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
               <select
@@ -3739,8 +3796,6 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
               onSelect={(opt)=>{ updateMediaTrigger({ triggeredMissionId: opt?.id || '' }); }}
             />
           </>
-        ) : (
-          <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Toggle on to coordinate triggers across media, devices, and missions.</div>
         )}
 
         <div style={{ marginTop:16 }}>
