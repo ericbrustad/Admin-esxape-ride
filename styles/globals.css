@@ -355,3 +355,280 @@ body[data-skin="cartoon-bubbles"]{
   --admin-border-soft:rgba(214,168,244,0.55);
   --admin-divider:rgba(214,168,244,0.45);
 }
+
+body[data-skin="chrome-luminous"]{
+  --admin-body-bg:#f0f4fb;
+  --admin-body-texture:
+    linear-gradient(140deg, rgba(255,255,255,0.9), rgba(220,232,248,0.7)),
+    url('/media/skins/chrome-luminous.svg');
+  --admin-body-texture-size:cover,360px 360px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#1d2f44;
+  --admin-muted:#5b6f88;
+  --admin-accent:#39a3ff;
+  --admin-font-family:'Rajdhani','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(250,252,255,0.94);
+  --admin-header-border:1px solid rgba(160,188,224,0.55);
+  --admin-panel-bg:rgba(250,252,255,0.96);
+  --admin-panel-border:1px solid rgba(162,192,230,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 32px rgba(40,64,92,0.2);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.96), rgba(216,230,248,0.78)), url('/media/skins/chrome-luminous.svg');
+  --admin-panel-texture-size:auto,360px 360px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(158,206,255,0.92), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 30px rgba(42,68,100,0.22);
+  --admin-input-bg:rgba(255,255,255,0.95);
+  --admin-input-border:1px solid rgba(164,194,230,0.65);
+  --admin-input-color:#1d2f44;
+  --admin-button-bg:linear-gradient(145deg, rgba(90,150,214,0.96), rgba(40,92,168,0.96));
+  --admin-button-border:1px solid rgba(142,192,244,0.82);
+  --admin-button-color:#f5f9ff;
+  --admin-button-hover:rgba(120,176,232,0.26);
+  --admin-tab-bg:rgba(232,242,252,0.92);
+  --admin-tab-active-bg:rgba(220,236,252,0.95);
+  --admin-chip-bg:rgba(232,242,252,0.92);
+  --admin-chip-border:1px solid rgba(162,192,230,0.6);
+  --admin-danger-bg:rgba(255,232,236,0.94);
+  --admin-danger-border:1px solid rgba(214,132,150,0.6);
+  --admin-success-bg:rgba(230,246,240,0.94);
+  --admin-success-border:1px solid rgba(144,206,186,0.6);
+  --admin-success-color:#1d6552;
+  --admin-danger-color:#a34252;
+  --admin-border-soft:rgba(162,192,230,0.55);
+  --admin-divider:rgba(162,192,230,0.45);
+}
+
+body[data-skin="desert-horizon"]{
+  --admin-body-bg:#f9f1e4;
+  --admin-body-texture:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.85), rgba(255,240,210,0.55)),
+    url('/media/skins/desert-horizon.svg');
+  --admin-body-texture-size:cover,340px 340px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:screen,normal;
+  --admin-body-color:#3f2d18;
+  --admin-muted:#7d5c3a;
+  --admin-accent:#ff9a4f;
+  --admin-font-family:'Montserrat','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(255,247,235,0.94);
+  --admin-header-border:1px solid rgba(224,188,140,0.55);
+  --admin-panel-bg:rgba(255,249,239,0.96);
+  --admin-panel-border:1px solid rgba(226,196,152,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 32px rgba(122,86,46,0.2);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.95), rgba(244,216,176,0.75)), url('/media/skins/desert-horizon.svg');
+  --admin-panel-texture-size:auto,320px 320px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(255,210,150,0.9), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 30px rgba(120,80,44,0.2);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(226,196,152,0.65);
+  --admin-input-color:#3f2d18;
+  --admin-button-bg:linear-gradient(145deg, rgba(248,170,96,0.96), rgba(210,128,58,0.96));
+  --admin-button-border:1px solid rgba(244,190,126,0.8);
+  --admin-button-color:#fff8f0;
+  --admin-button-hover:rgba(248,190,126,0.32);
+  --admin-tab-bg:rgba(250,234,210,0.92);
+  --admin-tab-active-bg:rgba(244,224,198,0.95);
+  --admin-chip-bg:rgba(250,234,210,0.92);
+  --admin-chip-border:1px solid rgba(226,196,152,0.6);
+  --admin-danger-bg:rgba(255,228,218,0.94);
+  --admin-danger-border:1px solid rgba(210,130,100,0.6);
+  --admin-success-bg:rgba(234,246,226,0.94);
+  --admin-success-border:1px solid rgba(158,206,156,0.6);
+  --admin-success-color:#2b6a42;
+  --admin-danger-color:#a44d30;
+  --admin-border-soft:rgba(226,196,152,0.55);
+  --admin-divider:rgba(226,196,152,0.45);
+}
+
+body[data-skin="forest-meadow"]{
+  --admin-body-bg:#edf6e9;
+  --admin-body-texture:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.88), rgba(220,240,214,0.6)),
+    url('/media/skins/forest-meadow.svg');
+  --admin-body-texture-size:cover,340px 340px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:soft-light,normal;
+  --admin-body-color:#213620;
+  --admin-muted:#4a6a44;
+  --admin-accent:#56b76c;
+  --admin-font-family:'Merriweather Sans','Gill Sans','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(248,255,246,0.94);
+  --admin-header-border:1px solid rgba(170,206,168,0.55);
+  --admin-panel-bg:rgba(250,255,248,0.96);
+  --admin-panel-border:1px solid rgba(176,212,176,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.82);
+  --admin-panel-shadow:0 20px 32px rgba(68,96,62,0.2);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.95), rgba(210,236,200,0.76)), url('/media/skins/forest-meadow.svg');
+  --admin-panel-texture-size:auto,320px 320px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(164,212,150,0.9), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 30px rgba(64,92,58,0.2);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(176,212,176,0.65);
+  --admin-input-color:#213620;
+  --admin-button-bg:linear-gradient(145deg, rgba(122,190,120,0.96), rgba(72,148,90,0.96));
+  --admin-button-border:1px solid rgba(148,206,146,0.8);
+  --admin-button-color:#f4fbf1;
+  --admin-button-hover:rgba(140,202,140,0.3);
+  --admin-tab-bg:rgba(228,244,226,0.92);
+  --admin-tab-active-bg:rgba(218,240,220,0.95);
+  --admin-chip-bg:rgba(228,244,226,0.92);
+  --admin-chip-border:1px solid rgba(176,212,176,0.6);
+  --admin-danger-bg:rgba(255,228,228,0.94);
+  --admin-danger-border:1px solid rgba(210,128,128,0.6);
+  --admin-success-bg:rgba(226,246,232,0.94);
+  --admin-success-border:1px solid rgba(134,198,152,0.6);
+  --admin-success-color:#1f6a42;
+  --admin-danger-color:#a13c3c;
+  --admin-border-soft:rgba(176,212,176,0.55);
+  --admin-divider:rgba(176,212,176,0.45);
+}
+
+body[data-skin="starfield-dawn"]{
+  --admin-body-bg:#f3f1ff;
+  --admin-body-texture:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.9), rgba(230,224,255,0.6)),
+    url('/media/skins/starfield-dawn.svg');
+  --admin-body-texture-size:cover,360px 360px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:screen,normal;
+  --admin-body-color:#272a5a;
+  --admin-muted:#5a5fa3;
+  --admin-accent:#7f90ff;
+  --admin-font-family:'Exo 2','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(250,248,255,0.94);
+  --admin-header-border:1px solid rgba(188,176,236,0.55);
+  --admin-panel-bg:rgba(252,250,255,0.96);
+  --admin-panel-border:1px solid rgba(190,182,240,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.85);
+  --admin-panel-shadow:0 20px 34px rgba(64,54,108,0.22);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.96), rgba(220,212,255,0.78)), url('/media/skins/starfield-dawn.svg');
+  --admin-panel-texture-size:auto,340px 340px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:screen,normal;
+  --admin-piping:linear-gradient(135deg, rgba(174,184,255,0.9), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 32px rgba(62,54,108,0.22);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(190,182,240,0.65);
+  --admin-input-color:#272a5a;
+  --admin-button-bg:linear-gradient(145deg, rgba(142,152,248,0.96), rgba(98,108,220,0.96));
+  --admin-button-border:1px solid rgba(176,184,250,0.82);
+  --admin-button-color:#f5f4ff;
+  --admin-button-hover:rgba(166,176,250,0.3);
+  --admin-tab-bg:rgba(234,228,252,0.92);
+  --admin-tab-active-bg:rgba(226,220,250,0.95);
+  --admin-chip-bg:rgba(234,228,252,0.92);
+  --admin-chip-border:1px solid rgba(190,182,240,0.6);
+  --admin-danger-bg:rgba(255,226,234,0.94);
+  --admin-danger-border:1px solid rgba(210,120,148,0.6);
+  --admin-success-bg:rgba(232,246,240,0.94);
+  --admin-success-border:1px solid rgba(146,206,188,0.6);
+  --admin-success-color:#1f6a58;
+  --admin-danger-color:#a14866;
+  --admin-border-soft:rgba(190,182,240,0.55);
+  --admin-divider:rgba(190,182,240,0.45);
+}
+
+body[data-skin="cartoon-parade"]{
+  --admin-body-bg:#fff3fb;
+  --admin-body-texture:
+    radial-gradient(circle at 25% 15%, rgba(255,255,255,0.92), rgba(255,224,246,0.6)),
+    radial-gradient(circle at 80% 20%, rgba(248,224,255,0.6), rgba(240,210,255,0.45)),
+    url('/media/skins/cartoon-parade.svg');
+  --admin-body-texture-size:cover,cover,360px 360px;
+  --admin-body-repeat:no-repeat,no-repeat,repeat;
+  --admin-body-position:center,center,center;
+  --admin-body-blend:screen,screen,normal;
+  --admin-body-color:#4a2a72;
+  --admin-muted:#7c5ea6;
+  --admin-accent:#ff7ad6;
+  --admin-font-family:'Baloo 2','Comic Sans MS','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(255,246,255,0.94);
+  --admin-header-border:1px solid rgba(224,176,248,0.55);
+  --admin-panel-bg:rgba(255,248,255,0.96);
+  --admin-panel-border:1px solid rgba(226,180,248,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.86);
+  --admin-panel-shadow:0 20px 34px rgba(116,76,154,0.22);
+  --admin-panel-surface:linear-gradient(155deg, rgba(255,255,255,0.96), rgba(246,210,255,0.78)), url('/media/skins/cartoon-parade.svg');
+  --admin-panel-texture-size:auto,340px 340px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:screen,normal;
+  --admin-piping:linear-gradient(135deg, rgba(244,176,255,0.92), rgba(255,255,255,0.98));
+  --admin-piping-shadow:0 18px 32px rgba(120,78,160,0.22);
+  --admin-input-bg:rgba(255,255,255,0.94);
+  --admin-input-border:1px solid rgba(226,180,248,0.65);
+  --admin-input-color:#4a2a72;
+  --admin-button-bg:linear-gradient(145deg, rgba(255,162,230,0.96), rgba(170,128,255,0.96));
+  --admin-button-border:1px solid rgba(244,186,255,0.82);
+  --admin-button-color:#fff6ff;
+  --admin-button-hover:rgba(255,200,250,0.34);
+  --admin-tab-bg:rgba(244,226,255,0.92);
+  --admin-tab-active-bg:rgba(236,216,255,0.95);
+  --admin-chip-bg:rgba(244,226,255,0.92);
+  --admin-chip-border:1px solid rgba(226,180,248,0.6);
+  --admin-danger-bg:rgba(255,222,236,0.94);
+  --admin-danger-border:1px solid rgba(214,112,154,0.6);
+  --admin-success-bg:rgba(236,250,242,0.94);
+  --admin-success-border:1px solid rgba(168,214,190,0.6);
+  --admin-success-color:#2b7a60;
+  --admin-danger-color:#ae4c72;
+  --admin-border-soft:rgba(226,180,248,0.55);
+  --admin-divider:rgba(226,180,248,0.45);
+}
+
+body[data-skin="arctic-lab"]{
+  --admin-body-bg:#edf8fb;
+  --admin-body-texture:
+    linear-gradient(140deg, rgba(255,255,255,0.9), rgba(214,240,248,0.7)),
+    url('/media/skins/arctic-lab.svg');
+  --admin-body-texture-size:cover,360px 360px;
+  --admin-body-repeat:no-repeat,repeat;
+  --admin-body-position:center,center;
+  --admin-body-blend:overlay,normal;
+  --admin-body-color:#14394a;
+  --admin-muted:#4a6d7a;
+  --admin-accent:#46c1e6;
+  --admin-font-family:'Titillium Web','Segoe UI',sans-serif;
+  --admin-header-bg:rgba(246,253,255,0.94);
+  --admin-header-border:1px solid rgba(160,208,224,0.55);
+  --admin-panel-bg:rgba(250,253,255,0.96);
+  --admin-panel-border:1px solid rgba(168,214,228,0.6);
+  --admin-panel-highlight:rgba(255,255,255,0.84);
+  --admin-panel-shadow:0 20px 32px rgba(38,78,94,0.22);
+  --admin-panel-surface:linear-gradient(150deg, rgba(255,255,255,0.96), rgba(210,236,248,0.78)), url('/media/skins/arctic-lab.svg');
+  --admin-panel-texture-size:auto,360px 360px;
+  --admin-panel-repeat:no-repeat,repeat;
+  --admin-panel-blend:soft-light,normal;
+  --admin-piping:linear-gradient(135deg, rgba(156,220,236,0.9), rgba(255,255,255,0.96));
+  --admin-piping-shadow:0 18px 32px rgba(36,76,92,0.22);
+  --admin-input-bg:rgba(255,255,255,0.95);
+  --admin-input-border:1px solid rgba(168,214,228,0.65);
+  --admin-input-color:#14394a;
+  --admin-button-bg:linear-gradient(145deg, rgba(92,186,214,0.96), rgba(44,136,174,0.96));
+  --admin-button-border:1px solid rgba(140,208,228,0.82);
+  --admin-button-color:#f6fcff;
+  --admin-button-hover:rgba(120,208,232,0.3);
+  --admin-tab-bg:rgba(224,246,252,0.92);
+  --admin-tab-active-bg:rgba(214,242,250,0.95);
+  --admin-chip-bg:rgba(224,246,252,0.92);
+  --admin-chip-border:1px solid rgba(168,214,228,0.6);
+  --admin-danger-bg:rgba(255,228,236,0.94);
+  --admin-danger-border:1px solid rgba(210,126,150,0.6);
+  --admin-success-bg:rgba(224,248,240,0.94);
+  --admin-success-border:1px solid rgba(146,210,186,0.6);
+  --admin-success-color:#1b6b54;
+  --admin-danger-color:#a24058;
+  --admin-border-soft:rgba(168,214,228,0.55);
+  --admin-divider:rgba(168,214,228,0.45);
+}

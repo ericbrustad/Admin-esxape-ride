@@ -202,7 +202,7 @@ function missionBodyStyle(a) {
   const fontFamily = a.fontFamily || 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif';
   const fontSize   = (a.fontSizePx || 22) + 'px';
   const textBg     = `rgba(${hex(a.textBgColor||'#000')}, ${a.textBgOpacity ?? 0})`;
-  const screenBg   = a.screenBgImage
+  const screenBg   = a.screenBgImage && a.screenBgImageEnabled !== false
     ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity??0}), rgba(0,0,0,${a.screenBgOpacity??0})), url(${toDirect(a.screenBgImage)}) center/cover no-repeat`
     : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity??0}), rgba(0,0,0,${a.screenBgOpacity??0})), ${a.screenBgColor||'#000'}`;
 

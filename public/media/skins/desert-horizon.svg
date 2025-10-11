@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="sky" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ffe9c7"/>
+      <stop offset="55%" stop-color="#f7d9ac"/>
+      <stop offset="100%" stop-color="#f0c899"/>
+    </linearGradient>
+    <linearGradient id="dune" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f6d2a4"/>
+      <stop offset="50%" stop-color="#f0c18b"/>
+      <stop offset="100%" stop-color="#e6b57d"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="70%" cy="25%" r="35%">
+      <stop offset="0%" stop-color="#fff4d6"/>
+      <stop offset="60%" stop-color="rgba(255,230,180,0.65)"/>
+      <stop offset="100%" stop-color="rgba(255,220,160,0)"/>
+    </radialGradient>
+    <linearGradient id="highlight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.45)"/>
+      <stop offset="45%" stop-color="rgba(255,255,255,0)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.32)"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <rect width="1600" height="900" fill="url(#sun)"/>
+  <g opacity="0.8">
+    <path d="M0 520 Q260 480 540 520 T1120 520 T1600 520 V900 H0Z" fill="url(#dune)"/>
+    <path d="M0 600 Q220 560 500 600 T1100 600 T1600 600 V900 H0Z" fill="#e1b382" opacity="0.85"/>
+    <path d="M0 690 Q320 640 650 700 T1300 700 T1600 700 V900 H0Z" fill="#d7a673" opacity="0.88"/>
+  </g>
+  <g opacity="0.25">
+    <path d="M1200 180 C1260 120 1340 110 1410 150" stroke="#f4d7ae" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M200 160 C280 120 380 120 460 170" stroke="#f8e2bf" stroke-width="10" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.4">
+    <path d="M140 520 C260 470 360 470 500 520" stroke="#f8dfba" stroke-width="6" fill="none"/>
+    <path d="M620 560 C780 520 940 530 1100 560" stroke="#f2d1a4" stroke-width="5" fill="none"/>
+    <path d="M1020 630 C1180 600 1340 600 1500 630" stroke="#e8c18b" stroke-width="4" fill="none"/>
+  </g>
+  <rect width="1600" height="900" fill="url(#highlight)" opacity="0.35"/>
+  <g fill="#c08c56" opacity="0.32">
+    <path d="M1380 470 l-18 -52 22 8 18 -56 18 54 22 -10 -20 56 20 12 -46 4z"/>
+    <path d="M180 560 l-14 -40 18 6 16 -42 14 40 18 -8 -16 44 16 10 -38 2z"/>
+  </g>
+</svg>

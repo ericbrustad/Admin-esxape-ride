@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import { BACKGROUND_TEXTURES } from '../lib/admin-shared';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -288,6 +289,7 @@ function defaultAppearance() {
     screenBgColor: '#000000',
     screenBgOpacity: 0.0,
     screenBgImage: '',
+    screenBgImageEnabled: true,
     textAlign: 'center',
     textVertical: 'top',
   };
@@ -321,6 +323,7 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#dbe4f1',
       screenBgOpacity: 0.45,
       screenBgImage: '/media/skins/control-fabric.svg',
+      screenBgImageEnabled: true,
       textAlign: 'left',
     },
   },
@@ -338,6 +341,7 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#d6e2f2',
       screenBgOpacity: 0.5,
       screenBgImage: '/media/skins/space-metal.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -356,6 +360,7 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#f1ddbc',
       screenBgOpacity: 0.55,
       screenBgImage: '/media/skins/desert-canvas.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -374,6 +379,7 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#d4ebcc',
       screenBgOpacity: 0.54,
       screenBgImage: '/media/skins/forest-foliage.svg',
+      screenBgImageEnabled: true,
       textAlign: 'left',
       textVertical: 'top',
     },
@@ -392,6 +398,7 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#d7def6',
       screenBgOpacity: 0.5,
       screenBgImage: '/media/skins/starfield-soft.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -410,6 +417,121 @@ const APPEARANCE_SKINS = [
       screenBgColor: '#f2dfff',
       screenBgOpacity: 0.55,
       screenBgImage: '/media/skins/cartoon-balloons.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'chrome-luminous',
+    label: 'Chrome Luminous',
+    description: 'Polished chrome with soft sky reflections and nav console glow.',
+    uiKey: 'chrome-luminous',
+    appearance: {
+      fontFamily: '"Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#1a2335',
+      textBgColor: '#f5f9ff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#dde6f5',
+      screenBgOpacity: 0.42,
+      screenBgImage: '/media/skins/chrome-luminous.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'desert-horizon',
+    label: 'Desert Horizon',
+    description: 'Pale dunes, mirage chrome and cactus silhouettes at sunrise.',
+    uiKey: 'desert-horizon',
+    appearance: {
+      fontFamily: '"Montserrat", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#3f2d18',
+      textBgColor: '#fff6e6',
+      textBgOpacity: 0.74,
+      screenBgColor: '#f3dfc1',
+      screenBgOpacity: 0.48,
+      screenBgImage: '/media/skins/desert-horizon.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'forest-meadow',
+    label: 'Forest Meadow',
+    description: 'Sunlit canopy with moss glass, bark piping, and flower flecks.',
+    uiKey: 'forest-meadow',
+    appearance: {
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#20331e',
+      textBgColor: '#f2faed',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dcedd2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/forest-meadow.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'starfield-dawn',
+    label: 'Starfield Dawn',
+    description: 'Lavender nebula glass with chrome rails and early starlight.',
+    uiKey: 'starfield-dawn',
+    appearance: {
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 23,
+      fontColor: '#262a58',
+      textBgColor: '#f4f0ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#e0dcfa',
+      screenBgOpacity: 0.46,
+      screenBgImage: '/media/skins/starfield-dawn.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'cartoon-parade',
+    label: 'Cartoon Parade',
+    description: 'High-energy balloons, confetti piping, and carnival gloss.',
+    uiKey: 'cartoon-parade',
+    appearance: {
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 30,
+      fontColor: '#4a256a',
+      textBgColor: '#fff4ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#f7e4ff',
+      screenBgOpacity: 0.52,
+      screenBgImage: '/media/skins/cartoon-parade.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'arctic-lab',
+    label: 'Arctic Lab',
+    description: 'Glacial glass, mint piping, and frosted chrome instrumentation.',
+    uiKey: 'arctic-lab',
+    appearance: {
+      fontFamily: '"Titillium Web", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#133246',
+      textBgColor: '#f2fbff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#d5eef5',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/arctic-lab.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -438,6 +560,7 @@ function isAppearanceEqual(a, b) {
     'screenBgColor',
     'screenBgOpacity',
     'screenBgImage',
+    'screenBgImageEnabled',
     'textAlign',
     'textVertical',
   ];
@@ -541,6 +664,7 @@ useEffect(()=>{
     config?.appearance?.screenBgColor,
     config?.appearance?.screenBgOpacity,
     config?.appearance?.screenBgImage,
+    config?.appearance?.screenBgImageEnabled,
     config?.appearance?.textAlign,
     config?.appearance?.textVertical,
   ]);
@@ -2395,7 +2519,7 @@ useEffect(()=>{
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
                 {APPEARANCE_SKINS.map((skin)=>{
                   const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage
+                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
                     ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
                     : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
                   return (
@@ -2628,16 +2752,81 @@ function AppearanceEditor({ value, onChange }) {
           <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
-        <Field label="Screen background opacity">
+        <Field label="Background overlay opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
           <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
-        <Field label="Screen background image (URL)">
-          <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
+        <Field label="Background image library">
+          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <input
+              type="checkbox"
+              checked={a.screenBgImageEnabled !== false}
+              onChange={(e)=>onChange({ ...a, screenBgImageEnabled:e.target.checked })}
+            />
+            <span>Enable themed background image</span>
+          </label>
+          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>
+            Choose one of the curated textures or provide your own URL. Disable to fall back to solid color.
+          </div>
+          <div style={{
+            marginTop:10,
+            display:'grid',
+            gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',
+            gap:10,
+            opacity: a.screenBgImageEnabled === false ? 0.45 : 1,
+            pointerEvents: a.screenBgImageEnabled === false ? 'none' : 'auto',
+          }}>
+            {BACKGROUND_TEXTURES.map((tex) => {
+              const active = (a.screenBgImage || '') === tex.image;
+              return (
+                <button
+                  key={tex.key}
+                  type="button"
+                  onClick={()=>onChange({ ...a, screenBgImage: tex.image, screenBgImageEnabled: true })}
+                  style={{
+                    borderRadius:10,
+                    border: active ? '2px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+                    padding:0,
+                    overflow:'hidden',
+                    background:'#000',
+                    color:'var(--admin-body-color)',
+                    cursor:'pointer',
+                  }}
+                >
+                  <div style={{
+                    height:70,
+                    background:`linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.35)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`,
+                  }}/>
+                  <div style={{ padding:'6px 8px', fontSize:12, textAlign:'left' }}>
+                    <div style={{ fontWeight:600 }}>{tex.label}</div>
+                    <div style={{ color:'var(--admin-muted)', fontSize:11 }}>{tex.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Custom background image URL">
+          <input
+            style={S.input}
+            value={a.screenBgImage || ''}
+            onChange={(e)=>{
+              const nextUrl = e.target.value;
+              onChange({
+                ...a,
+                screenBgImage: nextUrl,
+                screenBgImageEnabled: nextUrl ? true : false,
+              });
+            }}
+            placeholder="https://..."
+          />
           {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
+            <img
+              src={toDirectMediaURL(a.screenBgImage)}
+              alt="bg"
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}
+            />
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
@@ -2654,7 +2843,7 @@ function AppearanceEditor({ value, onChange }) {
 
       <div style={{
         marginTop:12, border:'1px dashed var(--admin-border-soft)', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
+        background: a.screenBgImage && a.screenBgImageEnabled !== false
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
         padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',

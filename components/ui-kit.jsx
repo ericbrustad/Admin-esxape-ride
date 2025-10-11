@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   clamp, hexToRgb, toDirectMediaURL,
-  FONT_FAMILIES, defaultAppearance
+  FONT_FAMILIES, BACKGROUND_TEXTURES, defaultAppearance
 } from '../lib/admin-shared';
 
 /* -------- Field wrappers -------- */
@@ -51,13 +51,75 @@ export function AppearanceEditor({ value, onChange }) {
           <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
-        <Field label="Screen background opacity">
+        <Field label="Background overlay opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
           <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
-        <Field label="Screen background image (URL)">
-          <input style={styles.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
+        <Field label="Background image library">
+          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <input
+              type="checkbox"
+              checked={a.screenBgImageEnabled !== false}
+              onChange={(e)=>onChange({ ...a, screenBgImageEnabled:e.target.checked })}
+            />
+            <span>Enable themed background image</span>
+          </label>
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>
+            Pick one of the built-in textures or provide a custom URL. Disable for a pure color background.
+          </div>
+          <div style={{
+            marginTop:10,
+            display:'grid',
+            gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',
+            gap:10,
+            opacity: a.screenBgImageEnabled === false ? 0.45 : 1,
+            pointerEvents: a.screenBgImageEnabled === false ? 'none' : 'auto',
+          }}>
+            {BACKGROUND_TEXTURES.map((tex) => {
+              const active = (a.screenBgImage || '') === tex.image;
+              return (
+                <button
+                  key={tex.key}
+                  type="button"
+                  onClick={()=>onChange({ ...a, screenBgImage: tex.image, screenBgImageEnabled: true })}
+                  style={{
+                    borderRadius:10,
+                    border: active ? '2px solid #3c82ff' : '1px solid #2a323b',
+                    padding:0,
+                    overflow:'hidden',
+                    background:'#000',
+                    color:'#e9eef2',
+                    cursor:'pointer',
+                  }}
+                >
+                  <div style={{
+                    height:70,
+                    background:`linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.4)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`,
+                  }}/>
+                  <div style={{ padding:'6px 8px', fontSize:12, textAlign:'left' }}>
+                    <div style={{ fontWeight:600 }}>{tex.label}</div>
+                    <div style={{ color:'#9fb0bf', fontSize:11 }}>{tex.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Custom background image URL">
+          <input
+            style={styles.input}
+            value={a.screenBgImage || ''}
+            onChange={(e)=>{
+              const nextUrl = e.target.value;
+              onChange({
+                ...a,
+                screenBgImage: nextUrl,
+                screenBgImageEnabled: nextUrl ? true : false,
+              });
+            }}
+            placeholder="https://..."
+          />
           {a.screenBgImage && (
             <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
                  style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
@@ -77,7 +139,7 @@ export function AppearanceEditor({ value, onChange }) {
 
       <div style={{
         marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
+        background: a.screenBgImage && a.screenBgImageEnabled !== false
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
         padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',

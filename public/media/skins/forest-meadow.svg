@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="meadow" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#f4fbf1"/>
+      <stop offset="45%" stop-color="#e0f2db"/>
+      <stop offset="100%" stop-color="#d2e9cd"/>
+    </linearGradient>
+    <radialGradient id="light" cx="25%" cy="20%" r="45%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.8)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <radialGradient id="light2" cx="78%" cy="18%" r="42%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.7)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <linearGradient id="leaf" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a7d99c"/>
+      <stop offset="100%" stop-color="#6cb972"/>
+    </linearGradient>
+    <linearGradient id="tree" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6a8f5c"/>
+      <stop offset="100%" stop-color="#43693d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#meadow)"/>
+  <rect width="1600" height="900" fill="url(#light)"/>
+  <rect width="1600" height="900" fill="url(#light2)"/>
+  <g opacity="0.55">
+    <path d="M0 640 C220 600 360 620 520 680 S840 760 1040 720 S1320 640 1600 660 V900 H0Z" fill="#c3e3b8"/>
+    <path d="M0 720 C180 700 340 740 520 780 S880 860 1180 810 S1400 720 1600 740 V900 H0Z" fill="#b1dba8"/>
+  </g>
+  <g opacity="0.35">
+    <path d="M140 520 Q190 480 240 500 T340 520" stroke="#8fc389" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M1080 540 Q1160 500 1260 520 T1420 560" stroke="#9bd199" stroke-width="10" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.25">
+    <path d="M180 360 q60 -120 160 -160 q-60 60 -40 140 q80 -40 120 -90 q-20 90 -10 140 q70 -60 140 -90 q-40 70 -30 150 q90 -60 160 -80 q-40 70 -30 150" stroke="#7db46f" stroke-width="18" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.4">
+    <path d="M1250 360 q80 -140 190 -200 q-70 80 -50 160 q90 -50 150 -110 q-30 90 -20 150" stroke="#76ab66" stroke-width="20" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.35">
+    <path d="M220 660 l-24 -140 40 30 26 -110 26 100 42 -40 -30 148 44 32 -76 -8z" fill="url(#tree)"/>
+    <path d="M1320 620 l-28 -160 52 36 32 -132 34 122 50 -46 -36 176 54 36 -92 -10z" fill="url(#tree)"/>
+  </g>
+  <g opacity="0.35">
+    <ellipse cx="320" cy="420" rx="140" ry="90" fill="url(#leaf)" transform="rotate(-12 320 420)"/>
+    <ellipse cx="1380" cy="420" rx="170" ry="110" fill="url(#leaf)" transform="rotate(8 1380 420)"/>
+  </g>
+</svg>
