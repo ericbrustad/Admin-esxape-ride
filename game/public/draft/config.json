@@ -65,19 +65,19 @@
     ]
   },
   "appearance": {
-    "fontFamily": "Georgia, serif",
-    "fontSizePx": 28,
-    "fontColor": "#6c39a2",
-    "textBgColor": "#d336d3",
-    "textBgOpacity": 0.8,
-    "screenBgColor": "#d54b10",
-    "screenBgOpacity": 0.1,
-    "screenBgImage": "/media/skins/cartoon-balloons.svg",
+    "fontFamily": "\"Orbitron\", \"Rajdhani\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 26,
+    "fontColor": "#14253a",
+    "textBgColor": "#f3f8ff",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#d6e2f2",
+    "screenBgOpacity": 0.5,
+    "screenBgImage": "/media/skins/space-metal.svg",
     "screenBgImageEnabled": true,
     "textAlign": "center",
     "textVertical": "top"
   },
-  "appearanceSkin": "cartoon-bubbles",
+  "appearanceSkin": "space-military",
   "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
