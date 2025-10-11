@@ -68,7 +68,7 @@ function defaultConfig(title, gameType, mode = 'single') {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
-    game: { title, type: gameType || 'Mystery' },
+    game: { title, type: gameType || 'Mystery', coverImage: '' },
     forms: { players },              // 1 | 2 | 4
     textRules: []
   };

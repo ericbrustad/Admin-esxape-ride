@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
@@ -293,7 +293,7 @@ export default function Admin() {
   let mounted = true;
   (async ()=>{
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool']);
+      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
       if (mounted) setInventory(Array.isArray(items) ? items : []);
     } catch {
       if (mounted) setInventory([]);
@@ -445,6 +445,7 @@ export default function Admin() {
 
         let merged = {
           ...dc, ...c0,
+          game: { ...dc.game, ...(c0.game || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
@@ -472,7 +473,7 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery' },
+      game:   { title:'Untitled Game', type:'Mystery', coverImage:'' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1526,6 +1527,21 @@ export default function Admin() {
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Game Cover Image</h3>
+            <div style={{ color:'#9fb0bf', marginBottom:12, fontSize:12 }}>
+              Upload, drag-and-drop, or reuse media pool assets to feature a hero image across player headers and share links.
+            </div>
+            <GameCoverImageEditor
+              title={config.game.title}
+              type={config.game.type}
+              value={config.game.coverImage || ''}
+              onChange={(url)=>setConfig(c => ({ ...c, game:{ ...c.game, coverImage:url } }))}
+              uploadToRepo={uploadToRepo}
+              inventory={inventory}
+            />
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
               <Field label="Default Map Center — Latitude">
@@ -1816,6 +1832,244 @@ function AppearanceEditor({ value, onChange }) {
         }}>
           Preview text
         </div>
+      </div>
+    </div>
+  );
+}
+
+function GameCoverImageEditor({
+  title,
+  type,
+  value,
+  onChange,
+  uploadToRepo,
+  inventory = [],
+}) {
+  const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [manual, setManual] = useState(value || '');
+
+  useEffect(() => { setManual(value || ''); }, [value]);
+
+  const normalizedValue = value ? toDirectMediaURL(value) : '';
+  const coverTitle = title || 'Untitled Game';
+  const coverSubtitle = type || 'Set your cover image below';
+
+  const imageItems = useMemo(() => {
+    const seen = new Set();
+    return (inventory || [])
+      .filter(item => item && item.url && (item.type === 'image' || item.type === 'gif'))
+      .map(item => {
+        const direct = toDirectMediaURL(item.url);
+        if (seen.has(direct)) return null;
+        seen.add(direct);
+        return { ...item, direct };
+      })
+      .filter(Boolean);
+  }, [inventory]);
+
+  function useUrl(url) {
+    const next = url || '';
+    onChange(next);
+    setManual(next);
+  }
+
+  async function handleFile(file) {
+    if (!file || !uploadToRepo) return;
+    setBusy(true);
+    try {
+      const url = await uploadToRepo(file, 'uploads');
+      if (url) useUrl(url);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) {
+      handleFile(file);
+      return;
+    }
+    const link = e.dataTransfer?.getData('text/uri-list') || e.dataTransfer?.getData('text/plain');
+    if (link) {
+      const trimmed = link.trim();
+      if (trimmed) useUrl(trimmed);
+    }
+  }
+
+  const dropStyle = {
+    border: `1px dashed ${dragging ? '#38bdf8' : '#2a323b'}`,
+    background: dragging ? 'rgba(56, 189, 248, 0.08)' : '#0b0c10',
+    color: '#9fb0bf',
+    padding: 20,
+    borderRadius: 14,
+    textAlign: 'center',
+    transition: 'border 0.2s ease, background 0.2s ease',
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div
+          style={{
+            position: 'relative',
+            height: 220,
+            borderRadius: 18,
+            overflow: 'hidden',
+            border: '1px solid #1f262d',
+            background: normalizedValue ? `url(${normalizedValue}) center/cover no-repeat` : '#0f1418',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'flex-start',
+          }}
+        >
+          {normalizedValue && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(180deg, rgba(11,12,16,0.15) 0%, rgba(11,12,16,0.78) 100%)',
+              }}
+            />
+          )}
+          {!normalizedValue && (
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#9fb0bf' }}>
+              Drop or upload a cover image
+            </div>
+          )}
+          <div style={{ position: 'relative', padding: 24, width: '100%' }}>
+            <div style={{ fontSize: 30, fontWeight: 700, color: '#f8fafc', textShadow: '0 4px 18px rgba(0,0,0,0.45)' }}>
+              {coverTitle}
+            </div>
+            <div style={{ marginTop: 6, color: '#cbd5f5', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1.4 }}>
+              {coverSubtitle}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+        onDrop={handleDrop}
+        style={dropStyle}
+      >
+        <div style={{ fontWeight: 600, color: '#e9eef2' }}>Upload cover</div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>
+          Drag & drop a JPG/PNG (recommended 1200×600) or choose a file.
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            style={{ ...S.button, opacity: busy ? 0.6 : 1 }}
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+          >
+            {busy ? 'Uploading…' : 'Choose file'}
+          </button>
+          {value && (
+            <>
+              <button
+                type="button"
+                style={S.button}
+                onClick={() => { if (typeof window !== 'undefined') window.open(toDirectMediaURL(value), '_blank'); }}
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                style={{ ...S.button, borderColor: '#7a1f1f', background: '#2a1313' }}
+                onClick={() => useUrl('')}
+              >
+                Remove
+              </button>
+            </>
+          )}
+        </div>
+        <input
+          type="file"
+          accept="image/*"
+          ref={inputRef}
+          style={{ display: 'none' }}
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+      </div>
+
+      <Field label="Or paste an image URL">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
+          <input
+            style={S.input}
+            placeholder="https://…"
+            value={manual}
+            onChange={(e) => setManual(e.target.value)}
+          />
+          <button
+            type="button"
+            style={S.button}
+            onClick={() => {
+              if (manual.trim() || manual === '') useUrl(manual.trim());
+            }}
+          >
+            Use URL
+          </button>
+        </div>
+      </Field>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 8 }}>Select from media pool</div>
+        {imageItems.length === 0 ? (
+          <div style={{ color: '#6b7280', fontSize: 13, padding: 12, border: '1px dashed #2a323b', borderRadius: 12 }}>
+            Upload images in the Media Pool to see them here.
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))',
+              gap: 12,
+              maxHeight: 260,
+              overflowY: 'auto',
+              paddingRight: 4,
+            }}
+          >
+            {imageItems.map(item => {
+              const active = normalizedValue && normalizedValue === item.direct;
+              return (
+                <button
+                  key={item.url}
+                  type="button"
+                  onClick={() => useUrl(item.url)}
+                  style={{
+                    border: `1px solid ${active ? '#38bdf8' : '#1f262d'}`,
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                    background: '#12181d',
+                    cursor: 'pointer',
+                    padding: 0,
+                    textAlign: 'left',
+                    color: '#e9eef2',
+                  }}
+                >
+                  <div style={{ height: 88, background: `url(${item.direct}) center/cover no-repeat` }} />
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.name || baseNameFromUrl(item.url)}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9fb0bf' }}>
+                      {item.source === 'game' ? 'Game media' : 'Admin media'}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
