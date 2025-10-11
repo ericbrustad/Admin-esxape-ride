@@ -99,7 +99,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
       const b64 = btoa(String.fromCharCode(...new Uint8Array(array)));
       const safeName = file.name.replace(/[^\w.\-]+/g, "_");
       const timestamp = Date.now();
-      const path = ["public", "media", subfolder, `${timestamp}-${safeName}`].join("/");
+      const path = `public/media/${subfolder}/${timestamp}-${safeName}`;
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
