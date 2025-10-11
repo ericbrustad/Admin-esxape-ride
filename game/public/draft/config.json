@@ -65,18 +65,18 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Copperplate\", \"Trebuchet MS\", \"Segoe UI\", sans-serif",
+    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
     "fontSizePx": 24,
-    "fontColor": "#ffe8b8",
-    "textBgColor": "#543d24",
-    "textBgOpacity": 0.62,
-    "screenBgColor": "#3a2815",
-    "screenBgOpacity": 0.83,
+    "fontColor": "#e6f8e0",
+    "textBgColor": "#17331c",
+    "textBgOpacity": 0.15,
+    "screenBgColor": "#0d1d12",
+    "screenBgOpacity": 0.88,
     "screenBgImage": "",
-    "textAlign": "center",
+    "textAlign": "left",
     "textVertical": "top"
   },
-  "appearanceSkin": "military-desert",
+  "appearanceSkin": "forest-outpost",
   "mediaTriggers": {
     "enabled": false,
     "actionType": "media",
