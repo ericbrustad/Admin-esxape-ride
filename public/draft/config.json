@@ -65,13 +65,13 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
+    "fontFamily": "Georgia, serif",
     "fontSizePx": 24,
-    "fontColor": "#20331e",
+    "fontColor": "#2ebd1f",
     "textBgColor": "#f2faed",
-    "textBgOpacity": 0.76,
+    "textBgOpacity": 0,
     "screenBgColor": "#dcedd2",
-    "screenBgOpacity": 0.5,
+    "screenBgOpacity": 1,
     "screenBgImage": "/media/skins/forest-meadow.svg",
     "screenBgImageEnabled": true,
     "textAlign": "left",
