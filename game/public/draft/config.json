@@ -15,8 +15,52 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "dd",
+      "type": "clone",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "dd",
+      "type": "clone",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -65,21 +109,21 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
+    "fontFamily": "\"Orbitron\", \"Rajdhani\", sans-serif",
     "fontSizePx": 24,
-    "fontColor": "#1f2d1f",
-    "textBgColor": "#edf8e6",
+    "fontColor": "#3f2d18",
+    "textBgColor": "#fff6e6",
     "textBgOpacity": 0.74,
-    "screenBgColor": "#d4ebcc",
-    "screenBgOpacity": 0.54,
-    "screenBgImage": "/media/skins/forest-foliage.svg",
+    "screenBgColor": "#f3dfc1",
+    "screenBgOpacity": 0.48,
+    "screenBgImage": "/media/skins/desert-horizon.svg",
     "screenBgImageEnabled": true,
-    "textAlign": "left",
+    "textAlign": "center",
     "textVertical": "top",
     "panelDepth": true
   },
-  "appearanceSkin": "forest-outpost",
-  "appearanceTone": "light",
+  "appearanceSkin": "desert-horizon",
+  "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
     "actionType": "media",
