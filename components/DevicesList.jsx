@@ -31,6 +31,8 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {devices.map((d, i) => {
           const selected = editingId === d.id;
+          const background = selected ? 'rgba(220, 90, 90, 0.28)' : 'rgba(193, 64, 64, 0.18)';
+          const borderColor = selected ? 'rgba(220, 90, 90, 0.5)' : 'rgba(193, 64, 64, 0.35)';
           return (
             <div
               key={d.id}
@@ -42,8 +44,8 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
                 padding: 10,
                 borderRadius: 8,
                 cursor: 'pointer',
-                background: selected ? 'rgba(130,200,140,0.12)' : 'transparent',
-                border: '1px solid rgba(255,255,255,0.04)',
+                background,
+                border: `1px solid ${borderColor}`,
               }}
             >
               {/* Thumbnail */}

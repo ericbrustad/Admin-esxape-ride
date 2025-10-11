@@ -1,8 +1,23 @@
 import React from 'react';
 
 export default function MissionListItem({ mission = {}, onClick = () => {} }) {
+  const background = mission.isTrigger ? 'rgba(255, 214, 102, 0.18)' : 'rgba(61, 171, 105, 0.18)';
+  const borderColor = mission.isTrigger ? 'rgba(255, 214, 102, 0.4)' : 'rgba(61, 171, 105, 0.3)';
+
   return (
-    <div onClick={() => onClick(mission)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 8, borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.03)' }}>
+    <div
+      onClick={() => onClick(mission)}
+      style={{
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 8,
+        cursor: 'pointer',
+        border: `1px solid ${borderColor}`,
+        background,
+      }}
+    >
       <div style={{ width: 46, height: 46, borderRadius: 6, overflow: 'hidden', background: '#0b0f11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {mission.thumbnailUrl ? <img src={mission.thumbnailUrl} alt={mission.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ color: '#6e848b', fontSize: 12 }}>No<br/>Img</div>}
       </div>
