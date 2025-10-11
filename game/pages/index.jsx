@@ -15,7 +15,7 @@ function toDirect(u){ try{
   return u;
 }catch{return u;}}
 
-export default function Game() {
+function RealGameApp() {
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('Loading…');
@@ -194,6 +194,12 @@ export default function Game() {
       <OutcomeModal open={!!outcome} outcome={outcome} onClose={()=>{ setOutcome(null); next(); }} />
     </main>
   );
+}
+
+export default function GamePage() {
+  const enabled = process.env.NEXT_PUBLIC_ENABLE_GAME === '1';
+  if (!enabled) return <div style={{ padding: 20 }}>Game is disabled for now.</div>;
+  return <RealGameApp />;
 }
 
 /* helpers */
