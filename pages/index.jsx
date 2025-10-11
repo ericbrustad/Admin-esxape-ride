@@ -284,7 +284,10 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push(normalizedSlug);
     seen.add(normalizedSlug);
   }
-  if (normalizedSlug === 'default' && !seen.has('default-game')) cleaned.push('default-game');
+  if (normalizedSlug === 'default' && !seen.has('default-game')) {
+    cleaned.push('default-game');
+    seen.add('default-game');
+  }
   game.tags = cleaned;
   game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
   base.game = game;
@@ -515,7 +518,7 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery', tags:['default'], coverImage:'' },
+      game:   { title:'Untitled Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -573,12 +576,31 @@ export default function Admin() {
   }
 
   async function publishWithSlug(slug, channel='published') {
-    const first = isDefaultSlug(slug)
-      ? `/api/game${qs({ channel })}`
-      : `/api/game${qs({ slug, channel })}`;
-    const fallback = isDefaultSlug(slug)
-      ? null
-      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
+    if (isDefaultSlug(slug)) {
+      try {
+        const res = await fetch('/api/publish', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          credentials:'include',
+          body: JSON.stringify({ slug: 'root' }),
+        });
+        const txt = await res.text();
+        let data = {};
+        try { data = JSON.parse(txt); } catch {}
+        if (!res.ok || data?.ok === false) {
+          const err = data?.error || txt || 'publish failed';
+          throw new Error(err);
+        }
+        setStatus('✅ Published');
+        return true;
+      } catch (e) {
+        setStatus('❌ Publish failed: ' + (e?.message || e));
+        return false;
+      }
+    }
+
+    const first = `/api/game${qs({ slug, channel })}`;
+    const fallback = `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
 
     try {
       const res = await fetch(first, {
@@ -588,11 +610,10 @@ export default function Admin() {
       const txt = await res.text();
       let data = {};
       try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) { if (fallback) throw new Error('try fallback'); else throw new Error(txt||'publish failed'); }
+      if (!res.ok) throw new Error('try fallback');
       setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
       return true;
     } catch (e) {
-      if (!fallback) { setStatus('❌ Publish failed: ' + (e?.message||e)); return false; }
       try {
         const res2 = await fetch(fallback, {
           method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',

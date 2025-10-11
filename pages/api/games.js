@@ -68,6 +68,7 @@ function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
   const normSlug = (slugTag || slugify(title)).toLowerCase();
   const tags = normSlug ? [normSlug] : [];
+  if (normSlug === 'default' && !tags.includes('default-game')) tags.push('default-game');
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
     game: { title, type: gameType || 'Mystery', tags, coverImage: '' },

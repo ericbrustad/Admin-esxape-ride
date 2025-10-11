@@ -59,25 +59,36 @@ async function putFile(path, content, message) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
   try {
-    const slug = (req.query.slug || '').toString().trim();
+    const rawSlug = (req.query.slug || '').toString().trim();
+    const normalized = rawSlug.toLowerCase();
+    const isDefault = !rawSlug || normalized === 'default' || normalized === 'root' || normalized === 'legacy-root';
+
     const { missions, config } = req.body || {};
-    if (!slug) return res.status(400).json({ error: 'Missing slug' });
     if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
 
+    const slug = isDefault ? 'default' : rawSlug;
     const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
-    const paths = {
-      mAdmin: `public/games/${slug}/draft/missions.json`,
-      cAdmin: `public/games/${slug}/draft/config.json`,
-      mGame:  `game/public/games/${slug}/draft/missions.json`,
-      cGame:  `game/public/games/${slug}/draft/config.json`,
-    };
+
+    const paths = isDefault
+      ? {
+          mAdmin: 'public/draft/missions.json',
+          cAdmin: 'public/draft/config.json',
+          mGame:  'game/public/draft/missions.json',
+          cGame:  'game/public/draft/config.json',
+        }
+      : {
+          mAdmin: `public/games/${slug}/draft/missions.json`,
+          cAdmin: `public/games/${slug}/draft/config.json`,
+          mGame:  `game/public/games/${slug}/draft/missions.json`,
+          cGame:  `game/public/games/${slug}/draft/config.json`,
+        };
 
     await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
     await putFile(paths.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin)`);
     await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
     await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
 
-    res.status(200).json({ ok: true, wrote: Object.values(paths) });
+    res.status(200).json({ ok: true, slug: isDefault ? null : slug, wrote: Object.values(paths) });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }
