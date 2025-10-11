@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff4fe"/>
+      <stop offset="50%" stop-color="#f6dfff"/>
+      <stop offset="100%" stop-color="#f0cfff"/>
+    </linearGradient>
+    <radialGradient id="bubble" cx="0" cy="0" r="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.95)"/>
+      <stop offset="60%" stop-color="rgba(255,255,255,0.4)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <linearGradient id="stripe" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(255,170,236,0.6)"/>
+      <stop offset="50%" stop-color="rgba(170,128,255,0.35)"/>
+      <stop offset="100%" stop-color="rgba(255,210,180,0.6)"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#base)"/>
+  <g opacity="0.45">
+    <rect x="-200" y="180" width="360" height="1200" fill="url(#stripe)" transform="rotate(-18 0 0)"/>
+    <rect x="320" y="-260" width="320" height="1200" fill="url(#stripe)" transform="rotate(-8 0 0)"/>
+    <rect x="780" y="-220" width="360" height="1200" fill="url(#stripe)" transform="rotate(6 0 0)"/>
+    <rect x="1200" y="-180" width="320" height="1200" fill="url(#stripe)" transform="rotate(16 0 0)"/>
+  </g>
+  <g opacity="0.6">
+    <circle cx="200" cy="180" r="120" fill="url(#bubble)"/>
+    <circle cx="420" cy="120" r="90" fill="url(#bubble)"/>
+    <circle cx="640" cy="200" r="130" fill="url(#bubble)"/>
+    <circle cx="940" cy="140" r="110" fill="url(#bubble)"/>
+    <circle cx="1180" cy="200" r="140" fill="url(#bubble)"/>
+    <circle cx="1420" cy="160" r="100" fill="url(#bubble)"/>
+  </g>
+  <g opacity="0.55">
+    <circle cx="260" cy="520" r="110" fill="url(#bubble)"/>
+    <circle cx="520" cy="600" r="140" fill="url(#bubble)"/>
+    <circle cx="840" cy="540" r="150" fill="url(#bubble)"/>
+    <circle cx="1120" cy="620" r="130" fill="url(#bubble)"/>
+    <circle cx="1360" cy="560" r="120" fill="url(#bubble)"/>
+  </g>
+  <g opacity="0.4" stroke="rgba(255,120,200,0.5)" stroke-width="12" stroke-linecap="round">
+    <path d="M160 720 C340 660 520 660 700 720" fill="none"/>
+    <path d="M940 700 C1120 660 1280 660 1440 700" fill="none"/>
+  </g>
+  <g opacity="0.4" stroke="rgba(170,120,255,0.45)" stroke-width="10" stroke-linecap="round">
+    <path d="M240 280 C360 240 460 240 580 280" fill="none"/>
+    <path d="M880 300 C1040 260 1180 260 1340 300" fill="none"/>
+  </g>
+</svg>

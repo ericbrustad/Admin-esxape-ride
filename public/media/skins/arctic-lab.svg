@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="ice" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f2fbff"/>
+      <stop offset="45%" stop-color="#d5f1f8"/>
+      <stop offset="100%" stop-color="#bde4f0"/>
+    </linearGradient>
+    <radialGradient id="glacier" cx="30%" cy="20%" r="45%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.85)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <radialGradient id="glacier2" cx="75%" cy="18%" r="40%">
+      <stop offset="0%" stop-color="rgba(200,245,255,0.75)"/>
+      <stop offset="100%" stop-color="rgba(200,245,255,0)"/>
+    </radialGradient>
+    <linearGradient id="grid" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(120,190,208,0.35)"/>
+      <stop offset="100%" stop-color="rgba(120,190,208,0)"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#ice)"/>
+  <rect width="1600" height="900" fill="url(#glacier)"/>
+  <rect width="1600" height="900" fill="url(#glacier2)"/>
+  <g opacity="0.4">
+    <rect x="-200" y="120" width="360" height="1200" fill="url(#grid)" transform="rotate(-18 0 0)"/>
+    <rect x="200" y="-200" width="360" height="1200" fill="url(#grid)" transform="rotate(-8 0 0)"/>
+    <rect x="720" y="-240" width="360" height="1200" fill="url(#grid)" transform="rotate(6 0 0)"/>
+    <rect x="1180" y="-200" width="360" height="1200" fill="url(#grid)" transform="rotate(16 0 0)"/>
+  </g>
+  <g opacity="0.25">
+    <path d="M160 640 C360 580 520 600 760 640 S1180 700 1440 660" stroke="#8ed0de" stroke-width="16" stroke-linecap="round" fill="none"/>
+    <path d="M120 500 C300 440 520 440 720 500 S1120 560 1360 520" stroke="#9cdbea" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.28">
+    <path d="M280 780 C480 720 700 720 960 780" stroke="#7bc0d4" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <path d="M1040 760 C1220 720 1380 720 1560 760" stroke="#6cb4c8" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <g opacity="0.35" stroke="#a6dff0" stroke-width="8" stroke-linecap="round">
+    <path d="M80 320 l90 -50"/>
+    <path d="M1500 340 l100 -54"/>
+    <path d="M760 120 l120 -48"/>
+  </g>
+</svg>

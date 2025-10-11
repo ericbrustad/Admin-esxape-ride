@@ -1,7 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import AssignedMediaTab from '../components/AssignedMediaTab';
+import { AppearanceEditor } from '../components/ui-kit';
+import {
+  normalizeTone,
+  appearanceBackgroundStyle,
+  defaultAppearance,
+  surfaceStylesFromAppearance,
+} from '../lib/admin-shared';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -271,27 +279,6 @@ function sanitizeTriggerConfig(input = {}) {
 function mergeTriggerState(current, partial = {}) {
   return { ...DEFAULT_TRIGGER_CONFIG, ...(current || {}), ...(partial || {}) };
 }
-const FONT_FAMILIES = [
-  { v:'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', label:'System' },
-  { v:'Georgia, serif',                      label:'Georgia' },
-  { v:'Times New Roman, Times, serif',      label:'Times New Roman' },
-  { v:'Arial, Helvetica, sans-serif',       label:'Arial' },
-  { v:'Courier New, Courier, monospace',    label:'Courier New' },
-];
-function defaultAppearance() {
-  return {
-    fontFamily: FONT_FAMILIES[0].v,
-    fontSizePx: 22,
-    fontColor: '#ffffff',
-    textBgColor: '#000000',
-    textBgOpacity: 0.0,
-    screenBgColor: '#000000',
-    screenBgOpacity: 0.0,
-    screenBgImage: '',
-    textAlign: 'center',
-    textVertical: 'top',
-  };
-}
 function createDeviceDraft(overrides = {}) {
   const base = {
     title: '',
@@ -311,31 +298,36 @@ const APPEARANCE_SKINS = [
   {
     key: 'default',
     label: 'Default Control',
-    description: 'Baseline agent interface with balanced contrast.',
+    description: 'Neutral chrome-lite mission console with woven fabric texture.',
     uiKey: 'default',
     appearance: {
       ...defaultAppearance(),
-      fontColor: '#e9eef2',
-      textBgColor: '#141b20',
-      textBgOpacity: 0.35,
-      screenBgColor: '#05090f',
-      screenBgOpacity: 0.78,
+      fontColor: '#1f2a35',
+      textBgColor: '#f4f8fb',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dbe4f1',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/control-fabric.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
     },
   },
   {
     key: 'space-military',
     label: 'Space Military Command',
-    description: 'Metallic chrome cockpit with holographic HUD glow.',
+    description: 'Jet cockpit chrome and brushed metal HUD piping.',
     uiKey: 'space-military',
     appearance: {
+      ...defaultAppearance(),
       fontFamily: '"Orbitron", "Rajdhani", "Segoe UI", sans-serif',
       fontSizePx: 26,
-      fontColor: '#c7f6ff',
-      textBgColor: '#0b1d2b',
-      textBgOpacity: 0.72,
-      screenBgColor: '#040b12',
-      screenBgOpacity: 0.85,
-      screenBgImage: '',
+      fontColor: '#14253a',
+      textBgColor: '#f3f8ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#d6e2f2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/space-metal.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -343,17 +335,19 @@ const APPEARANCE_SKINS = [
   {
     key: 'military-desert',
     label: 'Desert Ops',
-    description: 'Sun-baked armor plating with tactical sand textures.',
+    description: 'Sun-baked armor plating with sandy cactus silhouettes.',
     uiKey: 'military-desert',
     appearance: {
+      ...defaultAppearance(),
       fontFamily: '"Copperplate", "Trebuchet MS", "Segoe UI", sans-serif',
       fontSizePx: 24,
-      fontColor: '#ffe8b8',
-      textBgColor: '#543d24',
-      textBgOpacity: 0.62,
-      screenBgColor: '#3a2815',
-      screenBgOpacity: 0.83,
-      screenBgImage: '',
+      fontColor: '#3b2a16',
+      textBgColor: '#fff4de',
+      textBgOpacity: 0.76,
+      screenBgColor: '#f1ddbc',
+      screenBgOpacity: 0.55,
+      screenBgImage: '/media/skins/desert-canvas.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -361,17 +355,19 @@ const APPEARANCE_SKINS = [
   {
     key: 'forest-outpost',
     label: 'Forest Outpost',
-    description: 'Leaf canopy, bark fibers, and moss lighting.',
+    description: 'Leaf canopy, wood grain, and moss-lit control glass.',
     uiKey: 'forest-outpost',
     appearance: {
+      ...defaultAppearance(),
       fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
       fontSizePx: 24,
-      fontColor: '#e6f8e0',
-      textBgColor: '#17331c',
-      textBgOpacity: 0.68,
-      screenBgColor: '#0d1d12',
-      screenBgOpacity: 0.88,
-      screenBgImage: '',
+      fontColor: '#1f2d1f',
+      textBgColor: '#edf8e6',
+      textBgOpacity: 0.74,
+      screenBgColor: '#d4ebcc',
+      screenBgOpacity: 0.54,
+      screenBgImage: '/media/skins/forest-foliage.svg',
+      screenBgImageEnabled: true,
       textAlign: 'left',
       textVertical: 'top',
     },
@@ -379,17 +375,19 @@ const APPEARANCE_SKINS = [
   {
     key: 'starfield',
     label: 'Starfield Observatory',
-    description: 'Deep space with constellations and thruster flares.',
+    description: 'Soft starfield glass with nebula shimmer and chrome trim.',
     uiKey: 'starfield',
     appearance: {
+      ...defaultAppearance(),
       fontFamily: '"Exo 2", "Segoe UI", sans-serif',
       fontSizePx: 22,
-      fontColor: '#d5e8ff',
-      textBgColor: '#0d1c3a',
+      fontColor: '#1f2648',
+      textBgColor: '#eef1ff',
       textBgOpacity: 0.7,
-      screenBgColor: '#050a1f',
-      screenBgOpacity: 0.88,
-      screenBgImage: '',
+      screenBgColor: '#d7def6',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/starfield-soft.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -400,14 +398,136 @@ const APPEARANCE_SKINS = [
     description: 'High-def balloons, candy gloss, and playful fonts.',
     uiKey: 'cartoon-bubbles',
     appearance: {
+      ...defaultAppearance(),
       fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
       fontSizePx: 28,
-      fontColor: '#fff3fe',
-      textBgColor: '#5f2a7a',
-      textBgOpacity: 0.6,
-      screenBgColor: '#321353',
-      screenBgOpacity: 0.86,
-      screenBgImage: '',
+      fontColor: '#4b2c6c',
+      textBgColor: '#fff1ff',
+      textBgOpacity: 0.68,
+      screenBgColor: '#f2dfff',
+      screenBgOpacity: 0.55,
+      screenBgImage: '/media/skins/cartoon-balloons.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'chrome-luminous',
+    label: 'Chrome Luminous',
+    description: 'Polished chrome with soft sky reflections and nav console glow.',
+    uiKey: 'chrome-luminous',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#1a2335',
+      textBgColor: '#f5f9ff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#dde6f5',
+      screenBgOpacity: 0.42,
+      screenBgImage: '/media/skins/chrome-luminous.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'desert-horizon',
+    label: 'Desert Horizon',
+    description: 'Pale dunes, mirage chrome and cactus silhouettes at sunrise.',
+    uiKey: 'desert-horizon',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Montserrat", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#3f2d18',
+      textBgColor: '#fff6e6',
+      textBgOpacity: 0.74,
+      screenBgColor: '#f3dfc1',
+      screenBgOpacity: 0.48,
+      screenBgImage: '/media/skins/desert-horizon.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'forest-meadow',
+    label: 'Forest Meadow',
+    description: 'Sunlit canopy with moss glass, bark piping, and flower flecks.',
+    uiKey: 'forest-meadow',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#20331e',
+      textBgColor: '#f2faed',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dcedd2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/forest-meadow.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'starfield-dawn',
+    label: 'Starfield Dawn',
+    description: 'Lavender nebula glass with chrome rails and early starlight.',
+    uiKey: 'starfield-dawn',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 23,
+      fontColor: '#262a58',
+      textBgColor: '#f4f0ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#e0dcfa',
+      screenBgOpacity: 0.46,
+      screenBgImage: '/media/skins/starfield-dawn.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'cartoon-parade',
+    label: 'Cartoon Parade',
+    description: 'High-energy balloons, confetti piping, and carnival gloss.',
+    uiKey: 'cartoon-parade',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 30,
+      fontColor: '#4a256a',
+      textBgColor: '#fff4ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#f7e4ff',
+      screenBgOpacity: 0.52,
+      screenBgImage: '/media/skins/cartoon-parade.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+  },
+  {
+    key: 'arctic-lab',
+    label: 'Arctic Lab',
+    description: 'Glacial glass, mint piping, and frosted chrome instrumentation.',
+    uiKey: 'arctic-lab',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Titillium Web", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#133246',
+      textBgColor: '#f2fbff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#d5eef5',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/arctic-lab.svg',
+      screenBgImageEnabled: true,
       textAlign: 'center',
       textVertical: 'top',
     },
@@ -417,12 +537,65 @@ const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, sk
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
 const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
 
-function applyAdminUiThemeForDocument(skinKey) {
+function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   if (typeof document === 'undefined') return;
   const body = document.body;
   if (!body) return;
+  const root = document.documentElement;
   const uiKey = ADMIN_SKIN_TO_UI.get(skinKey) || DEFAULT_UI_SKIN;
+  const normalizedTone = normalizeTone(tone);
+  const background = appearanceBackgroundStyle(appearance, normalizedTone);
+  const surfaces = surfaceStylesFromAppearance(appearance, normalizedTone);
+  const overlay = clamp(Number(appearance?.screenBgOpacity ?? 0), 0, 1);
+  const fontSize = clamp(Number(appearance?.fontSizePx ?? 22), 10, 72);
+  const fontFamily = appearance?.fontFamily || '';
+  const textColor = normalizedTone === 'dark'
+    ? '#f4f7ff'
+    : (appearance?.fontColor || '#1f2d3a');
+  const textBg = `rgba(${hexToRgb(appearance?.textBgColor || '#000000')}, ${clamp(Number(appearance?.textBgOpacity ?? 0), 0, 1)})`;
+  const mutedColor = normalizedTone === 'dark'
+    ? 'rgba(198, 212, 236, 0.78)'
+    : 'rgba(36, 52, 72, 0.68)';
+  const inputBg = normalizedTone === 'dark'
+    ? `rgba(12, 18, 28, ${clamp(0.78 + overlay * 0.12, 0.72, 0.92)})`
+    : `rgba(255, 255, 255, ${clamp(0.88 - overlay * 0.28, 0.55, 0.97)})`;
+  const inputBorder = normalizedTone === 'dark'
+    ? '1px solid rgba(132, 176, 226, 0.42)'
+    : '1px solid rgba(128, 156, 204, 0.42)';
+  const buttonColor = normalizedTone === 'dark' ? '#f4f7ff' : '#0e1c2e';
   body.dataset.skin = uiKey;
+  body.dataset.tone = normalizedTone;
+  body.style.backgroundColor = background.backgroundColor || '';
+  body.style.backgroundImage = background.backgroundImage || 'none';
+  body.style.backgroundSize = background.backgroundSize || '';
+  body.style.backgroundRepeat = background.backgroundRepeat || '';
+  body.style.backgroundPosition = background.backgroundPosition || '';
+  body.style.backgroundBlendMode = background.backgroundBlendMode || '';
+  body.style.setProperty('--appearance-panel-bg', surfaces.panelBg);
+  body.style.setProperty('--appearance-panel-border', surfaces.panelBorder);
+  body.style.setProperty('--appearance-panel-shadow', surfaces.panelShadow);
+  body.style.setProperty('--appearance-piping-opacity', String(surfaces.pipingOpacity));
+  body.style.setProperty('--appearance-piping-shadow', surfaces.pipingShadow);
+  body.style.setProperty('--appearance-screen-overlay', String(overlay));
+  body.style.setProperty('--admin-body-color', textColor);
+  body.style.setProperty('--admin-muted', mutedColor);
+  body.style.setProperty('--admin-input-bg', inputBg);
+  body.style.setProperty('--admin-input-border', inputBorder);
+  body.style.setProperty('--admin-input-color', textColor);
+  body.style.setProperty('--admin-button-color', buttonColor);
+  if (appearance?.screenBgImage && appearance?.screenBgImageEnabled !== false) {
+    body.style.setProperty('--appearance-panel-surface', 'none');
+  } else {
+    body.style.removeProperty('--appearance-panel-surface');
+  }
+  body.dataset.panelDepth = appearance?.panelDepth === false ? 'flat' : 'deep';
+  if (root) {
+    if (fontFamily) root.style.setProperty('--appearance-font-family', fontFamily);
+    else root.style.removeProperty('--appearance-font-family');
+    root.style.setProperty('--appearance-font-size', `${fontSize}px`);
+    root.style.setProperty('--appearance-font-color', textColor);
+    root.style.setProperty('--appearance-text-bg', textBg);
+  }
 }
 
 function isAppearanceEqual(a, b) {
@@ -436,8 +609,10 @@ function isAppearanceEqual(a, b) {
     'screenBgColor',
     'screenBgOpacity',
     'screenBgImage',
+    'screenBgImageEnabled',
     'textAlign',
     'textVertical',
+    'panelDepth',
   ];
   return keys.every((key) => {
     const av = a[key];
@@ -521,14 +696,15 @@ useEffect(()=>{
 
   useEffect(() => {
     if (!config) {
-      applyAdminUiThemeForDocument('default');
+      applyAdminUiThemeForDocument('default', defaultAppearance(), 'light');
       return;
     }
     const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
       ? config.appearanceSkin
       : null;
     const detected = detectAppearanceSkin(config.appearance, config.appearanceSkin);
-    applyAdminUiThemeForDocument(stored || detected);
+    const tone = normalizeTone(config.appearanceTone);
+    applyAdminUiThemeForDocument(stored || detected, config.appearance, tone);
   }, [
     config?.appearanceSkin,
     config?.appearance?.fontFamily,
@@ -539,8 +715,11 @@ useEffect(()=>{
     config?.appearance?.screenBgColor,
     config?.appearance?.screenBgOpacity,
     config?.appearance?.screenBgImage,
+    config?.appearance?.screenBgImageEnabled,
     config?.appearance?.textAlign,
     config?.appearance?.textVertical,
+    config?.appearance?.panelDepth,
+    config?.appearanceTone,
   ]);
 
   
@@ -704,7 +883,8 @@ useEffect(()=>{
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
-          appearance: { ...dc.appearance, ...(c0.appearance || {}) },
+          appearance: {
+      ...defaultAppearance(), ...dc.appearance, ...(c0.appearance || {}) },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
           mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG, ...(c0.mediaTriggers || {}) },
@@ -741,6 +921,7 @@ useEffect(()=>{
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
       appearanceSkin: 'default',
+      appearanceTone: 'light',
       mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
@@ -1191,9 +1372,25 @@ useEffect(()=>{
   function applyAppearanceSkin(key) {
     const preset = APPEARANCE_SKIN_MAP.get(key);
     if (!preset) return;
-    applyAdminUiThemeForDocument(key);
-    setConfig(prev => ({ ...prev, appearance: { ...preset.appearance }, appearanceSkin: key }));
+    const tone = normalizeTone(config?.appearanceTone);
+    applyAdminUiThemeForDocument(key, preset.appearance, tone);
+    setConfig(prev => ({ ...prev, appearance: {
+      ...defaultAppearance(), ...preset.appearance }, appearanceSkin: key }));
+    setDirty(true);
     setStatus(`✅ Applied theme: ${preset.label}`);
+  }
+
+  function updateInterfaceTone(nextTone) {
+    const normalized = normalizeTone(nextTone);
+    if (normalized === normalizeTone(config?.appearanceTone)) return;
+    const appearance = config?.appearance || defaultAppearance();
+    const skinKey = config?.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+      ? config.appearanceSkin
+      : detectAppearanceSkin(appearance, config?.appearanceSkin);
+    applyAdminUiThemeForDocument(skinKey, appearance, normalized);
+    setConfig(prev => ({ ...prev, appearanceTone: normalized }));
+    setDirty(true);
+    setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
   async function toggleProtection() {
@@ -1359,7 +1556,7 @@ useEffect(()=>{
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--admin-panel-bg)', boxShadow: 'var(--admin-panel-shadow)' }}>
+        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
           Loading… (pulling config & missions)
         </div>
       </main>
@@ -1390,6 +1587,7 @@ useEffect(()=>{
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
+  const interfaceTone = normalizeTone(config.appearanceTone);
   const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
@@ -1418,7 +1616,7 @@ useEffect(()=>{
                   padding:'6px 14px',
                   borderRadius:999,
                   border:`1px solid ${protectionIndicatorColor}`,
-                  background:'var(--admin-panel-bg)',
+                  background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
                   color: protectionIndicatorColor,
                   fontWeight:700,
                   letterSpacing:1,
@@ -1621,7 +1819,7 @@ useEffect(()=>{
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--admin-panel-bg)', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
                       <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -1969,6 +2167,7 @@ useEffect(()=>{
                   </label>
                   {editing.appearanceOverrideEnabled && (
                     <AppearanceEditor value={editing.appearance||defaultAppearance()}
+                      tone={interfaceTone}
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
@@ -2034,11 +2233,11 @@ useEffect(()=>{
                       padding:12,
                       borderRadius:12,
                       border:`1px solid ${selected ? 'rgba(45, 212, 191, 0.35)' : 'var(--admin-border-soft)'}`,
-                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--admin-panel-bg)',
+                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--appearance-panel-bg, var(--admin-panel-bg))',
                       cursor:'pointer',
                     }}
                   >
-                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--admin-panel-bg)', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
                       {iconUrl
                         ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
                         : <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
@@ -2210,7 +2409,7 @@ useEffect(()=>{
                                 <span style={{ opacity:0.6 }}>▾</span>
                               </button>
                               {deviceTriggerPicker === 'action' && (
-                                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:30, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 16px 32px rgba(0,0,0,0.4)' }}>
+                                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:30, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow:'0 16px 32px rgba(0,0,0,0.4)' }}>
                                   {actionOptions.length === 0 ? (
                                     <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
                                   ) : actionOptions.map(opt => (
@@ -2388,12 +2587,45 @@ useEffect(()=>{
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {[
+                  { key:'light', label:'☀️ Light — dark text' },
+                  { key:'dark', label:'🌙 Dark — light text' },
+                ].map((option) => {
+                  const active = interfaceTone === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={()=>updateInterfaceTone(option.key)}
+                      style={{
+                        borderRadius:12,
+                        padding:'8px 14px',
+                        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                        color:'var(--admin-body-color)',
+                        cursor:'pointer',
+                        fontWeight: active ? 600 : 500,
+                        boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
+                Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
+              </div>
+            </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
                 {APPEARANCE_SKINS.map((skin)=>{
                   const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage
+                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
                     ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
                     : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
                   return (
@@ -2435,13 +2667,18 @@ useEffect(()=>{
             </div>
             <AppearanceEditor
               value={config.appearance||defaultAppearance()}
-              onChange={(next)=>setConfig(prev => ({
-                ...prev,
-                appearance: next,
-                appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
-                  ? prev.appearanceSkin
-                  : detectAppearanceSkin(next, prev.appearanceSkin),
-              }))}
+              tone={interfaceTone}
+              onChange={(next)=>{
+                setConfig(prev => ({
+                  ...prev,
+                  appearance: next,
+                  appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
+                    ? prev.appearanceSkin
+                    : detectAppearanceSkin(next, prev.appearanceSkin),
+                }));
+                setDirty(true);
+                setStatus('🎨 Updated appearance settings');
+              }}
             />
             <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
@@ -2470,7 +2707,7 @@ useEffect(()=>{
 
       {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
-        <AssignedMediaTab
+        <AssignedMediaPageTab
           config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
@@ -2591,85 +2828,6 @@ function Field({ label, children }) {
     </div>
   );
 }
-function ColorField({ label, value, onChange }) {
-  return (
-    <Field label={label}>
-      <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, alignItems:'center' }}>
-        <input type="color" value={value} onChange={(e)=>onChange(e.target.value)} />
-        <input style={S.input} value={value} onChange={(e)=>onChange(e.target.value)} />
-      </div>
-    </Field>
-  );
-}
-function AppearanceEditor({ value, onChange }) {
-  const a = value || defaultAppearance();
-  return (
-    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-        <Field label="Font family">
-          <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
-            {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
-          </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed var(--admin-border-soft)', borderRadius:8, fontFamily:a.fontFamily }}>
-            Aa — preview text with this font
-          </div>
-        </Field>
-        <Field label="Font size (px)">
-          <input type="number" min={10} max={72} style={S.input}
-            value={a.fontSizePx} onChange={(e)=>onChange({ ...a, fontSizePx:clamp(Number(e.target.value||0),10,72) })}/>
-        </Field>
-        <ColorField label="Text color" value={a.fontColor} onChange={(v)=>onChange({ ...a, fontColor:v })}/>
-        <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>onChange({ ...a, textBgColor:v })}/>
-        <Field label="Text background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
-            onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
-        </Field>
-        <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
-        <Field label="Screen background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
-            onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
-        </Field>
-        <Field label="Screen background image (URL)">
-          <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
-          {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-          )}
-        </Field>
-        <Field label="Text alignment (horizontal)">
-          <select style={S.input} value={a.textAlign} onChange={(e)=>onChange({ ...a, textAlign:e.target.value })}>
-            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-          </select>
-        </Field>
-        <Field label="Text position (vertical)">
-          <select style={S.input} value={a.textVertical} onChange={(e)=>onChange({ ...a, textVertical:e.target.value })}>
-            <option value="top">Top</option><option value="center">Center</option>
-          </select>
-        </Field>
-      </div>
-
-      <div style={{
-        marginTop:12, border:'1px dashed var(--admin-border-soft)', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
-          ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
-          : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
-        padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',
-      }}>
-        <div style={{
-          maxWidth:'100%',
-          background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
-          textAlign:a.textAlign, width:'fit-content',
-          justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
-        }}>
-          Preview text
-        </div>
-      </div>
-    </div>
-  );
-}
 function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
   const [correct, setCorrect] = useState(Number.isInteger(correctIndex) ? correctIndex : undefined);
@@ -2720,10 +2878,10 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: {
-    background: 'var(--admin-body-bg)',
-    color: 'var(--admin-body-color)',
+    background: 'transparent',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
     minHeight: '100vh',
-    fontFamily: 'var(--admin-font-family)',
+    fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
   header: {
     padding: 16,
@@ -2736,23 +2894,23 @@ const S = {
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
   sidebarTall: {
-    background: 'var(--admin-panel-bg)',
-    border: 'var(--admin-panel-border)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
     borderRadius: 18,
     padding: 14,
     position: 'sticky',
     top: 20,
     height: 'calc(100vh - 140px)',
     overflow: 'auto',
-    boxShadow: 'var(--admin-panel-shadow)',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   card: {
     position: 'relative',
-    background: 'var(--admin-panel-bg)',
-    border: 'var(--admin-panel-border)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
     borderRadius: 18,
     padding: 18,
-    boxShadow: 'var(--admin-panel-shadow)',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
   input: {
@@ -2949,7 +3107,7 @@ function MapOverview({
   return (
     <div>
       {!leafletReady && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }}/>
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }}/>
     </div>
   );
 }
@@ -3017,7 +3175,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
           type="range" min={5} max={500} step={5}
@@ -3325,7 +3483,7 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
@@ -3391,6 +3549,62 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
     trigger: sanitizeTriggerConfig(d?.trigger),
   }));
 
+  const mediaPool = useMemo(() => {
+    return (inventory || []).map((item, idx) => {
+      const rawUrl = item?.url || item?.path || item;
+      const directUrl = toDirectMediaURL(rawUrl);
+      if (!directUrl) return null;
+      const thumb = toDirectMediaURL(item?.thumbUrl || directUrl);
+      return {
+        id: directUrl,
+        name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
+        type: item?.type || item?.kind || '',
+        tags: Array.isArray(item?.tags) ? item.tags : [],
+        thumbUrl: thumb,
+        url: directUrl,
+        openUrl: rawUrl || directUrl,
+      };
+    }).filter(Boolean);
+  }, [inventory]);
+
+  const assignedState = useMemo(() => ({
+    missionIcons: (config.icons?.missions || []).map(icon => icon.key),
+    deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
+    rewardMedia: (config.media?.rewardsPool || []).map(item => item.url),
+    penaltyMedia: (config.media?.penaltiesPool || []).map(item => item.url),
+    actionMedia: config.media?.actionMedia || [],
+  }), [config]);
+
+  const arraysEqual = useCallback((a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }, []);
+
+  const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
+    const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
+    setConfig(current => {
+      const prevAction = current.media?.actionMedia || [];
+      if (arraysEqual(prevAction, nextAction)) return current;
+      return {
+        ...current,
+        media: {
+          ...(current.media || {}),
+          actionMedia: [...nextAction],
+        },
+      };
+    });
+  }, [arraysEqual, setConfig]);
+
+  const triggerEnabled = !!triggerConfig.enabled;
+
+  const handleTriggerToggle = useCallback((enabled) => {
+    setMediaTriggerPicker('');
+    updateMediaTrigger({ enabled });
+  }, [updateMediaTrigger]);
+
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
     setConfig(c => {
@@ -3412,18 +3626,18 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Trigger Automation</h3>
-        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <input
-            type="checkbox"
-            checked={triggerConfig.enabled}
-            onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ enabled: e.target.checked }); }}
-          />
-          <span>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
-        </label>
+        <AssignedMediaTab
+          mediaPool={mediaPool}
+          assigned={assignedState}
+          onChange={handleAssignedStateChange}
+          triggerEnabled={triggerEnabled}
+          setTriggerEnabled={handleTriggerToggle}
+        />
 
-        {triggerConfig.enabled ? (
+        {triggerEnabled && (
           <>
+            <div style={{ fontWeight:600, margin:'8px 0 12px', fontSize:18 }}>Automation Routing</div>
+
             <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
               <select
@@ -3485,8 +3699,6 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
               onSelect={(opt)=>{ updateMediaTrigger({ triggeredMissionId: opt?.id || '' }); }}
             />
           </>
-        ) : (
-          <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Toggle on to coordinate triggers across media, devices, and missions.</div>
         )}
 
         <div style={{ marginTop:16 }}>
@@ -3632,7 +3844,7 @@ function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownK
           <span style={{ opacity:0.6 }}>▾</span>
         </button>
         {isOpen && (
-          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
+          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
             {options.length === 0 ? (
               <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
             ) : options.map(opt => (
