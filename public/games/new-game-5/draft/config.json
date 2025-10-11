@@ -5,7 +5,8 @@
   },
   "game": {
     "title": "Untitled Game",
-    "type": "Mystery"
+    "type": "Mystery",
+    "coverImage": ""
   },
   "forms": {
     "players": 1

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import MediaPool from '../components/MediaPool';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -445,6 +446,7 @@ export default function Admin() {
 
         let merged = {
           ...dc, ...c0,
+          game: { ...dc.game, ...(c0.game || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
@@ -472,7 +474,7 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery' },
+      game:   { title:'Untitled Game', type:'Mystery', coverImage:'' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -932,6 +934,7 @@ export default function Admin() {
 
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
+  const coverImageUrl = config?.game?.coverImage || '';
 
   const missionRadiusDisabled = (selectedMissionIdx==null);
   const missionRadiusValue = selectedMissionIdx!=null
@@ -980,6 +983,26 @@ export default function Admin() {
                 ))}
               </select>
               <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
+              <div
+                style={{
+                  width:72,
+                  height:72,
+                  border:'1px solid #2a323b',
+                  borderRadius:12,
+                  overflow:'hidden',
+                  background:'#0b0c10',
+                  display:'grid',
+                  placeItems:'center',
+                  color:'#9fb0bf',
+                  fontSize:11,
+                  textAlign:'center',
+                  padding:'4px',
+                }}
+              >
+                {coverImageUrl
+                  ? <img src={toDirectMediaURL(coverImageUrl)} alt="Game cover" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                  : <span>No Cover</span>}
+              </div>
             </div>
 
             {/* Save & Publish with optional delay */}
@@ -1627,6 +1650,8 @@ export default function Admin() {
           config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
+          inventory={inventory}
+          uploadToRepo={uploadToRepo}
         />
       )}
 
@@ -2401,12 +2426,83 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
+function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = [], uploadToRepo = async () => '' }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
+
+  const coverImage = config?.game?.coverImage || '';
+  const coverDisplayUrl = coverImage ? toDirectMediaURL(coverImage) : '';
+  const coverInputRef = useRef(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverError, setCoverError] = useState('');
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverDragActive, setCoverDragActive] = useState(false);
+
+  const imageInventory = useMemo(
+    () => (inventory || [])
+      .filter((item) => {
+        const kind = classifyByExt(item?.url);
+        return kind === 'image' || kind === 'gif';
+      })
+      .map((item) => ({ ...item, type: 'image' })),
+    [inventory]
+  );
+
+  const setCoverImage = (url) => {
+    setConfig((c) => ({
+      ...c,
+      game: { ...(c.game || {}), coverImage: url || '' },
+    }));
+  };
+
+  async function handleCoverFile(file) {
+    if (!file) return;
+    if (!(file.type || '').startsWith('image/')) {
+      setCoverError('Please upload an image file (png, jpg, webp, gif).');
+      return;
+    }
+    setCoverBusy(true);
+    setCoverError('');
+    try {
+      const url = await uploadToRepo(file, 'uploads');
+      if (!url) {
+        setCoverError('Upload failed. Please try again.');
+        return;
+      }
+      setCoverImage(url);
+    } catch (err) {
+      setCoverError(err?.message ? `Upload failed: ${err.message}` : 'Upload failed.');
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  function onCoverFileChange(e) {
+    const file = e.target.files?.[0];
+    if (file) handleCoverFile(file);
+    e.target.value = '';
+  }
+
+  function onCoverDrop(e) {
+    e.preventDefault();
+    setCoverDragActive(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleCoverFile(file);
+  }
+
+  function openFileDialog() {
+    coverInputRef.current?.click();
+  }
+
+  function chooseFromMediaPool(item) {
+    if (!item?.url) return;
+    setCoverImage(item.url);
+    setCoverPickerOpen(false);
+    setCoverError('');
+  }
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2428,6 +2524,82 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
 
   return (
     <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop:0, marginBottom:12 }}>Game Cover Image</h3>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setCoverDragActive(true); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setCoverDragActive(false); }}
+          onDrop={onCoverDrop}
+          onClick={openFileDialog}
+          role="presentation"
+          style={{
+            border:`2px dashed ${coverDragActive ? '#2dd4bf' : '#2a323b'}`,
+            borderRadius:14,
+            background:'#0b0c10',
+            minHeight:180,
+            display:'grid',
+            placeItems:'center',
+            cursor:'pointer',
+            position:'relative',
+            overflow:'hidden',
+          }}
+        >
+          {coverDisplayUrl ? (
+            <img src={coverDisplayUrl} alt="Game cover preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          ) : (
+            <div style={{ color:'#9fb0bf', textAlign:'center', maxWidth:320 }}>
+              Drop an image, click to upload, or choose from the Media Pool.
+            </div>
+          )}
+          {coverBusy && (
+            <div style={{
+              position:'absolute',
+              inset:0,
+              background:'rgba(11,12,16,0.75)',
+              display:'grid',
+              placeItems:'center',
+              color:'#e9eef2',
+              fontWeight:600,
+            }}>
+              Uploading…
+            </div>
+          )}
+        </div>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+          <button type="button" style={S.button} onClick={openFileDialog}>Upload Image</button>
+          <button
+            type="button"
+            style={S.button}
+            onClick={()=>setCoverPickerOpen(true)}
+            disabled={!imageInventory.length}
+          >
+            Choose from Media Pool
+          </button>
+          {coverImage && (
+            <button
+              type="button"
+              style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+              onClick={()=>setCoverImage('')}
+            >
+              Remove Cover
+            </button>
+          )}
+        </div>
+        {coverError && <div style={{ color:'#fca5a5', marginTop:8 }}>{coverError}</div>}
+        {!imageInventory.length && (
+          <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            Tip: upload images in the Media Pool to enable quick selection.
+          </div>
+        )}
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display:'none' }}
+          onChange={onCoverFileChange}
+        />
+      </div>
+
       {/* Icons */}
       <div style={S.card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -2468,6 +2640,21 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
           />
         </div>
       </div>
+
+      {coverPickerOpen && (
+        <div style={S.overlay}>
+          <div style={{ ...S.card, width:'min(780px, 95vw)', maxHeight:'80vh', overflowY:'auto' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <h3 style={{ margin:0 }}>Select Cover Image</h3>
+              <button type="button" style={S.button} onClick={()=>setCoverPickerOpen(false)}>Close</button>
+            </div>
+            <MediaPool
+              media={imageInventory}
+              onSelect={(item)=>chooseFromMediaPool(item)}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

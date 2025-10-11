@@ -5,7 +5,8 @@
   },
   "game": {
     "title": "Newbie",
-    "type": "Thriller"
+    "type": "Thriller",
+    "coverImage": ""
   },
   "forms": {
     "players": 1
