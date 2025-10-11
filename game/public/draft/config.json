@@ -65,19 +65,20 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Orbitron\", \"Rajdhani\", \"Segoe UI\", sans-serif",
-    "fontSizePx": 26,
-    "fontColor": "#f7f9fd",
-    "textBgColor": "#466ba0",
-    "textBgOpacity": 0,
-    "screenBgColor": "#2171e8",
-    "screenBgOpacity": 0.3,
-    "screenBgImage": "/media/skins/space-metal.svg",
-    "screenBgImageEnabled": false,
+    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 24,
+    "fontColor": "#1f2d1f",
+    "textBgColor": "#edf8e6",
+    "textBgOpacity": 0.74,
+    "screenBgColor": "#d4ebcc",
+    "screenBgOpacity": 0,
+    "screenBgImage": "/media/skins/forest-foliage.svg",
+    "screenBgImageEnabled": true,
     "textAlign": "center",
-    "textVertical": "top"
+    "textVertical": "center",
+    "panelDepth": true
   },
-  "appearanceSkin": "space-military",
+  "appearanceSkin": "forest-outpost",
   "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
