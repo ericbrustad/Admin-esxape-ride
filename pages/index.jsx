@@ -73,7 +73,7 @@ function classifyByExt(u) {
 }
 
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons']) {
+async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers']) {
   const seen = new Set();
   const out = [];
   await Promise.all(dirs.map(async (dir) => {
@@ -266,6 +266,35 @@ function defaultAppearance() {
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
 
+function normalizeGameMetadata(cfg, slug = '') {
+  const base = { ...(cfg || {}) };
+  const game = { ...(base.game || {}) };
+  const rawTags = Array.isArray(game.tags) ? game.tags : [];
+  const cleaned = [];
+  const seen = new Set();
+  rawTags.forEach((tag) => {
+    const str = String(tag || '').trim();
+    if (!str) return;
+    const key = str.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    cleaned.push(str);
+  });
+  const normalizedSlug = (slug || '').toString().trim().toLowerCase() || 'default';
+  if (!seen.has(normalizedSlug)) {
+    cleaned.push(normalizedSlug);
+    seen.add(normalizedSlug);
+  }
+  if (normalizedSlug === 'default' && !seen.has('default-game')) {
+    cleaned.push('default-game');
+    seen.add('default-game');
+  }
+  game.tags = cleaned;
+  game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
+  base.game = game;
+  return base;
+}
+
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
@@ -295,7 +324,7 @@ export default function Admin() {
   let mounted = true;
   (async ()=>{
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool']);
+      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
       if (mounted) setInventory(Array.isArray(items) ? items : []);
     } catch {
       if (mounted) setInventory([]);
@@ -304,8 +333,15 @@ export default function Admin() {
   return ()=> { mounted = false; };
 },[]);;
 
-  
+
   const [dirty, setDirty]       = useState(false);
+
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverPickerItems, setCoverPickerItems] = useState([]);
+  const [coverPickerLoading, setCoverPickerLoading] = useState(false);
+  const [coverDropActive, setCoverDropActive] = useState(false);
+  const coverFileInputRef = useRef(null);
+  const [gameTagsDraft, setGameTagsDraft] = useState('');
 
   // selections
   const [selectedDevIdx, setSelectedDevIdx] = useState(null);
@@ -341,6 +377,13 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
+
+  useEffect(() => {
+    const tags = Array.isArray(config?.game?.tags) ? config.game.tags : [];
+    setGameTagsDraft(tags.join(', '));
+  }, [config?.game?.tags]);
 
   useEffect(() => {
     try {
@@ -448,6 +491,8 @@ export default function Admin() {
 
         let merged = {
           ...dc, ...c0,
+          game: { ...dc.game, ...(c0.game || {}) },
+          splash: { ...dc.splash, ...(c0.splash || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
@@ -459,6 +504,7 @@ export default function Admin() {
         };
 
         merged = applyDefaultIcons(merged);
+        merged = normalizeGameMetadata(merged, slugForMeta);
 
         setSuite(normalized);
         setConfig(merged);
@@ -475,7 +521,7 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery' },
+      game:   { title:'Untitled Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -512,12 +558,15 @@ export default function Admin() {
     const url = isDefaultSlug(slug)
       ? `/api/save-bundle`
       : `/api/save-bundle${qs({ slug })}`;
+    const slugTag = isDefaultSlug(slug) ? 'default' : slug;
+    const preparedConfig = normalizeGameMetadata(config, slugTag);
+    if (preparedConfig !== config) setConfig(preparedConfig);
     try {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ missions: suite, config })
+        body: JSON.stringify({ missions: suite, config: preparedConfig })
       });
       const text = await r.text();
       if (!r.ok) throw new Error(text || 'save failed');
@@ -530,12 +579,31 @@ export default function Admin() {
   }
 
   async function publishWithSlug(slug, channel='published') {
-    const first = isDefaultSlug(slug)
-      ? `/api/game${qs({ channel })}`
-      : `/api/game${qs({ slug, channel })}`;
-    const fallback = isDefaultSlug(slug)
-      ? null
-      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
+    if (isDefaultSlug(slug)) {
+      try {
+        const res = await fetch('/api/publish', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          credentials:'include',
+          body: JSON.stringify({ slug: 'root' }),
+        });
+        const txt = await res.text();
+        let data = {};
+        try { data = JSON.parse(txt); } catch {}
+        if (!res.ok || data?.ok === false) {
+          const err = data?.error || txt || 'publish failed';
+          throw new Error(err);
+        }
+        setStatus('✅ Published');
+        return true;
+      } catch (e) {
+        setStatus('❌ Publish failed: ' + (e?.message || e));
+        return false;
+      }
+    }
+
+    const first = `/api/game${qs({ slug, channel })}`;
+    const fallback = `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
 
     try {
       const res = await fetch(first, {
@@ -545,11 +613,10 @@ export default function Admin() {
       const txt = await res.text();
       let data = {};
       try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) { if (fallback) throw new Error('try fallback'); else throw new Error(txt||'publish failed'); }
+      if (!res.ok) throw new Error('try fallback');
       setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
       return true;
     } catch (e) {
-      if (!fallback) { setStatus('❌ Publish failed: ' + (e?.message||e)); return false; }
       try {
         const res2 = await fetch(fallback, {
           method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
@@ -950,15 +1017,95 @@ export default function Admin() {
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
+  function updateGameTagsDraft(value) {
+    setGameTagsDraft(value);
+    const tags = value.split(',').map(t => t.trim()).filter(Boolean);
+    setConfig(prev => {
+      if (!prev) return prev;
+      return normalizeGameMetadata({ ...prev, game: { ...prev.game, tags } }, slugForMeta);
+    });
+  }
+
+  async function handleCoverFile(file) {
+    if (!file) return;
+    const safeName = file.name || 'cover';
+    setUploadStatus(`Uploading ${safeName}…`);
+    try {
+      const url = await uploadToRepo(file, 'covers');
+      if (!url) {
+        setUploadStatus(`❌ Upload failed for ${safeName}`);
+        return;
+      }
+      setConfig(prev => {
+        if (!prev) return prev;
+        const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
+        return next;
+      });
+      setDirty(true);
+      setUploadStatus(`✅ Uploaded ${safeName}`);
+      try {
+        const refreshed = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+        if (Array.isArray(refreshed)) setInventory(refreshed);
+      } catch {}
+    } catch (err) {
+      setUploadStatus(`❌ ${(err?.message) || 'upload failed'}`);
+    }
+  }
+
+  async function openCoverPicker() {
+    setCoverPickerOpen(true);
+    setCoverPickerLoading(true);
+    setCoverPickerItems([]);
+    try {
+      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
+      setCoverPickerItems(filtered);
+    } catch {
+      setCoverPickerItems([]);
+    } finally {
+      setCoverPickerLoading(false);
+    }
+  }
+
+  function applyCoverFromUrl(url) {
+    if (!url) return;
+    setConfig(prev => {
+      if (!prev) return prev;
+      const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
+      return next;
+    });
+    setDirty(true);
+    setCoverPickerOpen(false);
+  }
+
+  function clearCoverImage() {
+    setConfig(prev => {
+      if (!prev) return prev;
+      const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: '' } }, slugForMeta);
+      return next;
+    });
+    setDirty(true);
+  }
+
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
-  const isDefault = !activeSlug || activeSlug === 'default';
+  const isDefault = slugForMeta === 'default';
+  const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const headerStyle = coverImageUrl
+    ? {
+        ...S.header,
+        backgroundImage: `linear-gradient(180deg, rgba(11,12,16,0.92) 0%, rgba(11,12,16,0.94) 100%), url(${coverImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : S.header;
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
     <div style={S.body}>
-      <header style={S.header}>
+      <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
             {tabsOrder.map((t)=>{
@@ -1527,6 +1674,17 @@ export default function Admin() {
                 {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
+            <Field label="Game Tags (comma separated)">
+              <input
+                style={S.input}
+                value={gameTagsDraft}
+                onChange={(e)=>updateGameTagsDraft(e.target.value)}
+                placeholder="default-game, mystery"
+              />
+              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+                The current slug and <code>default-game</code> are enforced automatically.
+              </div>
+            </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input type="checkbox" checked={config.splash.enabled}
@@ -1534,6 +1692,89 @@ export default function Admin() {
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Game Cover Image</h3>
+            <div style={{ display:'grid', gap:12 }}>
+              <div
+                style={{
+                  border:'1px solid #22303c',
+                  borderRadius:12,
+                  minHeight:160,
+                  overflow:'hidden',
+                  background:'#0b0c10',
+                  display:'grid',
+                  placeItems: coverImageUrl ? 'stretch' : 'center',
+                }}
+              >
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Cover preview"
+                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
+                  />
+                ) : (
+                  <div style={{ color:'#9fb0bf', fontSize:13 }}>No cover image selected.</div>
+                )}
+              </div>
+
+              <div
+                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
+                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
+                onDrop={(e)=>{
+                  e.preventDefault();
+                  setCoverDropActive(false);
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) handleCoverFile(file);
+                }}
+                style={{
+                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#2a323b'}`,
+                  background: coverDropActive ? '#14231a' : '#0b0c10',
+                  borderRadius:12,
+                  padding:16,
+                  textAlign:'center',
+                  color:'#9fb0bf',
+                }}
+              >
+                <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
+                <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
+              </div>
+
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <>
+                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={(e)=>{
+                      const file = e.target.files?.[0];
+                      if (file) handleCoverFile(file);
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                </>
+                <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
+                  {coverPickerLoading ? 'Loading media…' : 'Browse media pool'}
+                </button>
+                <button
+                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                  onClick={clearCoverImage}
+                  disabled={!config?.game?.coverImage}
+                >
+                  Remove cover
+                </button>
+              </div>
+
+              {uploadStatus && (
+                <div style={{ fontSize:12, color:'#9fb0bf' }}>{uploadStatus}</div>
+              )}
+              <div style={{ fontSize:12, color:'#9fb0bf' }}>
+                Tip: cover art appears behind the header controls and is saved to <code>/media/covers</code>.
+              </div>
+            </div>
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
@@ -1641,6 +1882,49 @@ export default function Admin() {
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
         />
+      )}
+
+      {coverPickerOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:1600, padding:16 }}>
+          <div style={{ ...S.card, width:'min(680px, 94vw)', maxHeight:'80vh', overflowY:'auto' }}>
+            <h3 style={{ marginTop:0 }}>Select Cover Image</h3>
+            {coverPickerLoading ? (
+              <div style={{ color:'#9fb0bf' }}>Loading media…</div>
+            ) : coverPickerItems.length === 0 ? (
+              <div style={{ color:'#9fb0bf' }}>
+                No cover-ready images found. Upload a new file or add art to the media pool.
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
+                {coverPickerItems.map((item) => (
+                  <button
+                    key={item.url}
+                    onClick={()=>applyCoverFromUrl(item.url)}
+                    style={{
+                      border:'1px solid #2a323b',
+                      borderRadius:12,
+                      background:'#0b0c10',
+                      padding:0,
+                      cursor:'pointer',
+                      overflow:'hidden',
+                      textAlign:'left',
+                    }}
+                  >
+                    <img
+                      src={toDirectMediaURL(item.url)}
+                      alt={item.name || item.url}
+                      style={{ width:'100%', height:120, objectFit:'cover' }}
+                    />
+                    <div style={{ padding:'6px 8px', fontSize:12, color:'#9fb0bf' }}>{item.name || item.url}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+              <button style={S.button} onClick={()=>setCoverPickerOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* TEST */}

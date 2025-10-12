@@ -12,8 +12,8 @@ async function ghJson(url, init = {}) {
   const r = await fetch(url, {
     ...init,
     headers: {
-      'Authorization': `token ${token}`,
-      'Accept': 'application/vnd.github+json',
+      Authorization: `token ${token}`,
+      Accept: 'application/vnd.github+json',
       ...(init.headers || {}),
     },
   });
@@ -47,6 +47,7 @@ async function putFile(path, content, message) {
       const body = { message, content: b64, branch, ...(sha ? { sha } : {}) };
       return await ghJson(url, { method: 'PUT', body: JSON.stringify(body) });
     } catch (e) {
+      // GitHub can return 409 if a concurrent update happened — retry a couple times with backoff.
       if (String(e.message || '').startsWith('409')) {
         await new Promise(r => setTimeout(r, 400 * attempt));
         continue;
@@ -59,14 +60,18 @@ async function putFile(path, content, message) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
+
   try {
-    const slug = (req.query.slug || '').toString().trim();
+    // Accept blank/missing slug as default — be forgiving like the codex branch did.
+    const rawSlug = (req.query.slug || '').toString().trim();
+    const normalized = rawSlug.toLowerCase();
+    const isDefaultSlug = !rawSlug || normalized === 'default' || normalized === 'root' || normalized === 'legacy-root';
+    const slug = isDefaultSlug ? 'default' : rawSlug;
+
     const { missions, config } = req.body || {};
-    if (!slug) return res.status(400).json({ error: 'Missing slug' });
     if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
 
     const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
-    const isDefault = slug === 'default';
 
     const paths = {
       mAdmin: `public/games/${slug}/draft/missions.json`,
@@ -93,8 +98,8 @@ export default async function handler(req, res) {
       wrote.push(paths.cGame);
     }
 
-    // If this is the 'default' slug, also write legacy locations
-    if (isDefault) {
+    // If this is the 'default' slug, also write legacy locations for backwards compatibility
+    if (isDefaultSlug) {
       const legacyAdminM = 'public/draft/missions.json';
       const legacyAdminC = 'public/draft/config.json';
 
@@ -116,7 +121,8 @@ export default async function handler(req, res) {
       }
     }
 
-    res.status(200).json({ ok: true, wrote });
+    // Return null slug for default to match previous behavior
+    res.status(200).json({ ok: true, slug: isDefaultSlug ? null : slug, wrote });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }

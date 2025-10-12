@@ -5,7 +5,12 @@
   },
   "game": {
     "title": "DEFAULT",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "default",
+      "default-game"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1
