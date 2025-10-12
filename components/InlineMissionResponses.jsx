@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 
 /**
@@ -86,7 +85,8 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
       const array = await file.arrayBuffer();
       const b64 = btoa(String.fromCharCode(...new Uint8Array(array)));
       const safeName = file.name.replace(/[^\w.\-]+/g, "_");
-      const path = `public/media/${subfolder}/${Date.now()}-${safeName}`;
+      const timestamp = Date.now();
+      const path = `public/media/${subfolder}/${timestamp}-${safeName}`;
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -202,6 +202,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     // device options from devices state
     const hasDevices = devices && devices.length > 0;
 
+    // keep currentSideRef in sync for renderMediaTile's "Select" buttons
+    useEffect(() => { currentSideRef.current = sideKey; }, [sideKey]);
+
     return (
       <div style={{ border:'1px solid #1f2b2f', borderRadius:10, padding:12, marginBottom:12, background:'#071014' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
@@ -239,7 +242,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   {deviceId && (()=>{
                     const d = devices.find(x => (x.id||x.key||x._id) === deviceId);
                     if (!d) return null;
-                    const url = d.iconUrl || d.url || d.iconKey && (d.iconKey) ? '' : '';
                     return (
                       <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                         <div style={{ width:48, height:48, border:'1px solid #263236', borderRadius:8, overflow:'hidden', display:'grid', placeItems:'center' }}>

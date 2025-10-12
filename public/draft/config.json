@@ -65,20 +65,20 @@
     ]
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#1f2a35",
-    "textBgColor": "#f4f8fb",
-    "textBgOpacity": 0.76,
-    "screenBgColor": "#dbe4f1",
-    "screenBgOpacity": 0.45,
-    "screenBgImage": "/media/skins/control-fabric.svg",
-    "screenBgImageEnabled": true,
+    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 24,
+    "fontColor": "#f8fafc",
+    "textBgColor": "#0f172a",
+    "textBgOpacity": 0.88,
+    "screenBgColor": "#020617",
+    "screenBgOpacity": 0.9,
+    "screenBgImage": "/media/skins/forest-foliage.svg",
+    "screenBgImageEnabled": false,
     "textAlign": "left",
     "textVertical": "top",
     "panelDepth": true
   },
-  "appearanceSkin": "default",
+  "appearanceSkin": "forest-outpost",
   "appearanceTone": "dark",
   "mediaTriggers": {
     "enabled": false,
@@ -103,18 +103,18 @@
     "splash": {
       "fontFamily": "Georgia, serif",
       "fontSize": 24,
-      "textColor": "#100f10",
+      "textColor": "#f1f5f9",
       "align": "left",
-      "backgroundColor": "#e6eaf9",
+      "backgroundColor": "#0f172a",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     },
     "missionDefault": {
       "fontFamily": "system-ui, Arial, sans-serif",
       "fontSize": 18,
-      "textColor": "#ffffff",
+      "textColor": "#f8fafc",
       "align": "center",
-      "backgroundColor": "#0b0c10",
+      "backgroundColor": "#111827",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }

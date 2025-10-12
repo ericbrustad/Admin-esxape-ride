@@ -1,6 +1,7 @@
 // pages/api/games.js
 // ------------------
 // [1] GitHub API config + helpers
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
@@ -76,6 +77,11 @@ function defaultConfig(title, gameType, mode = 'single') {
 
 // [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
+  if (!GAME_ENABLED) {
+    if (req.method === 'GET') return res.json({ ok: true, games: [] });
+    return res.status(403).json({ ok: false, error: 'Game project disabled' });
+  }
+
   if (!token || !owner || !repo) {
     return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
   }
