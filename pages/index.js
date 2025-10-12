@@ -249,6 +249,17 @@ const FONT_FAMILIES = [
   { v:'Arial, Helvetica, sans-serif',       label:'Arial' },
   { v:'Courier New, Courier, monospace',    label:'Courier New' },
 ];
+const DEFAULT_MEDIA_TRIGGERS = {
+  enabled: false,
+  actionType: 'media',
+  actionTarget: '',
+  actionLabel: '',
+  actionThumbnail: '',
+  triggerDeviceId: '',
+  triggerDeviceLabel: '',
+  triggeredResponseKey: '',
+  triggeredMissionId: '',
+};
 function defaultAppearance() {
   return {
     fontFamily: FONT_FAMILIES[0].v,
@@ -259,8 +270,10 @@ function defaultAppearance() {
     screenBgColor: '#000000',
     screenBgOpacity: 0.0,
     screenBgImage: '',
+    screenBgImageEnabled: true,
     textAlign: 'center',
     textVertical: 'top',
+    panelDepth: true,
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
@@ -402,13 +415,14 @@ export default function Admin() {
       try {
         setStatus('Loading…');
         const isDefault = !activeSlug || activeSlug === 'default';
+        const slugForApi = normalizedSlug(activeSlug || 'default');
 
         const missionUrls = isDefault
-          ? ['/missions.json']
+          ? [`/games/${encodeURIComponent(slugForApi)}/missions.json`, '/missions.json']
           : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
 
         const configUrls = isDefault
-          ? ['/api/config']
+          ? [`/api/config${qs({ slug: slugForApi })}`, '/api/config']
           : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
 
         const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
@@ -432,13 +446,14 @@ export default function Admin() {
           timer: { ...dc.timer, ...(c0.timer || {}) },
           devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
                    : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
-          media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
+          media: { rewardsPool:[], penaltiesPool:[], actionMedia:[], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: { ...dc.appearance, ...(c0.appearance || {}) },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
         };
 
+        merged.mediaTriggers = { ...DEFAULT_MEDIA_TRIGGERS, ...(c0.mediaTriggers || {}) };
         merged = applyDefaultIcons(merged);
 
         setSuite(normalized);
@@ -461,9 +476,10 @@ export default function Admin() {
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
       devices: [], powerups: [],
-      media: { rewardsPool:[], penaltiesPool:[] },
+      media: { rewardsPool:[], penaltiesPool:[], actionMedia:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      mediaTriggers: { ...DEFAULT_MEDIA_TRIGGERS },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
@@ -486,13 +502,13 @@ export default function Admin() {
 
   /* ── API helpers respecting Default Game (legacy root) ── */
   function isDefaultSlug(slug) { return !slug || slug === 'default'; }
+  function normalizedSlug(slug) { return isDefaultSlug(slug) ? 'default' : slug; }
 
   async function saveAllWithSlug(slug) {
     if (!suite || !config) return false;
     setStatus('Saving…');
-    const url = isDefaultSlug(slug)
-      ? `/api/save-bundle`
-      : `/api/save-bundle${qs({ slug })}`;
+    const slugForApi = normalizedSlug(slug);
+    const url = `/api/save-bundle${qs({ slug: slugForApi })}`;
     try {
       const r = await fetch(url, {
         method: 'POST',
@@ -505,18 +521,34 @@ export default function Admin() {
       setStatus('✅ Saved');
       return true;
     } catch (e) {
+      if (isDefaultSlug(slug)) {
+        try {
+          const fallback = await fetch('/api/save-bundle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ missions: suite, config })
+          });
+          const txt = await fallback.text();
+          if (!fallback.ok) throw new Error(txt || 'save failed');
+          setStatus('✅ Saved');
+          return true;
+        } catch (err) {
+          setStatus('❌ Save failed: ' + (err?.message || err));
+          return false;
+        }
+      }
       setStatus('❌ Save failed: ' + (e?.message || e));
       return false;
     }
   }
 
   async function publishWithSlug(slug, channel='published') {
-    const first = isDefaultSlug(slug)
-      ? `/api/game${qs({ channel })}`
-      : `/api/game${qs({ slug, channel })}`;
+    const slugForApi = normalizedSlug(slug);
+    const first = `/api/game${qs({ slug: slugForApi, channel })}`;
     const fallback = isDefaultSlug(slug)
-      ? null
-      : `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
+      ? '/api/publish'
+      : `/api/game/${encodeURIComponent(slugForApi)}${qs({ channel })}`;
 
     try {
       const res = await fetch(first, {
@@ -534,7 +566,9 @@ export default function Admin() {
       try {
         const res2 = await fetch(fallback, {
           method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ action:'publish' })
+          body: isDefaultSlug(slug)
+            ? JSON.stringify({ slug: slugForApi })
+            : JSON.stringify({ action:'publish' })
         });
         const txt2 = await res2.text();
         let data2 = {};
@@ -993,12 +1027,12 @@ export default function Admin() {
             </div>
 
             <a
-              href={isDefault ? '/missions.json' : `/games/${encodeURIComponent(activeSlug)}/missions.json`}
+              href={`/games/${encodeURIComponent(normalizedSlug(activeSlug || 'default'))}/missions.json`}
               target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View missions.json
             </a>
             <a
-              href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
+              href={`/api/config${qs({ slug: normalizedSlug(activeSlug || 'default') })}`}
               target="_blank" rel="noreferrer" style={{ ...S.button }}>
               View config.json
             </a>
@@ -1578,6 +1612,34 @@ export default function Admin() {
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
             <AppearanceEditor value={config.appearance||defaultAppearance()}
               onChange={(next)=>setConfig({ ...config, appearance:next })}/>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+              <button
+                style={S.button}
+                onClick={()=>{
+                  setConfig(c => ({ ...c, appearance: defaultAppearance() }));
+                  setStatus('Reset current theme to default');
+                }}
+              >
+                Reset Current Theme to Default
+              </button>
+              <button
+                style={S.button}
+                onClick={()=>{
+                  pushHistory();
+                  setSuite(s => ({
+                    ...s,
+                    missions: (s.missions || []).map(m => ({
+                      ...m,
+                      appearanceOverrideEnabled: false,
+                      appearance: defaultAppearance(),
+                    })),
+                  }));
+                  setStatus('Applied default theme to all missions');
+                }}
+              >
+                Reset Default to All Themes
+              </button>
+            </div>
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
               Tip: Keep vertical alignment at <b>Top</b> so text doesn’t cover the backpack.
             </div>
@@ -1704,7 +1766,7 @@ export default function Admin() {
                 style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
                 onClick={reallyDeleteGame}
               >
-                Delete
+                Delete Game
               </button>
             </div>
           </div>
@@ -2396,9 +2458,11 @@ function MediaPoolTab({
 function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
+  const actionMedia = config.media?.actionMedia || [];
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
+  const triggers = { ...DEFAULT_MEDIA_TRIGGERS, ...(config.mediaTriggers || {}) };
 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
@@ -2406,6 +2470,7 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
       const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
       if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
       if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
+      if (kind === 'action') m.actionMedia = (m.actionMedia||[]).filter((_,i)=>i!==idx);
       return { ...c, media: m };
     });
   }
@@ -2420,6 +2485,27 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
 
   return (
     <main style={S.wrap}>
+      <div style={S.card}>
+        <h3 style={{ marginTop:0, marginBottom:12 }}>Assigned Media Trigger</h3>
+        <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:12 }}>
+          <input
+            type="checkbox"
+            checked={!!triggers.enabled}
+            onChange={(e)=>{
+              const enabled = e.target.checked;
+              setConfig(c => ({
+                ...c,
+                mediaTriggers: { ...DEFAULT_MEDIA_TRIGGERS, ...(c.mediaTriggers || {}), enabled },
+              }));
+            }}
+          />
+          Enable assigned media trigger automation
+        </label>
+        <div style={{ color:'#9fb0bf', fontSize:12 }}>
+          Toggle automation on to keep trigger, device, and media assignments in sync for the active theme.
+        </div>
+      </div>
+
       {/* Icons */}
       <div style={S.card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -2447,7 +2533,7 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
       {/* Pools */}
       <div style={{ ...S.card, marginTop:16 }}>
         <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px,1fr))', gap:16 }}>
           <Pool
             title={`Rewards Pool (${rewards.length})`}
             items={rewards}
@@ -2457,6 +2543,11 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults }) {
             title={`Penalties Pool (${penalties.length})`}
             items={penalties}
             onRemove={(idx)=>removePoolItem('penalties', idx)}
+          />
+          <Pool
+            title={`Action Media (${actionMedia.length})`}
+            items={actionMedia}
+            onRemove={(idx)=>removePoolItem('action', idx)}
           />
         </div>
       </div>
