@@ -72,6 +72,14 @@ export default async function handler(req, res) {
     await putFileWithRetry(gamePubC, draftC.text, `publish(${slug}): game config.json`);
     wrote.push(gamePubM, gamePubC);
 
+    if (slug === 'default') {
+      const legacyPubM = joinPath('game/public/missions.json');
+      const legacyPubC = joinPath('game/public/config.json');
+      await putFileWithRetry(legacyPubM, draftM.text, 'publish(default legacy missions.json)');
+      await putFileWithRetry(legacyPubC, draftC.text, 'publish(default legacy config.json)');
+      wrote.push(legacyPubM, legacyPubC);
+    }
+
     // optional: keep an index.json under root for admin lists (unchanged)
 
     let version = '';

@@ -83,6 +83,7 @@ export default async function handler(req, res) {
     const configText = typeof configObj === 'string' ? configObj : JSON.stringify(configObj, null, 2);
 
     const wrote = [];
+    const isDefault = slug === 'default';
 
     // Draft (Admin root)
     const rootDraftM = joinPath(`public/games/${slug}/draft/missions.json`);
@@ -104,6 +105,36 @@ export default async function handler(req, res) {
     await putFileWithRetry(gamePubM, missionsText, `publish(${slug}): game missions.json`);
     await putFileWithRetry(gamePubC, configText, `publish(${slug}): game config.json`);
     wrote.push(gamePubM, gamePubC);
+
+    if (isDefault) {
+      const legacyDraftM = joinPath('public/draft/missions.json');
+      const legacyDraftC = joinPath('public/draft/config.json');
+      const legacyGameDraftM = joinPath('game/public/draft/missions.json');
+      const legacyGameDraftC = joinPath('game/public/draft/config.json');
+      const legacyPubM = joinPath('public/missions.json');
+      const legacyPubC = joinPath('public/config.json');
+      const legacyGamePubM = joinPath('game/public/missions.json');
+      const legacyGamePubC = joinPath('game/public/config.json');
+
+      await putFileWithRetry(legacyDraftM, missionsText, 'save+publish(legacy draft missions): default');
+      await putFileWithRetry(legacyDraftC, configText, 'save+publish(legacy draft config): default');
+      await putFileWithRetry(legacyGameDraftM, missionsText, 'save+publish(legacy game draft missions): default');
+      await putFileWithRetry(legacyGameDraftC, configText, 'save+publish(legacy game draft config): default');
+      await putFileWithRetry(legacyPubM, missionsText, 'publish(legacy missions.json): default');
+      await putFileWithRetry(legacyPubC, configText, 'publish(legacy config.json): default');
+      await putFileWithRetry(legacyGamePubM, missionsText, 'publish(legacy game missions.json): default');
+      await putFileWithRetry(legacyGamePubC, configText, 'publish(legacy game config.json): default');
+      wrote.push(
+        legacyDraftM,
+        legacyDraftC,
+        legacyGameDraftM,
+        legacyGameDraftC,
+        legacyPubM,
+        legacyPubC,
+        legacyGamePubM,
+        legacyGamePubC,
+      );
+    }
 
     let version = '';
     try { version = JSON.parse(missionsText)?.version || ''; } catch {}
