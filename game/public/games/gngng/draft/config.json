@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "gngng",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "gngng"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1

@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "Untitled Game",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "game-1-thriller-single-player"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1
