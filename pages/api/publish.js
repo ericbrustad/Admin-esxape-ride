@@ -1,5 +1,6 @@
 // pages/api/publish.js
 import { readJson, bulkCommitMixed, joinPath } from '../../lib/github.js';
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 const pretty = obj => JSON.stringify(obj, null, 2) + '\n';
 
@@ -63,14 +64,19 @@ export default async function handler(req, res) {
 
     if (cfg) {
       files.push({ path: joinPath(adminDest, 'config.json'), content: pretty(cfg) });
-      if (!legacy) files.push({ repoPath: joinPath('game/public/games', slug, 'config.json'), content: pretty(cfg) });
+      if (!legacy && GAME_ENABLED) {
+        files.push({ repoPath: joinPath('game/public/games', slug, 'config.json'), content: pretty(cfg) });
+      }
     }
     if (mis) {
       files.push({ path: joinPath(adminDest, 'missions.json'), content: pretty(mis) });
-      if (!legacy) files.push({ repoPath: joinPath('game/public/games', slug, 'missions.json'), content: pretty(mis) });
+      if (!legacy && GAME_ENABLED) {
+        files.push({ repoPath: joinPath('game/public/games', slug, 'missions.json'), content: pretty(mis) });
+      }
     }
 
-    const commit = await bulkCommitMixed(files, `publish ${legacy ? '(root)' : slug} (+ mirror to game/)`);
+    const mirrorNote = GAME_ENABLED ? ' (+ mirror to game/)' : '';
+    const commit = await bulkCommitMixed(files, `publish ${legacy ? '(root)' : slug}${mirrorNote}`);
 
     return res.status(200).json({
       ok: true,

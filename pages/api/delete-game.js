@@ -1,4 +1,6 @@
 // pages/api/delete-game.js
+import { GAME_ENABLED } from '../../lib/game-switch.js';
+
 const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
@@ -33,6 +35,9 @@ async function del(path, sha, message) {
 }
 
 export default async function handler(req, res) {
+  if (!GAME_ENABLED) {
+    return res.status(403).json({ ok: false, error: 'Game project disabled' });
+  }
   if (req.method !== 'POST') { res.setHeader('Allow','POST'); return res.status(405).end(); }
   const { slug } = req.body || {};
   if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug' });

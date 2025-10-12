@@ -8,6 +8,8 @@
 - Game in /game (Vercel: game-esxape-ride)
 - Admin ENV: NEXT_PUBLIC_GAME_ORIGIN=https://game.esxaperide.com, GITHUB_* (owner, name, branch=main, token, base_dir='')
 - Game ENV: may use NEXT_PUBLIC_GAME_ORIGIN for own links
+- Game mirroring can be toggled in the repo's `.env` file. Leave `GAME_ENABLED`/`NEXT_PUBLIC_GAME_ENABLED` at `0` (default) to
+  keep Game disabled, or set them to `1` to enable Game writes and UI controls.
 
 ## Save / Publish
 - Save All -> Admin draft only:

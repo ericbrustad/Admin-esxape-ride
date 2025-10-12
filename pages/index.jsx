@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import { GAME_ENABLED } from '../lib/game-switch';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -296,6 +297,7 @@ function normalizeGameMetadata(cfg, slug = '') {
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
+  const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
 
   const [games, setGames] = useState([]);
@@ -446,6 +448,7 @@ export default function Admin() {
 
   /* load games */
   useEffect(() => {
+    if (!gameEnabled) { setGames([]); return; }
     (async () => {
       try {
         const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
@@ -453,7 +456,7 @@ export default function Admin() {
         if (j.ok) setGames(j.games || []);
       } catch {}
     })();
-  }, []);
+  }, [gameEnabled]);
 
   /* load suite/config when slug changes */
   useEffect(() => {
@@ -633,6 +636,7 @@ export default function Admin() {
   }
 
   async function reloadGamesList() {
+    if (!gameEnabled) { setGames([]); return; }
     try {
       const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
       const j = await r.json();
@@ -648,9 +652,9 @@ export default function Admin() {
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
 
-    if (deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
+    if (gameEnabled && deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
 
-    await publishWithSlug(slug, 'published');
+    if (gameEnabled) await publishWithSlug(slug, 'published');
 
     await reloadGamesList();
     setPreviewNonce(n => n + 1);
@@ -659,6 +663,7 @@ export default function Admin() {
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
+    if (!gameEnabled) { setConfirmDeleteOpen(false); return; }
     const slug = activeSlug || 'default';
     const urlTry = [
       `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
@@ -1118,28 +1123,32 @@ export default function Admin() {
                 </button>
               );
             })}
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
-                {games.map(g=>(
-                  <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                ))}
-              </select>
-              <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
-            </div>
+            {gameEnabled && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
+                <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
+              </div>
+            )}
 
             {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
-                <input
-                  type="number" min={0} max={120}
-                  value={deployDelaySec}
-                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90 }}
-                />
-              </label>
+              {gameEnabled && (
+                <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90 }}
+                  />
+                </label>
+              )}
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -1149,7 +1158,9 @@ export default function Admin() {
                 disabled={savePubBusy}
                 style={{ ...S.button, background:'#103217', border:'1px solid #1d5c2a', opacity: savePubBusy ? 0.7 : 1 }}
               >
-                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
+                {savePubBusy
+                  ? (gameEnabled ? 'Saving & Publishing…' : 'Saving…')
+                  : (gameEnabled ? '💾 Save & Publish' : '💾 Save')}
               </button>
             </div>
 
@@ -1823,12 +1834,14 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button
-                style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                onClick={()=> setConfirmDeleteOpen(true)}
-              >
-                🗑 Delete Game
-              </button>
+              {gameEnabled && (
+                <button
+                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                  onClick={()=> setConfirmDeleteOpen(true)}
+                >
+                  🗑 Delete Game
+                </button>
+              )}
               <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
             </div>
           </div>
@@ -1949,7 +1962,7 @@ export default function Admin() {
       )}
 
       {/* New Game modal */}
-      {showNewGame && (
+      {gameEnabled && showNewGame && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Create New Game</h3>
@@ -1993,7 +2006,7 @@ export default function Admin() {
       )}
 
       {/* Delete confirm modal */}
-      {confirmDeleteOpen && (
+      {gameEnabled && confirmDeleteOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
