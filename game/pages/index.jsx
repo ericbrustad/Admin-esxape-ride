@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import PhotoCapture from '../components/PhotoCapture';
 import OutcomeModal from '../components/OutcomeModal';
 import BackpackButton from '../components/BackpackButton';
@@ -16,6 +17,7 @@ function toDirect(u){ try{
 }catch{return u;}}
 
 export default function Game() {
+  const router = useRouter();
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('Loading…');
@@ -25,36 +27,123 @@ export default function Game() {
   const [outcome, setOutcome]   = useState(null);   // object from mission.onCorrect/onWrong
   const [backpackOpen, setBackpackOpen] = useState(false);
 
-  const { slug, channel } = useMemo(() => {
-    const u = new URL(window.location.href);
-    return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
-  }, []);
+  const [route, setRoute] = useState({ slug: '', channel: 'published' });
+  const { slug, channel } = route;
+  const routeReady = !!slug;
 
-  useEffect(() => { initBackpack(slug); }, [slug]);
+  const [backpackVersion, setBackpackVersion] = useState(0);
+  const refreshBackpack = useCallback(() => setBackpackVersion((v) => v + 1), []);
+  const [answerDraft, setAnswerDraft] = useState('');
 
-  useEffect(() => { (async () => {
-    try {
-      const base = channel === 'published' ? 'published' : 'draft';
-      const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
-      const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
-      setSuite(ms); setConfig(cfg); setStatus('');
-    } catch (e) {
-      setStatus('Failed to load game.');
-    }
-  })(); }, [slug, channel]);
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const search = router.asPath.includes('?') ? router.asPath.split('?')[1] : '';
+    const params = new URLSearchParams(search);
+
+    const rawSlug = router.query.slug ?? params.get('slug') ?? '';
+    const nextSlug = Array.isArray(rawSlug) ? (rawSlug[0] || '') : rawSlug;
+
+    const rawChannel = router.query.channel ?? params.get('channel') ?? 'published';
+    const nextChannel = Array.isArray(rawChannel) ? (rawChannel[0] || 'published') : rawChannel || 'published';
+
+    setRoute((prev) => (
+      prev.slug === nextSlug && prev.channel === nextChannel
+        ? prev
+        : { slug: nextSlug, channel: nextChannel }
+    ));
+  }, [router.isReady, router.query.slug, router.query.channel, router.asPath]);
+
+  useEffect(() => {
+    if (!routeReady) return;
+    initBackpack(slug);
+    refreshBackpack();
+  }, [routeReady, slug, refreshBackpack]);
+
+  useEffect(() => {
+    if (!routeReady) return;
+    let cancelled = false;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        setStatus('Loading…');
+        setSuite(null);
+        setConfig(null);
+        const base = channel === 'published' ? 'published' : 'draft';
+        const prefix = `/games/${encodeURIComponent(slug)}/${base}`;
+
+        const missionsRes = await fetch(`${prefix}/missions.json`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!missionsRes.ok) throw new Error(`Unable to load missions (${missionsRes.status})`);
+        const ms = await missionsRes.json();
+
+        let cfg = {};
+        try {
+          const configRes = await fetch(`${prefix}/config.json`, {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          if (configRes.ok) {
+            cfg = await configRes.json();
+          }
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+          cfg = {};
+        }
+
+        if (cancelled) return;
+        setSuite(ms);
+        setConfig(cfg || {});
+        setStatus('');
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
+        setStatus('Failed to load game.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [routeReady, slug, channel]);
+
+  useEffect(() => {
+    setIdx(0);
+  }, [slug]);
+
+  useEffect(() => {
+    setAnswerDraft('');
+  }, [idx, slug]);
+
+  if (!routeReady) {
+    return <main style={outer}><div style={card}>{status || 'Loading game…'}</div></main>;
+  }
 
   if (!suite || !config) {
     return <main style={outer}><div style={card}>{status}</div></main>;
   }
 
-  const missions = suite.missions || [];
+  const missions = Array.isArray(suite.missions) ? suite.missions : [];
   const m = missions[idx];
 
-  function next() { setIdx(i => Math.min(i + 1, missions.length - 1)); }
+  const points = useMemo(() => {
+    if (typeof window === 'undefined' || !slug) return 0;
+    try {
+      return getBackpack(slug).points || 0;
+    } catch {
+      return 0;
+    }
+  }, [slug, backpackVersion]);
+
+  function next() { setIdx(i => Math.min(i + 1, Math.max(missions.length - 1, 0))); }
   function prev() { setIdx(i => Math.max(i - 1, 0)); }
 
   function applyOutcome(o, wasCorrect) {
     if (!o || !o.enabled) return next();
+    if (!slug) return next();
     // Apply points?
     if (wasCorrect && typeof m?.rewards?.points === 'number') addPoints(slug, m.rewards.points);
 
@@ -71,6 +160,8 @@ export default function Game() {
     }
     if (o.clueText) addClue(slug, o.clueText);
 
+    refreshBackpack();
+
     // Show visual outcome
     setOutcome({
       title: wasCorrect ? 'Correct!' : 'Try Again',
@@ -81,20 +172,23 @@ export default function Game() {
   }
 
   function handleMC(answerIdx) {
+    if (!m) return;
     const ci = Number(m.content?.correctIndex);
     const ok = Number(answerIdx) === ci;
-    recordAnswer(slug, m.id, { correct: ok, value: answerIdx });
+    if (slug && m?.id) recordAnswer(slug, m.id, { correct: ok, value: answerIdx });
     applyOutcome(ok ? m.onCorrect : m.onWrong, ok);
   }
   function handleSA(text) {
+    if (!m) return;
     const ans = (m.content?.answer || '').trim().toLowerCase();
     const acceptable = (m.content?.acceptable || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
     const ok = [ans, ...acceptable].includes(String(text||'').trim().toLowerCase());
-    recordAnswer(slug, m.id, { correct: ok, value: text });
+    if (slug && m?.id) recordAnswer(slug, m.id, { correct: ok, value: text });
     applyOutcome(ok ? m.onCorrect : m.onWrong, ok);
   }
   function handleStatementAck() {
-    recordAnswer(slug, m.id, { correct: true, value: 'ack' });
+    if (!m) return;
+    if (slug && m?.id) recordAnswer(slug, m.id, { correct: true, value: 'ack' });
     applyOutcome(m.onCorrect, true);
   }
 
@@ -119,13 +213,23 @@ export default function Game() {
         );
       }
       case 'short_answer': {
-        let val='';
         return (
           <div style={bodyStyle}>
             {label(m.content?.question || '')}
-            <input style={input} onChange={(e)=>{ val=e.target.value; }} placeholder="Type your answer…"/>
+            <input
+              style={input}
+              value={answerDraft}
+              onChange={(e)=>setAnswerDraft(e.target.value)}
+              onKeyDown={(e)=>{
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSA(answerDraft);
+                }
+              }}
+              placeholder="Type your answer…"
+            />
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
-              <button style={btn} onClick={()=>handleSA(val)}>Submit</button>
+              <button style={btn} onClick={()=>handleSA(answerDraft)}>Submit</button>
               <button style={btn} onClick={prev}>Back</button>
             </div>
           </div>
@@ -165,15 +269,17 @@ export default function Game() {
 
       {/* Backpack */}
       <BackpackButton onClick={()=>setBackpackOpen(true)} />
-      <BackpackDrawer slug={slug} open={backpackOpen} onClose={()=>setBackpackOpen(false)} />
+      <BackpackDrawer slug={slug} open={backpackOpen} onClose={()=>setBackpackOpen(false)} onMutate={refreshBackpack} />
 
       {/* Mission */}
       <div style={card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
           <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9fb0bf' }}>Mission {idx+1} / {missions.length}</span></div>
-          <div style={{ color:'#9fb0bf' }}>Points: {getBackpack(slug).points || 0}</div>
+          <div style={{ color:'#9fb0bf' }}>Points: {points}</div>
         </div>
-        {renderMission()}
+        {missions.length ? renderMission() : (
+          <div style={{ color:'#9fb0bf' }}>No missions available yet.</div>
+        )}
       </div>
 
       {/* Photo overlay capture */}
@@ -182,9 +288,14 @@ export default function Game() {
           overlayUrl={showPhoto.overlayUrl}
           onCancel={()=>setShowPhoto(null)}
           onSave={(dataUrl)=>{
-            addPhoto(slug, { dataUrl, title:'Captured' });
+            if (slug) {
+              addPhoto(slug, { dataUrl, title:'Captured' });
+              if (m?.id) {
+                recordAnswer(slug, m.id, { correct:true, value:'photo' });
+              }
+              refreshBackpack();
+            }
             setShowPhoto(null);
-            recordAnswer(slug, m.id, { correct:true, value:'photo' });
             applyOutcome(m.onCorrect, true);
           }}
         />

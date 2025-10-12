@@ -1,8 +1,8 @@
 import React from 'react';
 import { getBackpack, removePocketItem } from '../lib/backpack';
 
-export default function BackpackDrawer({ slug, open, onClose }) {
-  if (!open) return null;
+export default function BackpackDrawer({ slug, open, onClose, onMutate }) {
+  if (!open || !slug) return null;
   const s = getBackpack(slug);
   const ph = (s.pockets?.photos)||[];
   const rw = (s.pockets?.rewards)||[];
@@ -20,21 +20,33 @@ export default function BackpackDrawer({ slug, open, onClose }) {
         <Section title="Photos">
           <ThumbGrid
             items={ph.map(x=>({ id:x.id, title:x.title, url:x.url }))}
-            onRemove={(id)=>{ removePocketItem(slug, 'photos', id); onClose(); }}
+            onRemove={(id)=>{
+              removePocketItem(slug, 'photos', id);
+              onMutate?.();
+              onClose();
+            }}
           />
         </Section>
 
         <Section title="Rewards">
           <ThumbGrid
             items={rw.map(x=>({ id:x.id, title:x.name, url:x.thumbUrl }))}
-            onRemove={(id)=>{ removePocketItem(slug, 'rewards', id); onClose(); }}
+            onRemove={(id)=>{
+              removePocketItem(slug, 'rewards', id);
+              onMutate?.();
+              onClose();
+            }}
           />
         </Section>
 
         <Section title="Utilities">
           <ThumbGrid
             items={ut.map(x=>({ id:x.id, title:x.name, url:x.thumbUrl }))}
-            onRemove={(id)=>{ removePocketItem(slug, 'utilities', id); onClose(); }}
+            onRemove={(id)=>{
+              removePocketItem(slug, 'utilities', id);
+              onMutate?.();
+              onClose();
+            }}
           />
         </Section>
 
