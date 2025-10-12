@@ -24,7 +24,7 @@ import React, { useMemo } from 'react';
 
 function Section({ title, children, style }) {
   return (
-    <div style={{ background:'#f7fff4', border:'1px solid #b7e3b0', borderRadius:14, padding:16, marginBottom:16, ...style }}>
+    <div style={{ background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16, marginBottom:16, color:'#e9eef2', ...style }}>
       <div style={{ fontWeight:600, fontSize:18, marginBottom:8 }}>{title}</div>
       {children}
     </div>
@@ -33,7 +33,7 @@ function Section({ title, children, style }) {
 
 function Pill({ children }) {
   return (
-    <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:999, background:'#e9fbe9', border:'1px solid #cfe9cf', fontSize:12 }}>
+    <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:999, background:'#0f1418', border:'1px solid #2a323b', fontSize:12, color:'#c9d6e2' }}>
       {children}
     </span>
   );
@@ -41,8 +41,8 @@ function Pill({ children }) {
 
 function SmallButton({ children, onClick, tone='solid' }) {
   const styles = tone==='danger'
-    ? { background:'#fee2e2', border:'1px solid #fecaca' }
-    : { background:'#e6f4ea', border:'1px solid #cfe9cf' };
+    ? { background:'#2a1313', border:'1px solid #7a1f1f', color:'#fca5a5' }
+    : { background:'#1a2027', border:'1px solid #2a323b', color:'#e9eef2' };
   return (
     <button onClick={onClick} style={{ ...styles, padding:'6px 10px', borderRadius:10, fontWeight:600 }}>
       {children}
@@ -95,9 +95,9 @@ export default function AssignedMediaTab({
       <Section title="Trigger Automation">
         <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
           <input type="checkbox" checked={!!triggerEnabled} onChange={e=>setTriggerEnabled(e.target.checked)} />
-          <span>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
+          <span style={{ color:'#e9eef2' }}>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
         </label>
-        <div style={{ fontSize:12, color:'#3a573a', marginBottom:12 }}>
+        <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:12 }}>
           Toggle on to coordinate triggers across media, devices, and missions.
         </div>
 
@@ -108,7 +108,7 @@ export default function AssignedMediaTab({
             <select
               onChange={(e)=> assignActionMedia(e.target.value)}
               defaultValue=""
-              style={{ padding:'10px 12px', borderRadius:10, border:'1px solid #b7e3b0', background:'#ffffff' }}
+              style={{ padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0f15', color:'#e9eef2' }}
             >
               <option value="" disabled>Select action media…</option>
               {actionCandidates.map(m => (
@@ -119,7 +119,7 @@ export default function AssignedMediaTab({
             </select>
             <Pill>{safeAssigned.actionMedia.length} assigned</Pill>
           </div>
-          <div style={{ fontSize:12, color:'#3a573a', marginTop:6 }}>
+          <div style={{ fontSize:12, color:'#9fb0bf', marginTop:6 }}>
             Choose one or more media items to be used as **Action Media** (e.g., sound effects, short clips, effects).
           </div>
         </div>
@@ -133,25 +133,25 @@ export default function AssignedMediaTab({
         <div style={{ marginTop:8 }}>
           <div style={{ fontWeight:600, marginBottom:8 }}>Action Media ({safeAssigned.actionMedia.length})</div>
           {safeAssigned.actionMedia.length === 0 ? (
-            <div style={{ fontSize:13, color:'#6b7280' }}>No Action Media assigned yet.</div>
+            <div style={{ fontSize:13, color:'#9fb0bf' }}>No Action Media assigned yet.</div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:12 }}>
               {safeAssigned.actionMedia.map(id => {
                 const m = idToObj(id);
                 return (
-                  <div key={id} style={{ background:'#ffffff', border:'1px solid #b7e3b0', borderRadius:12, padding:12 }}>
+                  <div key={id} style={{ background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12 }}>
                     <div style={{ display:'grid', gridTemplateColumns:'60px 1fr', gap:12, alignItems:'center' }}>
-                      <div style={{ width:60, height:60, background:'#f3f4f6', borderRadius:10, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        {m.thumbUrl ? <img src={m.thumbUrl} alt={m.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:12, color:'#6b7280' }}>no preview</span>}
+                      <div style={{ width:60, height:60, background:'#0f1418', borderRadius:10, overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid #2a323b' }}>
+                        {m.thumbUrl ? <img src={m.thumbUrl} alt={m.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <span style={{ fontSize:12, color:'#9fb0bf' }}>no preview</span>}
                       </div>
                       <div>
-                        <div style={{ fontWeight:600 }}>{m.name || m.id}</div>
-                        <div style={{ fontSize:12, color:'#6b7280' }}>{m.type || 'media'}</div>
+                        <div style={{ fontWeight:600, color:'#e9eef2' }}>{m.name || m.id}</div>
+                        <div style={{ fontSize:12, color:'#9fb0bf' }}>{m.type || 'media'}</div>
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:8, marginTop:10 }}>
-                      <button onClick={()=> window.open(m.openUrl || m.url || '#', '_blank')} style={{ background:'#e6f4ea', border:'1px solid #cfe9cf', padding:'6px 10px', borderRadius:10, fontWeight:600 }}>Open</button>
-                      <button onClick={()=> removeActionMedia(id)} style={{ background:'#fee2e2', border:'1px solid #fecaca', padding:'6px 10px', borderRadius:10, fontWeight:600 }}>Remove</button>
+                      <SmallButton onClick={()=> window.open(m.openUrl || m.url || '#', '_blank')}>Open</SmallButton>
+                      <SmallButton tone="danger" onClick={()=> removeActionMedia(id)}>Remove</SmallButton>
                     </div>
                   </div>
                 )
