@@ -58,36 +58,53 @@ async function putFile(path, content, message) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
+
   try {
+    // Accept blank/missing slug as default — be forgiving like the codex branch did.
     const rawSlug = (req.query.slug || '').toString().trim();
     const normalized = rawSlug.toLowerCase();
     const isDefault = !rawSlug || normalized === 'default' || normalized === 'root' || normalized === 'legacy-root';
+    const slug = isDefault ? 'default' : rawSlug;
 
     const { missions, config } = req.body || {};
     if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
 
-    const slug = isDefault ? 'default' : rawSlug;
     const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
 
-    const paths = isDefault
-      ? {
-          mAdmin: 'public/draft/missions.json',
-          cAdmin: 'public/draft/config.json',
-          mGame:  'game/public/draft/missions.json',
-          cGame:  'game/public/draft/config.json',
-        }
-      : {
-          mAdmin: `public/games/${slug}/draft/missions.json`,
-          cAdmin: `public/games/${slug}/draft/config.json`,
-          mGame:  `game/public/games/${slug}/draft/missions.json`,
-          cGame:  `game/public/games/${slug}/draft/config.json`,
-        };
+    // Always write the per-game paths (so every game — including 'default' — has a per-game copy).
+    const paths = {
+      mAdmin: `public/games/${slug}/draft/missions.json`,
+      cAdmin: `public/games/${slug}/draft/config.json`,
+      mGame:  `game/public/games/${slug}/draft/missions.json`,
+      cGame:  `game/public/games/${slug}/draft/config.json`,
+    };
 
     await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
     await putFile(paths.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin)`);
     await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
     await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
 
+    // For compatibility with older codepaths, if this is the default game also write legacy top-level drafts
+    if (isDefault) {
+      const legacy = {
+        mAdmin: 'public/draft/missions.json',
+        cAdmin: 'public/draft/config.json',
+        mGame:  'game/public/draft/missions.json',
+        cGame:  'game/public/draft/config.json',
+      };
+      await putFile(legacy.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin legacy)`);
+      await putFile(legacy.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin legacy)`);
+      await putFile(legacy.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game legacy)`);
+      await putFile(legacy.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game legacy)`);
+      Object.assign(paths, {
+        legacyMAdmin: legacy.mAdmin,
+        legacyCAdmin: legacy.cAdmin,
+        legacyMGame: legacy.mGame,
+        legacyCGame: legacy.cGame,
+      });
+    }
+
+    // Return null slug for default to match previous behavior
     res.status(200).json({ ok: true, slug: isDefault ? null : slug, wrote: Object.values(paths) });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
