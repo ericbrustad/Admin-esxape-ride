@@ -339,6 +339,9 @@ export default function Admin() {
   const [previewNonce, setPreviewNonce] = useState(0);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  const isDefault = !activeSlug || activeSlug === 'default';
+  const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
+
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -989,9 +992,6 @@ export default function Admin() {
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
-
-  const isDefault = !activeSlug || activeSlug === 'default';
-  const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
     <div style={S.body}>
