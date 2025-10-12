@@ -82,7 +82,7 @@ export default async function handler(req, res) {
 
     const wrote = [];
 
-    // Always write admin copies
+    // Always write the per-game admin copies
     await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
     wrote.push(paths.mAdmin);
 
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       wrote.push(paths.cGame);
     }
 
-    // If this is the 'default' slug, also write legacy locations for backwards compatibility
+    // For compatibility with older codepaths, if this is the default game also write legacy top-level drafts
     if (isDefaultSlug) {
       const legacyAdminM = 'public/draft/missions.json';
       const legacyAdminC = 'public/draft/config.json';

@@ -20,11 +20,71 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
   "media": {
+    "rewards": [
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": "/media/bundles/GOLDEN%20COIN.png"
+      }
+    ],
     "rewardsPool": [],
-    "penaltiesPool": []
+    "penaltiesPool": [],
+    "pool": [
+      "/media/bundles/ROBOT1small.png",
+      "/media/bundles/SMOKE%20BOMB.png",
+      "/media/bundles/evidence%202.png",
+      "/media/bundles/CLUEgreen.png",
+      "/media/bundles/GOLDEN%20COIN.png",
+      "/media/bundles/trivia%20icon.png",
+      "/media/bundles/trivia%20yellow.png"
+    ],
+    "actionMedia": []
   },
   "icons": {
     "missions": [
@@ -49,6 +109,16 @@
         "key": "roaming-robot",
         "name": "Roaming Robot",
         "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-clone",
+        "name": "Roaming Robot",
+        "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-smoke",
+        "name": "Smoke Shield",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
       }
     ],
     "rewards": [

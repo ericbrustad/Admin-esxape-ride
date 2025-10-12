@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="chrome-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f9fbff"/>
+      <stop offset="45%" stop-color="#d4e1f4"/>
+      <stop offset="100%" stop-color="#c3d4eb"/>
+    </linearGradient>
+    <linearGradient id="chrome-sheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.6)"/>
+      <stop offset="40%" stop-color="rgba(255,255,255,0)"/>
+      <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.45)"/>
+    </linearGradient>
+    <linearGradient id="chrome-lines" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(122,162,214,0.25)"/>
+      <stop offset="100%" stop-color="rgba(122,162,214,0)"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="24" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#chrome-base)"/>
+  <rect width="1600" height="900" fill="url(#chrome-sheen)" opacity="0.8"/>
+  <g opacity="0.55">
+    <rect x="-200" y="140" width="400" height="1200" fill="url(#chrome-lines)" transform="rotate(-24 0 0)"/>
+    <rect x="200" y="-120" width="360" height="1200" fill="url(#chrome-lines)" transform="rotate(-16 0 0)"/>
+    <rect x="640" y="-200" width="320" height="1200" fill="url(#chrome-lines)" transform="rotate(-8 0 0)"/>
+    <rect x="1080" y="-240" width="380" height="1200" fill="url(#chrome-lines)" transform="rotate(6 0 0)"/>
+  </g>
+  <g opacity="0.32" filter="url(#glow)">
+    <ellipse cx="360" cy="120" rx="260" ry="140" fill="#ffffff"/>
+    <ellipse cx="1240" cy="760" rx="320" ry="180" fill="#9cc7ff"/>
+  </g>
+  <g opacity="0.35" stroke="#8fb5dd" stroke-width="1.5">
+    <path d="M140 640 C420 540 620 520 940 580" fill="none"/>
+    <path d="M200 260 C480 180 840 180 1240 320" fill="none"/>
+    <path d="M520 780 C760 720 980 720 1340 820" fill="none"/>
+  </g>
+</svg>

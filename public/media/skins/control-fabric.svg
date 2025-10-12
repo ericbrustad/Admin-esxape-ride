@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="fabricBase" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fefeff" />
+      <stop offset="0.45" stop-color="#e9eff7" />
+      <stop offset="1" stop-color="#d8e3f1" />
+    </linearGradient>
+    <pattern id="fabricWeave" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="rgba(240,244,250,0.6)" />
+      <rect x="0" y="0" width="16" height="2" fill="rgba(200,214,230,0.25)" />
+      <rect x="0" y="8" width="16" height="2" fill="rgba(200,214,230,0.25)" />
+      <rect x="0" y="4" width="16" height="1" fill="rgba(255,255,255,0.4)" />
+      <rect x="0" y="12" width="16" height="1" fill="rgba(255,255,255,0.35)" />
+      <rect x="0" y="0" width="2" height="16" fill="rgba(200,214,230,0.2)" />
+      <rect x="8" y="0" width="2" height="16" fill="rgba(200,214,230,0.2)" />
+      <rect x="4" y="0" width="1" height="16" fill="rgba(255,255,255,0.35)" />
+      <rect x="12" y="0" width="1" height="16" fill="rgba(255,255,255,0.3)" />
+    </pattern>
+    <radialGradient id="fabricGlow" cx="0.2" cy="0.15" r="0.8">
+      <stop offset="0" stop-color="rgba(255,255,255,0.75)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0)" />
+    </radialGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#fabricBase)" />
+  <rect width="400" height="400" fill="url(#fabricWeave)" opacity="0.75" />
+  <rect width="400" height="400" fill="url(#fabricGlow)" />
+  <path d="M0 120h400" stroke="rgba(255,255,255,0.4)" stroke-width="1" opacity="0.6" />
+  <path d="M0 280h400" stroke="rgba(150,170,190,0.35)" stroke-width="1" opacity="0.6" />
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="metalBase" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f4f7fb" />
+      <stop offset="0.5" stop-color="#ced9e7" />
+      <stop offset="1" stop-color="#f6f9ff" />
+    </linearGradient>
+    <pattern id="metalBrush" width="6" height="200" patternUnits="userSpaceOnUse">
+      <rect width="6" height="200" fill="rgba(190,205,224,0.35)" />
+      <rect x="0" y="0" width="6" height="1" fill="rgba(255,255,255,0.5)" />
+      <rect x="0" y="2" width="6" height="1" fill="rgba(160,180,205,0.45)" />
+      <rect x="0" y="4" width="6" height="1" fill="rgba(255,255,255,0.35)" />
+    </pattern>
+    <radialGradient id="metalGlow" cx="0.15" cy="0.2" r="0.6">
+      <stop offset="0" stop-color="rgba(255,255,255,0.9)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0)" />
+    </radialGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#metalBase)" />
+  <rect width="400" height="400" fill="url(#metalBrush)" opacity="0.65" />
+  <rect width="400" height="400" fill="url(#metalGlow)" />
+  <g stroke="rgba(148,186,230,0.4)" stroke-width="2" opacity="0.6">
+    <rect x="30" y="30" width="340" height="40" rx="8" />
+    <rect x="30" y="330" width="340" height="40" rx="8" />
+    <circle cx="60" cy="60" r="6" fill="rgba(200,230,255,0.8)" />
+    <circle cx="340" cy="60" r="6" fill="rgba(200,230,255,0.8)" />
+    <circle cx="60" cy="340" r="6" fill="rgba(200,230,255,0.8)" />
+    <circle cx="340" cy="340" r="6" fill="rgba(200,230,255,0.8)" />
+  </g>
+</svg>

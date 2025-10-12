@@ -1,3 +1,9 @@
+Admin Security Toggle
+---------------------
+- Set `ADMIN_PASSWORD_PROTECTED=0` (default) or `1` inside your environment configuration to control whether Basic Auth is required on first load.
+- The admin header now includes a "Protected" indicator and toggle. When enabled it writes to `public/admin-protection.json` so the middleware immediately enforces passwords across the UI.
+- Toggling requires valid Basic Auth credentials and mirrors the state into `game/public/admin-protection.json` for parity with the game bundle.
+
 Device & Response UI Package
 ----------------------------
 Files included (drop into your Next.js project or use as reference):

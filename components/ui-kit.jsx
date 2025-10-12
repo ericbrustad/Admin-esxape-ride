@@ -1,9 +1,29 @@
 // components/ui-kit.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   clamp, hexToRgb, toDirectMediaURL,
-  FONT_FAMILIES, defaultAppearance
+  FONT_FAMILIES, BACKGROUND_TEXTURES, defaultAppearance,
+  normalizeTone, appearanceBackgroundStyle,
 } from '../lib/admin-shared';
+
+async function uploadBackgroundImage(file) {
+  const array = await file.arrayBuffer();
+  const bytes = new Uint8Array(array);
+  const b64 = btoa(String.fromCharCode(...bytes));
+  const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+  const path = `public/media/backgrounds/${Date.now()}-${safeName}`;
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ path, contentBase64: b64, message: `upload ${safeName}` }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json?.error || 'Upload failed');
+  }
+  return '/' + path.replace(/^public\//, '');
+}
 
 /* -------- Field wrappers -------- */
 export function Field({ label, children }) {
@@ -26,67 +46,255 @@ export function ColorField({ label, value, onChange }) {
 }
 
 /* -------- Appearance Editor -------- */
-export function AppearanceEditor({ value, onChange }) {
+
+export function AppearanceEditor({ value, onChange, tone = 'light' }) {
   const a = value || defaultAppearance();
+  const normalizedTone = normalizeTone(tone);
+  const previewSurface = appearanceBackgroundStyle(a, normalizedTone);
+  const previewStyle = {
+    backgroundColor: previewSurface.backgroundColor,
+    backgroundImage: previewSurface.backgroundImage || undefined,
+    backgroundSize: previewSurface.backgroundSize || 'cover',
+    backgroundRepeat: previewSurface.backgroundRepeat || 'no-repeat',
+    backgroundPosition: previewSurface.backgroundPosition || 'center',
+    backgroundBlendMode: previewSurface.backgroundBlendMode || undefined,
+  };
+  const previewTextColor = normalizedTone === 'dark'
+    ? '#f4f7ff'
+    : (a.fontColor || '#ffffff');
+  const previewTextBg = normalizedTone === 'dark'
+    ? `rgba(8, 12, 20, ${Math.max(a.textBgOpacity ?? 0.6, 0.45)})`
+    : `rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity ?? 0})`;
+  const fontSize = clamp(Number(a.fontSizePx ?? 22), 10, 72);
+  const panelDepthEnabled = a.panelDepth !== false;
+  const textures = useMemo(() => {
+    const list = [...BACKGROUND_TEXTURES];
+    if (a.screenBgImage && !list.some(tex => tex.image === a.screenBgImage)) {
+      list.unshift({
+        key: 'custom-current',
+        label: 'Current image',
+        image: a.screenBgImage,
+        description: 'Custom background',
+      });
+    }
+    return list;
+  }, [a.screenBgImage]);
+  const [uploadingBg, setUploadingBg] = useState(false);
+  const fileInputRef = useRef(null);
+
+  async function handleFileSelection(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    setUploadingBg(true);
+    try {
+      const url = await uploadBackgroundImage(file);
+      onChange({ ...a, screenBgImage: url, screenBgImageEnabled: true });
+    } catch (err) {
+      console.error('background upload failed', err);
+      alert(`Upload failed: ${err?.message || err}`);
+    } finally {
+      setUploadingBg(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   return (
     <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
-          <select style={styles.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
-            {FONT_FAMILIES.map(f=><option key={f.v} value={f.v}>{f.label}</option>)}
-          </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
-            Aa — preview text with this font
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:8 }}>
+            {FONT_FAMILIES.map((f) => {
+              const active = a.fontFamily === f.v;
+              return (
+                <button
+                  key={f.v}
+                  type="button"
+                  onClick={()=>onChange({ ...a, fontFamily:f.v })}
+                  style={{
+                    borderRadius:12,
+                    border: active ? '2px solid #3c82ff' : '1px solid #2a323b',
+                    padding:'10px 12px',
+                    background: active ? 'rgba(60,130,255,0.18)' : 'rgba(14,22,32,0.4)',
+                    color:'#e9eef2',
+                    textAlign:'left',
+                    display:'grid',
+                    gap:4,
+                    cursor:'pointer',
+                  }}
+                >
+                  <span style={{ fontWeight:600 }}>{f.label}</span>
+                  <span style={{ fontFamily:f.v, fontSize:16, opacity:0.85 }}>Aa Bb 123</span>
+                </button>
+              );
+            })}
           </div>
         </Field>
         <Field label="Font size (px)">
-          <input type="number" min={10} max={72} style={styles.input}
-            value={a.fontSizePx} onChange={(e)=>onChange({ ...a, fontSizePx:clamp(Number(e.target.value||0),10,72) })}/>
+          <input
+            type="number"
+            min={10}
+            max={72}
+            style={styles.input}
+            value={fontSize}
+            onChange={(e)=>onChange({ ...a, fontSizePx:clamp(Number(e.target.value||0),10,72) })}
+          />
         </Field>
         <ColorField label="Text color" value={a.fontColor} onChange={(v)=>onChange({ ...a, fontColor:v })}/>
         <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>onChange({ ...a, textBgColor:v })}/>
         <Field label="Text background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{Math.round((a.textBgOpacity||0)*100)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
-        <Field label="Screen background opacity">
+        <Field label="Background overlay opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{Math.round((a.screenBgOpacity||0)*100)}%</div>
         </Field>
-        <Field label="Screen background image (URL)">
-          <input style={styles.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
+        <Field label="Background image library">
+          <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+            <input
+              type="checkbox"
+              checked={a.screenBgImageEnabled !== false}
+              onChange={(e)=>onChange({ ...a, screenBgImageEnabled:e.target.checked })}
+            />
+            <span>Enable themed background image</span>
+          </label>
+          <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:8 }}>
+            Choose one of the curated textures or supply your own file/URL below.
+          </div>
+          <div style={{
+            marginTop:6,
+            display:'grid',
+            gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',
+            gap:10,
+            opacity: a.screenBgImageEnabled === false ? 0.45 : 1,
+            pointerEvents: a.screenBgImageEnabled === false ? 'none' : 'auto',
+          }}>
+            {textures.map((tex) => {
+              const active = (a.screenBgImage || '') === tex.image;
+              return (
+                <button
+                  key={`${tex.key}-${tex.image}`}
+                  type="button"
+                  onClick={()=>onChange({ ...a, screenBgImage: tex.image, screenBgImageEnabled: true })}
+                  style={{
+                    borderRadius:10,
+                    border: active ? '2px solid #3c82ff' : '1px solid #2a323b',
+                    padding:0,
+                    overflow:'hidden',
+                    background:'#000',
+                    color:'#e9eef2',
+                    cursor:'pointer',
+                  }}
+                >
+                  <div style={{
+                    height:70,
+                    background: normalizedTone === 'dark'
+                      ? `linear-gradient(rgba(4,9,16,0.65), rgba(0,0,0,0.45)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`
+                      : `linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.35)), url(${toDirectMediaURL(tex.image)}) center/cover no-repeat`,
+                  }}/>
+                  <div style={{ padding:'6px 8px', fontSize:12, textAlign:'left' }}>
+                    <div style={{ fontWeight:600 }}>{tex.label}</div>
+                    <div style={{ color: normalizedTone === 'dark' ? '#c9d6ed' : '#9fb0bf', fontSize:11 }}>{tex.description}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Add background image">
+          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            <button
+              type="button"
+              style={{ ...styles.input, cursor:'pointer', width:'auto', padding:'8px 14px', fontWeight:600 }}
+              onClick={()=>fileInputRef.current?.click()}
+              disabled={uploadingBg}
+            >
+              {uploadingBg ? 'Uploading…' : 'Upload image'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display:'none' }}
+              onChange={handleFileSelection}
+            />
+            <div style={{ color:'#9fb0bf', fontSize:12 }}>
+              JPG, PNG, GIF, or WebP up to 8 MB.
+            </div>
+          </div>
+        </Field>
+        <Field label="Custom background image URL">
+          <input
+            style={styles.input}
+            value={a.screenBgImage || ''}
+            onChange={(e)=>{
+              const nextUrl = e.target.value;
+              onChange({
+                ...a,
+                screenBgImage: nextUrl,
+                screenBgImageEnabled: nextUrl ? true : false,
+              });
+            }}
+            placeholder="https://..."
+          />
           {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-                 style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+            <img
+              src={toDirectMediaURL(a.screenBgImage)}
+              alt="bg"
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}
+            />
           )}
+        </Field>
+        <Field label="3D interface depth">
+          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <input
+              type="checkbox"
+              checked={panelDepthEnabled}
+              onChange={(e)=>onChange({ ...a, panelDepth: e.target.checked })}
+            />
+            <span>Enable raised chrome outlines and deep shadows</span>
+          </label>
         </Field>
         <Field label="Text alignment (horizontal)">
           <select style={styles.input} value={a.textAlign} onChange={(e)=>onChange({ ...a, textAlign:e.target.value })}>
-            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
           </select>
         </Field>
         <Field label="Text position (vertical)">
           <select style={styles.input} value={a.textVertical} onChange={(e)=>onChange({ ...a, textVertical:e.target.value })}>
-            <option value="top">Top</option><option value="center">Center</option>
+            <option value="top">Top</option>
+            <option value="center">Center</option>
           </select>
         </Field>
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
-          ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
-          : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
-        padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',
+        marginTop:12,
+        border:'1px dashed #2a323b',
+        borderRadius:10,
+        overflow:'hidden',
+        ...previewStyle,
+        padding:12,
+        height:120,
+        display:'grid',
+        placeItems: a.textVertical==='center' ? 'center' : 'start',
+        boxShadow: panelDepthEnabled ? '0 18px 36px rgba(8,12,20,0.45)' : '0 8px 18px rgba(8,12,20,0.2)',
       }}>
         <div style={{
           maxWidth:'100%',
-          background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
-          textAlign:a.textAlign, width:'fit-content',
+          background: previewTextBg,
+          padding:'6px 10px',
+          borderRadius:8,
+          color:previewTextColor,
+          fontFamily:a.fontFamily,
+          fontSize:fontSize,
+          textAlign:a.textAlign,
+          width:'fit-content',
           justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
         }}>
           Preview text

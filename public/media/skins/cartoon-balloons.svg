@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bubbleBase" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff5ff" />
+      <stop offset="0.5" stop-color="#f3e1ff" />
+      <stop offset="1" stop-color="#e6d7ff" />
+    </linearGradient>
+    <radialGradient id="bubbleHighlight" cx="0.25" cy="0.2" r="0.7">
+      <stop offset="0" stop-color="rgba(255,255,255,0.9)" />
+      <stop offset="1" stop-color="rgba(255,255,255,0)" />
+    </radialGradient>
+    <radialGradient id="bubblePink" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd4f7" />
+      <stop offset="1" stop-color="rgba(255,128,220,0.05)" />
+    </radialGradient>
+    <radialGradient id="bubbleBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#c8e7ff" />
+      <stop offset="1" stop-color="rgba(110,180,255,0.05)" />
+    </radialGradient>
+    <radialGradient id="bubbleGold" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffeaa8" />
+      <stop offset="1" stop-color="rgba(255,190,64,0.05)" />
+    </radialGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#bubbleBase)" />
+  <rect width="400" height="400" fill="url(#bubbleHighlight)" />
+  <g opacity="0.9">
+    <circle cx="90" cy="120" r="60" fill="url(#bubblePink)" />
+    <circle cx="180" cy="80" r="48" fill="url(#bubbleBlue)" />
+    <circle cx="280" cy="120" r="54" fill="url(#bubbleGold)" />
+    <circle cx="120" cy="240" r="46" fill="url(#bubbleBlue)" />
+    <circle cx="220" cy="250" r="58" fill="url(#bubblePink)" />
+    <circle cx="320" cy="240" r="44" fill="url(#bubbleBlue)" />
+    <circle cx="80" cy="310" r="40" fill="url(#bubbleGold)" />
+    <circle cx="200" cy="340" r="36" fill="url(#bubblePink)" />
+    <circle cx="310" cy="330" r="42" fill="url(#bubbleBlue)" />
+  </g>
+  <g fill="rgba(255,255,255,0.6)">
+    <ellipse cx="120" cy="90" rx="24" ry="12" />
+    <ellipse cx="220" cy="70" rx="18" ry="10" />
+    <ellipse cx="260" cy="110" rx="20" ry="12" />
+    <ellipse cx="100" cy="220" rx="18" ry="10" />
+    <ellipse cx="240" cy="220" rx="22" ry="12" />
+  </g>
+</svg>
