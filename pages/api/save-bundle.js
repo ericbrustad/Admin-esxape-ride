@@ -66,6 +66,8 @@ export default async function handler(req, res) {
     if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
 
     const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
+    const isDefault = slug === 'default';
+
     const paths = {
       mAdmin: `public/games/${slug}/draft/missions.json`,
       cAdmin: `public/games/${slug}/draft/config.json`,
@@ -75,16 +77,43 @@ export default async function handler(req, res) {
 
     const wrote = [];
 
+    // Always write admin copies
     await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
     wrote.push(paths.mAdmin);
-    await putFile(paths.cAdmin, JSON.stringify(config,   null, 2), `${msg} config(admin)`);
+
+    await putFile(paths.cAdmin, JSON.stringify(config, null, 2), `${msg} config(admin)`);
     wrote.push(paths.cAdmin);
 
+    // Conditionally write game copies if feature flag enabled
     if (GAME_ENABLED) {
-      await putFile(paths.mGame,  JSON.stringify(missions, null, 2), `${msg} missions(game)`);
+      await putFile(paths.mGame, JSON.stringify(missions, null, 2), `${msg} missions(game)`);
       wrote.push(paths.mGame);
-      await putFile(paths.cGame,  JSON.stringify(config,   null, 2), `${msg} config(game)`);
+
+      await putFile(paths.cGame, JSON.stringify(config, null, 2), `${msg} config(game)`);
       wrote.push(paths.cGame);
+    }
+
+    // If this is the 'default' slug, also write legacy locations
+    if (isDefault) {
+      const legacyAdminM = 'public/draft/missions.json';
+      const legacyAdminC = 'public/draft/config.json';
+
+      await putFile(legacyAdminM, JSON.stringify(missions, null, 2), `${msg} missions(admin legacy)`);
+      wrote.push(legacyAdminM);
+
+      await putFile(legacyAdminC, JSON.stringify(config, null, 2), `${msg} config(admin legacy)`);
+      wrote.push(legacyAdminC);
+
+      if (GAME_ENABLED) {
+        const legacyGameM = 'game/public/draft/missions.json';
+        const legacyGameC = 'game/public/draft/config.json';
+
+        await putFile(legacyGameM, JSON.stringify(missions, null, 2), `${msg} missions(game legacy)`);
+        wrote.push(legacyGameM);
+
+        await putFile(legacyGameC, JSON.stringify(config, null, 2), `${msg} config(game legacy)`);
+        wrote.push(legacyGameC);
+      }
     }
 
     res.status(200).json({ ok: true, wrote });
