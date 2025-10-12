@@ -20,8 +20,52 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "n",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 730,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": false,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.982771,
+      "lng": -93.283024
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "n",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 730,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": false,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.982771,
+      "lng": -93.283024
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -72,19 +116,19 @@
   "appearance": {
     "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
     "fontSizePx": 24,
-    "fontColor": "#f8fafc",
-    "textBgColor": "#0f172a",
-    "textBgOpacity": 0.88,
-    "screenBgColor": "#020617",
-    "screenBgOpacity": 0.9,
-    "screenBgImage": "/media/skins/forest-foliage.svg",
-    "screenBgImageEnabled": false,
+    "fontColor": "#20331e",
+    "textBgColor": "#f2faed",
+    "textBgOpacity": 0.76,
+    "screenBgColor": "#dcedd2",
+    "screenBgOpacity": 0.5,
+    "screenBgImage": "/media/skins/forest-meadow.svg",
+    "screenBgImageEnabled": true,
     "textAlign": "left",
     "textVertical": "top",
     "panelDepth": true
   },
-  "appearanceSkin": "forest-outpost",
-  "appearanceTone": "dark",
+  "appearanceSkin": "forest-meadow",
+  "appearanceTone": "light",
   "mediaTriggers": {
     "enabled": false,
     "actionType": "media",
