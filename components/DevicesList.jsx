@@ -1,6 +1,37 @@
 import React, { useState } from 'react';
 import InlineMissionResponses from './InlineMissionResponses';
 
+const styles = {
+  editor: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    background: '#071213',
+    border: '1px solid rgba(255,255,255,0.04)',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: '6px 12px',
+    borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#132028',
+    color: '#cfe8ea',
+    cursor: 'pointer',
+  },
+  saveButton: {
+    padding: 8,
+    borderRadius: 6,
+  },
+  actionRow: {
+    marginTop: 14,
+    display: 'flex',
+    gap: 8,
+  },
+};
+
 /**
  * DevicesList component
  * - devices: array of { id, name, lat, lng, thumbnailUrl, triggeredTicker, triggerTargetId, enableOnCorrect, enableOnWrong, hasResponses }
@@ -80,8 +111,9 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
 
       {/* Inline editor for the selected device */}
       {editingId ? (
-        <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: '#071213', border: '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Edit Device — {local.id}</div>
+        <div style={styles.editor}>
+          <button onClick={cancelEdit} style={styles.closeButton}>Cancel</button>
+          <div style={{ fontWeight: 800, marginBottom: 8, paddingRight: 72 }}>Edit Device — {local.id}</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 12 }}>
             <div>
@@ -141,9 +173,8 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
                 <input value={local.thumbnailUrl || ''} onChange={(e) => setLocal({...local, thumbnailUrl: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} placeholder="https://..." />
               </div>
 
-              <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
-                <button onClick={saveEdit} style={{ padding: 8, borderRadius: 6 }}>Save</button>
-                <button onClick={cancelEdit} style={{ padding: 8, borderRadius: 6, background: '#122027', color: '#cfe8ea' }}>Cancel</button>
+              <div style={styles.actionRow}>
+                <button onClick={saveEdit} style={{ ...styles.saveButton }}>Save &amp; Close</button>
               </div>
             </div>
           </div>

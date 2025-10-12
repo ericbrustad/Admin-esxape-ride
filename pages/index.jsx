@@ -1286,11 +1286,11 @@ export default function Admin() {
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
+                  <button style={S.dismissButton} onClick={cancelEdit}>Cancel</button>
                   <div style={{ position:'sticky', top:0, zIndex:5, background:'#12181d', paddingBottom:8, marginBottom:8, borderBottom:'1px solid #1f262d' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
-                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                      <button style={S.button} onClick={saveToList}>💾 Save &amp; Close</button>
                     </div>
                   </div>
 
@@ -2180,6 +2180,7 @@ const S = {
   search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
   hr:{ border:'1px solid #1f262d', borderBottom:'none' },
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
+  dismissButton:{ position:'absolute', top:12, right:12, padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
   chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
   chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
 };

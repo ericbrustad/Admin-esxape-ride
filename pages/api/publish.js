@@ -61,16 +61,28 @@ export default async function handler(req, res) {
 
     // Admin destination: published path (if sluged) or public root for legacy
     const adminDest = legacy ? 'public' : joinPath('public/games', slug);
+    const defaultGameAdminDest = joinPath('public/games', 'default');
+    const defaultGameMirrorDest = joinPath('game/public/games', 'default');
 
     if (cfg) {
       files.push({ path: joinPath(adminDest, 'config.json'), content: pretty(cfg) });
-      if (!legacy && GAME_ENABLED) {
+      if (legacy) {
+        files.push({ path: joinPath(defaultGameAdminDest, 'config.json'), content: pretty(cfg) });
+        if (GAME_ENABLED) {
+          files.push({ repoPath: joinPath(defaultGameMirrorDest, 'config.json'), content: pretty(cfg) });
+        }
+      } else if (GAME_ENABLED) {
         files.push({ repoPath: joinPath('game/public/games', slug, 'config.json'), content: pretty(cfg) });
       }
     }
     if (mis) {
       files.push({ path: joinPath(adminDest, 'missions.json'), content: pretty(mis) });
-      if (!legacy && GAME_ENABLED) {
+      if (legacy) {
+        files.push({ path: joinPath(defaultGameAdminDest, 'missions.json'), content: pretty(mis) });
+        if (GAME_ENABLED) {
+          files.push({ repoPath: joinPath(defaultGameMirrorDest, 'missions.json'), content: pretty(mis) });
+        }
+      } else if (GAME_ENABLED) {
         files.push({ repoPath: joinPath('game/public/games', slug, 'missions.json'), content: pretty(mis) });
       }
     }
