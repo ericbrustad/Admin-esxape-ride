@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PhotoCapture from '../components/PhotoCapture';
 import OutcomeModal from '../components/OutcomeModal';
 import BackpackButton from '../components/BackpackButton';
@@ -25,25 +25,49 @@ export default function Game() {
   const [outcome, setOutcome]   = useState(null);   // object from mission.onCorrect/onWrong
   const [backpackOpen, setBackpackOpen] = useState(false);
 
-  const { slug, channel } = useMemo(() => {
-    const u = new URL(window.location.href);
-    return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
+  const [{ slug, channel }, setRoute] = useState({ slug: '', channel: 'published' });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const u = new URL(window.location.href);
+      setRoute({
+        slug: u.searchParams.get('slug') || '',
+        channel: u.searchParams.get('channel') || 'published'
+      });
+    } catch (e) {
+      setRoute({ slug: '', channel: 'published' });
+    }
   }, []);
 
-  useEffect(() => { initBackpack(slug); }, [slug]);
+  useEffect(() => {
+    if (!slug) return;
+    initBackpack(slug);
+  }, [slug]);
 
-  useEffect(() => { (async () => {
-    try {
-      const base = channel === 'published' ? 'published' : 'draft';
-      const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
-      const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
-      setSuite(ms); setConfig(cfg); setStatus('');
-    } catch (e) {
-      setStatus('Failed to load game.');
+  useEffect(() => {
+    if (!slug) {
+      setSuite(null);
+      setConfig(null);
+      setStatus('Waiting for game…');
+      return;
     }
-  })(); }, [slug, channel]);
+    setSuite(null);
+    setConfig(null);
+    setStatus('Loading…');
+    (async () => {
+      try {
+        const base = channel === 'published' ? 'published' : 'draft';
+        const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
+        const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
+        setSuite(ms); setConfig(cfg); setStatus('');
+      } catch (e) {
+        setStatus('Failed to load game.');
+      }
+    })();
+  }, [slug, channel]);
 
-  if (!suite || !config) {
+  if (!slug || !suite || !config) {
     return <main style={outer}><div style={card}>{status}</div></main>;
   }
 

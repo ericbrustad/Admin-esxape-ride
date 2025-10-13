@@ -1,6 +1,9 @@
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-19 — Game client SSR route guard + loading reset. Commit: e006dccf842fa581e545cf9701ffa1e37d01eede.
+  - Direct link: `game/pages/index.jsx`
+  - Notes: Prevents the Next.js export crash by deferring slug/channel resolution to the client, resetting mission data while loading, and reusing the existing backpack/setup flows without touching the admin layout structure.
 - 2025-10-18 — Mission trigger layout refinements and media tag surfacing. Commit: a75859d56fc6271675b58153efcbee2e3263e982.
   - Direct links: `pages/index.jsx`, `components/InlineMissionResponses.jsx`, `components/AssignedMediaTab.jsx`
   - Notes: Aligns mission editor controls with Save/Reset/Cancel expectations, renames Action Trigger copy, surfaces response media thumbnails above selectors, and mirrors Media Pool tags inside the Assigned Media tab.
