@@ -174,7 +174,7 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
               </div>
 
               <div style={styles.actionRow}>
-                <button onClick={saveEdit} style={{ ...styles.saveButton }}>Save &amp; Close</button>
+                <button onClick={saveEdit} style={{ ...styles.saveButton }}>Save and Close</button>
               </div>
             </div>
           </div>

@@ -163,6 +163,7 @@ const SKIN_THEMES = [
   {
     key: 'dark',
     label: 'Dark',
+    isDefault: true,
     description: 'Midnight HUD with high-contrast text.',
     tone: 'dark',
     appearance: {
@@ -326,6 +327,40 @@ const SKIN_THEME_MAP = SKIN_THEMES.reduce((acc, skin) => {
   acc[skin.key] = skin;
   return acc;
 }, {});
+
+function detectSkinKeyFromAppearance(ap) {
+  if (!ap) return null;
+  const keys = [
+    'fontFamily', 'fontSizePx', 'fontColor', 'textBgColor', 'textBgOpacity',
+    'screenBgColor', 'screenBgOpacity', 'screenBgImage', 'screenBgImageEnabled',
+    'textAlign', 'textVertical', 'panelDepth',
+  ];
+  for (const skin of SKIN_THEMES) {
+    const baseline = { ...defaultAppearance(), ...(skin.appearance || {}) };
+    let match = true;
+    for (const key of keys) {
+      const expectedRaw = baseline[key];
+      const actualRaw = ap[key];
+      const expected = expectedRaw === undefined || expectedRaw === null ? '' : expectedRaw;
+      const actual = actualRaw === undefined || actualRaw === null ? '' : actualRaw;
+      if (typeof expected === 'number' || typeof actual === 'number') {
+        const expectedNum = Number(expectedRaw ?? 0);
+        const actualNum = Number(actualRaw ?? 0);
+        if (!Number.isFinite(expectedNum) || !Number.isFinite(actualNum)) {
+          if (expected !== actual) { match = false; break; }
+        } else if (Math.abs(expectedNum - actualNum) > 0.01) {
+          match = false;
+          break;
+        }
+      } else if (expected !== actual) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return skin.key;
+  }
+  return null;
+}
 
 function applyDefaultIcons(cfg) {
   const next = { ...cfg, icons: { missions:[], devices:[], rewards:[], ...(cfg.icons || {}) } };
@@ -675,6 +710,14 @@ export default function Admin() {
 
         merged = applyDefaultIcons(merged);
         merged = normalizeGameMetadata(merged, slugForMeta);
+
+        if (!merged.appearanceSkin || !SKIN_THEME_MAP[merged.appearanceSkin]) {
+          const detected = detectSkinKeyFromAppearance(merged.appearance || {});
+          merged.appearanceSkin = detected && SKIN_THEME_MAP[detected] ? detected : 'dark';
+        }
+        if (!merged.appearanceTone) {
+          merged.appearanceTone = SKIN_THEME_MAP[merged.appearanceSkin]?.tone || 'dark';
+        }
 
         setSuite(normalized);
         setConfig(merged);
@@ -1666,7 +1709,7 @@ export default function Admin() {
                   )}
 
                   <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
+                    <button style={S.button} onClick={saveToList}>💾 Save and Close</button>
                     <button style={S.button} onClick={cancelEdit}>Close</button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
@@ -2259,51 +2302,107 @@ function AppearanceEditor({ value, onChange, skinKey = 'custom', onSkinChange })
 
   return (
     <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:12, marginBottom:16 }}>
         {SKIN_THEMES.map((skin) => {
-          const preview = skin.appearance || defaultAppearance();
+          const preview = { ...defaultAppearance(), ...(skin.appearance || {}) };
           const selected = skinKey === skin.key;
+          const swatches = Array.from(new Set([
+            preview.screenBgColor,
+            preview.textBgColor,
+            preview.fontColor,
+          ].map((c)=>c && String(c).toLowerCase()).filter(Boolean)));
           return (
             <button
               key={skin.key}
               type="button"
               onClick={()=>applySkin(skin)}
+              aria-pressed={selected}
               style={{
-                flex:'1 0 200px',
-                minWidth:180,
-                border:'1px solid ' + (selected ? '#38bdf8' : '#2a323b'),
-                background:selected ? '#15202b' : '#0f1418',
-                color:'#e9eef2',
-                borderRadius:12,
-                padding:12,
-                textAlign:'left',
+                display:'flex',
+                borderRadius:14,
+                padding:0,
+                border:'none',
                 cursor:'pointer',
-                transition:'border-color 120ms ease, background 120ms ease',
+                background:'transparent',
+                textAlign:'left',
               }}
             >
-              <div style={{ fontWeight:700, marginBottom:4 }}>{skin.label}</div>
-              <div style={{ fontSize:12, color:'#9fb0bf', minHeight:32 }}>{skin.description}</div>
               <div
                 style={{
-                  marginTop:10,
-                  borderRadius:8,
-                  border:'1px solid rgba(255,255,255,0.08)',
-                  padding:'6px 8px',
-                  fontFamily:preview.fontFamily,
-                  fontSize:Math.max(14, Math.min(18, preview.fontSizePx || 22)),
-                  color:preview.fontColor,
-                  background:previewBackground(preview),
+                  flex:1,
+                  display:'flex',
+                  flexDirection:'column',
+                  borderRadius:14,
+                  overflow:'hidden',
+                  border:`1px solid ${selected ? '#38bdf8' : 'rgba(255,255,255,0.08)'}`,
+                  background:selected ? 'rgba(21,32,43,0.92)' : 'rgba(10,15,19,0.92)',
+                  boxShadow: selected ? '0 0 0 2px rgba(56,189,248,0.18)' : 'none',
+                  transition:'border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease',
                 }}
               >
-                Preview
+                <div style={{ padding:'12px 14px 4px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ fontWeight:700 }}>{skin.label}</div>
+                  {skin.isDefault && (
+                    <span style={{ fontSize:11, color:'#38bdf8', border:'1px solid rgba(56,189,248,0.4)', borderRadius:999, padding:'2px 8px' }}>
+                      Default
+                    </span>
+                  )}
+                </div>
+                <div style={{ color:'#9fb0bf', fontSize:12, padding:'0 14px 10px', minHeight:36 }}>{skin.description}</div>
+                <div
+                  style={{
+                    margin:'0 14px',
+                    borderRadius:10,
+                    border:'1px solid rgba(255,255,255,0.06)',
+                    padding:'12px 14px',
+                    background:previewBackground(preview),
+                    display:'grid',
+                    gap:6,
+                    minHeight:110,
+                  }}
+                >
+                  <div style={{ fontFamily:preview.fontFamily, fontWeight:700, fontSize:Math.max(15, Math.min(19, (preview.fontSizePx || 20) + 1)), color:preview.fontColor }}>
+                    Mission Briefing
+                  </div>
+                  <div
+                    style={{
+                      fontFamily:preview.fontFamily,
+                      fontSize:Math.max(13, Math.min(17, preview.fontSizePx || 18)),
+                      color:preview.fontColor,
+                      background:`rgba(${hexToRgb(preview.textBgColor)}, ${preview.textBgOpacity ?? 0})`,
+                      padding:'6px 10px',
+                      borderRadius:8,
+                      width:'fit-content',
+                    }}
+                  >
+                    Coordinates locked. Agents are go.
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:6, padding:'12px 14px 14px', alignItems:'center' }}>
+                  {swatches.map((color)=> (
+                    <span
+                      key={color}
+                      style={{
+                        width:18,
+                        height:18,
+                        borderRadius:6,
+                        border:'1px solid rgba(255,255,255,0.15)',
+                        background:color,
+                      }}
+                    />
+                  ))}
+                  <span style={{ marginLeft:'auto', fontSize:11, color:selected ? '#38bdf8' : '#9fb0bf' }}>
+                    {selected ? 'Selected' : 'Preview theme'}
+                  </span>
+                </div>
               </div>
             </button>
           );
         })}
-        {skinKey === 'custom' && (
-          <div style={{ alignSelf:'center', fontSize:12, color:'#9fb0bf' }}>Custom adjustments active</div>
-        )}
       </div>
+      {skinKey === 'custom' && (
+        <div style={{ marginBottom:12, fontSize:12, color:'#9fb0bf' }}>Custom adjustments active</div>
+      )}
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">

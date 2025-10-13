@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <defs>
+    <linearGradient id="forest-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e3f3d9" />
+      <stop offset="100%" stop-color="#c1e3b2" />
+    </linearGradient>
+    <pattern id="leaf" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(12)">
+      <path d="M12 2c3.5 5.5 3.5 10.5 0 16-3.5-5.5-3.5-10.5 0-16z" fill="#b4d7a6" opacity="0.45" />
+      <circle cx="12" cy="12" r="2" fill="#9cc491" opacity="0.6" />
+    </pattern>
+  </defs>
+  <rect width="160" height="160" fill="url(#forest-bg)" />
+  <rect width="160" height="160" fill="url(#leaf)" />
+</svg>
