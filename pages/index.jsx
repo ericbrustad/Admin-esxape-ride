@@ -159,6 +159,174 @@ const DEFAULT_BUNDLES = {
   ],
 };
 
+const SKIN_THEMES = [
+  {
+    key: 'dark',
+    label: 'Dark',
+    description: 'Midnight HUD with high-contrast text.',
+    tone: 'dark',
+    appearance: {
+      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+      fontSizePx: 22,
+      fontColor: '#f8fafc',
+      textBgColor: '#020617',
+      textBgOpacity: 0.35,
+      screenBgColor: '#0b0c10',
+      screenBgOpacity: 0.75,
+      screenBgImage: '',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+      panelDepth: true,
+    },
+    theme: {
+      splash: {
+        fontFamily: 'Georgia, serif',
+        fontSize: 24,
+        textColor: '#f1f5f9',
+        align: 'left',
+        backgroundColor: '#0f172a',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+      missionDefault: {
+        fontFamily: 'system-ui, Arial, sans-serif',
+        fontSize: 18,
+        textColor: '#f8fafc',
+        align: 'center',
+        backgroundColor: '#111827',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+    },
+  },
+  {
+    key: 'classic',
+    label: 'Light',
+    description: 'Control-room light panels with fabric overlay.',
+    tone: 'light',
+    appearance: {
+      fontFamily: '"Orbitron", "Rajdhani", sans-serif',
+      fontSizePx: 22,
+      fontColor: '#1f2a35',
+      textBgColor: '#f4f8fb',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dbe4f1',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/control-fabric.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+      panelDepth: true,
+    },
+    theme: {
+      splash: {
+        fontFamily: 'Georgia, serif',
+        fontSize: 24,
+        textColor: '#100f10',
+        align: 'left',
+        backgroundColor: '#e6eaf9',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+      missionDefault: {
+        fontFamily: 'system-ui, Arial, sans-serif',
+        fontSize: 18,
+        textColor: '#ffffff',
+        align: 'center',
+        backgroundColor: '#0b0c10',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+    },
+  },
+  {
+    key: 'forest',
+    label: 'Forest',
+    description: 'Organic greens with diffused overlays.',
+    tone: 'light',
+    appearance: {
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#20331e',
+      textBgColor: '#f2faed',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dcedd2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/forest-meadow.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+      panelDepth: true,
+    },
+    theme: {
+      splash: {
+        fontFamily: 'Georgia, serif',
+        fontSize: 24,
+        textColor: '#20331e',
+        align: 'left',
+        backgroundColor: '#dcedd2',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+      missionDefault: {
+        fontFamily: 'system-ui, Arial, sans-serif',
+        fontSize: 18,
+        textColor: '#1f2d1c',
+        align: 'center',
+        backgroundColor: '#b4d7a6',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+    },
+  },
+  {
+    key: 'neon',
+    label: 'Neon',
+    description: 'Synthwave purples with glow highlights.',
+    tone: 'dark',
+    appearance: {
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontSizePx: 22,
+      fontColor: '#ffe3ff',
+      textBgColor: '#3b0f4e',
+      textBgOpacity: 0.5,
+      screenBgColor: '#0a0216',
+      screenBgOpacity: 0.82,
+      screenBgImage: '',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+      panelDepth: true,
+    },
+    theme: {
+      splash: {
+        fontFamily: 'Georgia, serif',
+        fontSize: 24,
+        textColor: '#ffe3ff',
+        align: 'left',
+        backgroundColor: '#240046',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+      missionDefault: {
+        fontFamily: 'system-ui, Arial, sans-serif',
+        fontSize: 18,
+        textColor: '#ffe3ff',
+        align: 'center',
+        backgroundColor: '#1a0328',
+        backgroundImageUrl: '',
+        backgroundSize: 'cover',
+      },
+    },
+  },
+];
+
+const SKIN_THEME_MAP = SKIN_THEMES.reduce((acc, skin) => {
+  acc[skin.key] = skin;
+  return acc;
+}, {});
+
 function applyDefaultIcons(cfg) {
   const next = { ...cfg, icons: { missions:[], devices:[], rewards:[], ...(cfg.icons || {}) } };
   function ensure(kind, arr) {
@@ -254,14 +422,16 @@ function defaultAppearance() {
   return {
     fontFamily: FONT_FAMILIES[0].v,
     fontSizePx: 22,
-    fontColor: '#ffffff',
-    textBgColor: '#000000',
-    textBgOpacity: 0.0,
-    screenBgColor: '#000000',
-    screenBgOpacity: 0.0,
+    fontColor: '#f8fafc',
+    textBgColor: '#020617',
+    textBgOpacity: 0.35,
+    screenBgColor: '#0b0c10',
+    screenBgOpacity: 0.75,
     screenBgImage: '',
+    screenBgImageEnabled: true,
     textAlign: 'center',
     textVertical: 'top',
+    panelDepth: true,
   };
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
@@ -529,6 +699,8 @@ export default function Admin() {
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
       appearance: defaultAppearance(),
+      appearanceSkin: 'dark',
+      appearanceTone: 'dark',
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
@@ -1848,8 +2020,20 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
-            <AppearanceEditor value={config.appearance||defaultAppearance()}
-              onChange={(next)=>setConfig({ ...config, appearance:next })}/>
+            <AppearanceEditor
+              value={config.appearance||defaultAppearance()}
+              skinKey={config.appearanceSkin || 'dark'}
+              onChange={(next)=>{ setConfig((prev)=>({ ...prev, appearance:next })); setDirty(true); }}
+              onSkinChange={(key, skin)=>{
+                setConfig((prev)=>{
+                  const next = { ...prev, appearanceSkin:key };
+                  if (skin && skin.tone) next.appearanceTone = skin.tone;
+                  if (skin && skin.theme) next.theme = { ...(prev.theme || {}), ...skin.theme };
+                  return next;
+                });
+                setDirty(true);
+              }}
+            />
             <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
@@ -2048,13 +2232,82 @@ function ColorField({ label, value, onChange }) {
     </Field>
   );
 }
-function AppearanceEditor({ value, onChange }) {
-  const a = value || defaultAppearance();
+function AppearanceEditor({ value, onChange, skinKey = 'custom', onSkinChange }) {
+  const a = { ...defaultAppearance(), ...(value || {}) };
+  const activeSkin = SKIN_THEME_MAP[skinKey] || null;
+
+  function updateAppearance(partial) {
+    const next = { ...a, ...partial };
+    onChange(next);
+    if (onSkinChange) onSkinChange('custom');
+  }
+
+  function previewBackground(ap) {
+    const opacity = ap.screenBgOpacity ?? 0;
+    const overlay = `rgba(0,0,0,${opacity})`;
+    if (ap.screenBgImage && ap.screenBgImageEnabled !== false) {
+      return `linear-gradient(${overlay}, ${overlay}), url(${toDirectMediaURL(ap.screenBgImage)}) center/cover no-repeat`;
+    }
+    return `linear-gradient(${overlay}, ${overlay}), ${ap.screenBgColor || '#000000'}`;
+  }
+
+  function applySkin(skin) {
+    const next = { ...defaultAppearance(), ...(skin.appearance || {}) };
+    onChange(next);
+    if (onSkinChange) onSkinChange(skin.key, skin);
+  }
+
   return (
     <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:10, marginBottom:16 }}>
+        {SKIN_THEMES.map((skin) => {
+          const preview = skin.appearance || defaultAppearance();
+          const selected = skinKey === skin.key;
+          return (
+            <button
+              key={skin.key}
+              type="button"
+              onClick={()=>applySkin(skin)}
+              style={{
+                flex:'1 0 200px',
+                minWidth:180,
+                border:'1px solid ' + (selected ? '#38bdf8' : '#2a323b'),
+                background:selected ? '#15202b' : '#0f1418',
+                color:'#e9eef2',
+                borderRadius:12,
+                padding:12,
+                textAlign:'left',
+                cursor:'pointer',
+                transition:'border-color 120ms ease, background 120ms ease',
+              }}
+            >
+              <div style={{ fontWeight:700, marginBottom:4 }}>{skin.label}</div>
+              <div style={{ fontSize:12, color:'#9fb0bf', minHeight:32 }}>{skin.description}</div>
+              <div
+                style={{
+                  marginTop:10,
+                  borderRadius:8,
+                  border:'1px solid rgba(255,255,255,0.08)',
+                  padding:'6px 8px',
+                  fontFamily:preview.fontFamily,
+                  fontSize:Math.max(14, Math.min(18, preview.fontSizePx || 22)),
+                  color:preview.fontColor,
+                  background:previewBackground(preview),
+                }}
+              >
+                Preview
+              </div>
+            </button>
+          );
+        })}
+        {skinKey === 'custom' && (
+          <div style={{ alignSelf:'center', fontSize:12, color:'#9fb0bf' }}>Custom adjustments active</div>
+        )}
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
-          <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
+          <select style={S.input} value={a.fontFamily} onChange={(e)=>updateAppearance({ fontFamily:e.target.value })}>
             {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
           <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
@@ -2062,58 +2315,101 @@ function AppearanceEditor({ value, onChange }) {
           </div>
         </Field>
         <Field label="Font size (px)">
-          <input type="number" min={10} max={72} style={S.input}
-            value={a.fontSizePx} onChange={(e)=>onChange({ ...a, fontSizePx:clamp(Number(e.target.value||0),10,72) })}/>
+          <input
+            type="number"
+            min={10}
+            max={72}
+            style={S.input}
+            value={a.fontSizePx}
+            onChange={(e)=>updateAppearance({ fontSizePx:clamp(Number(e.target.value||0),10,72) })}
+          />
         </Field>
-        <ColorField label="Text color" value={a.fontColor} onChange={(v)=>onChange({ ...a, fontColor:v })}/>
-        <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>onChange({ ...a, textBgColor:v })}/>
+        <ColorField label="Text color" value={a.fontColor} onChange={(v)=>updateAppearance({ fontColor:v })}/>
+        <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>updateAppearance({ textBgColor:v })}/>
         <Field label="Text background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
-            onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={a.textBgOpacity}
+            onChange={(e)=>updateAppearance({ textBgOpacity:Number(e.target.value) })}
+          />
           <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
-        <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
+        <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>updateAppearance({ screenBgColor:v })}/>
         <Field label="Screen background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
-            onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={a.screenBgOpacity}
+            onChange={(e)=>updateAppearance({ screenBgOpacity:Number(e.target.value) })}
+          />
           <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <Field label="Screen background image (URL)">
-          <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
+          <input
+            style={S.input}
+            value={a.screenBgImage || ''}
+            onChange={(e)=>updateAppearance({ screenBgImage:e.target.value })}
+          />
           {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+            <img
+              src={toDirectMediaURL(a.screenBgImage)}
+              alt="bg"
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}
+            />
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
-          <select style={S.input} value={a.textAlign} onChange={(e)=>onChange({ ...a, textAlign:e.target.value })}>
+          <select style={S.input} value={a.textAlign} onChange={(e)=>updateAppearance({ textAlign:e.target.value })}>
             <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
           </select>
         </Field>
         <Field label="Text position (vertical)">
-          <select style={S.input} value={a.textVertical} onChange={(e)=>onChange({ ...a, textVertical:e.target.value })}>
+          <select style={S.input} value={a.textVertical} onChange={(e)=>updateAppearance({ textVertical:e.target.value })}>
             <option value="top">Top</option><option value="center">Center</option>
           </select>
         </Field>
       </div>
 
-      <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
-          ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
-          : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
-        padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',
-      }}>
-        <div style={{
-          maxWidth:'100%',
-          background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
-          textAlign:a.textAlign, width:'fit-content',
-          justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
-        }}>
+      <div
+        style={{
+          marginTop:12,
+          border:'1px dashed #2a323b',
+          borderRadius:10,
+          overflow:'hidden',
+          background: previewBackground(a),
+          padding:12,
+          height:120,
+          display:'grid',
+          placeItems: a.textVertical==='center' ? 'center' : 'start',
+        }}
+      >
+        <div
+          style={{
+            maxWidth:'100%',
+            background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
+            padding:'6px 10px',
+            borderRadius:8,
+            color:a.fontColor,
+            fontFamily:a.fontFamily,
+            fontSize:a.fontSizePx,
+            textAlign:a.textAlign,
+            width:'fit-content',
+            justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
+          }}
+        >
           Preview text
         </div>
       </div>
+      {activeSkin && skinKey !== 'custom' && (
+        <div style={{ marginTop:8, fontSize:12, color:'#9fb0bf' }}>
+          Active preset: <b>{activeSkin.label}</b>
+        </div>
+      )}
     </div>
   );
 }
