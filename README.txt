@@ -26,3 +26,7 @@ If you want, I can:
 - Integrate these components into your actual pages/index.jsx and wire up your existing state/handlers.
 - Convert styles to your project's theme or CSS modules.
 - Add accessible keyboard support for reordering and selection.
+
+Update Notes
+------------
+- Commit c791821: Added shared appearance helpers (`normalizeTone`, `appearanceBackgroundStyle`, and `surfaceStylesFromAppearance`) so the Admin UI skins/themes and password switch logic continue to work. Direct reference: `lib/admin-shared.js`.
