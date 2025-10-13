@@ -39,3 +39,6 @@ Update Notes
   and confirms skins, themes, and password toggle options remain available. Direct link: `pages/index.jsx` in this repository.
 - Commit `a3d8f08` records mission saves in the undo/redo history so edits can be reverted immediately after saving. Direct link:
   `pages/index.jsx` → `saveToList` in this repository.
+- Commit `390ad54` adds local filesystem fallbacks for `/api/config` and `/api/games`, removes the duplicate `pages/index.js`
+  entry, and fixes the admin hook order so the panel no longer crashes when data finishes loading. Direct links: `pages/api/config.js`,
+  `pages/api/games.js`, and `pages/index.jsx`.

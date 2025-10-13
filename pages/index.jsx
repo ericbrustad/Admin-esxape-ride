@@ -568,6 +568,13 @@ useEffect(()=>{
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
   const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
+  const canResetDeviceDraft = useMemo(() => {
+    try {
+      return JSON.stringify(devDraft) !== JSON.stringify(devDraftBaseline);
+    } catch {
+      return false;
+    }
+  }, [devDraft, devDraftBaseline]);
 
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
@@ -1420,13 +1427,6 @@ useEffect(()=>{
     : 25;
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
-  const canResetDeviceDraft = useMemo(() => {
-    try {
-      return JSON.stringify(devDraft) !== JSON.stringify(devDraftBaseline);
-    } catch {
-      return false;
-    }
-  }, [devDraft, devDraftBaseline]);
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)

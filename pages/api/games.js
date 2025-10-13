@@ -1,20 +1,25 @@
 // pages/api/games.js
 // ------------------
 // [1] GitHub API config + helpers
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+
 const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
 const token  = process.env.GITHUB_TOKEN;
 const branch = process.env.REPO_BRANCH || 'main';
 
+const hasGitHubConfig = !!(owner && repo && token);
+
 const authHeaders = {
-  Authorization: `Bearer ${token}`,
   'User-Agent': 'esx-admin',
   Accept: 'application/vnd.github+json',
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
 };
 
-async function getFile(path) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
+async function getRemoteFile(relPath) {
+  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(relPath)}?ref=${branch}`;
   const res = await fetch(url, { headers: authHeaders });
   if (!res.ok) return null;
   const json = await res.json();
@@ -22,9 +27,30 @@ async function getFile(path) {
   return { sha: json.sha, text };
 }
 
-async function putFile(path, text, message) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const head = await getFile(path);
+async function getLocalFile(relPath) {
+  const abs = path.join(process.cwd(), relPath);
+  try {
+    const text = await fs.readFile(abs, 'utf8');
+    return { sha: null, text };
+  } catch {
+    return null;
+  }
+}
+
+async function getFile(relPath) {
+  return hasGitHubConfig ? getRemoteFile(relPath) : getLocalFile(relPath);
+}
+
+async function putFile(relPath, text, message) {
+  if (!hasGitHubConfig) {
+    const abs = path.join(process.cwd(), relPath);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    await fs.writeFile(abs, text, 'utf8');
+    return { ok: true, path: relPath, message, local: true };
+  }
+
+  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(relPath)}`;
+  const head = await getRemoteFile(relPath);
   const body = {
     message,
     content: Buffer.from(text, 'utf8').toString('base64'),
@@ -76,16 +102,17 @@ function defaultConfig(title, gameType, mode = 'single') {
 
 // [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
-  if (!token || !owner || !repo) {
-    return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
-  }
-
   const indexPath = 'public/games/index.json';
 
   if (req.method === 'GET') {
-    const file = await getFile(indexPath);
-    const list = file ? JSON.parse(file.text || '[]') : [];
-    return res.json({ ok: true, games: list });
+    try {
+      const file = await getFile(indexPath);
+      const list = file ? JSON.parse(file.text || '[]') : [];
+      return res.json({ ok: true, games: list, source: hasGitHubConfig ? 'github' : 'local' });
+    } catch (err) {
+      console.error('games GET failed:', err);
+      return res.status(500).json({ ok: false, error: String(err?.message || err) });
+    }
   }
 
   if (req.method === 'POST') {
@@ -117,7 +144,7 @@ export default async function handler(req, res) {
       const next = [...list, item];
       await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
 
-      return res.json({ ok: true, slug, game: item });
+      return res.json({ ok: true, slug, game: item, source: hasGitHubConfig ? 'github' : 'local' });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ ok: false, error: String(err.message || err) });
