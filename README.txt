@@ -1,5 +1,10 @@
 Device & Response UI Package
 ----------------------------
+## Update Log
+- 2025-10-13 — Admin password protection API fix. Commit: 6ff58c6ee5795a7ee78809f83e5d6b0ffa597ead.
+  - Direct link: `pages/api/admin-protection.js`
+  - Notes: Restores the admin password toggle endpoint and always keeps the game password state off.
+
 Files included (drop into your Next.js project or use as reference):
 
 /components
