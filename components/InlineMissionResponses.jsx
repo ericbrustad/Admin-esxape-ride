@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 
 /**
  * InlineMissionResponses.jsx
@@ -42,6 +42,45 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
+
+  const mediaOptions = useMemo(() => {
+    return (inventory || []).map((it, idx) => {
+      const raw = it?.url || it?.path || it;
+      const url = toDirectMediaURL(raw);
+      if (!url) return null;
+      const label = it?.label || (String(raw || '').split('/').pop() || `Media ${idx + 1}`);
+      return {
+        id: url,
+        label,
+        thumbnail: url,
+        type: classifyByExt(url),
+        tags: Array.isArray(it?.tags) ? it.tags : [],
+      };
+    }).filter(Boolean);
+  }, [inventory]);
+
+  const deviceOptions = useMemo(() => {
+    return (devices || []).map((d, idx) => {
+      const id = d?.id || d?.key || d?._id || `device-${idx}`;
+      const label = d?.title || d?.name || id;
+      const thumb = toDirectMediaURL(d?.iconUrl || d?.icon || '');
+      return { id, label, thumbnail: thumb, meta: d };
+    });
+  }, [devices]);
+
+  const missionOptions = useMemo(() => {
+    if (!editing) return [];
+    const id = editing.id || 'current-mission';
+    const label = `${editing.title || id} Mission`;
+    const thumb = toDirectMediaURL(editing.iconUrl || editing.icon || '');
+    return [{ id, label, thumbnail: thumb, meta: editing }];
+  }, [editing]);
+
+  const actionOptionsByType = useMemo(() => ({
+    media: mediaOptions,
+    devices: deviceOptions,
+    missions: missionOptions,
+  }), [mediaOptions, deviceOptions, missionOptions]);
 
   useEffect(() => {
     let mounted = true;
@@ -161,7 +200,12 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   }
 
   function toggleEngage(side, on) {
-    updateSide(side, { enabled: !!on });
+    const current = ensureSide(side);
+    const payload = { enabled: !!on };
+    if (on && !current.triggerActionType) {
+      payload.triggerActionType = 'media';
+    }
+    updateSide(side, payload);
   }
 
   function renderMediaTile(it) {
@@ -198,6 +242,20 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     const deviceLabel = side.deviceLabel;
     const mediaUrl = side.mediaUrl;
     const audioUrl = side.audioUrl;
+    const actionType = side.triggerActionType || 'media';
+    const actionTarget = side.triggerActionTarget || '';
+    const actionLabel = side.triggerActionLabel || '';
+    const actionOptions = actionOptionsByType[actionType] || [];
+    const selectedAction = actionOptions.find(opt => opt.id === actionTarget) || null;
+    const resolvedActionPreview = side.triggerActionThumbnail || selectedAction?.thumbnail || '';
+    const selectedMediaUrl = mediaUrl || audioUrl || '';
+    const selectedMediaType = classifyByExt(selectedMediaUrl);
+    const summaryBorder = sideKey === 'onCorrect' ? '#1aa654' : '#7a1f1f';
+    const summaryBackground = sideKey === 'onCorrect' ? 'rgba(26,166,84,0.08)' : 'rgba(122,31,31,0.08)';
+    const summaryTitle = sideKey === 'onCorrect' ? 'Correct Response Media' : 'Wrong Response Media';
+    const tickerMessage = enabled
+      ? `Response Enabled — ${deviceId ? 'Trigger Device ready' : 'Select a Trigger Device'} · ${actionTarget ? `Triggered Response: ${actionLabel || actionTarget}` : 'Choose a Triggered Response'}`
+      : 'No Devices Enabled';
 
     // device options from devices state
     const hasDevices = devices && devices.length > 0;
@@ -219,7 +277,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         {/* status ticker */}
         <div style={{ marginTop:8, marginBottom:8 }}>
           <div style={{ padding:8, borderRadius:8, border:'1px solid #132122', background: enabled ? 'rgba(34,197,94,0.06)' : 'transparent', color: enabled ? '#a7f3d0' : '#9fb0bf' }}>
-            {enabled ? (deviceId ? "Response Device Enabled!" : "Response Enabled — No Devices Selected") : "No Devices Enabled"}
+            {tickerMessage}
           </div>
         </div>
 
@@ -269,6 +327,111 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               <button style={styles.smallButton} title="Move selected device down">▼</button>
             </div>
             <div style={{ fontSize:11, color:'#9fb0bf', marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop:12,
+            border:`1px solid ${summaryBorder}`,
+            borderRadius:10,
+            padding:12,
+            background: summaryBackground,
+          }}
+        >
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <div style={{ fontWeight:700 }}>{summaryTitle}</div>
+            <div style={{ fontSize:12, color:'#9fb0bf' }}>
+              Triggered Response: {selectedAction ? selectedAction.label : 'Choose an option'}
+            </div>
+          </div>
+
+          <div style={{ marginTop:10 }}>
+            {selectedMediaUrl ? (
+              <div
+                style={{
+                  border:'1px solid #233236',
+                  borderRadius:10,
+                  overflow:'hidden',
+                  background:'#071018',
+                  padding:selectedMediaType==='audio' ? 12 : 0,
+                  maxWidth:320,
+                  margin:'0 auto',
+                }}
+              >
+                {selectedMediaType === 'image' || selectedMediaType === 'gif' ? (
+                  <img
+                    src={selectedMediaUrl}
+                    alt="selected response"
+                    style={{ width:'100%', height:'auto', maxHeight:160, objectFit:'cover' }}
+                  />
+                ) : selectedMediaType === 'video' ? (
+                  <video src={selectedMediaUrl} style={{ width:'100%', maxHeight:180 }} controls muted />
+                ) : selectedMediaType === 'audio' ? (
+                  <audio src={selectedMediaUrl} controls style={{ width:'100%' }} />
+                ) : (
+                  <a href={selectedMediaUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', display:'inline-block', padding:8 }}>{selectedMediaUrl}</a>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize:12, color:'#9fb0bf' }}>No media assigned yet. Select or upload media below.</div>
+            )}
+          </div>
+
+          {resolvedActionPreview && (
+            <div style={{ marginTop:12, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <div style={{ fontSize:12, color:'#9fb0bf' }}>Selected Action Trigger Preview</div>
+              <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid #233236', background:'#071018', display:'grid', placeItems:'center' }}>
+                <img src={resolvedActionPreview} alt="action trigger preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop:12, display:'grid', gap:10 }}>
+            <div>
+              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Triggered Response Type</div>
+              <select
+                style={styles.select}
+                value={actionType}
+                onChange={(e)=>{
+                  const nextType = e.target.value;
+                  updateSide(sideKey, {
+                    triggerActionType: nextType,
+                    triggerActionTarget: '',
+                    triggerActionLabel: '',
+                    triggerActionThumbnail: '',
+                  });
+                }}
+              >
+                <option value="media">Media</option>
+                <option value="devices">Devices</option>
+                <option value="missions">Missions</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Action Trigger</div>
+              <select
+                style={styles.select}
+                value={actionTarget}
+                onChange={(e)=>{
+                  const nextId = e.target.value;
+                  const opt = actionOptions.find(o => o.id === nextId) || null;
+                  updateSide(sideKey, {
+                    triggerActionTarget: nextId,
+                    triggerActionLabel: opt?.label || '',
+                    triggerActionThumbnail: opt?.thumbnail || '',
+                  });
+                }}
+              >
+                <option value="">Select Action Trigger (Geo Fence Threshold Crossed)</option>
+                {actionOptions.map(opt => (
+                  <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={{ fontSize:12, color:'#9fb0bf', marginTop:6 }}>
+            Selected Action Trigger: {selectedAction ? selectedAction.label : 'Geo Fence Threshold Crossed'}
           </div>
         </div>
 

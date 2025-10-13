@@ -19,7 +19,6 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
           <div key={m.id} onClick={() => onSelect(m)} style={{ borderRadius: 6, overflow: 'hidden', background: '#0b0f11', padding: 6, cursor: 'pointer' }}>
             {m.type === 'image' ? <img src={m.url} alt={m.id} style={{ width: '100%', height: 90, objectFit: 'cover' }} /> : <div style={{ color: '#cfe8ea', height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{m.type.toUpperCase()}</div>}
             <div style={{ fontSize: 12, color: '#9fb0bf', marginTop: 6 }}>{m.id}</div>
-            <div style={{ fontSize: 11, color: '#6e848b' }}>{(m.tags || []).join(', ')}</div>
           </div>
         ))}
       </div>

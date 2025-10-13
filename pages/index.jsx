@@ -9,6 +9,7 @@ import {
   appearanceBackgroundStyle,
   defaultAppearance,
   surfaceStylesFromAppearance,
+  DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
 
@@ -536,7 +537,8 @@ const APPEARANCE_SKINS = [
 ];
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
-const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
+const DEFAULT_SKIN_PRESET = APPEARANCE_SKIN_MAP.get(DEFAULT_APPEARANCE_SKIN);
+const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get(DEFAULT_APPEARANCE_SKIN) || DEFAULT_APPEARANCE_SKIN;
 
 function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   if (typeof document === 'undefined') return;
@@ -688,6 +690,7 @@ export default function Admin() {
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
+  const [missionBaseline, setMissionBaseline] = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
 useEffect(()=>{
@@ -727,7 +730,8 @@ useEffect(()=>{
 
   useEffect(() => {
     if (!config) {
-      applyAdminUiThemeForDocument('default', defaultAppearance(), 'light');
+      const fallbackAppearance = DEFAULT_SKIN_PRESET?.appearance || defaultAppearance();
+      applyAdminUiThemeForDocument(DEFAULT_APPEARANCE_SKIN, fallbackAppearance, 'light');
       return;
     }
     const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
@@ -783,6 +787,7 @@ useEffect(()=>{
   const [isDeviceEditorOpen, setIsDeviceEditorOpen] = useState(false);
   const [deviceEditorMode, setDeviceEditorMode] = useState('new');
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
+  const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
@@ -932,7 +937,10 @@ useEffect(()=>{
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: {
-    ...defaultAppearance(), ...dc.appearance, ...(c0.appearance || {}) },
+            ...defaultAppearance(),
+            ...dc.appearance,
+            ...(c0.appearance || {}),
+          },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
           mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG, ...(c0.mediaTriggers || {}) },
@@ -968,8 +976,11 @@ useEffect(()=>{
       devices: [], powerups: [],
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
-      appearance: defaultAppearance(),
-      appearanceSkin: 'default',
+      appearanceSkin: DEFAULT_APPEARANCE_SKIN,
+      appearance: {
+        ...defaultAppearance(),
+        ...(DEFAULT_SKIN_PRESET?.appearance || {}),
+      },
       appearanceTone: 'light',
       mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
@@ -1168,7 +1179,8 @@ useEffect(()=>{
       showContinue: true,
       trigger: { ...DEFAULT_TRIGGER_CONFIG },
     };
-    setEditing(draft); setSelected(null); setDirty(true);
+    const baseline = JSON.parse(JSON.stringify(draft));
+    setEditing(draft); setSelected(null); setDirty(true); setMissionBaseline(baseline);
   }
   function editExisting(m) {
     const e = JSON.parse(JSON.stringify(m));
@@ -1178,9 +1190,17 @@ useEffect(()=>{
     if (!e.wrong)   e.wrong   = { mode: 'none' };
     if (e.showContinue === undefined) e.showContinue = true;
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
-    setEditing(e); setSelected(m.id); setDirty(false);
+    const baseline = JSON.parse(JSON.stringify(e));
+    setEditing(e); setSelected(m.id); setDirty(false); setMissionBaseline(baseline);
   }
-  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
+  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); setMissionBaseline(null); }
+  function resetMissionEditor() {
+    if (!missionBaseline) return;
+    const baseline = JSON.parse(JSON.stringify(missionBaseline));
+    setEditing(baseline);
+    setDirty(false);
+    setStatus('↩️ Mission changes reset');
+  }
   function bumpVersion(v) {
     const p = String(v || '0.0.0').split('.').map(n=>parseInt(n||'0',10)); while (p.length<3) p.push(0); p[2]+=1; return p.join('.');
   }
@@ -1205,7 +1225,7 @@ useEffect(()=>{
 
     const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
     setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id); setEditing(null); setDirty(false);
+    setSelected(editing.id); setEditing(null); setDirty(false); setMissionBaseline(null);
     setStatus('✅ Mission saved');
   }
   function removeMission(id) {
@@ -1300,10 +1320,12 @@ useEffect(()=>{
     setSelectedMissionIdx(null);
     const baseLat = Number(config.map?.centerLat ?? 44.9778);
     const baseLng = Number(config.map?.centerLng ?? -93.2650);
-    setDevDraft(createDeviceDraft({
+    const initial = createDeviceDraft({
       lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
       lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
-    }));
+    });
+    setDevDraft(initial);
+    setDevDraftBaseline(createDeviceDraft({ ...initial }));
   }
   function openDeviceEditor(idx) {
     if (idx == null) return;
@@ -1313,12 +1335,22 @@ useEffect(()=>{
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(idx);
     setSelectedMissionIdx(null);
-    setDevDraft(createDeviceDraft({ ...item }));
+    const draft = createDeviceDraft({ ...item });
+    setDevDraft(draft);
+    setDevDraftBaseline(createDeviceDraft({ ...item }));
   }
   function closeDeviceEditor() {
     setIsDeviceEditorOpen(false);
     setDeviceEditorMode('new');
     setDevDraft(createDeviceDraft());
+    setDevDraftBaseline(createDeviceDraft());
+  }
+  function resetDeviceEditor() {
+    const baseline = createDeviceDraft({ ...devDraftBaseline });
+    const unchanged = JSON.stringify(baseline) === JSON.stringify(devDraft);
+    setDevDraft(baseline);
+    setDeviceTriggerPicker('');
+    setStatus(unchanged ? 'ℹ️ Device draft unchanged' : '↩️ Device changes reset');
   }
   function saveDraftDevice() {
     const normalized = {
@@ -1977,16 +2009,36 @@ useEffect(()=>{
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
-                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', paddingBottom:12, marginBottom:12, borderBottom:'1px solid var(--admin-border-soft)' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                        <button style={S.button} onClick={saveToList}>💾 Save and Close Mission</button>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span style={{ fontSize:12, color:'var(--admin-muted)', textTransform:'uppercase', letterSpacing:0.8 }}>Mission ID</span>
+                          <input
+                            style={{ ...S.input, width:140, textAlign:'center', fontWeight:600, cursor:'not-allowed' }}
+                            value={editing.id}
+                            readOnly
+                          />
+                        </div>
+                      </div>
+                      <div style={{ textAlign:'center' }}>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)', textTransform:'uppercase', letterSpacing:1 }}>Title</div>
+                        <div style={{ display:'inline-flex', alignItems:'baseline', gap:10, marginTop:6 }}>
+                          <input
+                            style={{ ...S.input, fontSize:24, fontWeight:650, textAlign:'center', minWidth:220 }}
+                            value={editing.title}
+                            onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}
+                          />
+                          <span style={{ fontSize:20, fontWeight:600, color:'var(--admin-muted)' }}>Mission</span>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <button style={S.button} onClick={resetMissionEditor} disabled={!missionBaseline}>Reset</button>
+                        <button style={S.button} onClick={cancelEdit}>Cancel and Close</button>
+                      </div>
                     </div>
                   </div>
-
-                  <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
-                  <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
@@ -2209,12 +2261,13 @@ useEffect(()=>{
                           </div>
 
                           <TriggerDropdown
-                            label="Action target"
+                            label="Action Trigger"
                             openKey={missionTriggerPicker}
                             setOpenKey={setMissionTriggerPicker}
                             dropdownKey="mission-action"
                             options={actionOptions}
                             selected={selectedAction}
+                            placeholder="Select Action Trigger (e.g., Geo Fence Threshold Crossed)"
                             onSelect={(opt)=>{
                               updateMissionTrigger({
                                 actionTarget: opt?.id || '',
@@ -2223,9 +2276,12 @@ useEffect(()=>{
                               });
                             }}
                           />
+                          <div style={{ fontSize:12, color:'var(--admin-muted)', marginTop:6 }}>
+                            Selected Action Trigger: {selectedAction ? selectedAction.label : 'Geo Fence Threshold Crossed'}
+                          </div>
                           {resolvedActionPreview && (
                             <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
-                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Selected action preview</div>
+                              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Selected Action Trigger preview</div>
                               <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
                                 <img src={resolvedActionPreview} alt="action preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                               </div>
@@ -2437,37 +2493,6 @@ useEffect(()=>{
                     Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                  </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
-                      disabled={selectedDevIdx==null}
-                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
-                    />
-                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
-                <input
-                  type="range" min={5} max={2000} step={5}
-                  disabled={deviceRadiusDisabled}
-                  value={deviceRadiusValue}
-                  onChange={(e)=>{
-                    const r = Number(e.target.value);
-                    if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
-                    else setDevDraft(d=>({ ...d, pickupRadius: r }));
-                  }}
-                />
-                <code style={{ color:'var(--admin-muted)' }}>
-                  {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                   : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
-                   : 'Select a device to adjust radius'}
-                </code>
               </div>
 
               {isDeviceEditorOpen && (() => {
@@ -2478,14 +2503,33 @@ useEffect(()=>{
                 const resolvedPreview = previewThumb ? toDirectMediaURL(previewThumb) : '';
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12, flexWrap:'wrap' }}>
                       <div>
                         <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
                         {deviceEditorMode === 'edit' && devDraft.id && (
                           <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                         )}
                       </div>
-                      <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                        <button
+                          style={{ ...S.button, padding:'6px 12px' }}
+                          onClick={resetDeviceEditor}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          style={{ ...S.button, padding:'6px 12px' }}
+                          onClick={closeDeviceEditor}
+                        >
+                          Close
+                        </button>
+                        <button
+                          style={{ ...S.button, ...S.buttonSuccess, padding:'6px 12px' }}
+                          onClick={saveDraftDevice}
+                        >
+                          💾 Save & Close
+                        </button>
+                      </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -2556,7 +2600,7 @@ useEffect(()=>{
                           </div>
 
                           <div style={{ marginTop:12 }}>
-                            <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Action target</div>
+                            <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Action Trigger</div>
                             <div style={{ position:'relative' }}>
                               <button
                                 type="button"
@@ -2617,16 +2661,46 @@ useEffect(()=>{
                       )}
                     </div>
 
-                    <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                      <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
-                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
-                        {devDraft.lat==null ? 'Click the map or search an address to set location'
-                          : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
-                      </div>
+                    <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location'
+                        : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
                   </div>
                 );
               })()}
+
+              <div style={{ display:'grid', gap:8, marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedDevIdx==null}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                  </label>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <input
+                    type="range" min={5} max={2000} step={5}
+                    disabled={deviceRadiusDisabled}
+                    value={deviceRadiusValue}
+                    onChange={(e)=>{
+                      const r = Number(e.target.value);
+                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                      else setDevDraft(d=>({ ...d, pickupRadius: r }));
+                    }}
+                  />
+                  <code style={{ color:'var(--admin-muted)' }}>
+                    {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
+                     : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
+                     : 'Select a device to adjust radius'}
+                  </code>
+                </div>
+              </div>
 
               <MapOverview
                 missions={(suite?.missions)||[]}
@@ -2658,289 +2732,47 @@ useEffect(()=>{
       {tab==='settings' && (
         <main style={S.wrap}>
           <div style={S.card}>
-            <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <Field label="Game Title"><input style={S.input} value={config.game.title}
-              onChange={(e)=>setConfig({ ...config, game:{ ...config.game, title:e.target.value } })}/></Field>
-            <Field label="Game Type">
-              <select style={S.input} value={config.game.type}
-                onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
-                {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
-              </select>
-            </Field>
-            <Field label="Game Tags (comma separated)">
-              <input
-                style={S.input}
-                value={gameTagsDraft}
-                onChange={(e)=>updateGameTagsDraft(e.target.value)}
-                placeholder="default-game, mystery"
-              />
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
-                The current slug and <code>default-game</code> are enforced automatically.
-              </div>
-            </Field>
-            <Field label="Stripe Splash Page">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input type="checkbox" checked={config.splash.enabled}
-                  onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
-                Enable Splash (game code & Stripe)
-              </label>
-            </Field>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Cover Image</h3>
-            <div style={{ display:'grid', gap:12 }}>
+            <h3 style={{ marginTop:0 }}>Admin Protection</h3>
+            <div style={{ display:'grid', gap:16 }}>
               <div
                 style={{
-                  border:'1px solid #22303c',
+                  display:'flex',
+                  alignItems:'center',
+                  gap:10,
+                  padding:'10px 16px',
                   borderRadius:12,
-                  minHeight:160,
-                  overflow:'hidden',
-                  background:'#0b0c10',
-                  display:'grid',
-                  placeItems: coverImageUrl ? 'stretch' : 'center',
+                  border:`1px solid ${protectionIndicatorColor}`,
+                  background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
+                  color: protectionIndicatorColor,
+                  fontWeight:700,
+                  letterSpacing:1,
+                  textTransform:'uppercase',
+                  boxShadow:'0 0 12px currentColor',
                 }}
               >
-                {coverImageUrl ? (
-                  <img
-                    src={coverImageUrl}
-                    alt="Cover preview"
-                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                  />
-                ) : (
-                  <div style={{ color:'#9fb0bf', fontSize:13 }}>No cover image selected.</div>
-                )}
+                <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', background:'currentColor', boxShadow:'0 0 12px currentColor' }} />
+                {protectionState.loading ? 'Checking…' : protectionState.enabled ? 'Protected' : 'Not Protected'}
               </div>
-
-              <div
-                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
-                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
-                onDrop={(e)=>{
-                  e.preventDefault();
-                  setCoverDropActive(false);
-                  const file = e.dataTransfer?.files?.[0];
-                  if (file) handleCoverFile(file);
-                }}
+              <button
+                onClick={toggleProtection}
+                disabled={protectionState.saving || protectionState.loading}
                 style={{
-                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#2a323b'}`,
-                  background: coverDropActive ? '#14231a' : '#0b0c10',
-                  borderRadius:12,
-                  padding:16,
-                  textAlign:'center',
-                  color:'#9fb0bf',
+                  ...S.button,
+                  ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                  minWidth: 200,
+                  justifyContent:'center',
+                  opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
                 }}
               >
-                <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
-                <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
+                {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+              </button>
+              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                Toggle protection to control whether the admin deck requires the shared password.
               </div>
-
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                <>
-                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display:'none' }}
-                    onChange={(e)=>{
-                      const file = e.target.files?.[0];
-                      if (file) handleCoverFile(file);
-                      if (e.target) e.target.value = '';
-                    }}
-                  />
-                </>
-                <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
-                  {coverPickerLoading ? 'Loading media…' : 'Browse media pool'}
-                </button>
-                <button
-                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                  onClick={clearCoverImage}
-                  disabled={!config?.game?.coverImage}
-                >
-                  Remove cover
-                </button>
-              </div>
-
-              {uploadStatus && (
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{uploadStatus}</div>
-              )}
-              <div style={{ fontSize:12, color:'#9fb0bf' }}>
-                Tip: cover art appears behind the header controls and is saved to <code>/media/covers</code>.
-              </div>
-            </div>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-              <Field label="Default Map Center — Latitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLat ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Default Map Center — Longitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLng ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Find center by address/city">
-                <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                  <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
-                  <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
-                </form>
-                <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
-                  {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
-                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
-                    </div>
-                  ))}
-                </div>
-              </Field>
-              <Field label="Default Zoom">
-                <input
-                  type="number" min={2} max={20} style={S.input}
-                  value={config.map?.defaultZoom ?? 13}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } })}
-                />
-              </Field>
-              <Field label="Geofence Mode">
-                <select
-                  style={S.input}
-                  value={config.geofence?.mode || 'test'}
-                  onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
-                >
-                  <option value="test">Test — click to enter (dev)</option>
-                  <option value="live">Live — GPS radius only</option>
-                </select>
-              </Field>
-            </div>
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
-            </div>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Maintenance</h3>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {gameEnabled && (
-                <button
-                  style={{ ...S.button, ...S.buttonDanger }}
-                  onClick={()=> setConfirmDeleteOpen(true)}
-                >
-                  🗑 Delete Game
-                </button>
-              )}
-              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
-            </div>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                {[
-                  { key:'light', label:'☀️ Light — dark text' },
-                  { key:'dark', label:'🌙 Dark — light text' },
-                ].map((option) => {
-                  const active = interfaceTone === option.key;
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={()=>updateInterfaceTone(option.key)}
-                      style={{
-                        borderRadius:12,
-                        padding:'8px 14px',
-                        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
-                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
-                        color:'var(--admin-body-color)',
-                        cursor:'pointer',
-                        fontWeight: active ? 600 : 500,
-                        boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
-                Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
-              </div>
-            </div>
-            <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
-                {APPEARANCE_SKINS.map((skin)=>{
-                  const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
-                    ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
-                    : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
-                  return (
-                    <button
-                      key={skin.key}
-                      type="button"
-                      onClick={()=>applyAppearanceSkin(skin.key)}
-                      style={{
-                        borderRadius:12,
-                        border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
-                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
-                        padding:12,
-                        textAlign:'left',
-                        color:'var(--admin-body-color)',
-                        cursor:'pointer',
-                      }}
-                    >
-                      <div style={{ fontWeight:600 }}>{skin.label}</div>
-                      <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
-                      <div style={{
-                        border:'1px dashed var(--admin-border-soft)',
-                        borderRadius:8,
-                        padding:10,
-                        background: previewBg,
-                        color: skin.appearance.fontColor,
-                        fontFamily: skin.appearance.fontFamily,
-                        fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
-                        textAlign: skin.appearance.textAlign,
-                      }}>
-                        Preview text
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
-                Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
-              </div>
-            </div>
-            <AppearanceEditor
-              value={config.appearance||defaultAppearance()}
-              tone={interfaceTone}
-              onChange={(next)=>{
-                setConfig(prev => ({
-                  ...prev,
-                  appearance: next,
-                  appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
-                    ? prev.appearanceSkin
-                    : detectAppearanceSkin(next, prev.appearanceSkin),
-                }));
-                setDirty(true);
-                setStatus('🎨 Updated appearance settings');
-              }}
-            />
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
         </main>
       )}
-
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
@@ -3864,6 +3696,25 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     }).filter(Boolean);
   }, [inventory]);
 
+  const mediaMetaLookup = useMemo(() => {
+    const map = new Map();
+    mediaPool.forEach((item) => {
+      const key = item.id || item.url;
+      if (key) {
+        map.set(key, { tags: item.tags || [], type: item.type || classifyByExt(item.url) });
+      }
+      if (item.url && !map.has(item.url)) {
+        map.set(item.url, { tags: item.tags || [], type: item.type || classifyByExt(item.url) });
+      }
+    });
+    return map;
+  }, [mediaPool]);
+
+  const resolveMediaMeta = useCallback((url = '') => {
+    const direct = toDirectMediaURL(url);
+    return mediaMetaLookup.get(direct) || mediaMetaLookup.get(url) || null;
+  }, [mediaMetaLookup]);
+
   const assignedState = useMemo(() => ({
     missionIcons: (config.icons?.missions || []).map(icon => icon.key),
     deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
@@ -3949,17 +3800,21 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
             </div>
 
             <TriggerDropdown
-              label="Action target"
+              label="Action Trigger"
               openKey={mediaTriggerPicker}
               setOpenKey={setMediaTriggerPicker}
               dropdownKey="media-action"
               options={selectedActionList}
               selected={selectedAction}
+              placeholder="Select Action Trigger (e.g., Geo Fence Threshold Crossed)"
               onSelect={(opt)=>{ updateMediaTrigger({ actionTarget: opt?.id || '', actionLabel: opt?.label || '', actionThumbnail: opt?.thumbnail || '' }); }}
             />
+            <div style={{ fontSize:12, color:'var(--admin-muted)', marginTop:6 }}>
+              Selected Action Trigger: {selectedAction ? selectedAction.label : 'Geo Fence Threshold Crossed'}
+            </div>
             {resolvedActionPreview && (
               <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action preview</div>
+                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action Trigger preview</div>
                 <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
                   <img src={toDirectMediaURL(resolvedActionPreview)} alt="action preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                 </div>
@@ -4055,11 +3910,13 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
             title={`Rewards Pool (${rewards.length})`}
             items={rewards}
             onRemove={(idx)=>removePoolItem('rewards', idx)}
+            resolveMeta={resolveMediaMeta}
           />
           <Pool
             title={`Penalties Pool (${penalties.length})`}
             items={penalties}
             onRemove={(idx)=>removePoolItem('penalties', idx)}
+            resolveMeta={resolveMediaMeta}
           />
         </div>
       </div>
@@ -4098,7 +3955,7 @@ function IconGroup({ title, items, onRemove }) {
     </div>
   );
 }
-function Pool({ title, items, onRemove }) {
+function Pool({ title, items, onRemove, resolveMeta = () => null }) {
   return (
     <div>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
@@ -4109,6 +3966,25 @@ function Pool({ title, items, onRemove }) {
               {it.label || baseNameFromUrl(it.url)}
             </div>
             <MediaPreview url={it.url} kind="pool item" />
+            {(() => {
+              const meta = resolveMeta ? resolveMeta(it.url) : null;
+              const tags = Array.isArray(meta?.tags) && meta.tags.length ? meta.tags
+                : Array.isArray(it.tags) && it.tags.length ? it.tags
+                : [];
+              const type = meta?.type || it.type || classifyByExt(it.url);
+              return (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Type: {type || 'media'}</div>
+                  {tags.length > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
+                      {tags.map((tag) => (
+                        <span key={tag} style={S.chip}>#{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
               <button
@@ -4126,7 +4002,7 @@ function Pool({ title, items, onRemove }) {
   );
 }
 
-function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownKey, options = [], selected = null, onSelect = () => {} }) {
+function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownKey, options = [], selected = null, onSelect = () => {}, placeholder = 'Select option' }) {
   const isOpen = openKey === dropdownKey;
   return (
     <div style={{ marginTop:12 }}>
@@ -4137,7 +4013,7 @@ function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownK
           style={{ ...S.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
           onClick={()=>setOpenKey(isOpen ? '' : dropdownKey)}
         >
-          <span>{selected ? selected.label : 'Select option'}</span>
+          <span>{selected ? selected.label : placeholder}</span>
           <span style={{ opacity:0.6 }}>▾</span>
         </button>
         {isOpen && (

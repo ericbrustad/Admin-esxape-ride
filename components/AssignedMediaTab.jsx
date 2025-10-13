@@ -110,6 +110,20 @@ export default function AssignedMediaTab({
     actionMedia: assigned.actionMedia || [],
   };
 
+  const tagUsageCounts = useMemo(() => {
+    const counts = new Map();
+    mediaPool.forEach(item => {
+      if (!Array.isArray(item?.tags)) return;
+      item.tags.forEach(tag => {
+        const label = String(tag).trim();
+        if (!label) return;
+        const key = label.toLowerCase();
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+    });
+    return counts;
+  }, [mediaPool]);
+
   // "Action" candidates: prefer items with type === 'action' or tag 'action'.
   // Fallback to all media when no action-tagged items exist.
   const actionCandidates = useMemo(() => {
@@ -219,6 +233,23 @@ export default function AssignedMediaTab({
                       <div>
                         <div style={{ fontWeight:600 }}>{m.name || m.id}</div>
                         <div style={{ fontSize:12, color:PALETTE.muted }}>{m.type || 'media'}</div>
+                        {Array.isArray(m.tags) && m.tags.length > 0 && (
+                          <div style={{ marginTop:8, display:'grid', gap:4 }}>
+                            {m.tags.map((tag) => {
+                              const label = String(tag).trim();
+                              if (!label) return null;
+                              const count = tagUsageCounts.get(label.toLowerCase()) || 0;
+                              return (
+                                <div
+                                  key={label}
+                                  style={{ fontSize:11, color:PALETTE.muted }}
+                                >
+                                  {label} ({count})
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:8, marginTop:10 }}>
