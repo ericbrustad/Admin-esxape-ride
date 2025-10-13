@@ -1,6 +1,9 @@
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Device editor map controls realignment. Commit: 974ddf67a4a52d773578de28d015c9ff6f455f64.
+  - Direct link: `pages/index.jsx`
+  - Notes: Keeps the device radius slider and ring selector anchored above the map while grouping Save, Cancel, and Close in the editor header.
 - 2025-10-13 — Admin password protection API fix. Commit: 6ff58c6ee5795a7ee78809f83e5d6b0ffa597ead.
   - Direct link: `pages/api/admin-protection.js`
   - Notes: Restores the admin password toggle endpoint and always keeps the game password state off.

@@ -783,6 +783,7 @@ useEffect(()=>{
   const [isDeviceEditorOpen, setIsDeviceEditorOpen] = useState(false);
   const [deviceEditorMode, setDeviceEditorMode] = useState('new');
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
+  const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
@@ -1300,10 +1301,12 @@ useEffect(()=>{
     setSelectedMissionIdx(null);
     const baseLat = Number(config.map?.centerLat ?? 44.9778);
     const baseLng = Number(config.map?.centerLng ?? -93.2650);
-    setDevDraft(createDeviceDraft({
+    const initial = createDeviceDraft({
       lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
       lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
-    }));
+    });
+    setDevDraft(initial);
+    setDevDraftBaseline(createDeviceDraft({ ...initial }));
   }
   function openDeviceEditor(idx) {
     if (idx == null) return;
@@ -1313,12 +1316,22 @@ useEffect(()=>{
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(idx);
     setSelectedMissionIdx(null);
-    setDevDraft(createDeviceDraft({ ...item }));
+    const draft = createDeviceDraft({ ...item });
+    setDevDraft(draft);
+    setDevDraftBaseline(createDeviceDraft({ ...item }));
   }
   function closeDeviceEditor() {
     setIsDeviceEditorOpen(false);
     setDeviceEditorMode('new');
     setDevDraft(createDeviceDraft());
+    setDevDraftBaseline(createDeviceDraft());
+  }
+  function resetDeviceEditor() {
+    const baseline = createDeviceDraft({ ...devDraftBaseline });
+    const unchanged = JSON.stringify(baseline) === JSON.stringify(devDraft);
+    setDevDraft(baseline);
+    setDeviceTriggerPicker('');
+    setStatus(unchanged ? 'ℹ️ Device draft unchanged' : '↩️ Device changes reset');
   }
   function saveDraftDevice() {
     const normalized = {
@@ -2437,37 +2450,6 @@ useEffect(()=>{
                     Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
-                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
-                  </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
-                      disabled={selectedDevIdx==null}
-                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
-                    />
-                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
-                  </label>
-                </div>
-              </div>
-
-              <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginBottom:8 }}>
-                <input
-                  type="range" min={5} max={2000} step={5}
-                  disabled={deviceRadiusDisabled}
-                  value={deviceRadiusValue}
-                  onChange={(e)=>{
-                    const r = Number(e.target.value);
-                    if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
-                    else setDevDraft(d=>({ ...d, pickupRadius: r }));
-                  }}
-                />
-                <code style={{ color:'var(--admin-muted)' }}>
-                  {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                   : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
-                   : 'Select a device to adjust radius'}
-                </code>
               </div>
 
               {isDeviceEditorOpen && (() => {
@@ -2478,14 +2460,33 @@ useEffect(()=>{
                 const resolvedPreview = previewThumb ? toDirectMediaURL(previewThumb) : '';
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12, flexWrap:'wrap' }}>
                       <div>
                         <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
                         {deviceEditorMode === 'edit' && devDraft.id && (
                           <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                         )}
                       </div>
-                      <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
+                        <button
+                          style={{ ...S.button, padding:'6px 12px' }}
+                          onClick={resetDeviceEditor}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          style={{ ...S.button, padding:'6px 12px' }}
+                          onClick={closeDeviceEditor}
+                        >
+                          Close
+                        </button>
+                        <button
+                          style={{ ...S.button, ...S.buttonSuccess, padding:'6px 12px' }}
+                          onClick={saveDraftDevice}
+                        >
+                          💾 Save & Close
+                        </button>
+                      </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -2617,16 +2618,46 @@ useEffect(()=>{
                       )}
                     </div>
 
-                    <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                      <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
-                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
-                        {devDraft.lat==null ? 'Click the map or search an address to set location'
-                          : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
-                      </div>
+                    <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>
+                      {devDraft.lat==null ? 'Click the map or search an address to set location'
+                        : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
                   </div>
                 );
               })()}
+
+              <div style={{ display:'grid', gap:8, marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <input type="checkbox" checked={showRings} onChange={(e)=>setShowRings(e.target.checked)}/> Show radius rings
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    Selected pin size:
+                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                      disabled={selectedDevIdx==null}
+                      onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
+                    />
+                    <code style={{ color:'var(--admin-muted)' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                  </label>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <input
+                    type="range" min={5} max={2000} step={5}
+                    disabled={deviceRadiusDisabled}
+                    value={deviceRadiusValue}
+                    onChange={(e)=>{
+                      const r = Number(e.target.value);
+                      if (selectedDevIdx!=null) setSelectedDeviceRadius(r);
+                      else setDevDraft(d=>({ ...d, pickupRadius: r }));
+                    }}
+                  />
+                  <code style={{ color:'var(--admin-muted)' }}>
+                    {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
+                     : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
+                     : 'Select a device to adjust radius'}
+                  </code>
+                </div>
+              </div>
 
               <MapOverview
                 missions={(suite?.missions)||[]}
