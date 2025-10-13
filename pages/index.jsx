@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+resolve conflicts import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
-import AssignedMediaPageTab from '../components/AssignedMediaTab';
+<<<<<<< codex/update-admin-ui-skins-with-textures-huhqvs
+import AssignedMediaTab from '../components/AssignedMediaTab';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -10,7 +11,9 @@ import {
   defaultAppearance,
   surfaceStylesFromAppearance,
 } from '../lib/admin-shared';
+=======
 import { GAME_ENABLED } from '../lib/game-switch';
+>>>>>>> main
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -1576,8 +1579,6 @@ useEffect(()=>{
     setMapResults([]);
   }
 
-  
-
   // Project Health scan
   async function scanProject() {
     const inv = await listInventory(['uploads','bundles','icons']);
@@ -1630,7 +1631,7 @@ useEffect(()=>{
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--admin-panel-bg)', boxShadow: 'var(--admin-panel-shadow)' }}>
+        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
           Loading… (pulling config & missions)
         </div>
       </main>
@@ -1661,20 +1662,101 @@ useEffect(()=>{
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
+  const interfaceTone = normalizeTone(config.appearanceTone);
   const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
+  function updateGameTagsDraft(value) {
+    setGameTagsDraft(value);
+    const tags = value.split(',').map(t => t.trim()).filter(Boolean);
+    setConfig(prev => {
+      if (!prev) return prev;
+      return normalizeGameMetadata({ ...prev, game: { ...prev.game, tags } }, slugForMeta);
+    });
+  }
+
+  async function handleCoverFile(file) {
+    if (!file) return;
+    const safeName = file.name || 'cover';
+    setUploadStatus(`Uploading ${safeName}…`);
+    try {
+      const url = await uploadToRepo(file, 'covers');
+      if (!url) {
+        setUploadStatus(`❌ Upload failed for ${safeName}`);
+        return;
+      }
+      setConfig(prev => {
+        if (!prev) return prev;
+        const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
+        return next;
+      });
+      setDirty(true);
+      setUploadStatus(`✅ Uploaded ${safeName}`);
+      try {
+        const refreshed = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+        if (Array.isArray(refreshed)) setInventory(refreshed);
+      } catch {}
+    } catch (err) {
+      setUploadStatus(`❌ ${(err?.message) || 'upload failed'}`);
+    }
+  }
+
+  async function openCoverPicker() {
+    setCoverPickerOpen(true);
+    setCoverPickerLoading(true);
+    setCoverPickerItems([]);
+    try {
+      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
+      setCoverPickerItems(filtered);
+    } catch {
+      setCoverPickerItems([]);
+    } finally {
+      setCoverPickerLoading(false);
+    }
+  }
+
+  function applyCoverFromUrl(url) {
+    if (!url) return;
+    setConfig(prev => {
+      if (!prev) return prev;
+      const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
+      return next;
+    });
+    setDirty(true);
+    setCoverPickerOpen(false);
+  }
+
+  function clearCoverImage() {
+    setConfig(prev => {
+      if (!prev) return prev;
+      const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: '' } }, slugForMeta);
+      return next;
+    });
+    setDirty(true);
+  }
+
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
-  const isDefault = !activeSlug || activeSlug === 'default';
+  const isDefault = slugForMeta === 'default';
+  const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const headerStyle = coverImageUrl
+    ? {
+        ...S.header,
+        backgroundImage: `linear-gradient(180deg, rgba(11,12,16,0.92) 0%, rgba(11,12,16,0.94) 100%), url(${coverImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }
+    : S.header;
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
     <div style={S.body}>
-      <header style={S.header}>
+      <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:16 }}>
             <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
@@ -1689,7 +1771,7 @@ useEffect(()=>{
                   padding:'6px 14px',
                   borderRadius:999,
                   border:`1px solid ${protectionIndicatorColor}`,
-                  background:'var(--admin-panel-bg)',
+                  background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
                   color: protectionIndicatorColor,
                   fontWeight:700,
                   letterSpacing:1,
@@ -1735,6 +1817,7 @@ useEffect(()=>{
                 </button>
               );
             })}
+<<<<<<< codex/update-admin-ui-skins-with-textures-huhqvs
             <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
               <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
@@ -1757,6 +1840,34 @@ useEffect(()=>{
                   style={{ ...S.input, width:90 }}
                 />
               </label>
+=======
+            {gameEnabled && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
+                <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
+              </div>
+            )}
+
+            {/* Save & Publish with optional delay */}
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              {gameEnabled && (
+                <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90 }}
+                  />
+                </label>
+              )}
+>>>>>>> main
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -1766,7 +1877,9 @@ useEffect(()=>{
                 disabled={savePubBusy}
                 style={{ ...S.button, ...S.buttonSuccess, opacity: savePubBusy ? 0.7 : 1 }}
               >
-                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
+                {savePubBusy
+                  ? (gameEnabled ? 'Saving & Publishing…' : 'Saving…')
+                  : (gameEnabled ? '💾 Save & Publish' : '💾 Save')}
               </button>
             </div>
 
@@ -1892,7 +2005,7 @@ useEffect(()=>{
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--admin-panel-bg)', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
+                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
                     <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
                     <div style={{ display:'flex', gap:8 }}>
                       <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
@@ -2240,6 +2353,7 @@ useEffect(()=>{
                   </label>
                   {editing.appearanceOverrideEnabled && (
                     <AppearanceEditor value={editing.appearance||defaultAppearance()}
+                      tone={interfaceTone}
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
@@ -2288,15 +2402,58 @@ useEffect(()=>{
               )}
             </div>
 
-            <DevicesList
-              devices={devices || []}
-              selectedId={selectedDevIdx ?? undefined}
-              onSelect={(_, index) => openDeviceEditor(index)}
-              onReorder={(_, direction, index) => moveDevice(index, direction)}
-              onDuplicate={(_, index) => duplicateDevice(index)}
-              onDelete={(_, index) => deleteDevice(index)}
-              getIconUrl={(device) => deviceThumbnailUrl(device)}
-            />
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(devices||[]).map((x,i)=>{
+                const iconUrl = x.iconKey ? deviceIconUrlFromKey(x.iconKey) : '';
+                const selected = selectedDevIdx === i;
+                const hasCoords = typeof x.lat === 'number' && typeof x.lng === 'number';
+                return (
+                  <div
+                    key={x.id||i}
+                    onClick={()=>openDeviceEditor(i)}
+                    style={{
+                      display:'grid',
+                      gridTemplateColumns:'56px 1fr auto',
+                      gap:12,
+                      alignItems:'center',
+                      padding:12,
+                      borderRadius:12,
+                      border:`1px solid ${selected ? 'rgba(45, 212, 191, 0.35)' : 'var(--admin-border-soft)'}`,
+                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+                      cursor:'pointer',
+                    }}
+                  >
+                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
+                      {iconUrl
+                        ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
+                        : <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
+                    </div>
+                    <div>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                        <div style={{ fontWeight:600 }}>{`D${i+1}`} — {x.title || '(untitled)'}</div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
+                      </div>
+                      <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
+                        <span style={S.chip}>{x.type}</span>
+                        <span style={S.chip}>Radius {x.pickupRadius} m</span>
+                        <span style={S.chip}>Effect {x.effectSeconds}s</span>
+                      </div>
+                    </div>
+                    <div onClick={(e)=>e.stopPropagation()} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Move up" style={{ ...S.button, padding:'6px 10px' }} disabled={i===0} onClick={()=>moveDevice(i,-1)}>▲</button>
+                        <button title="Move down" style={{ ...S.button, padding:'6px 10px' }} disabled={i===(devices?.length||0)-1} onClick={()=>moveDevice(i,+1)}>▼</button>
+                      </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button title="Duplicate" style={{ ...S.button, padding:'6px 10px' }} onClick={()=>duplicateDevice(i)}>⧉</button>
+                        <button title="Delete" style={{ ...S.button, ...S.buttonDanger, padding:'6px 10px' }} onClick={()=>deleteDevice(i)}>🗑</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
           <section style={{ position:'relative' }}>
@@ -2356,16 +2513,7 @@ useEffect(()=>{
                           <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                         )}
                       </div>
-                      <div style={{ display:'flex', gap:8 }}>
-                        <button
-                          style={{ ...S.button, padding:'6px 12px', opacity: canResetDeviceDraft ? 1 : 0.6 }}
-                          onClick={resetDeviceDraft}
-                          disabled={!canResetDeviceDraft}
-                        >
-                          Cancel
-                        </button>
-                        <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
-                      </div>
+                      <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -2447,7 +2595,7 @@ useEffect(()=>{
                                 <span style={{ opacity:0.6 }}>▾</span>
                               </button>
                               {deviceTriggerPicker === 'action' && (
-                                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:30, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 16px 32px rgba(0,0,0,0.4)' }}>
+                                <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:30, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow:'0 16px 32px rgba(0,0,0,0.4)' }}>
                                   {actionOptions.length === 0 ? (
                                     <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
                                   ) : actionOptions.map(opt => (
@@ -2498,15 +2646,7 @@ useEffect(()=>{
                     </div>
 
                     <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                      <button style={S.button} onClick={()=>saveDraftDevice({ closeAfter: false })}>💾 Save Device</button>
-                      {deviceEditorMode === 'new' && (
-                        <button
-                          style={{ ...S.button, ...S.buttonSuccess }}
-                          onClick={()=>saveDraftDevice({ closeAfter: true })}
-                        >
-                          Save & Close
-                        </button>
-                      )}
+                      <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
                       <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                         {devDraft.lat==null ? 'Click the map or search an address to set location'
                           : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
@@ -2555,6 +2695,17 @@ useEffect(()=>{
                 {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
               </select>
             </Field>
+            <Field label="Game Tags (comma separated)">
+              <input
+                style={S.input}
+                value={gameTagsDraft}
+                onChange={(e)=>updateGameTagsDraft(e.target.value)}
+                placeholder="default-game, mystery"
+              />
+              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+                The current slug and <code>default-game</code> are enforced automatically.
+              </div>
+            </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input type="checkbox" checked={config.splash.enabled}
@@ -2562,6 +2713,89 @@ useEffect(()=>{
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Game Cover Image</h3>
+            <div style={{ display:'grid', gap:12 }}>
+              <div
+                style={{
+                  border:'1px solid #22303c',
+                  borderRadius:12,
+                  minHeight:160,
+                  overflow:'hidden',
+                  background:'#0b0c10',
+                  display:'grid',
+                  placeItems: coverImageUrl ? 'stretch' : 'center',
+                }}
+              >
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Cover preview"
+                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
+                  />
+                ) : (
+                  <div style={{ color:'#9fb0bf', fontSize:13 }}>No cover image selected.</div>
+                )}
+              </div>
+
+              <div
+                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
+                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
+                onDrop={(e)=>{
+                  e.preventDefault();
+                  setCoverDropActive(false);
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) handleCoverFile(file);
+                }}
+                style={{
+                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#2a323b'}`,
+                  background: coverDropActive ? '#14231a' : '#0b0c10',
+                  borderRadius:12,
+                  padding:16,
+                  textAlign:'center',
+                  color:'#9fb0bf',
+                }}
+              >
+                <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
+                <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
+              </div>
+
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <>
+                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={(e)=>{
+                      const file = e.target.files?.[0];
+                      if (file) handleCoverFile(file);
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                </>
+                <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
+                  {coverPickerLoading ? 'Loading media…' : 'Browse media pool'}
+                </button>
+                <button
+                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                  onClick={clearCoverImage}
+                  disabled={!config?.game?.coverImage}
+                >
+                  Remove cover
+                </button>
+              </div>
+
+              {uploadStatus && (
+                <div style={{ fontSize:12, color:'#9fb0bf' }}>{uploadStatus}</div>
+              )}
+              <div style={{ fontSize:12, color:'#9fb0bf' }}>
+                Tip: cover art appears behind the header controls and is saved to <code>/media/covers</code>.
+              </div>
+            </div>
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
@@ -2621,24 +2855,68 @@ useEffect(()=>{
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+<<<<<<< codex/update-admin-ui-skins-with-textures-huhqvs
               <button
                 style={{ ...S.button, ...S.buttonDanger }}
                 onClick={()=> setConfirmDeleteOpen(true)}
               >
                 🗑 Delete Game
               </button>
+=======
+              {gameEnabled && (
+                <button
+                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
+                  onClick={()=> setConfirmDeleteOpen(true)}
+                >
+                  🗑 Delete Game
+                </button>
+              )}
+>>>>>>> main
               <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
             </div>
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {[
+                  { key:'light', label:'☀️ Light — dark text' },
+                  { key:'dark', label:'🌙 Dark — light text' },
+                ].map((option) => {
+                  const active = interfaceTone === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={()=>updateInterfaceTone(option.key)}
+                      style={{
+                        borderRadius:12,
+                        padding:'8px 14px',
+                        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                        color:'var(--admin-body-color)',
+                        cursor:'pointer',
+                        fontWeight: active ? 600 : 500,
+                        boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
+                Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
+              </div>
+            </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
                 {APPEARANCE_SKINS.map((skin)=>{
                   const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage
+                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
                     ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
                     : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
                   return (
@@ -2680,13 +2958,18 @@ useEffect(()=>{
             </div>
             <AppearanceEditor
               value={config.appearance||defaultAppearance()}
-              onChange={(next)=>setConfig(prev => ({
-                ...prev,
-                appearance: next,
-                appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
-                  ? prev.appearanceSkin
-                  : detectAppearanceSkin(next, prev.appearanceSkin),
-              }))}
+              tone={interfaceTone}
+              onChange={(next)=>{
+                setConfig(prev => ({
+                  ...prev,
+                  appearance: next,
+                  appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
+                    ? prev.appearanceSkin
+                    : detectAppearanceSkin(next, prev.appearanceSkin),
+                }));
+                setDirty(true);
+                setStatus('🎨 Updated appearance settings');
+              }}
             />
             <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
@@ -2715,7 +2998,7 @@ useEffect(()=>{
 
       {/* ASSIGNED MEDIA — renamed Media tab */}
       {tab==='assigned' && (
-        <AssignedMediaTab
+        <AssignedMediaPageTab
           config={config}
           setConfig={setConfig}
           onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
@@ -2723,6 +3006,49 @@ useEffect(()=>{
           devices={devices}
           missions={suite?.missions || []}
         />
+      )}
+
+      {coverPickerOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:1600, padding:16 }}>
+          <div style={{ ...S.card, width:'min(680px, 94vw)', maxHeight:'80vh', overflowY:'auto' }}>
+            <h3 style={{ marginTop:0 }}>Select Cover Image</h3>
+            {coverPickerLoading ? (
+              <div style={{ color:'#9fb0bf' }}>Loading media…</div>
+            ) : coverPickerItems.length === 0 ? (
+              <div style={{ color:'#9fb0bf' }}>
+                No cover-ready images found. Upload a new file or add art to the media pool.
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
+                {coverPickerItems.map((item) => (
+                  <button
+                    key={item.url}
+                    onClick={()=>applyCoverFromUrl(item.url)}
+                    style={{
+                      border:'1px solid #2a323b',
+                      borderRadius:12,
+                      background:'#0b0c10',
+                      padding:0,
+                      cursor:'pointer',
+                      overflow:'hidden',
+                      textAlign:'left',
+                    }}
+                  >
+                    <img
+                      src={toDirectMediaURL(item.url)}
+                      alt={item.name || item.url}
+                      style={{ width:'100%', height:120, objectFit:'cover' }}
+                    />
+                    <div style={{ padding:'6px 8px', fontSize:12, color:'#9fb0bf' }}>{item.name || item.url}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+              <button style={S.button} onClick={()=>setCoverPickerOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* TEST */}
@@ -2760,7 +3086,7 @@ useEffect(()=>{
       )}
 
       {/* New Game modal */}
-      {showNewGame && (
+      {gameEnabled && showNewGame && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Create New Game</h3>
@@ -2804,7 +3130,7 @@ useEffect(()=>{
       )}
 
       {/* Delete confirm modal */}
-      {confirmDeleteOpen && (
+      {gameEnabled && confirmDeleteOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
@@ -2833,85 +3159,6 @@ function Field({ label, children }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 12, color: 'var(--admin-muted)', marginBottom: 6 }}>{label}</div>
       {children}
-    </div>
-  );
-}
-function ColorField({ label, value, onChange }) {
-  return (
-    <Field label={label}>
-      <div style={{ display:'grid', gridTemplateColumns:'100px 1fr', gap:8, alignItems:'center' }}>
-        <input type="color" value={value} onChange={(e)=>onChange(e.target.value)} />
-        <input style={S.input} value={value} onChange={(e)=>onChange(e.target.value)} />
-      </div>
-    </Field>
-  );
-}
-function AppearanceEditor({ value, onChange }) {
-  const a = value || defaultAppearance();
-  return (
-    <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-        <Field label="Font family">
-          <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
-            {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
-          </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed var(--admin-border-soft)', borderRadius:8, fontFamily:a.fontFamily }}>
-            Aa — preview text with this font
-          </div>
-        </Field>
-        <Field label="Font size (px)">
-          <input type="number" min={10} max={72} style={S.input}
-            value={a.fontSizePx} onChange={(e)=>onChange({ ...a, fontSizePx:clamp(Number(e.target.value||0),10,72) })}/>
-        </Field>
-        <ColorField label="Text color" value={a.fontColor} onChange={(v)=>onChange({ ...a, fontColor:v })}/>
-        <ColorField label="Text background color" value={a.textBgColor} onChange={(v)=>onChange({ ...a, textBgColor:v })}/>
-        <Field label="Text background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
-            onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
-        </Field>
-        <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
-        <Field label="Screen background opacity">
-          <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
-            onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
-        </Field>
-        <Field label="Screen background image (URL)">
-          <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
-          {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-          )}
-        </Field>
-        <Field label="Text alignment (horizontal)">
-          <select style={S.input} value={a.textAlign} onChange={(e)=>onChange({ ...a, textAlign:e.target.value })}>
-            <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-          </select>
-        </Field>
-        <Field label="Text position (vertical)">
-          <select style={S.input} value={a.textVertical} onChange={(e)=>onChange({ ...a, textVertical:e.target.value })}>
-            <option value="top">Top</option><option value="center">Center</option>
-          </select>
-        </Field>
-      </div>
-
-      <div style={{
-        marginTop:12, border:'1px dashed var(--admin-border-soft)', borderRadius:10, overflow:'hidden',
-        background:a.screenBgImage
-          ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
-          : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
-        padding:12, height:120, display:'grid', placeItems: a.textVertical==='center' ? 'center' : 'start',
-      }}>
-        <div style={{
-          maxWidth:'100%',
-          background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
-          textAlign:a.textAlign, width:'fit-content',
-          justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
-        }}>
-          Preview text
-        </div>
-      </div>
     </div>
   );
 }
@@ -2965,10 +3212,10 @@ function MediaPreview({ url, kind }) {
 /* Styles */
 const S = {
   body: {
-    background: 'var(--admin-body-bg)',
-    color: 'var(--admin-body-color)',
+    background: 'transparent',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
     minHeight: '100vh',
-    fontFamily: 'var(--admin-font-family)',
+    fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
   header: {
     padding: 16,
@@ -2981,23 +3228,23 @@ const S = {
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
   sidebarTall: {
-    background: 'var(--admin-panel-bg)',
-    border: 'var(--admin-panel-border)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
     borderRadius: 18,
     padding: 14,
     position: 'sticky',
     top: 20,
     height: 'calc(100vh - 140px)',
     overflow: 'auto',
-    boxShadow: 'var(--admin-panel-shadow)',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   card: {
     position: 'relative',
-    background: 'var(--admin-panel-bg)',
-    border: 'var(--admin-panel-border)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
     borderRadius: 18,
     padding: 18,
-    boxShadow: 'var(--admin-panel-shadow)',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
   input: {
@@ -3194,7 +3441,7 @@ function MapOverview({
   return (
     <div>
       {!leafletReady && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }}/>
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }}/>
     </div>
   );
 }
@@ -3262,7 +3509,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--admin-panel-bg)' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
           type="range" min={5} max={500} step={5}
@@ -3570,7 +3817,7 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const rewards = config.media?.rewardsPool || [];
   const penalties = config.media?.penaltiesPool || [];
@@ -3636,6 +3883,62 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
     trigger: sanitizeTriggerConfig(d?.trigger),
   }));
 
+  const mediaPool = useMemo(() => {
+    return (inventory || []).map((item, idx) => {
+      const rawUrl = item?.url || item?.path || item;
+      const directUrl = toDirectMediaURL(rawUrl);
+      if (!directUrl) return null;
+      const thumb = toDirectMediaURL(item?.thumbUrl || directUrl);
+      return {
+        id: directUrl,
+        name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
+        type: item?.type || item?.kind || '',
+        tags: Array.isArray(item?.tags) ? item.tags : [],
+        thumbUrl: thumb,
+        url: directUrl,
+        openUrl: rawUrl || directUrl,
+      };
+    }).filter(Boolean);
+  }, [inventory]);
+
+  const assignedState = useMemo(() => ({
+    missionIcons: (config.icons?.missions || []).map(icon => icon.key),
+    deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
+    rewardMedia: (config.media?.rewardsPool || []).map(item => item.url),
+    penaltyMedia: (config.media?.penaltiesPool || []).map(item => item.url),
+    actionMedia: config.media?.actionMedia || [],
+  }), [config]);
+
+  const arraysEqual = useCallback((a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }, []);
+
+  const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
+    const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
+    setConfig(current => {
+      const prevAction = current.media?.actionMedia || [];
+      if (arraysEqual(prevAction, nextAction)) return current;
+      return {
+        ...current,
+        media: {
+          ...(current.media || {}),
+          actionMedia: [...nextAction],
+        },
+      };
+    });
+  }, [arraysEqual, setConfig]);
+
+  const triggerEnabled = !!triggerConfig.enabled;
+
+  const handleTriggerToggle = useCallback((enabled) => {
+    setMediaTriggerPicker('');
+    updateMediaTrigger({ enabled });
+  }, [updateMediaTrigger]);
+
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
     setConfig(c => {
@@ -3657,18 +3960,18 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Trigger Automation</h3>
-        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <input
-            type="checkbox"
-            checked={triggerConfig.enabled}
-            onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ enabled: e.target.checked }); }}
-          />
-          <span>Enable Assigned Media Trigger — instantly link media, devices, and missions.</span>
-        </label>
+        <AssignedMediaTab
+          mediaPool={mediaPool}
+          assigned={assignedState}
+          onChange={handleAssignedStateChange}
+          triggerEnabled={triggerEnabled}
+          setTriggerEnabled={handleTriggerToggle}
+        />
 
-        {triggerConfig.enabled ? (
+        {triggerEnabled && (
           <>
+            <div style={{ fontWeight:600, margin:'8px 0 12px', fontSize:18 }}>Automation Routing</div>
+
             <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
               <select
@@ -3730,8 +4033,6 @@ function AssignedMediaTab({ config, setConfig, onReapplyDefaults, inventory = []
               onSelect={(opt)=>{ updateMediaTrigger({ triggeredMissionId: opt?.id || '' }); }}
             />
           </>
-        ) : (
-          <div style={{ marginTop:8, color:'var(--admin-muted)', fontSize:12 }}>Toggle on to coordinate triggers across media, devices, and missions.</div>
         )}
 
         <div style={{ marginTop:16 }}>
@@ -3877,7 +4178,7 @@ function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownK
           <span style={{ opacity:0.6 }}>▾</span>
         </button>
         {isOpen && (
-          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--admin-panel-bg)', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
+          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
             {options.length === 0 ? (
               <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
             ) : options.map(opt => (
@@ -3904,4 +4205,4 @@ function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownK
       </div>
     </div>
   );
-}
+} resolve conflicts
