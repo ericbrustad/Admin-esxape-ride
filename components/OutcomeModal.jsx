@@ -41,7 +41,7 @@ export default function OutcomeModal({ open, onClose = () => {}, title = 'Outcom
     if (/\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower)) {
       return <audio src={u} controls style={{ width: '100%' }} />;
     }
-    return <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9fb0bf' }}>Open media URL</a>;
+    return <a href={u} target="_blank" rel="noreferrer" style={{ color: '#9aa8d8' }}>Open media URL</a>;
   }
 
   return (
@@ -101,7 +101,7 @@ export default function OutcomeModal({ open, onClose = () => {}, title = 'Outcom
                 placeholder={local.mode === 'mission' ? 'm01' : 'd01 or device-key'}
                 onChange={(e) => update('targetId', e.target.value)}
               />
-              <div style={{ fontSize: 12, color: '#9fb0bf', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: '#9aa8d8', marginTop: 6 }}>
                 When this outcome triggers, the selected {local.mode === 'mission' ? 'mission' : 'device'} will be activated (if supported).
               </div>
             </>
@@ -134,7 +134,7 @@ const styles = {
     border: '1px solid #1f262d',
     borderRadius: 12,
     padding: 14,
-    color: '#e9eef2',
+    color: '#f4f7ff',
     boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
   },
   header: {
@@ -157,29 +157,29 @@ const styles = {
     width: '100%',
     padding: '10px 12px',
     borderRadius: 10,
-    border: '1px solid #2a323b',
-    background: '#0b0c10',
-    color: '#e9eef2',
+    border: '1px solid #253458',
+    background: '#081123',
+    color: '#f4f7ff',
     boxSizing: 'border-box',
   },
   label: {
     fontSize: 12,
-    color: '#9fb0bf',
+    color: '#9aa8d8',
   },
   button: {
     padding: '10px 14px',
     borderRadius: 10,
-    border: '1px solid #2a323b',
+    border: '1px solid #253458',
     background: '#1a2027',
-    color: '#e9eef2',
+    color: '#f4f7ff',
     cursor: 'pointer',
   },
   smallButton: {
     padding: '6px 8px',
     borderRadius: 8,
-    border: '1px solid #2a323b',
+    border: '1px solid #253458',
     background: '#0f1418',
-    color: '#e9eef2',
+    color: '#f4f7ff',
     cursor: 'pointer',
   },
   previewMedia: {
@@ -187,6 +187,6 @@ const styles = {
     maxHeight: 260,
     objectFit: 'contain',
     borderRadius: 10,
-    border: '1px solid #2a323b',
+    border: '1px solid #253458',
   },
 };

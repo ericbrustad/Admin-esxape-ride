@@ -26,3 +26,8 @@ If you want, I can:
 - Integrate these components into your actual pages/index.jsx and wire up your existing state/handlers.
 - Convert styles to your project's theme or CSS modules.
 - Add accessible keyboard support for reordering and selection.
+
+---
+
+Update Notes:
+- 2025-10-13 — Commit 850982f98cd4c89f3442cc3f50c14bd497785c24: Neon Escape theme refresh applied across admin & game configs, UI chrome, and shared cover art.

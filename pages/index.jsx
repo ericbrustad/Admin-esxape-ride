@@ -994,7 +994,7 @@ export default function Admin() {
 
   if (!suite || !config) {
     return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
+      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9aa8d8', padding: 16 }}>
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid #1f262d', background: '#12181d' }}>
           Loading… (pulling config & missions)
         </div>
@@ -1125,7 +1125,7 @@ export default function Admin() {
             })}
             {gameEnabled && (
               <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
-                <label style={{ color:'#9fb0bf', fontSize:12 }}>Game:</label>
+                <label style={{ color:'#9aa8d8', fontSize:12 }}>Game:</label>
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                   <option value="default">(Default Game)</option>
                   {games.map(g=>(
@@ -1139,7 +1139,7 @@ export default function Admin() {
             {/* Save & Publish with optional delay */}
             <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
               {gameEnabled && (
-                <label style={{ color:'#9fb0bf', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                <label style={{ color:'#9aa8d8', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   Deploy delay (sec):
                   <input
                     type="number" min={0} max={120}
@@ -1175,7 +1175,7 @@ export default function Admin() {
               View config.json
             </a>
           </div>
-          <div style={{ color:'#9fb0bf', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          <div style={{ color:'#9aa8d8', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
 
@@ -1209,7 +1209,7 @@ export default function Admin() {
                       <div style={{ fontWeight:600 }}>
                         <span style={{ opacity:.65, marginRight:6 }}>#{idx+1}</span>{m.title||m.id}
                       </div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
+                      <div style={{ color:'#9aa8d8', fontSize:12 }}>{TYPE_LABELS[m.type] || m.type} — id: {m.id}</div>
                     </div>
                     <div style={{ display:'flex', gap:6 }}>
                       <button title="Move up"   style={{ ...S.button, padding:'6px 10px' }} onClick={()=>moveMission(idx,-1)}>▲</button>
@@ -1228,7 +1228,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Missions Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'#9aa8d8', fontSize:12 }}>
                     Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
                 </div>
@@ -1242,7 +1242,7 @@ export default function Admin() {
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'#9aa8d8' }}>{selectedMissionIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1254,7 +1254,7 @@ export default function Admin() {
                   value={missionRadiusValue}
                   onChange={(e)=> setSelectedMissionRadius(Number(e.target.value)) }
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'#9aa8d8' }}>
                   {selectedMissionIdx==null ? 'Select a mission to adjust radius' : `M${selectedMissionIdx+1} radius: ${missionRadiusValue} m`}
                 </code>
               </div>
@@ -1322,8 +1322,8 @@ export default function Admin() {
                         {(() => {
                           const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
                           return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>;
+                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #253458', borderRadius:8 }}/>
+                            : <div style={{ width:48, height:48, border:'1px dashed #253458', borderRadius:8, display:'grid', placeItems:'center', color:'#9aa8d8' }}>icon</div>;
                         })()}
                       </div>
                     </div>
@@ -1394,7 +1394,7 @@ export default function Admin() {
 
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
-                      <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Pick location & radius</div>
+                      <div style={{ fontSize:12, color:'#9aa8d8', marginBottom:6 }}>Pick location & radius</div>
                       <MapPicker
                         lat={editing.content?.lat} lng={editing.content?.lng} radius={editing.content?.radiusMeters ?? 25}
                         center={mapCenter}
@@ -1521,11 +1521,11 @@ export default function Admin() {
                 <button type="submit" disabled={devSearching} style={S.button}>{devSearching ? 'Searching…' : 'Search'}</button>
               </form>
 
-              <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
+              <div style={{ background:'#081123', border:'1px solid #253458', borderRadius:10, padding:8, maxHeight:180, overflow:'auto', display: devResults.length>0 ? 'block' : 'none' }}>
                 {devResults.map((r,i)=>(
                   <div key={i} onClick={()=>applySearchResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
                     <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                    <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                    <div style={{ color:'#9aa8d8', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                   </div>
                 ))}
               </div>
@@ -1554,7 +1554,7 @@ export default function Admin() {
                 </li>
               ))}
             </ul>
-            {(devices||[]).length===0 && <div style={{ color:'#9fb0bf' }}>No devices yet. Use “Add Device” to place devices.</div>}
+            {(devices||[]).length===0 && <div style={{ color:'#9aa8d8' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
           <section style={{ position:'relative' }}>
@@ -1562,7 +1562,7 @@ export default function Admin() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
                   <h3 style={{ margin:0 }}>Devices Map</h3>
-                  <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                  <div style={{ color:'#9aa8d8', fontSize:12 }}>
                     Select a <b>device</b> pin to move it. Map uses your **Game Region** center/zoom.
                   </div>
                 </div>
@@ -1576,7 +1576,7 @@ export default function Admin() {
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
-                    <code style={{ color:'#9fb0bf' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
+                    <code style={{ color:'#9aa8d8' }}>{selectedDevIdx==null ? '—' : `${selectedPinSize}px`}</code>
                   </label>
                 </div>
               </div>
@@ -1592,7 +1592,7 @@ export default function Admin() {
                     else setDevDraft(d=>({ ...d, pickupRadius: r }));
                   }}
                 />
-                <code style={{ color:'#9fb0bf' }}>
+                <code style={{ color:'#9aa8d8' }}>
                   {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
                    : placingDev ? `New device radius: ${deviceRadiusValue} m`
                    : 'Select a device to adjust radius'}
@@ -1600,12 +1600,12 @@ export default function Admin() {
               </div>
 
               {placingDev && (
-                <div style={{ border:'1px solid #22303c', borderRadius:10, padding:10, marginBottom:8 }}>
+                <div style={{ border:'1px solid #1b2944', borderRadius:10, padding:10, marginBottom:8 }}>
                   <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                     <div>
                       {devDraft.iconKey
-                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
-                        : <div style={{ width:48, height:48, border:'1px dashed #2a323b', borderRadius:8, display:'grid', placeItems:'center', color:'#9fb0bf' }}>icon</div>}
+                        ? <img alt="icon" src={toDirectMediaURL(deviceIconUrlFromKey(devDraft.iconKey))} style={{ width:48, height:48, objectFit:'contain', border:'1px solid #253458', borderRadius:8 }}/>
+                        : <div style={{ width:48, height:48, border:'1px dashed #253458', borderRadius:8, display:'grid', placeItems:'center', color:'#9aa8d8' }}>icon</div>}
                     </div>
                     <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                     <Field label="Type">
@@ -1627,7 +1627,7 @@ export default function Admin() {
                   <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center' }}>
                     <button style={S.button} onClick={()=>setPlacingDev(false)}>Cancel</button>
                     <button style={S.button} onClick={saveDraftDevice}>Save Device</button>
-                    <div style={{ color:'#9fb0bf' }}>
+                    <div style={{ color:'#9aa8d8' }}>
                       {devDraft.lat==null ? 'Click the map or search an address to set location' :
                         <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
@@ -1681,7 +1681,7 @@ export default function Admin() {
                 onChange={(e)=>updateGameTagsDraft(e.target.value)}
                 placeholder="default-game, mystery"
               />
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+              <div style={{ marginTop:6, fontSize:12, color:'#9aa8d8' }}>
                 The current slug and <code>default-game</code> are enforced automatically.
               </div>
             </Field>
@@ -1699,11 +1699,11 @@ export default function Admin() {
             <div style={{ display:'grid', gap:12 }}>
               <div
                 style={{
-                  border:'1px solid #22303c',
+                  border:'1px solid #1b2944',
                   borderRadius:12,
                   minHeight:160,
                   overflow:'hidden',
-                  background:'#0b0c10',
+                  background:'#081123',
                   display:'grid',
                   placeItems: coverImageUrl ? 'stretch' : 'center',
                 }}
@@ -1715,7 +1715,7 @@ export default function Admin() {
                     style={{ width:'100%', height:'100%', objectFit:'cover' }}
                   />
                 ) : (
-                  <div style={{ color:'#9fb0bf', fontSize:13 }}>No cover image selected.</div>
+                  <div style={{ color:'#9aa8d8', fontSize:13 }}>No cover image selected.</div>
                 )}
               </div>
 
@@ -1729,15 +1729,15 @@ export default function Admin() {
                   if (file) handleCoverFile(file);
                 }}
                 style={{
-                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#2a323b'}`,
-                  background: coverDropActive ? '#14231a' : '#0b0c10',
+                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#253458'}`,
+                  background: coverDropActive ? '#14231a' : '#081123',
                   borderRadius:12,
                   padding:16,
                   textAlign:'center',
-                  color:'#9fb0bf',
+                  color:'#9aa8d8',
                 }}
               >
-                <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
+                <div style={{ fontWeight:600, color:'#f4f7ff' }}>Drag & drop cover art</div>
                 <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
               </div>
 
@@ -1769,9 +1769,9 @@ export default function Admin() {
               </div>
 
               {uploadStatus && (
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{uploadStatus}</div>
+                <div style={{ fontSize:12, color:'#9aa8d8' }}>{uploadStatus}</div>
               )}
-              <div style={{ fontSize:12, color:'#9fb0bf' }}>
+              <div style={{ fontSize:12, color:'#9aa8d8' }}>
                 Tip: cover art appears behind the header controls and is saved to <code>/media/covers</code>.
               </div>
             </div>
@@ -1799,11 +1799,11 @@ export default function Admin() {
                   <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
                   <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
                 </form>
-                <div style={{ background:'#0b0c10', border:'1px solid #2a323b', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                <div style={{ background:'#081123', border:'1px solid #253458', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
                   {mapResults.map((r,i)=>(
                     <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid #1f262d' }}>
                       <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'#9fb0bf', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                      <div style={{ color:'#9aa8d8', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                     </div>
                   ))}
                 </div>
@@ -1826,7 +1826,7 @@ export default function Admin() {
                 </select>
               </Field>
             </div>
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ color:'#9aa8d8', marginTop:8, fontSize:12 }}>
               These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
             </div>
           </div>
@@ -1850,7 +1850,7 @@ export default function Admin() {
             <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
             <AppearanceEditor value={config.appearance||defaultAppearance()}
               onChange={(next)=>setConfig({ ...config, appearance:next })}/>
-            <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+            <div style={{ color:'#9aa8d8', marginTop:8, fontSize:12 }}>
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
@@ -1889,9 +1889,9 @@ export default function Admin() {
           <div style={{ ...S.card, width:'min(680px, 94vw)', maxHeight:'80vh', overflowY:'auto' }}>
             <h3 style={{ marginTop:0 }}>Select Cover Image</h3>
             {coverPickerLoading ? (
-              <div style={{ color:'#9fb0bf' }}>Loading media…</div>
+              <div style={{ color:'#9aa8d8' }}>Loading media…</div>
             ) : coverPickerItems.length === 0 ? (
-              <div style={{ color:'#9fb0bf' }}>
+              <div style={{ color:'#9aa8d8' }}>
                 No cover-ready images found. Upload a new file or add art to the media pool.
               </div>
             ) : (
@@ -1901,9 +1901,9 @@ export default function Admin() {
                     key={item.url}
                     onClick={()=>applyCoverFromUrl(item.url)}
                     style={{
-                      border:'1px solid #2a323b',
+                      border:'1px solid #253458',
                       borderRadius:12,
-                      background:'#0b0c10',
+                      background:'#081123',
                       padding:0,
                       cursor:'pointer',
                       overflow:'hidden',
@@ -1915,7 +1915,7 @@ export default function Admin() {
                       alt={item.name || item.url}
                       style={{ width:'100%', height:120, objectFit:'cover' }}
                     />
-                    <div style={{ padding:'6px 8px', fontSize:12, color:'#9fb0bf' }}>{item.name || item.url}</div>
+                    <div style={{ padding:'6px 8px', fontSize:12, color:'#9aa8d8' }}>{item.name || item.url}</div>
                   </button>
                 ))}
               </div>
@@ -1944,7 +1944,7 @@ export default function Admin() {
                 <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
               </div>
             </div>
-            {!gameBase && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
+            {!gameBase && <div style={{ color:'#9aa8d8', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
             {gameBase && (
               <iframe
                 key={previewNonce} // hard refresh on nonce change
@@ -1954,7 +1954,7 @@ export default function Admin() {
                   preview: '1',
                   cb: String(Date.now())
                 }).toString()}`}
-                style={{ width:'100%', height:'70vh', border:'1px solid #22303c', borderRadius:12 }}
+                style={{ width:'100%', height:'70vh', border:'1px solid #1b2944', borderRadius:12 }}
               />
             )}
           </div>
@@ -2010,7 +2010,7 @@ export default function Admin() {
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'#e9eef2', marginBottom:12 }}>
+            <div style={{ color:'#f4f7ff', marginBottom:12 }}>
               Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
             </div>
             <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -2033,7 +2033,7 @@ export default function Admin() {
 function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#9aa8d8', marginBottom: 6 }}>{label}</div>
       {children}
     </div>
   );
@@ -2051,13 +2051,13 @@ function ColorField({ label, value, onChange }) {
 function AppearanceEditor({ value, onChange }) {
   const a = value || defaultAppearance();
   return (
-    <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid #1b2944', borderRadius:10, padding:12 }}>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
           <select style={S.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
             {FONT_FAMILIES.map((f)=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
+          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #253458', borderRadius:8, fontFamily:a.fontFamily }}>
             Aa — preview text with this font
           </div>
         </Field>
@@ -2070,19 +2070,19 @@ function AppearanceEditor({ value, onChange }) {
         <Field label="Text background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'#9aa8d8', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
         <Field label="Screen background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:'#9aa8d8', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <Field label="Screen background image (URL)">
           <input style={S.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
           {a.screenBgImage && (
             <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+              style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #253458', borderRadius:8 }}/>
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
@@ -2098,7 +2098,7 @@ function AppearanceEditor({ value, onChange }) {
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
+        marginTop:12, border:'1px dashed #253458', borderRadius:10, overflow:'hidden',
         background:a.screenBgImage
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
@@ -2128,7 +2128,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
     onChange({ choices: trimmed, correctIndex: ci });
   }
   return (
-    <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12 }}>
+    <div style={{ border:'1px solid #253458', borderRadius:10, padding:12 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>Choices (A–E)</div>
       {[0,1,2,3,4].map((i)=>(
         <div key={i} style={{ display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -2137,7 +2137,7 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
             onChange={(e)=>{ const next=[...local]; next[i]=e.target.value; setLocal(next); sync(next, correct); }}/>
         </div>
       ))}
-      <div style={{ color:'#9fb0bf', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
+      <div style={{ color:'#9aa8d8', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
     </div>
   );
 }
@@ -2150,15 +2150,15 @@ function MediaPreview({ url, kind }) {
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
+      <div style={{ color:'#9aa8d8', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
       {isVideo ? (
-        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
+        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #253458' }}/>
       ) : isImage ? (
-        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #253458' }}/>
       ) : isAudio ? (
         <audio src={u} controls style={{ width:'100%' }} />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9aa8d8', textDecoration:'underline' }}>Open media</a>
       )}
     </div>
   );
@@ -2166,21 +2166,21 @@ function MediaPreview({ url, kind }) {
 
 /* Styles */
 const S = {
-  body: { background:'#0b0c10', color:'#e9eef2', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
+  body: { background:'#081123', color:'#f4f7ff', minHeight:'100vh', fontFamily:'system-ui, Arial, sans-serif' },
   header: { padding:16, background:'#11161a', borderBottom:'1px solid #1f2329' }, // CORRECTED LINE
   wrap: { maxWidth:1200, margin:'0 auto', padding:16 },
   wrapGrid2: { display:'grid', gridTemplateColumns:'360px 1fr', gap:16, alignItems:'start', maxWidth:1400, margin:'0 auto', padding:16 },
   sidebarTall: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:12, position:'sticky', top:12, height:'calc(100vh - 120px)', overflow:'auto' },
   card: { background:'#12181d', border:'1px solid #1f262d', borderRadius:14, padding:16 },
   missionItem: { borderBottom:'1px solid #1f262d', padding:'10px 4px' },
-  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' },
-  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' },
-  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0f1418', color:'#e9eef2', cursor:'pointer' },
+  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #253458', background:'#081123', color:'#f4f7ff' },
+  button:{ padding:'10px 14px', borderRadius:10, border:'1px solid #253458', background:'#1a2027', color:'#f4f7ff', cursor:'pointer' },
+  tab:{ padding:'8px 12px', borderRadius:10, border:'1px solid #253458', background:'#0f1418', color:'#f4f7ff', cursor:'pointer' },
   tabActive:{ background:'#1a2027' },
-  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', marginBottom:10 },
+  search:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #253458', background:'#081123', color:'#f4f7ff', marginBottom:10 },
   hr:{ border:'1px solid #1f262d', borderBottom:'none' },
   overlay:{ position:'fixed', inset:0, display:'grid', placeItems:'center', background:'rgba(0,0,0,0.55)', zIndex:2000, padding:16 },
-  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #2a323b', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
+  chip:{ fontSize:11, color:'#c9d6e2', border:'1px solid #253458', padding:'2px 6px', borderRadius:999, background:'#0f1418' },
   chipRow:{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' },
 };
 
@@ -2321,8 +2321,8 @@ function MapOverview({
 
   return (
     <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+      {!leafletReady && <div style={{ color:'#9aa8d8', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #1b2944', background:'#0b1116' }}/>
     </div>
   );
 }
@@ -2390,7 +2390,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
 
   return (
     <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }} />
+      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid #1b2944', background:'#0b1116' }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
         <input
           type="range" min={5} max={500} step={5}
@@ -2405,7 +2405,7 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
             }
           }}
         />
-        <code style={{ color:'#9fb0bf' }}>{rad} m</code>
+        <code style={{ color:'#9aa8d8' }}>{rad} m</code>
       </div>
     </div>
   );
@@ -2420,7 +2420,7 @@ function TextTab({ config, setConfig }) {
     <main style={S.wrap}>
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'#9fb0bf', marginBottom:8, fontSize:12 }}>
+        <div style={{ color:'#9aa8d8', marginBottom:8, fontSize:12 }}>
           One rule per line. This saves into <code>config.textRules</code>.
         </div>
         <textarea
@@ -2623,8 +2623,8 @@ function MediaPoolTab({
             <input type="file" onChange={onUpload} style={{ display:'none' }} />
           </label>
         </div>
-        {uploadStatus && <div style={{ marginTop:8, color:'#9fb0bf' }}>{uploadStatus}</div>}
-        <div style={{ color:'#9fb0bf', marginTop:8, fontSize:12 }}>
+        {uploadStatus && <div style={{ marginTop:8, color:'#9aa8d8' }}>{uploadStatus}</div>}
+        <div style={{ color:'#9aa8d8', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
       </div>
@@ -2657,14 +2657,14 @@ function MediaPoolTab({
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'#9fb0bf' }}>No files.</div>
+          <div style={{ color:'#9aa8d8' }}>No files.</div>
         ) : (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
               const use = usageCounts(url);
               return (
-                <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+                <div key={idx} style={{ border:'1px solid #253458', borderRadius:10, padding:10 }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {baseNameFromUrl(url)}
@@ -2774,15 +2774,15 @@ function IconGroup({ title, items, onRemove }) {
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'#9fb0bf', marginBottom:8 }}>No icons yet.</div>}
+      {items.length === 0 && <div style={{ color:'#9aa8d8', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(
-          <div key={it.key} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10, display:'grid', gap:6 }}>
+          <div key={it.key} style={{ border:'1px solid #253458', borderRadius:10, padding:10, display:'grid', gap:6 }}>
             <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
-              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #2a323b', borderRadius:8 }}/>
+              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid #253458', borderRadius:8 }}/>
               <div>
                 <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{it.key}</div>
+                <div style={{ fontSize:12, color:'#9aa8d8' }}>{it.key}</div>
               </div>
             </div>
             <div style={{ display:'flex', gap:8 }}>
@@ -2806,7 +2806,7 @@ function Pool({ title, items, onRemove }) {
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
         {items.map((it, idx)=>(
-          <div key={idx} style={{ border:'1px solid #2a323b', borderRadius:10, padding:10 }}>
+          <div key={idx} style={{ border:'1px solid #253458', borderRadius:10, padding:10 }}>
             <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
               {it.label || baseNameFromUrl(it.url)}
             </div>
@@ -2822,7 +2822,7 @@ function Pool({ title, items, onRemove }) {
             </div>
           </div>
         ))}
-        {items.length===0 && <div style={{ color:'#9fb0bf' }}>No items.</div>}
+        {items.length===0 && <div style={{ color:'#9aa8d8' }}>No items.</div>}
       </div>
     </div>
   );

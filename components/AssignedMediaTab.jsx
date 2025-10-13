@@ -23,18 +23,19 @@ import React, { useMemo } from 'react';
  */
 
 const PALETTE = {
-  cardBg: '#11161a',
-  cardBorder: '#1f262d',
-  text: '#e9eef2',
-  muted: '#9fb0bf',
-  pillBg: '#1a2027',
-  pillBorder: '#2a323b',
-  accentBg: '#1d5c2a',
-  accentBorder: '#1f7a32',
-  dangerBg: '#2a1313',
-  dangerBorder: '#7a1f1f',
-  inputBg: '#0b0c10',
-  inputBorder: '#2a323b',
+  cardBg: 'rgba(12, 23, 40, 0.88)',
+  cardBorder: '#1b2944',
+  text: '#f4f7ff',
+  muted: '#9aa8d8',
+  pillBg: 'rgba(17, 31, 52, 0.85)',
+  pillBorder: '#253458',
+  accentBg: 'linear-gradient(135deg,#f97316 0%,#fb923c 100%)',
+  accentBorder: 'rgba(249,115,22,0.7)',
+  accentText: '#080c1a',
+  dangerBg: 'rgba(86, 20, 33, 0.6)',
+  dangerBorder: 'rgba(248,113,113,0.6)',
+  inputBg: '#081123',
+  inputBorder: '#253458',
 };
 
 function Section({ title, children, style }) {
@@ -76,8 +77,17 @@ function Pill({ children }) {
 
 function SmallButton({ children, onClick, tone='solid' }) {
   const styles = tone === 'danger'
-    ? { background: PALETTE.dangerBg, border: `1px solid ${PALETTE.dangerBorder}` }
-    : { background: PALETTE.accentBg, border: `1px solid ${PALETTE.accentBorder}` };
+    ? {
+        background: PALETTE.dangerBg,
+        border: `1px solid ${PALETTE.dangerBorder}`,
+        color: '#fcdbe1',
+      }
+    : {
+        background: PALETTE.accentBg,
+        border: `1px solid ${PALETTE.accentBorder}`,
+        color: PALETTE.accentText,
+        boxShadow: '0 8px 18px rgba(249,115,22,0.25)',
+      };
   return (
     <button
       onClick={onClick}

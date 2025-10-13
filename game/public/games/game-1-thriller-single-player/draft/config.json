@@ -102,5 +102,25 @@
   },
   "geofence": {
     "mode": "test"
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "\"Rajdhani\", \"Segoe UI\", sans-serif",
+      "fontSize": 32,
+      "textColor": "#f4f7ff",
+      "align": "center",
+      "backgroundColor": "#050914",
+      "backgroundImageUrl": "/media/covers/escape-grid.svg",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "\"Source Sans Pro\", \"Segoe UI\", sans-serif",
+      "fontSize": 20,
+      "textColor": "#f4f7ff",
+      "align": "left",
+      "backgroundColor": "#081123",
+      "backgroundImageUrl": "/media/covers/escape-grid.svg",
+      "backgroundSize": "cover"
+    }
   }
 }

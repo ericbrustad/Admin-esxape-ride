@@ -154,7 +154,7 @@ export default function Game() {
         return (
           <div style={bodyStyle}>
             {label('Unsupported mission type')}
-            <div style={{ color:'#9fb0bf' }}>Type: {m.type}</div>
+            <div style={{ color:'#9aa8d8' }}>Type: {m.type}</div>
           </div>
         );
     }
@@ -170,8 +170,8 @@ export default function Game() {
       {/* Mission */}
       <div style={card}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9fb0bf' }}>Mission {idx+1} / {missions.length}</span></div>
-          <div style={{ color:'#9fb0bf' }}>Points: {getBackpack(slug).points || 0}</div>
+          <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9aa8d8' }}>Mission {idx+1} / {missions.length}</span></div>
+          <div style={{ color:'#9aa8d8' }}>Points: {getBackpack(slug).points || 0}</div>
         </div>
         {renderMission()}
       </div>
@@ -213,11 +213,11 @@ function missionBodyStyle(a) {
   };
 }
 function hex(h){try{const s=h.replace('#','');const b=s.length===3?s.split('').map(c=>c+c).join(''):s;return `${parseInt(b.slice(0,2),16)}, ${parseInt(b.slice(2,4),16)}, ${parseInt(b.slice(4,6),16)}`;}catch{return'0,0,0';}}
-const outer = { maxWidth: 960, margin:'0 auto', padding:12, minHeight:'100vh', background:'#0b0c10', color:'#e9eef2', fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif' };
+const outer = { maxWidth: 960, margin:'0 auto', padding:12, minHeight:'100vh', background:'#081123', color:'#f4f7ff', fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif' };
 const card  = { background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12, marginTop:12 };
 const labelStyle = { background:'rgba(0,0,0,.25)', padding:'6px 10px', borderRadius:8, marginBottom:8 };
-const btn   = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' };
-const input = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
+const btn   = { padding:'10px 12px', borderRadius:10, border:'1px solid #253458', background:'#1a2027', color:'#f4f7ff', cursor:'pointer' };
+const input = { padding:'10px 12px', borderRadius:10, border:'1px solid #253458', background:'#081123', color:'#f4f7ff', width:'100%' };
 
 function resolveOverlayUrl(config, overlayKey, overlayUrl) {
   if (overlayUrl) return toDirect(overlayUrl);

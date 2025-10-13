@@ -19,9 +19,9 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
   function setOW(next) { setEditing(prev => ({ ...prev, onWrong:   { buttonText:'OK', ...(prev?.onWrong  ||{}), ...next } })); }
 
   const row = { display:'grid', gridTemplateColumns:'160px 1fr', gap:8, alignItems:'center', margin:'6px 0' };
-  const lab = { fontSize:12, color:'#9fb0bf' };
-  const inp = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
-  const box = { border:'1px solid #2a323b', borderRadius:10, padding:10, margin:'12px 0' };
+  const lab = { fontSize:12, color:'#9aa8d8' };
+  const inp = { padding:'10px 12px', borderRadius:10, border:'1px solid #253458', background:'#081123', color:'#f4f7ff', width:'100%' };
+  const box = { border:'1px solid #253458', borderRadius:10, padding:10, margin:'12px 0' };
 
   const MediaPicker = ({ value, onChange, list }) => (
     <select value={value||''} onChange={e=>onChange(e.target.value||'')} style={inp}>
@@ -74,7 +74,7 @@ export default function AnswerResponseEditor({ editing, setEditing, inventory })
         </div>
       </div>
 
-      <div style={{ fontSize:12, color:'#9fb0bf', marginTop:8 }}>
+      <div style={{ fontSize:12, color:'#9aa8d8', marginTop:8 }}>
         Tip: leave <b>Auto‑close</b> at 0 to require a button click. Button label defaults to “OK”.
       </div>
     </div>

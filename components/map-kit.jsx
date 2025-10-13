@@ -105,8 +105,8 @@ export function MapOverview({
 
   return (
     <div>
-      {!leafletReady && <div style={{ color:'#9fb0bf', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #22303c', background:'#0b1116' }}/>
+      {!leafletReady && <div style={{ color:'#9aa8d8', marginBottom:8 }}>Loading map…</div>}
+      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid #1b2944', background:'#0b1116' }}/>
     </div>
   );
 }
@@ -155,10 +155,10 @@ export function MapPicker({ lat, lng, radius, onChange }) {
 
   return (
     <div>
-      <div ref={divRef} style={{ width:'100%', height:320, borderRadius:12, overflow:'hidden', border:'1px solid #2a323b', marginBottom:8 }} />
+      <div ref={divRef} style={{ width:'100%', height:320, borderRadius:12, overflow:'hidden', border:'1px solid #253458', marginBottom:8 }} />
       <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
         <input type="range" min={5} max={2000} step={5} value={r} onChange={(e)=>setR(Number(e.target.value))}/>
-        <code style={{ color:'#9fb0bf' }}>{r} m</code>
+        <code style={{ color:'#9aa8d8' }}>{r} m</code>
       </div>
     </div>
   );

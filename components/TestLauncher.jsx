@@ -16,7 +16,7 @@ export default function TestLauncher({ slug, channel='draft', preferPretty=false
   const common = { target: '_blank', rel: 'noreferrer', style: { textDecoration: 'none' } };
   return (
     <a href={href} {...common}>
-      <button style={{ padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' }}>
+      <button style={{ padding:'10px 14px', borderRadius:10, border:'1px solid #253458', background:'#1a2027', color:'#f4f7ff', cursor:'pointer' }}>
         Open full window
       </button>
     </a>

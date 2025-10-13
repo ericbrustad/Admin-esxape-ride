@@ -9,7 +9,7 @@ export default function MissionListItem({ mission = {}, onClick = () => {} }) {
 
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700 }}>{mission.title}</div>
-        <div style={{ fontSize: 12, color: '#9fb0bf' }}>ID: {mission.id}</div>
+        <div style={{ fontSize: 12, color: '#9aa8d8' }}>ID: {mission.id}</div>
         {/* bottom spacer / marker for responses */}
         <div style={{ marginTop: 8, height: 34, display: 'flex', alignItems: 'center', gap: 8 }}>
           {mission.hasResponses ? (

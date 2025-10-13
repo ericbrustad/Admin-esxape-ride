@@ -10,6 +10,6 @@ export default function BackpackButton({ onClick }) {
 
 const btn = {
   position:'fixed', left:10, bottom:10, zIndex:1000,
-  padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b',
-  background:'#1a2027', color:'#e9eef2', cursor:'pointer'
+  padding:'10px 12px', borderRadius:10, border:'1px solid #253458',
+  background:'#1a2027', color:'#f4f7ff', cursor:'pointer'
 };

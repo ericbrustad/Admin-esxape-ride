@@ -68,7 +68,7 @@ export default function PhotoCapture({ overlayUrl, onCancel, onSave }) {
           <>
             <video ref={videoRef} playsInline muted style={{ width:'100%', borderRadius:10, background:'#000' }} />
             <div style={{ marginTop:8, display:'flex', gap:8, justifyContent:'space-between' }}>
-              <div style={{ color:'#9fb0bf' }}>{streamErr || 'Align your shot and tap Capture.'}</div>
+              <div style={{ color:'#9aa8d8' }}>{streamErr || 'Align your shot and tap Capture.'}</div>
               <button style={btn} onClick={()=>composite(null)}>📸 Capture</button>
             </div>
           </>
@@ -89,4 +89,4 @@ export default function PhotoCapture({ overlayUrl, onCancel, onSave }) {
 
 const wrap  = { position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', display:'grid', placeItems:'center', zIndex:9999, padding:16 };
 const panel = { background:'#11161a', border:'1px solid #1f2329', borderRadius:12, padding:12, width:'min(540px, 96vw)' };
-const btn   = { padding:'10px 14px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' };
+const btn   = { padding:'10px 14px', borderRadius:10, border:'1px solid #253458', background:'#1a2027', color:'#f4f7ff', cursor:'pointer' };

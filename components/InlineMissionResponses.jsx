@@ -170,15 +170,15 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     return (
       <div key={url} style={{ border:'1px solid #233036', borderRadius:8, padding:8, display:'grid', gap:6 }}>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <div style={{ width:64, height:48, borderRadius:6, overflow:'hidden', background:'#0b0c10', display:'grid', placeItems:'center' }}>
+          <div style={{ width:64, height:48, borderRadius:6, overflow:'hidden', background:'#081123', display:'grid', placeItems:'center' }}>
             {kind === "image" || kind === "gif" ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
              : kind === "video" ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline /> 
-             : kind === "audio" ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-             : <div style={{ fontSize:12, color:'#9fb0bf' }}>File</div>}
+             : kind === "audio" ? <div style={{ fontSize:12, color:'#9aa8d8' }}>Audio</div>
+             : <div style={{ fontSize:12, color:'#9aa8d8' }}>File</div>}
           </div>
           <div style={{ flex:1, overflow:'hidden' }}>
             <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-            <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
+            <div style={{ fontSize:12, color:'#9aa8d8' }}>{classifyByExt(url)}</div>
           </div>
         </div>
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -218,7 +218,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
         {/* status ticker */}
         <div style={{ marginTop:8, marginBottom:8 }}>
-          <div style={{ padding:8, borderRadius:8, border:'1px solid #132122', background: enabled ? 'rgba(34,197,94,0.06)' : 'transparent', color: enabled ? '#a7f3d0' : '#9fb0bf' }}>
+          <div style={{ padding:8, borderRadius:8, border:'1px solid #132122', background: enabled ? 'rgba(34,197,94,0.06)' : 'transparent', color: enabled ? '#a7f3d0' : '#9aa8d8' }}>
             {enabled ? (deviceId ? "Response Device Enabled!" : "Response Enabled — No Devices Selected") : "No Devices Enabled"}
           </div>
         </div>
@@ -226,8 +226,8 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         {/* Device selector */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 160px', gap:8, alignItems:'center' }}>
           <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Trigger Device</div>
-            {loadingDevices ? <div style={{ color:'#9fb0bf' }}>Loading devices…</div> : (
+            <div style={{ fontSize:12, color:'#9aa8d8', marginBottom:6 }}>Trigger Device</div>
+            {loadingDevices ? <div style={{ color:'#9aa8d8' }}>Loading devices…</div> : (
               hasDevices ? (
                 <div style={{ display:'grid', gap:6 }}>
                   <select style={styles.select} value={deviceId || ""} onChange={(e)=>chooseDeviceForSide(sideKey, e.target.value)}>
@@ -245,9 +245,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                     return (
                       <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                         <div style={{ width:48, height:48, border:'1px solid #263236', borderRadius:8, overflow:'hidden', display:'grid', placeItems:'center' }}>
-                          {d && d.iconKey ? <img src={d.iconUrl || d.icon || ''} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ color:'#9fb0bf' }}>{d.title?.charAt(0) || 'D'}</div>}
+                          {d && d.iconKey ? <img src={d.iconUrl || d.icon || ''} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ color:'#9aa8d8' }}>{d.title?.charAt(0) || 'D'}</div>}
                         </div>
-                        <div style={{ color:'#9fb0bf' }}>{d.title || d.name || d.key}</div>
+                        <div style={{ color:'#9aa8d8' }}>{d.title || d.name || d.key}</div>
                         <div style={{ marginLeft:'auto' }}>
                           <button style={styles.smallButton} onClick={()=>removeDeviceForSide(sideKey)}>Clear</button>
                         </div>
@@ -256,19 +256,19 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   })()}
                 </div>
               ) : (
-                <div style={{ color:'#9fb0bf' }}>No devices available. Create a device in the Devices tab first.</div>
+                <div style={{ color:'#9aa8d8' }}>No devices available. Create a device in the Devices tab first.</div>
               )
             )}
           </div>
 
           {/* arrows and ordering hint (non-destructive — this component doesn't reorder devices list - that is managed on the Devices tab) */}
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Device list actions</div>
+            <div style={{ fontSize:12, color:'#9aa8d8', marginBottom:6 }}>Device list actions</div>
             <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
               <button style={styles.smallButton} title="Move selected device up">▲</button>
               <button style={styles.smallButton} title="Move selected device down">▼</button>
             </div>
-            <div style={{ fontSize:11, color:'#9fb0bf', marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
+            <div style={{ fontSize:11, color:'#9aa8d8', marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
           </div>
         </div>
 
@@ -309,13 +309,13 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                     <div style={{ width:56, height:44, borderRadius:6, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
                       {(classifyByExt(url) === 'image' || classifyByExt(url) === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         : (classifyByExt(url) === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
-                        : (classifyByExt(url) === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-                        : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(it.label||'file').slice(0,8)}</div>
+                        : (classifyByExt(url) === 'audio') ? <div style={{ fontSize:12, color:'#9aa8d8' }}>Audio</div>
+                        : <div style={{ fontSize:12, color:'#9aa8d8' }}>{(it.label||'file').slice(0,8)}</div>
                       }
                     </div>
                     <div style={{ flex:1, overflow:'hidden' }}>
                       <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-                      <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
+                      <div style={{ fontSize:12, color:'#9aa8d8' }}>{classifyByExt(url)}</div>
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
@@ -330,7 +330,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
           {/* selected preview */}
           {selectedPreviewUrl && (
             <div style={{ marginTop:10 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Preview</div>
+              <div style={{ fontSize:12, color:'#9aa8d8', marginBottom:6 }}>Preview</div>
               {classifyByExt(selectedPreviewUrl) === 'image' || classifyByExt(selectedPreviewUrl) === 'gif' ? (
                 <img src={selectedPreviewUrl} alt="preview" style={{ width:'100%', maxHeight:220, objectFit:'contain', borderRadius:8 }} />
               ) : classifyByExt(selectedPreviewUrl) === 'video' ? (
@@ -338,7 +338,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
                 <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
               ) : (
-                <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
+                <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9aa8d8' }}>{selectedPreviewUrl}</a>
               )}
             </div>
           )}
@@ -356,7 +356,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               }} />
             </label>
 
-            <div style={{ color:'#9fb0bf', fontSize:12 }}>
+            <div style={{ color:'#9aa8d8', fontSize:12 }}>
               Or drag & drop a file onto this box to upload and assign.
             </div>
           </div>
@@ -374,9 +374,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 }
 
 const styles = {
-  select: { width: "100%", padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  selectSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  inputSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2", width:240 },
-  smallButton: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" },
-  button: { padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" }
+  select: { width: "100%", padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#f4f7ff" },
+  selectSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#f4f7ff" },
+  inputSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#f4f7ff", width:240 },
+  smallButton: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#f4f7ff", cursor: "pointer" },
+  button: { padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#f4f7ff", cursor: "pointer" }
 };

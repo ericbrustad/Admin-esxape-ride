@@ -760,7 +760,7 @@ export default function Admin() {
   /* Minimal cover picker + header UI — paste your full UI later into the placeholder below if you want the entire JSX restored */
   if (!suite || !config) {
     return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9fb0bf', padding: 16 }}>
+      <main style={{ maxWidth: 900, margin: '40px auto', color: '#9aa8d8', padding: 16 }}>
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid #1f262d', background: '#12181d' }}>
           Loading… (fetching config and missions)
         </div>
@@ -776,7 +776,7 @@ export default function Admin() {
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
-              <label style={{ fontSize: 12, color: '#9fb0bf' }}>Game:</label>
+              <label style={{ fontSize: 12, color: '#9aa8d8' }}>Game:</label>
               <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ marginLeft: 8 }}>
                 <option value="default">(Default Game)</option>
                 {games.map(g=>(
@@ -797,7 +797,7 @@ export default function Admin() {
             </a>
           </div>
 
-          <div style={{ marginLeft: 'auto', color: '#9fb0bf' }}>{status}</div>
+          <div style={{ marginLeft: 'auto', color: '#9aa8d8' }}>{status}</div>
         </div>
       </header>
 
@@ -824,17 +824,17 @@ export default function Admin() {
               ) : (
                 <div>
                   <button onClick={()=>openCoverPicker()}>Choose Cover</button>
-                  <span style={{ marginLeft:8, color:'#9fb0bf' }}>No cover set</span>
+                  <span style={{ marginLeft:8, color:'#9aa8d8' }}>No cover set</span>
                 </div>
               )}
             </div>
             <div style={{ marginTop: 8 }}>
-              <label style={{ color:'#9fb0bf' }}>Tags (comma-separated)</label>
+              <label style={{ color:'#9aa8d8' }}>Tags (comma-separated)</label>
               <div>
                 <input value={gameTagsDraft} onChange={(e)=>updateGameTagsDraft(e.target.value)} placeholder="e.g. downtown,team-event,default" style={{ width: '60%' }} />
               </div>
             </div>
-            <div style={{ marginTop: 8, color: '#9fb0bf' }}>{uploadStatus}</div>
+            <div style={{ marginTop: 8, color: '#9aa8d8' }}>{uploadStatus}</div>
           </div>
         </section>
       </main>

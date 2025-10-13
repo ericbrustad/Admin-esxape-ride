@@ -58,13 +58,13 @@ function Section({ title, children }) {
 }
 
 function ThumbGrid({ items, onRemove }) {
-  if (!items.length) return <div style={{ color:'#9fb0bf' }}>Empty.</div>;
+  if (!items.length) return <div style={{ color:'#9aa8d8' }}>Empty.</div>;
   return (
     <div style={{ display:'grid', gap:12, gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))' }}>
       {items.map(it=>(
-        <div key={it.id} style={{ border:'1px solid #2a323b', borderRadius:10, background:'#0f1418', padding:8 }}>
+        <div key={it.id} style={{ border:'1px solid #253458', borderRadius:10, background:'#0f1418', padding:8 }}>
           <div style={{ width:'100%', height:90, border:'1px solid #1f262d', borderRadius:8, overflow:'hidden', display:'grid', placeItems:'center' }}>
-            {it.url ? <img alt="" src={it.url} style={{ maxWidth:'100%', maxHeight:'100%' }}/> : <div style={{ color:'#9fb0bf' }}>—</div>}
+            {it.url ? <img alt="" src={it.url} style={{ maxWidth:'100%', maxHeight:'100%' }}/> : <div style={{ color:'#9aa8d8' }}>—</div>}
           </div>
           <div style={{ fontSize:12, marginTop:6, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.title || 'Item'}</div>
           <button style={{ ...btn, width:'100%', marginTop:6 }} onClick={()=>onRemove && onRemove(it.id)}>Remove</button>
@@ -76,4 +76,4 @@ function ThumbGrid({ items, onRemove }) {
 
 const wrap  = { position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:9999, padding:16 };
 const panel = { width:'min(900px, 96vw)', maxHeight:'85vh', overflowY:'auto', background:'#11161a', border:'1px solid #1f2329', borderRadius:12, padding:12 };
-const btn   = { padding:'8px 10px', borderRadius:8, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' };
+const btn   = { padding:'8px 10px', borderRadius:8, border:'1px solid #253458', background:'#1a2027', color:'#f4f7ff', cursor:'pointer' };

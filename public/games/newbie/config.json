@@ -21,18 +21,18 @@
   "textRules": [],
   "powerups": [],
   "theme": {
-    "fontFamily": "system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif",
+    "fontFamily": "\"Source Sans Pro\",\"Segoe UI\",sans-serif",
     "fontGF": null,
-    "fontSize": 18,
-    "fontColor": "#ffffff",
+    "fontSize": 20,
+    "fontColor": "#f4f7ff",
     "fontColorOpacity": 1,
-    "fontBg": "#000000",
-    "fontBgOpacity": 0.5,
-    "screenBg": "#0b0c10",
-    "screenBgOpacity": 1,
-    "screenImg": "",
-    "screenImgOpacity": 1,
-    "textAlignV": "top"
+    "fontBg": "#081123",
+    "fontBgOpacity": 0.68,
+    "screenBg": "#050914",
+    "screenBgOpacity": 0.9,
+    "screenImg": "/media/covers/escape-grid.svg",
+    "screenImgOpacity": 0.6,
+    "textAlignV": "center"
   },
   "media": {
     "thumbs": {

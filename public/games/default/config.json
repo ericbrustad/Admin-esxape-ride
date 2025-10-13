@@ -18,21 +18,21 @@
   "powerups": [],
   "theme": {
     "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#100f10",
-      "align": "left",
-      "backgroundColor": "#e6eaf9",
-      "backgroundImageUrl": "",
+      "fontFamily": "\"Rajdhani\", \"Segoe UI\", sans-serif",
+      "fontSize": 32,
+      "textColor": "#f4f7ff",
+      "align": "center",
+      "backgroundColor": "#050914",
+      "backgroundImageUrl": "/media/covers/escape-grid.svg",
       "backgroundSize": "cover"
     },
     "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#ffffff",
-      "align": "center",
-      "backgroundColor": "#0b0c10",
-      "backgroundImageUrl": "",
+      "fontFamily": "\"Source Sans Pro\", \"Segoe UI\", sans-serif",
+      "fontSize": 20,
+      "textColor": "#f4f7ff",
+      "align": "left",
+      "backgroundColor": "#081123",
+      "backgroundImageUrl": "/media/covers/escape-grid.svg",
       "backgroundSize": "cover"
     }
   },

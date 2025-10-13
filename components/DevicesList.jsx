@@ -55,7 +55,7 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontWeight: 700 }}>{d.id} — {d.name}</div>
-                  <div style={{ fontSize: 12, color: '#9fb0bf' }}>{typeof d.lat === 'number' ? d.lat.toFixed(4) : d.lat}, {typeof d.lng === 'number' ? d.lng.toFixed(4) : d.lng}</div>
+                  <div style={{ fontSize: 12, color: '#9aa8d8' }}>{typeof d.lat === 'number' ? d.lat.toFixed(4) : d.lat}, {typeof d.lng === 'number' ? d.lng.toFixed(4) : d.lng}</div>
                 </div>
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                   {d.hasResponses ? (
@@ -85,28 +85,28 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 12, color: '#9fb0bf' }}>Name</label>
+              <label style={{ fontSize: 12, color: '#9aa8d8' }}>Name</label>
               <input value={local.name || ''} onChange={(e) => setLocal({...local, name: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} />
 
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, color: '#9fb0bf' }}>Latitude</label>
+                  <label style={{ fontSize: 12, color: '#9aa8d8' }}>Latitude</label>
                   <input value={local.lat || ''} onChange={(e) => setLocal({...local, lat: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} />
                 </div>
                 <div style={{ width: 160 }}>
-                  <label style={{ fontSize: 12, color: '#9fb0bf' }}>Longitude</label>
+                  <label style={{ fontSize: 12, color: '#9aa8d8' }}>Longitude</label>
                   <input value={local.lng || ''} onChange={(e) => setLocal({...local, lng: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} />
                 </div>
               </div>
 
               <div style={{ marginTop: 10 }}>
-                <label style={{ fontSize: 12, color: '#9fb0bf' }}>Triggered Device (ticker)</label>
+                <label style={{ fontSize: 12, color: '#9aa8d8' }}>Triggered Device (ticker)</label>
                 <input value={local.triggeredTicker || ''} onChange={(e) => setLocal({...local, triggeredTicker: e.target.value})} placeholder="e.g., D2" style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} />
                 <div style={{ fontSize: 12, color: '#6e848b', marginTop: 6 }}>Short ticker to display when this device triggers.</div>
               </div>
 
               <div style={{ marginTop: 10 }}>
-                <label style={{ fontSize: 12, color: '#9fb0bf' }}>Response Triggers / GeoTrigger Devices</label>
+                <label style={{ fontSize: 12, color: '#9aa8d8' }}>Response Triggers / GeoTrigger Devices</label>
                 {Array.isArray(triggerDevices) && triggerDevices.length > 0 ? (
                   <select value={local.triggerTargetId || ''} onChange={(e) => setLocal({...local, triggerTargetId: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }}>
                     <option value=''>-- select --</option>
@@ -131,13 +131,13 @@ export default function DevicesList({ devices = [], triggerDevices = [], onReord
             </div>
 
             <div>
-              <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>Thumbnail</div>
+              <div style={{ fontSize: 12, color: '#9aa8d8', marginBottom: 6 }}>Thumbnail</div>
               <div style={{ width: '100%', height: 140, borderRadius: 8, overflow: 'hidden', background: '#0b0f11', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {local.thumbnailUrl ? <img src={local.thumbnailUrl} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ color: '#6e848b' }}>No thumbnail</div>}
               </div>
 
               <div style={{ marginTop: 10 }}>
-                <label style={{ fontSize: 12, color: '#9fb0bf' }}>Thumbnail URL</label>
+                <label style={{ fontSize: 12, color: '#9aa8d8' }}>Thumbnail URL</label>
                 <input value={local.thumbnailUrl || ''} onChange={(e) => setLocal({...local, thumbnailUrl: e.target.value})} style={{ width: '100%', padding: 8, borderRadius: 6, marginTop: 6 }} placeholder="https://..." />
               </div>
 
