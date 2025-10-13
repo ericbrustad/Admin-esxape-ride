@@ -32,3 +32,8 @@ If you want, I can:
 - Integrate these components into your actual pages/index.jsx and wire up your existing state/handlers.
 - Convert styles to your project's theme or CSS modules.
 - Add accessible keyboard support for reordering and selection.
+
+Update Notes
+------------
+- Commit `da75336` restored the admin device editor controls (Save & Close for new devices plus top-right Cancel/Close buttons)
+  and confirms skins, themes, and password toggle options remain available. Direct link: `pages/index.jsx` in this repository.

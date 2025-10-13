@@ -566,6 +566,7 @@ useEffect(()=>{
   const [isDeviceEditorOpen, setIsDeviceEditorOpen] = useState(false);
   const [deviceEditorMode, setDeviceEditorMode] = useState('new');
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
+  const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
@@ -1047,10 +1048,12 @@ useEffect(()=>{
     setSelectedMissionIdx(null);
     const baseLat = Number(config.map?.centerLat ?? 44.9778);
     const baseLng = Number(config.map?.centerLng ?? -93.2650);
-    setDevDraft(createDeviceDraft({
+    const initialDraft = createDeviceDraft({
       lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
       lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
-    }));
+    });
+    setDevDraft(initialDraft);
+    setDevDraftBaseline(createDeviceDraft(initialDraft));
   }
   function openDeviceEditor(idx) {
     if (idx == null) return;
@@ -1060,14 +1063,24 @@ useEffect(()=>{
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(idx);
     setSelectedMissionIdx(null);
-    setDevDraft(createDeviceDraft({ ...item }));
+    const draft = createDeviceDraft({ ...item });
+    setDevDraft(draft);
+    setDevDraftBaseline(createDeviceDraft(draft));
   }
   function closeDeviceEditor() {
+    setDeviceTriggerPicker('');
     setIsDeviceEditorOpen(false);
     setDeviceEditorMode('new');
     setDevDraft(createDeviceDraft());
+    setDevDraftBaseline(createDeviceDraft());
   }
-  function saveDraftDevice() {
+  function resetDeviceDraft() {
+    setDeviceTriggerPicker('');
+    setDevDraft(createDeviceDraft(devDraftBaseline));
+    setStatus('↩️ Changes reset');
+  }
+  function saveDraftDevice(options = {}) {
+    const { closeAfter = false } = options;
     const normalized = {
       title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
       type: devDraft.type || 'smoke',
@@ -1091,7 +1104,15 @@ useEffect(()=>{
       setSelectedDevIdx(next.length - 1);
       setSelectedMissionIdx(null);
       setStatus('✅ Device added');
-      closeDeviceEditor();
+      if (closeAfter) {
+        closeDeviceEditor();
+      } else {
+        const newlySaved = createDeviceDraft({ ...item });
+        setDeviceEditorMode('edit');
+        setIsDeviceEditorOpen(true);
+        setDevDraft(newlySaved);
+        setDevDraftBaseline(createDeviceDraft(newlySaved));
+      }
       return;
     }
     if (deviceEditorMode === 'edit' && selectedDevIdx != null) {
@@ -1105,7 +1126,13 @@ useEffect(()=>{
       list[index] = { ...existing, ...normalized, lat, lng };
       setDevices(list);
       setStatus('✅ Device updated');
-      closeDeviceEditor();
+      if (closeAfter) {
+        closeDeviceEditor();
+      } else {
+        const updated = createDeviceDraft({ ...list[index] });
+        setDevDraft(updated);
+        setDevDraftBaseline(createDeviceDraft(updated));
+      }
     }
   }
   function duplicateDevice(idx) {
@@ -1124,7 +1151,9 @@ useEffect(()=>{
     setStatus('✅ Device duplicated');
     setDeviceEditorMode('edit');
     setIsDeviceEditorOpen(true);
-    setDevDraft(createDeviceDraft({ ...copy }));
+    const draft = createDeviceDraft({ ...copy });
+    setDevDraft(draft);
+    setDevDraftBaseline(createDeviceDraft(draft));
   }
   function deleteDevice(idx) {
     const list = [...(devices || [])];
@@ -1154,7 +1183,9 @@ useEffect(()=>{
     if (currentSelected === idx) {
       setSelectedDevIdx(target);
       if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
-        setDevDraft(createDeviceDraft({ ...list[target] }));
+        const draft = createDeviceDraft({ ...list[target] });
+        setDevDraft(draft);
+        setDevDraftBaseline(createDeviceDraft(draft));
       }
     } else if (currentSelected === target) {
       setSelectedDevIdx(idx);
@@ -1375,6 +1406,13 @@ useEffect(()=>{
     : 25;
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
+  const canResetDeviceDraft = useMemo(() => {
+    try {
+      return JSON.stringify(devDraft) !== JSON.stringify(devDraftBaseline);
+    } catch {
+      return false;
+    }
+  }, [devDraft, devDraftBaseline]);
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
@@ -2128,7 +2166,16 @@ useEffect(()=>{
                           <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                         )}
                       </div>
-                      <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
+                      <div style={{ display:'flex', gap:8 }}>
+                        <button
+                          style={{ ...S.button, padding:'6px 12px', opacity: canResetDeviceDraft ? 1 : 0.6 }}
+                          onClick={resetDeviceDraft}
+                          disabled={!canResetDeviceDraft}
+                        >
+                          Cancel
+                        </button>
+                        <button style={{ ...S.button, padding:'6px 12px' }} onClick={closeDeviceEditor}>Close</button>
+                      </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -2261,7 +2308,15 @@ useEffect(()=>{
                     </div>
 
                     <div style={{ marginTop:8, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                      <button style={S.button} onClick={saveDraftDevice}>💾 Save Device</button>
+                      <button style={S.button} onClick={()=>saveDraftDevice({ closeAfter: false })}>💾 Save Device</button>
+                      {deviceEditorMode === 'new' && (
+                        <button
+                          style={{ ...S.button, ...S.buttonSuccess }}
+                          onClick={()=>saveDraftDevice({ closeAfter: true })}
+                        >
+                          Save & Close
+                        </button>
+                      )}
                       <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                         {devDraft.lat==null ? 'Click the map or search an address to set location'
                           : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
