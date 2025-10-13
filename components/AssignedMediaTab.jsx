@@ -219,6 +219,27 @@ export default function AssignedMediaTab({
                       <div>
                         <div style={{ fontWeight:600 }}>{m.name || m.id}</div>
                         <div style={{ fontSize:12, color:PALETTE.muted }}>{m.type || 'media'}</div>
+                        {Array.isArray(m.tags) && m.tags.length > 0 && (
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
+                            {m.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                style={{
+                                  fontSize:11,
+                                  color:PALETTE.text,
+                                  background:'rgba(159,176,191,0.15)',
+                                  borderRadius:999,
+                                  padding:'2px 8px',
+                                  border:`1px solid ${PALETTE.pillBorder}`,
+                                  textTransform:'uppercase',
+                                  letterSpacing:0.6,
+                                }}
+                              >
+                                #{String(tag)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div style={{ display:'flex', gap:8, marginTop:10 }}>
