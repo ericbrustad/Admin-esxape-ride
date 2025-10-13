@@ -945,15 +945,29 @@ useEffect(()=>{
         return setStatus('❌ Missing: ' + f.label);
       }
     }
-    const missions = [...(suite.missions || [])];
-    const i = missions.findIndex(m => m.id === editing.id);
-    const obj = { ...editing };
-    obj.trigger = sanitizeTriggerConfig(editing.trigger);
-    if (!obj.appearanceOverrideEnabled) delete obj.appearance;
+    pushHistory();
 
-    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
-    setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id); setEditing(null); setDirty(false);
+    const missionId = editing.id;
+    const baseAppearance = editing.appearanceOverrideEnabled
+      ? { ...defaultAppearance(), ...(editing.appearance || {}) }
+      : null;
+    const prepared = {
+      ...editing,
+      trigger: sanitizeTriggerConfig(editing.trigger),
+      appearance: baseAppearance || undefined,
+    };
+    if (!prepared.appearanceOverrideEnabled) delete prepared.appearance;
+    if (!prepared.correct) prepared.correct = { mode: 'none' };
+    if (!prepared.wrong) prepared.wrong = { mode: 'none' };
+
+    setSuite((prev) => {
+      if (!prev) return prev;
+      const missions = [...(prev.missions || [])];
+      const idx = missions.findIndex((m) => m.id === missionId);
+      const list = idx >= 0 ? (missions[idx] = prepared, missions) : [...missions, prepared];
+      return { ...prev, missions: list, version: bumpVersion(prev.version || '0.0.0') };
+    });
+    setSelected(missionId); setEditing(null); setDirty(false);
     setStatus('✅ Mission saved');
   }
   function removeMission(id) {

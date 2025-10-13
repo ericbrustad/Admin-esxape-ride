@@ -37,3 +37,5 @@ Update Notes
 ------------
 - Commit `da75336` restored the admin device editor controls (Save & Close for new devices plus top-right Cancel/Close buttons)
   and confirms skins, themes, and password toggle options remain available. Direct link: `pages/index.jsx` in this repository.
+- Commit `a3d8f08` records mission saves in the undo/redo history so edits can be reverted immediately after saving. Direct link:
+  `pages/index.jsx` → `saveToList` in this repository.
