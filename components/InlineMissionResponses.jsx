@@ -1,5 +1,10 @@
 
 import React, { useEffect, useState, useRef } from "react";
+import styles from './InlineMissionResponses.module.css';
+
+function classNames(...values) {
+  return values.filter(Boolean).join(' ');
+}
 
 /**
  * InlineMissionResponses.jsx
@@ -182,7 +187,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     const side = ensureSide(sideKey);
     const enabled = !!side.enabled;
     const deviceId = side.deviceId;
-    const deviceLabel = side.deviceLabel;
     const mediaUrl = side.mediaUrl;
     const audioUrl = side.audioUrl;
 
@@ -190,81 +194,75 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     const hasDevices = devices && devices.length > 0;
 
     return (
-      <div style={{ border:'1px solid #1f2b2f', borderRadius:10, padding:12, marginBottom:12, background:'#071014' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-          <div style={{ fontWeight:700 }}>{title}</div>
-          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-            <label style={{ display:'flex', alignItems:'center', gap:8 }} title="When enabled this response will act as a trigger">
-              <input type="checkbox" checked={enabled} onChange={(e)=>toggleEngage(sideKey, e.target.checked)} /> Engage Response
+      <div className={styles.responseCard}>
+        <div className={styles.cardHeader}>
+          <div className={styles.headerTitle}>{title}</div>
+          <div className={styles.toggleRow}>
+            <label className={styles.toggleLabel} title="When enabled this response will act as a trigger">
+              <input type="checkbox" checked={enabled} onChange={(e)=>toggleEngage(sideKey, e.target.checked)} />
+              Engage Response
             </label>
           </div>
         </div>
 
-        {/* status ticker */}
-        <div style={{ marginTop:8, marginBottom:8 }}>
-          <div style={{ padding:8, borderRadius:8, border:'1px solid #132122', background: enabled ? 'rgba(34,197,94,0.06)' : 'transparent', color: enabled ? '#a7f3d0' : '#9fb0bf' }}>
-            {enabled ? (deviceId ? "Response Device Enabled!" : "Response Enabled — No Devices Selected") : "No Devices Enabled"}
-          </div>
+        <div className={classNames(styles.statusBanner, enabled && styles.statusBannerEnabled)}>
+          {enabled ? (deviceId ? "Response Device Enabled!" : "Response Enabled — No Devices Selected") : "No Devices Enabled"}
         </div>
 
-        {/* Device selector */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 160px', gap:8, alignItems:'center' }}>
-          <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Trigger Device</div>
-            {loadingDevices ? <div style={{ color:'#9fb0bf' }}>Loading devices…</div> : (
-              hasDevices ? (
-                <div style={{ display:'grid', gap:6 }}>
-                  <select style={styles.select} value={deviceId || ""} onChange={(e)=>chooseDeviceForSide(sideKey, e.target.value)}>
-                    <option value="">(Choose device…)</option>
-                    {devices.map((d, i)=>{
-                      const id = d.id || d.key || d._id || String(i);
-                      const label = d.title || d.name || d.key || id;
-                      return <option key={id} value={id}>{label} — {d.type || d.deviceType || ''}</option>;
-                    })}
-                  </select>
-                  {/* device thumbnail preview */}
-                  {deviceId && (()=>{
-                    const d = devices.find(x => (x.id||x.key||x._id) === deviceId);
-                    if (!d) return null;
-                    const url = d.iconUrl || d.url || d.iconKey && (d.iconKey) ? '' : '';
-                    return (
-                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <div style={{ width:48, height:48, border:'1px solid #263236', borderRadius:8, overflow:'hidden', display:'grid', placeItems:'center' }}>
-                          {d && d.iconKey ? <img src={d.iconUrl || d.icon || ''} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ color:'#9fb0bf' }}>{d.title?.charAt(0) || 'D'}</div>}
-                        </div>
-                        <div style={{ color:'#9fb0bf' }}>{d.title || d.name || d.key}</div>
-                        <div style={{ marginLeft:'auto' }}>
-                          <button style={styles.smallButton} onClick={()=>removeDeviceForSide(sideKey)}>Clear</button>
-                        </div>
+        <div className={styles.deviceGrid}>
+          <div className={styles.deviceColumn}>
+            <div className={styles.label}>Trigger Device</div>
+            {loadingDevices ? (
+              <div className={styles.helpText}>Loading devices…</div>
+            ) : hasDevices ? (
+              <div className={styles.deviceColumn}>
+                <select className={styles.select} value={deviceId || ""} onChange={(e)=>chooseDeviceForSide(sideKey, e.target.value)}>
+                  <option value="">(Choose device…)</option>
+                  {devices.map((d, i)=>{
+                    const id = d.id || d.key || d._id || String(i);
+                    const label = d.title || d.name || d.key || id;
+                    return <option key={id} value={id}>{label} — {d.type || d.deviceType || ''}</option>;
+                  })}
+                </select>
+                {deviceId && (()=>{
+                  const d = devices.find(x => (x.id||x.key||x._id) === deviceId);
+                  if (!d) return null;
+                  return (
+                    <div className={styles.devicePreviewRow}>
+                      <div className={styles.deviceThumbnail}>
+                        {d.iconUrl || d.icon ? (
+                          <img src={d.iconUrl || d.icon || ''} alt="" />
+                        ) : (
+                          <span>{(d.title || d.name || 'D').charAt(0)}</span>
+                        )}
                       </div>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div style={{ color:'#9fb0bf' }}>No devices available. Create a device in the Devices tab first.</div>
-              )
+                      <div>{d.title || d.name || d.key}</div>
+                      <button type="button" className={classNames(styles.smallButton, styles.clearButton)} onClick={()=>removeDeviceForSide(sideKey)}>Clear</button>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className={styles.helpText}>No devices available. Create a device in the Devices tab first.</div>
             )}
           </div>
-
-          {/* arrows and ordering hint (non-destructive — this component doesn't reorder devices list - that is managed on the Devices tab) */}
-          <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Device list actions</div>
-            <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
-              <button style={styles.smallButton} title="Move selected device up">▲</button>
-              <button style={styles.smallButton} title="Move selected device down">▼</button>
+          <div className={styles.deviceActions}>
+            <div className={styles.label}>Device list actions</div>
+            <div className={styles.deviceActionButtons}>
+              <button type="button" className={styles.smallButton} title="Move selected device up">▲</button>
+              <button type="button" className={styles.smallButton} title="Move selected device down">▼</button>
             </div>
-            <div style={{ fontSize:11, color:'#9fb0bf', marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
+            <div className={styles.helpText}>Note: Use the Devices tab to permanently reorder devices.</div>
           </div>
         </div>
 
-        <hr style={{ border:'1px solid #0f2527', margin:'12px 0' }} />
+        <hr className={styles.divider} />
 
-        {/* Media selector area */}
-        <div ref={dropRef} style={{ border:'1px dashed #123033', borderRadius:8, padding:10, background:'#061015' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
-            <div style={{ fontWeight:600 }}>{title} — Media</div>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              <select style={styles.selectSmall} value={mediaFilter} onChange={(e)=>setMediaFilter(e.target.value)} disabled={!enabled}>
+        <div ref={dropRef} className={styles.mediaDrop}>
+          <div className={styles.mediaHeader}>
+            <div className={styles.headerTitle}>{title} — Media</div>
+            <div className={styles.mediaControls}>
+              <select className={styles.selectSmall} value={mediaFilter} onChange={(e)=>setMediaFilter(e.target.value)} disabled={!enabled}>
                 <option value="auto">Auto (all)</option>
                 <option value="image">Images</option>
                 <option value="video">Videos</option>
@@ -273,8 +271,8 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <option value="other">Other</option>
               </select>
               <input
+                className={styles.inputSmall}
                 placeholder="Paste URL to assign…"
-                style={styles.inputSmall}
                 disabled={!enabled}
                 onKeyDown={async (e)=>{
                   if (e.key === 'Enter') {
@@ -290,11 +288,11 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
           {enabled ? (
             <>
-              <div style={{ display:'flex', gap:12, alignItems:'stretch', flexWrap:'wrap' }}>
-                <div style={{ flex:'1 1 260px', position:'relative' }}>
+              <div className={styles.mediaBody}>
+                <div className={styles.mediaPickerContainer}>
                   <button
                     type="button"
-                    style={{ ...styles.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
+                    className={classNames(styles.button, styles.mediaPickerTrigger)}
                     onClick={()=>setOpenPicker(prev => prev === sideKey ? '' : sideKey)}
                   >
                     <span>{(() => {
@@ -303,12 +301,12 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                       const match = filteredInventory().find(it => toDirectMediaURL(it.url || it.path || it) === selectedUrl);
                       return match?.label || baseNameFromUrl(selectedUrl);
                     })()}</span>
-                    <span style={{ opacity:0.6 }}>▾</span>
+                    <span className={styles.pickerIndicator}>▾</span>
                   </button>
                   {openPicker === sideKey && (
-                    <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid #123033', borderRadius:10, background:'#050d11', boxShadow:'0 18px 30px rgba(0,0,0,0.5)' }}>
+                    <div className={styles.mediaPickerPopover}>
                       {filteredInventory().length === 0 ? (
-                        <div style={{ padding:12, color:'#9fb0bf' }}>No media available. Upload a file below.</div>
+                        <div className={styles.mediaPickerEmpty}>No media available. Upload a file below.</div>
                       ) : filteredInventory().map((it, idx) => {
                         const raw = it.url || it.path || it;
                         const url = toDirectMediaURL(raw);
@@ -316,21 +314,30 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                         return (
                           <div
                             key={idx}
+                            className={styles.mediaPickerItem}
+                            role="button"
+                            tabIndex={0}
                             onClick={()=>{
                               chooseMediaForSide(sideKey, url);
                               setOpenPicker('');
                             }}
-                            style={{ display:'grid', gridTemplateColumns:'56px 1fr', gap:10, alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid #123033' }}
+                            onKeyDown={(event)=>{
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                chooseMediaForSide(sideKey, url);
+                                setOpenPicker('');
+                              }
+                            }}
                           >
-                            <div style={{ width:56, height:42, borderRadius:8, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
-                              {(kind === 'image' || kind === 'gif') && <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />}
-                              {kind === 'video' && <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />}
-                              {kind === 'audio' && <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>}
-                              {kind === 'other' && <div style={{ fontSize:12, color:'#9fb0bf' }}>{(it.label||'file').slice(0,8)}</div>}
+                            <div className={styles.mediaThumb}>
+                              {(kind === 'image' || kind === 'gif') && <img src={url} alt="" />}
+                              {kind === 'video' && <video src={url} muted playsInline />}
+                              {kind === 'audio' && <div>Audio</div>}
+                              {kind === 'other' && <div>{(it.label || 'file').slice(0, 8)}</div>}
                             </div>
                             <div>
-                              <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.label || baseNameFromUrl(url)}</div>
-                              <div style={{ fontSize:12, color:'#9fb0bf' }}>{kind}</div>
+                              <div className={styles.mediaItemTitle}>{it.label || baseNameFromUrl(url)}</div>
+                              <div className={styles.mediaItemMeta}>{kind}</div>
                             </div>
                           </div>
                         );
@@ -340,38 +347,36 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 </div>
 
                 {(mediaUrl || audioUrl) && (
-                  <div style={{ flex:'0 0 140px', border:'1px solid #123033', borderRadius:10, overflow:'hidden', background:'#050d11', display:'grid', placeItems:'center' }}>
+                  <div className={styles.mediaPreview}>
                     {(() => {
                       const current = mediaUrl || audioUrl || '';
                       const kind = classifyByExt(current);
-                      if (kind === 'image' || kind === 'gif') return <img src={current} alt="selected" style={{ width:'100%', height:'100%', objectFit:'cover' }} />;
-                      if (kind === 'video') return <video src={current} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />;
-                      if (kind === 'audio') return <div style={{ fontSize:12, color:'#9fb0bf', padding:8 }}>Audio attached</div>;
-                      return <div style={{ fontSize:12, color:'#9fb0bf', padding:8 }}>{baseNameFromUrl(current)}</div>;
+                      if (kind === 'image' || kind === 'gif') return <img src={current} alt="selected" />;
+                      if (kind === 'video') return <video src={current} muted playsInline />;
+                      if (kind === 'audio') return <div>Audio attached</div>;
+                      return <div>{baseNameFromUrl(current)}</div>;
                     })()}
                   </div>
                 )}
               </div>
 
               {selectedPreviewUrl && (
-                <div style={{ marginTop:10 }}>
-                  <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Preview</div>
-                  {classifyByExt(selectedPreviewUrl) === 'image' || classifyByExt(selectedPreviewUrl) === 'gif' ? (
-                    <img src={selectedPreviewUrl} alt="preview" style={{ width:'100%', maxHeight:220, objectFit:'contain', borderRadius:8 }} />
-                  ) : classifyByExt(selectedPreviewUrl) === 'video' ? (
-                    <video src={selectedPreviewUrl} controls style={{ width:'100%', maxHeight:260, borderRadius:8 }} />
-                  ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
-                    <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
-                  ) : (
-                    <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
-                  )}
+                <div className={styles.previewSection}>
+                  <div className={styles.previewTitle}>Preview</div>
+                  {(() => {
+                    const kind = classifyByExt(selectedPreviewUrl);
+                    if (kind === 'image' || kind === 'gif') return <img src={selectedPreviewUrl} alt="preview" className={styles.previewImage} />;
+                    if (kind === 'video') return <video src={selectedPreviewUrl} controls className={styles.previewVideo} />;
+                    if (kind === 'audio') return <audio src={selectedPreviewUrl} controls className={styles.audioPlayer} />;
+                    return <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" className={styles.mediaLink}>{selectedPreviewUrl}</a>;
+                  })()}
                 </div>
               )}
 
-              <div style={{ marginTop:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <label style={{ ...styles.button, display:'inline-grid', placeItems:'center' }}>
+              <div className={styles.uploadRow}>
+                <label className={styles.fileButton}>
                   Choose file
-                  <input type="file" style={{ display:'none' }} onChange={async (e)=>{
+                  <input type="file" className={styles.hiddenInput} onChange={async (e)=>{
                     const f = e.target.files?.[0]; if (!f) return;
                     const url = await uploadFileAsMedia(f, 'uploads');
                     if (url) {
@@ -380,13 +385,13 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   }} />
                 </label>
 
-                <div style={{ color:'#9fb0bf', fontSize:12 }}>
+                <div className={styles.helpText}>
                   Or drag & drop a file onto this box to upload and assign.
                 </div>
               </div>
             </>
           ) : (
-            <div style={{ marginTop:8, color:'#9fb0bf', fontSize:12 }}>Enable Engage Response to attach media options.</div>
+            <div className={styles.helpText}>Enable Engage Response to attach media options.</div>
           )}
         </div>
       </div>
@@ -394,17 +399,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   }
 
   return (
-    <div style={{ marginTop:12 }}>
+    <div className={styles.wrapper}>
       <ResponseEditor sideKey="onCorrect" title="Correct Response" />
       <ResponseEditor sideKey="onWrong" title="Wrong Response" />
     </div>
   );
 }
-
-const styles = {
-  select: { width: "100%", padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  selectSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  inputSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2", width:240 },
-  smallButton: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" },
-  button: { padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" }
-};

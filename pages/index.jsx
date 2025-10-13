@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
+import DevicesList from '../components/DevicesList';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -1009,6 +1010,12 @@ useEffect(()=>{
     if (!key) return '';
     const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
     return it?.url || '';
+  }
+  function deviceThumbnailUrl(device) {
+    if (!device) return '';
+    const iconUrl = device.iconKey ? deviceIconUrlFromKey(device.iconKey) : '';
+    const raw = iconUrl || device.thumbnailUrl || '';
+    return raw ? toDirectMediaURL(raw) : '';
   }
   function missionIconUrlFromKey(key) {
     if (!key) return '';
@@ -2069,58 +2076,15 @@ useEffect(()=>{
               )}
             </div>
 
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              {(devices||[]).map((x,i)=>{
-                const iconUrl = x.iconKey ? deviceIconUrlFromKey(x.iconKey) : '';
-                const selected = selectedDevIdx === i;
-                const hasCoords = typeof x.lat === 'number' && typeof x.lng === 'number';
-                return (
-                  <div
-                    key={x.id||i}
-                    onClick={()=>openDeviceEditor(i)}
-                    style={{
-                      display:'grid',
-                      gridTemplateColumns:'56px 1fr auto',
-                      gap:12,
-                      alignItems:'center',
-                      padding:12,
-                      borderRadius:12,
-                      border:`1px solid ${selected ? 'rgba(45, 212, 191, 0.35)' : 'var(--admin-border-soft)'}`,
-                      background:selected ? 'var(--admin-tab-active-bg)' : 'var(--admin-panel-bg)',
-                      cursor:'pointer',
-                    }}
-                  >
-                    <div style={{ width:52, height:52, borderRadius:10, background:'var(--admin-panel-bg)', border:'1px solid var(--admin-border-soft)', display:'grid', placeItems:'center', overflow:'hidden' }}>
-                      {iconUrl
-                        ? <img alt={x.title || 'device icon'} src={toDirectMediaURL(iconUrl)} style={{ width:'100%', height:'100%', objectFit:'contain' }}/>
-                        : <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'6px 4px' }}>{(x.type||'D').slice(0,1).toUpperCase()}</div>}
-                    </div>
-                    <div>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                        <div style={{ fontWeight:600 }}>{`D${i+1}`} — {x.title || '(untitled)'}</div>
-                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{hasCoords ? `${Number(x.lat).toFixed(4)}, ${Number(x.lng).toFixed(4)}` : 'Not placed'}</div>
-                      </div>
-                      <div style={{ marginTop:6, display:'flex', gap:8, flexWrap:'wrap', fontSize:12 }}>
-                        <span style={S.chip}>{x.type}</span>
-                        <span style={S.chip}>Radius {x.pickupRadius} m</span>
-                        <span style={S.chip}>Effect {x.effectSeconds}s</span>
-                      </div>
-                    </div>
-                    <div onClick={(e)=>e.stopPropagation()} style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button title="Move up" style={{ ...S.button, padding:'6px 10px' }} disabled={i===0} onClick={()=>moveDevice(i,-1)}>▲</button>
-                        <button title="Move down" style={{ ...S.button, padding:'6px 10px' }} disabled={i===(devices?.length||0)-1} onClick={()=>moveDevice(i,+1)}>▼</button>
-                      </div>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button title="Duplicate" style={{ ...S.button, padding:'6px 10px' }} onClick={()=>duplicateDevice(i)}>⧉</button>
-                        <button title="Delete" style={{ ...S.button, ...S.buttonDanger, padding:'6px 10px' }} onClick={()=>deleteDevice(i)}>🗑</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
+            <DevicesList
+              devices={devices || []}
+              selectedId={selectedDevIdx ?? undefined}
+              onSelect={(_, index) => openDeviceEditor(index)}
+              onReorder={(_, direction, index) => moveDevice(index, direction)}
+              onDuplicate={(_, index) => duplicateDevice(index)}
+              onDelete={(_, index) => deleteDevice(index)}
+              getIconUrl={(device) => deviceThumbnailUrl(device)}
+            />
           </aside>
 
           <section style={{ position:'relative' }}>

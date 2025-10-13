@@ -42,3 +42,6 @@ Update Notes
 - Commit `390ad54` adds local filesystem fallbacks for `/api/config` and `/api/games`, removes the duplicate `pages/index.js`
   entry, and fixes the admin hook order so the panel no longer crashes when data finishes loading. Direct links: `pages/api/config.js`,
   `pages/api/games.js`, and `pages/index.jsx`.
+- Commit `6f3b8b4` integrates the themed DevicesList and InlineMissionResponses into the admin dashboard, moving both views to
+  CSS modules with keyboard navigation and wiring them into `pages/index.jsx`. Direct links: `components/DevicesList.jsx`,
+  `components/InlineMissionResponses.jsx`, and `pages/index.jsx`.
