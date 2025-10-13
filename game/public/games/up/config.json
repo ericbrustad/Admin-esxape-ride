@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "up",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "up"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1

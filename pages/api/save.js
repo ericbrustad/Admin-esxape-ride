@@ -1,5 +1,6 @@
 // pages/api/save.js
 // Save draft missions to Admin + mirror to Game. Robust against concurrent SHA changes.
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 export const config = { api: { bodyParser: true } };
 
@@ -84,22 +85,26 @@ export default async function handler(req, res) {
     if (slug) {
       // Write sequentially (avoid SHA flapping)
       const rootDraft = joinPath(`public/games/${slug}/draft/missions.json`);
-      const gameDraft = joinPath(`game/public/games/${slug}/draft/missions.json`);
 
       await putFileWithRetry(rootDraft, text, `save(draft missions): ${slug}`);
       wrote.push(rootDraft);
 
-      await putFileWithRetry(gameDraft, text, `save(game draft missions): ${slug}`);
-      wrote.push(gameDraft);
+      if (GAME_ENABLED) {
+        const gameDraft = joinPath(`game/public/games/${slug}/draft/missions.json`);
+        await putFileWithRetry(gameDraft, text, `save(game draft missions): ${slug}`);
+        wrote.push(gameDraft);
+      }
     } else {
       const root = joinPath(`public/draft/missions.json`);
-      const game = joinPath(`game/public/draft/missions.json`);
 
       await putFileWithRetry(root, text, `save(legacy missions)`);
       wrote.push(root);
 
-      await putFileWithRetry(game, text, `save(game legacy missions)`);
-      wrote.push(game);
+      if (GAME_ENABLED) {
+        const game = joinPath(`game/public/draft/missions.json`);
+        await putFileWithRetry(game, text, `save(game legacy missions)`);
+        wrote.push(game);
+      }
     }
 
     res.json({ ok: true, slug: slug || null, wrote });

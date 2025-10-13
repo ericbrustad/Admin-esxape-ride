@@ -1,4 +1,6 @@
 // pages/api/game/[slug].js
+import { GAME_ENABLED } from '../../../lib/game-switch.js';
+
 export const config = { api: { bodyParser: true } };
 
 const {
@@ -54,6 +56,9 @@ async function putFileWithRetry(path, contentText, message, attempts = 3) {
 
 export default async function handler(req, res) {
   try {
+    if (!GAME_ENABLED) {
+      return res.status(403).json({ ok: false, error: 'Game project disabled' });
+    }
     if (req.method !== 'POST') return res.status(405).send('POST only');
 
     const slug = String(req.query.slug || '').trim();
@@ -71,6 +76,14 @@ export default async function handler(req, res) {
     await putFileWithRetry(gamePubM, draftM.text, `publish(${slug}): game missions.json`);
     await putFileWithRetry(gamePubC, draftC.text, `publish(${slug}): game config.json`);
     wrote.push(gamePubM, gamePubC);
+
+    if (slug === 'default') {
+      const legacyPubM = joinPath('game/public/missions.json');
+      const legacyPubC = joinPath('game/public/config.json');
+      await putFileWithRetry(legacyPubM, draftM.text, 'publish(default legacy missions.json)');
+      await putFileWithRetry(legacyPubC, draftC.text, 'publish(default legacy config.json)');
+      wrote.push(legacyPubM, legacyPubC);
+    }
 
     // optional: keep an index.json under root for admin lists (unchanged)
 

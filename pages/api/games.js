@@ -1,6 +1,7 @@
 // pages/api/games.js
 // ------------------
 // [1] GitHub API config + helpers
+import { GAME_ENABLED } from '../../lib/game-switch.js';
 const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
@@ -64,11 +65,14 @@ function defaultSuite(title, type) {
   };
 }
 
-function defaultConfig(title, gameType, mode = 'single') {
+function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
+  const normSlug = (slugTag || slugify(title)).toLowerCase();
+  const tags = normSlug ? [normSlug] : [];
+  if (normSlug === 'default' && !tags.includes('default-game')) tags.push('default-game');
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
-    game: { title, type: gameType || 'Mystery' },
+    game: { title, type: gameType || 'Mystery', tags, coverImage: '' },
     forms: { players },              // 1 | 2 | 4
     textRules: []
   };
@@ -76,6 +80,11 @@ function defaultConfig(title, gameType, mode = 'single') {
 
 // [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
+  if (!GAME_ENABLED) {
+    if (req.method === 'GET') return res.json({ ok: true, games: [] });
+    return res.status(403).json({ ok: false, error: 'Game project disabled' });
+  }
+
   if (!token || !owner || !repo) {
     return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
   }
@@ -105,7 +114,7 @@ export default async function handler(req, res) {
 
       // create suite + config
       const suite  = defaultSuite(title, type);
-      const config = defaultConfig(title, type, mode);
+      const config = defaultConfig(title, type, mode, slug);
 
       await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
         `feat: create game ${slug} missions.json`);

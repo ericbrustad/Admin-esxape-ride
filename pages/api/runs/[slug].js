@@ -1,6 +1,7 @@
 // pages/api/runs/[slug].js
 // Stores a run record. If body.session is present => partial save to runs/sessions/<session>.json
 // If no session => final run to runs/<timestamp>.json (also mirrored to game/ for production reads)
+import { GAME_ENABLED } from '../../../lib/game-switch.js';
 
 export const config = { api: { bodyParser: true } };
 
@@ -87,15 +88,19 @@ export default async function handler(req, res) {
     if (session) {
       // Partial: write to runs/sessions/<session>.json (mirrored to game/)
       const rootPath = joinPath(`public/games/${slug}/runs/sessions/${session}.json`);
-      const gamePath = joinPath(`game/public/games/${slug}/runs/sessions/${session}.json`);
       await putFile(rootPath, text, `run(partial ${slug}): ${session}`); wrote.push(rootPath);
-      await putFile(gamePath, text, `run(partial ${slug} game): ${session}`); wrote.push(gamePath);
+      if (GAME_ENABLED) {
+        const gamePath = joinPath(`game/public/games/${slug}/runs/sessions/${session}.json`);
+        await putFile(gamePath, text, `run(partial ${slug} game): ${session}`); wrote.push(gamePath);
+      }
     } else {
       // Final: write to runs/<timestamp>.json (mirrored to game/)
       const rootPath = joinPath(`public/games/${slug}/runs/${stamp}.json`);
-      const gamePath = joinPath(`game/public/games/${slug}/runs/${stamp}.json`);
       await putFile(rootPath, text, `run(${slug}): ${stamp}`); wrote.push(rootPath);
-      await putFile(gamePath, text, `run(${slug} game): ${stamp}`); wrote.push(gamePath);
+      if (GAME_ENABLED) {
+        const gamePath = joinPath(`game/public/games/${slug}/runs/${stamp}.json`);
+        await putFile(gamePath, text, `run(${slug} game): ${stamp}`); wrote.push(gamePath);
+      }
     }
 
     return res.json({ ok:true, slug, wrote, id: session || stamp });

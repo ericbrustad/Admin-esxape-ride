@@ -1,5 +1,5 @@
 {
-  "version": "0.0.4",
+  "version": "0.0.1",
   "missions": [
     {
       "id": "m01",
@@ -30,69 +30,6 @@
       "wrong": {
         "mode": "none"
       },
-      "showContinue": true
-    },
-    {
-      "id": "m02",
-      "title": "New Mission",
-      "type": "multiple_choice",
-      "iconKey": "trivia-2",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "none"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "question": "acaaccac",
-        "choices": [
-          "ac",
-          "aac",
-          "c"
-        ],
-        "correctIndex": 0,
-        "mediaUrl": "",
-        "geofenceEnabled": true,
-        "lat": "",
-        "lng": "",
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false,
-      "showContinue": true
-    },
-    {
-      "id": "m03",
-      "title": "New Mission",
-      "type": "multiple_choice",
-      "iconKey": "trivia-2",
-      "rewards": {
-        "points": 25
-      },
-      "correct": {
-        "mode": "none"
-      },
-      "wrong": {
-        "mode": "none"
-      },
-      "content": {
-        "question": "c c ",
-        "choices": [
-          "c",
-          "c"
-        ],
-        "correctIndex": 1,
-        "mediaUrl": "",
-        "geofenceEnabled": false,
-        "lat": "",
-        "lng": "",
-        "radiusMeters": 25,
-        "cooldownSeconds": 30
-      },
-      "appearanceOverrideEnabled": false,
       "showContinue": true
     }
   ]
