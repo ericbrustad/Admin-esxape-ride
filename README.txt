@@ -8,6 +8,9 @@ Device & Response UI Package
   - Direct link: `lib/admin-shared.js`
   - Direct link: `public/media/skins/`
   - Notes: Re-exports tone helpers so the admin password switch loads without build errors and ships the 12 themed skin backgrounds so the default skin stays legible while the game-side password remains disabled.
+- 2025-10-15 — Admin basic auth obeys toggle. Commit: b9d9bbffb5254cbd710aa5545454370d4ec1cb48.
+  - Direct link: `middleware.js`
+  - Notes: Middleware now checks `/admin-protection.json` before challenging, allowing the password switch to disable prompts while keeping caching for quick reads.
 
 Files included (drop into your Next.js project or use as reference):
 
