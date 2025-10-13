@@ -5,7 +5,7 @@
   },
   "game": {
     "title": "DEFAULT",
-    "type": "Mystery",
+    "type": "Chase",
     "tags": [
       "default",
       "default-game"
@@ -20,52 +20,8 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "n",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 730,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": false,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.982771,
-      "lng": -93.283024
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "n",
-      "type": "smoke",
-      "iconKey": "smoke-shield",
-      "pickupRadius": 730,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": false,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.982771,
-      "lng": -93.283024
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -114,31 +70,16 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Merriweather Sans\", \"Gill Sans\", \"Segoe UI\", sans-serif",
-    "fontSizePx": 24,
-    "fontColor": "#20331e",
-    "textBgColor": "#f2faed",
-    "textBgOpacity": 0.76,
-    "screenBgColor": "#dcedd2",
-    "screenBgOpacity": 0.5,
-    "screenBgImage": "/media/skins/forest-meadow.svg",
-    "screenBgImageEnabled": true,
-    "textAlign": "left",
-    "textVertical": "top",
-    "panelDepth": true
-  },
-  "appearanceSkin": "forest-meadow",
-  "appearanceTone": "light",
-  "mediaTriggers": {
-    "enabled": false,
-    "actionType": "media",
-    "actionTarget": "",
-    "actionLabel": "",
-    "actionThumbnail": "",
-    "triggerDeviceId": "",
-    "triggerDeviceLabel": "",
-    "triggeredResponseKey": "",
-    "triggeredMissionId": ""
+    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    "fontSizePx": 22,
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top"
   },
   "map": {
     "centerLat": 44.9778,
