@@ -1,6 +1,13 @@
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-14 — Admin password switch locked off in UI & API. Commit: abdaadb670605dda0912e29d49f6ab1e7fdfc799.
+  - Direct link: `pages/api/admin-protection.js`
+  - Direct link: `pages/index.jsx`
+  - Notes: Forces admin protection endpoints to return a locked-off state and disables the dashboard toggle so the password switch stays off.
+- 2025-10-15 — Export admin appearance helpers for UI theming. Commit: 26a69fd4208aed4fe0368bf62170261684299bb3.
+  - Direct link: `lib/admin-shared.js`
+  - Notes: Adds normalizeTone, appearanceBackgroundStyle, and surfaceStylesFromAppearance exports so the dashboard can theme itself without build warnings.
 - 2025-10-13 — Admin password protection API fix. Commit: 6ff58c6ee5795a7ee78809f83e5d6b0ffa597ead.
   - Direct link: `pages/api/admin-protection.js`
   - Notes: Restores the admin password toggle endpoint and always keeps the game password state off.

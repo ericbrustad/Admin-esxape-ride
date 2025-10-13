@@ -711,7 +711,15 @@ useEffect(()=>{
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (res.ok) {
-          setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+          const locked = !!data.locked;
+          const enabled = locked ? false : !!data.protected;
+          setProtectionState({
+            enabled,
+            loading: false,
+            saving: false,
+            updatedAt: data.updatedAt || null,
+            locked,
+          });
           setProtectionError('');
         } else {
           throw new Error(data?.error || 'Failed to load protection status');
@@ -786,7 +794,7 @@ useEffect(()=>{
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, locked: false });
   const [protectionError, setProtectionError] = useState('');
 
   // Combined Save & Publish
@@ -1466,6 +1474,10 @@ useEffect(()=>{
   }
 
   async function toggleProtection() {
+    if (protectionState.locked) {
+      setStatus('ℹ️ Admin password protection is locked off and cannot be enabled.');
+      return;
+    }
     const target = !protectionState.enabled;
     setProtectionError('');
     setProtectionState(prev => ({ ...prev, saving: true }));
@@ -1480,8 +1492,16 @@ useEffect(()=>{
       if (!res.ok) {
         throw new Error(data?.error || res.statusText || 'Toggle failed');
       }
-      setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
-      setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
+      const locked = !!data.locked;
+      const enabled = locked ? false : !!data.protected;
+      setProtectionState({
+        enabled,
+        loading: false,
+        saving: false,
+        updatedAt: data.updatedAt || null,
+        locked,
+      });
+      setStatus(locked ? 'ℹ️ Admin password protection is locked off.' : `✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
     } catch (err) {
       setProtectionState(prev => ({ ...prev, saving: false }));
       const msg = err?.message || 'Toggle failed';
@@ -1660,8 +1680,6 @@ useEffect(()=>{
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(config.appearanceTone);
-  const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
-  const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
@@ -1738,6 +1756,27 @@ useEffect(()=>{
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
+  const protectionLocked = !!protectionState.locked;
+  const protectionIndicatorColor = protectionState.loading
+    ? 'var(--admin-muted)'
+    : protectionLocked
+      ? 'var(--admin-muted)'
+      : protectionState.enabled
+        ? 'var(--admin-success-color)'
+        : 'var(--admin-danger-color)';
+  const protectionIndicatorLabel = protectionState.loading
+    ? 'Checking…'
+    : protectionLocked
+      ? 'Locked Off'
+      : protectionState.enabled
+        ? 'Protected'
+        : 'Not Protected';
+  const protectionToggleLabel = protectionLocked
+    ? 'Protection Locked Off'
+    : protectionState.enabled
+      ? 'Disable Protection'
+      : 'Enable Protection';
+
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
   const headerStyle = coverImageUrl
@@ -1777,21 +1816,28 @@ useEffect(()=>{
                 }}
               >
                 <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', background:'currentColor', boxShadow:'0 0 12px currentColor' }} />
-                {protectionState.loading ? 'Checking…' : protectionState.enabled ? 'Protected' : 'Not Protected'}
+                {protectionIndicatorLabel}
               </div>
               <button
                 onClick={toggleProtection}
-                disabled={protectionState.saving || protectionState.loading}
+                disabled={protectionState.saving || protectionState.loading || protectionLocked}
                 style={{
                   ...S.button,
-                  ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                  ...(protectionLocked
+                    ? S.buttonDisabled
+                    : (protectionState.enabled ? S.buttonDanger : S.buttonSuccess)),
                   minWidth: 180,
-                  opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
+                  opacity: (protectionState.saving || protectionState.loading || protectionLocked) ? 0.7 : 1,
                 }}
               >
                 {protectionState.saving ? 'Updating…' : protectionToggleLabel}
               </button>
             </div>
+            {protectionLocked && !protectionState.loading && (
+              <div style={{ color: 'var(--admin-muted)', fontSize: 12, marginTop: -6 }}>
+                Password protection is permanently disabled for this deployment.
+              </div>
+            )}
           </div>
           {protectionError && (
             <div style={{ color: 'var(--admin-danger-color)', fontSize: 12, marginBottom: 12 }}>
@@ -3238,6 +3284,12 @@ const S = {
     border: 'var(--admin-success-border)',
     background: 'var(--admin-success-bg)',
     color: 'var(--admin-body-color)',
+  },
+  buttonDisabled: {
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    color: 'var(--admin-muted)',
+    cursor: 'not-allowed',
   },
   tab: {
     padding: '8px 12px',

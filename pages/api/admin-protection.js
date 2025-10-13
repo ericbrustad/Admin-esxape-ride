@@ -37,27 +37,42 @@ async function syncGameProtection(nowIso) {
   return nextState;
 }
 
+async function ensureAdminProtectionDisabled(forceTimestamp = null) {
+  const current = await readProtection(ADMIN_PROTECTION_PATH);
+  const updatedAt = forceTimestamp || current.updatedAt || new Date().toISOString();
+  const adminState = { protected: false, updatedAt };
+  const shouldRewrite =
+    forceTimestamp != null ||
+    current.protected ||
+    !current.updatedAt ||
+    current.updatedAt !== updatedAt;
+
+  if (shouldRewrite) {
+    await writeProtection(ADMIN_PROTECTION_PATH, adminState);
+  }
+
+  return adminState;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    const adminState = await readProtection(ADMIN_PROTECTION_PATH);
-    const gameState = await syncGameProtection(null);
+    const adminState = await ensureAdminProtectionDisabled(null);
+    const gameState = await syncGameProtection(adminState.updatedAt);
     return res.status(200).json({
-      protected: adminState.protected,
+      protected: false,
       updatedAt: adminState.updatedAt,
       gameProtected: !!gameState.protected,
       gameUpdatedAt: gameState.updatedAt,
+      locked: true,
     });
   }
 
   if (req.method === 'POST') {
     try {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const target = !!body.protected;
       const nowIso = new Date().toISOString();
-      const adminState = { protected: target, updatedAt: nowIso };
-      await writeProtection(ADMIN_PROTECTION_PATH, adminState);
-      const gameState = await syncGameProtection(nowIso);
-      return res.status(200).json({ ...adminState, gameProtected: gameState.protected });
+      const adminState = await ensureAdminProtectionDisabled(nowIso);
+      const gameState = await syncGameProtection(adminState.updatedAt);
+      return res.status(200).json({ ...adminState, gameProtected: gameState.protected, locked: true });
     } catch (err) {
       return res.status(400).json({ error: err?.message || 'Invalid request body' });
     }
