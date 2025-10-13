@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
+
+/* ---- Local normalizer to guarantee UI defaults ---- */
+function normalizeConfig(cfg) {
+  try {
+    const next = { ...(cfg || {}) };
+    next.ui = normalizeUi(next.ui || {});
+    return next;
+  } catch { return cfg || {}; }
+}
+
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import { GAME_ENABLED } from '../lib/game-switch';
@@ -314,6 +324,17 @@ export default function Admin() {
 
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
+
+  // Apply interface tone to <html> for global styles
+  useEffect(() => {
+    try {
+      const t = (config && config.ui && config.ui.interfaceTone) || 'dark';
+      if (typeof document !== 'undefined') {
+        document.documentElement.dataset.themeTone = t;
+      }
+    } catch {}
+  }, [config && config.ui && config.ui.interfaceTone]);
+
   const [status, setStatus] = useState('');
 
   const [selected, setSelected] = useState(null);
@@ -507,7 +528,7 @@ export default function Admin() {
         merged = normalizeGameMetadata(merged, slugForMeta);
 
         setSuite(normalized);
-        setConfig(merged);
+        setConfig(normalizeConfig(merged));
         setSelected(null); setEditing(null); setDirty(false);
         setSelectedDevIdx(null); setSelectedMissionIdx(null);
         setStatus('');
@@ -560,7 +581,7 @@ export default function Admin() {
       : `/api/save-bundle${qs({ slug })}`;
     const slugTag = isDefaultSlug(slug) ? 'default' : slug;
     const preparedConfig = normalizeGameMetadata(config, slugTag);
-    if (preparedConfig !== config) setConfig(preparedConfig);
+    if (preparedConfig !== config) setConfig(normalizeConfig(preparedConfig));
     try {
       const r = await fetch(url, {
         method: 'POST',
