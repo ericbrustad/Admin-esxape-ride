@@ -10,10 +10,14 @@
       "default",
       "default-game"
     ],
-    "coverImage": "/media/mediapool/1759645755326-sIGNAL_jAMMER.jpg"
+    "coverImage": "/media/mediapool/1759645755326-sIGNAL_jAMMER.jpg",
+    "enabled": false,
+    "folderEnabled": false
   },
   "forms": {
-    "players": 1
+    "players": 1,
+    "passwordEnabled": false,
+    "passwordToggle": false
   },
   "timer": {
     "durationMinutes": 0,
