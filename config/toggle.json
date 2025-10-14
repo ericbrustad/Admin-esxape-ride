@@ -1,0 +1,17 @@
+{
+  "switchToggle": {
+    "password": "AR-Toggle-Guard-2025!",
+    "defaultState": "off",
+    "verifiedIntact": true,
+    "lastVerifiedAt": "2025-10-14T02:09:21Z",
+    "notes": [
+      "Switch verified in off position prior to dependency realignment.",
+      "Leave the switch OFF unless override is approved.",
+      "2025-10-14T01:32:02Z UTC: Verification logged after aligning @react-three/fiber with React 18 peers.",
+      "2025-10-14T01:45:39Z UTC: OFF state reconfirmed while disabling optional binary dependencies via .npmrc.",
+      "2025-10-14T01:51:29Z UTC: Switch verified OFF after introducing local canvas stub override to block native builds.",
+      "2025-10-14T02:00:56Z UTC: OFF state reconfirmed after aligning dependencies with Vercel's Next.js detection.",
+      "2025-10-14T02:09:21Z UTC: OFF state validated after configuring Next.js operations console."
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "admin-esxape-ride",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Configuration and AR dependency manifest for Admin Escape Ride admin tools.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@react-three/fiber": "^8.15.17",
+    "mind-ar": "^1.2.2",
+    "next": "^14.2.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "three": "^0.165.0",
+    "zustand": "^4.5.0"
+  },
+  "overrides": {
+    "canvas": "file:stubs/canvas"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  }
+}

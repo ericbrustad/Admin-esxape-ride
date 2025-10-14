@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light dark;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+body {
+  margin: 0;
+  padding: 2rem;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+a {
+  color: #38bdf8;
+}
+
+a:hover,
+a:focus {
+  text-decoration: underline;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+header h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2.5rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.status-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.4);
+}
+
+.status-card h2 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.status-value {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+  color: #22d3ee;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.status-row dt {
+  font-weight: 600;
+}
+
+.status-row dd {
+  margin: 0;
+  font-family: 'Roboto Mono', monospace;
+}
+
+footer {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
