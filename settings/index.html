@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Settings</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="settings">
+      <header class="settings__header">
+        <h1>Administration Settings</h1>
+        <p class="settings__hint">
+          Manage protection, notification visibility, and feature toggles. Changes
+          persist locally for review.
+        </p>
+      </header>
+
+      <section class="settings__section" aria-labelledby="protection-heading">
+        <div class="settings__section-header">
+          <h2 id="protection-heading">Protection Controls</h2>
+          <p class="settings__section-description">
+            Protection can only be managed from this settings area.
+          </p>
+        </div>
+        <label class="toggle">
+          <span class="toggle__label">Protection Enabled</span>
+          <input id="protection-toggle" type="checkbox" />
+          <span class="toggle__slider" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section class="settings__section" aria-labelledby="notifications-heading">
+        <div class="settings__section-header">
+          <h2 id="notifications-heading">Notification Visibility</h2>
+          <p class="settings__section-description">
+            Toggle visibility for enable/disable notifications strictly within the settings page.
+          </p>
+        </div>
+        <fieldset class="radio-group" role="radiogroup" aria-describedby="notifications-heading">
+          <legend class="radio-group__legend">Notification State</legend>
+          <label class="radio">
+            <input type="radio" name="notifications" value="enabled" />
+            <span>Enabled</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="notifications" value="disabled" />
+            <span>Disabled</span>
+          </label>
+        </fieldset>
+      </section>
+
+      <section class="settings__section" aria-labelledby="game-heading">
+        <div class="settings__section-header">
+          <h2 id="game-heading">Game Folder</h2>
+          <p class="settings__section-description">
+            Keep the game folder access switched off by default.
+          </p>
+        </div>
+        <label class="toggle">
+          <span class="toggle__label">Game Folder Access</span>
+          <input id="game-toggle" type="checkbox" />
+          <span class="toggle__slider" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section class="settings__section" aria-labelledby="password-heading">
+        <div class="settings__section-header">
+          <h2 id="password-heading">Password Requirement</h2>
+          <p class="settings__section-description">
+            Ensure password enforcement is set to off while auditing settings.
+          </p>
+        </div>
+        <label class="toggle">
+          <span class="toggle__label">Require Password</span>
+          <input id="password-toggle" type="checkbox" />
+          <span class="toggle__slider" aria-hidden="true"></span>
+        </label>
+      </section>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>
