@@ -1,0 +1,70 @@
+{
+  "splash": {
+    "enabled": false,
+    "mode": "single"
+  },
+  "game": {
+    "enabled": false,
+    "title": "Untitled Game",
+    "type": "Mystery",
+    "tags": [
+      "default",
+      "default-game"
+    ],
+    "coverImage": ""
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 45,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "rewardsPool": [],
+    "penaltiesPool": []
+  },
+  "icons": {
+    "missions": [],
+    "devices": [],
+    "rewards": []
+  },
+  "appearance": {
+    "fontFamily": "\"Orbitron\", \"Rajdhani\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 26,
+    "fontColor": "#14253a",
+    "textBgColor": "#f3f8ff",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#d6e2f2",
+    "screenBgOpacity": 0.5,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top",
+    "screenBgImageEnabled": false
+  },
+  "appearanceSkin": "space-military",
+  "appearanceTone": "light",
+  "mediaTriggers": {
+    "enabled": false,
+    "actionType": "media",
+    "actionTarget": "",
+    "actionLabel": "",
+    "actionThumbnail": "",
+    "triggerDeviceId": "",
+    "triggerDeviceLabel": "",
+    "triggeredResponseKey": "",
+    "triggeredMissionId": ""
+  },
+  "map": {
+    "enabled": false,
+    "centerLat": 0,
+    "centerLng": 0,
+    "defaultZoom": 1
+  },
+  "geofence": {
+    "mode": "off"
+  }
+}

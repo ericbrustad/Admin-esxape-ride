@@ -1,0 +1,53 @@
+{
+  "id": "msuite_esx",
+  "version": "0.6.24",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m01",
+      "title": "New Mission",
+      "type": "short_answer",
+      "rewards": {
+        "points": 25
+      },
+      "content": {
+        "question": "hi",
+        "answer": "hello",
+        "acceptable": [
+          "hello",
+          "hi",
+          "hey"
+        ],
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": 0,
+        "lng": 0,
+        "radiusMeters": 0,
+        "cooldownSeconds": 0
+      },
+      "appearanceOverrideEnabled": false,
+      "appearance": {
+        "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+        "fontSizePx": 22,
+        "fontColor": "#ffffff",
+        "textBgColor": "#000000",
+        "textBgOpacity": 0,
+        "screenBgColor": "#000000",
+        "screenBgOpacity": 0,
+        "screenBgImage": "",
+        "textAlign": "center",
+        "textVertical": "top"
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "showContinue": true
+    }
+  ]
+}
