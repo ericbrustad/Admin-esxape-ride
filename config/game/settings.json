@@ -1,0 +1,10 @@
+{
+  "folder": "Game",
+  "enabled": false,
+  "status": "off",
+  "lastCheckedAt": "2025-10-14T01:25:42Z",
+  "notes": [
+    "Game folder intentionally disabled to keep experience offline until AR pipeline is validated.",
+    "2025-10-14T01:25:42Z UTC: Status confirmed during dependency remediation."
+  ]
+}
