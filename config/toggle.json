@@ -1,0 +1,12 @@
+{
+  "switchToggle": {
+    "password": "AR-Toggle-Guard-2025!",
+    "defaultState": "off",
+    "verifiedIntact": true,
+    "lastVerifiedAt": "2025-10-14T01:10:00Z",
+    "notes": [
+      "Switch verified in off position prior to updates.",
+      "Leave the switch OFF unless override is approved."
+    ]
+  }
+}
