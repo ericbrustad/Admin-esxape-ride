@@ -114,6 +114,27 @@ function SmallButton({ children, onClick, tone = 'primary' }) {
   );
 }
 
+function TagPill({ children }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '2px 8px',
+        borderRadius: 999,
+        background: 'var(--admin-chip-bg)',
+        border: 'var(--admin-border-soft)',
+        fontSize: 11,
+        color: 'var(--admin-muted)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+      }}
+    >
+      #{children}
+    </span>
+  );
+}
+
 export default function AssignedMediaTab({
   mediaPool = [],
   assigned = {},
@@ -199,6 +220,9 @@ export default function AssignedMediaTab({
           const firstId = details.ids[0];
           const media = idToObj(firstId);
           const openUrl = media.openUrl || media.url || media.id || firstId || normalized;
+          const tags = Array.isArray(media.tags)
+            ? Array.from(new Set(media.tags.map((tag) => String(tag || '').trim()).filter(Boolean)))
+            : [];
           return {
             url: openUrl,
             label: media.name || media.id || 'Action media',
@@ -206,6 +230,7 @@ export default function AssignedMediaTab({
             references: [],
             kind: media.type || '',
             thumbUrl: media.thumbUrl || openUrl,
+            tags,
             removeKey: normalized,
           };
         });
@@ -216,6 +241,7 @@ export default function AssignedMediaTab({
     noun,
     allowRemove = false,
     onRemove = () => {},
+    showTags = false,
   } = {}) {
     const source = Array.isArray(items) ? items : [];
     const filtered = source.filter((item) => (item?.count || 0) > 0);
@@ -238,6 +264,9 @@ export default function AssignedMediaTab({
               const overflow = item.references && item.references.length > 3
                 ? ` +${item.references.length - 3}`
                 : '';
+              const tags = showTags && Array.isArray(item.tags)
+                ? Array.from(new Set(item.tags.map((tag) => String(tag || '').trim()).filter(Boolean)))
+                : [];
               return (
                 <div
                   key={item.url}
@@ -279,6 +308,13 @@ export default function AssignedMediaTab({
                       {referencePreview.length > 0 && (
                         <div style={{ marginTop: 4, fontSize: 11, color: 'var(--admin-muted)' }}>
                           {referencePreview.join(', ')}{overflow}
+                        </div>
+                      )}
+                      {tags.length > 0 && (
+                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {tags.map((tag) => (
+                            <TagPill key={`${item.url}-tag-${tag}`}>{tag}</TagPill>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -357,18 +393,22 @@ export default function AssignedMediaTab({
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',
           noun: 'mission',
+          showTags: true,
         })}
         {renderUsageSection('Device Media', deviceUsage, {
           emptyLabel: 'No device media assigned.',
           noun: 'device',
+          showTags: true,
         })}
         {renderUsageSection('Rewards Pool Media', rewardUsage, {
           emptyLabel: 'Rewards pool is empty.',
           noun: 'reward slot',
+          showTags: true,
         })}
         {renderUsageSection('Penalties Pool Media', penaltyUsage, {
           emptyLabel: 'Penalties pool is empty.',
           noun: 'penalty slot',
+          showTags: true,
         })}
         {renderUsageSection('Response Media — Correct', responseCorrectUsage, {
           emptyLabel: 'No mission response media for correct answers.',

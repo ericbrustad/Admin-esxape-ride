@@ -2063,19 +2063,46 @@ useEffect(()=>{
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
                   <div style={S.floatingBarTop}>
-                    <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
-                      Save and Close
-                    </button>
-                    <div style={{ textAlign:'center', flex:1, margin:'0 16px' }}>
-                      <h3 style={{ margin:'0', fontSize:18 }}>Edit Mission</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
+                        Save and Close
+                      </button>
+                      <div style={{ fontSize: 12, color: 'var(--admin-muted)', fontWeight: 600 }}>
+                        ID:
+                        <span style={{ marginLeft: 6, fontFamily: 'var(--admin-font-mono, ui-monospace)' }}>
+                          {editing.id || '—'}
+                        </span>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        flex: 1,
+                        margin: '0 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <h3 style={{ margin: '0', fontSize: 18 }}>
+                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                      </h3>
+                      <input
+                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
+                        value={editing.title || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, title: e.target.value });
+                          setDirty(true);
+                        }}
+                        placeholder="Mission title"
+                      />
                     </div>
                     <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
                       Cancel and Close
                     </button>
                   </div>
 
-                  <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
-                  <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
@@ -3338,6 +3365,7 @@ const S = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
+    flexWrap: 'wrap',
     padding: '12px 0',
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     borderBottom: '1px solid var(--admin-border-soft)',
@@ -4111,20 +4139,42 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         .filter(Boolean)
     );
 
+    const addTagValue = (set, value) => {
+      if (!set) return;
+      const normalizedTag = String(value || '').trim();
+      if (!normalizedTag) return;
+      set.add(normalizedTag);
+    };
+
     const ensureEntry = (map, rawUrl, defaults = {}) => {
       const key = normalize(rawUrl);
       if (!key) return null;
-      if (!map.has(key)) {
-        const info = inventoryIndex.get(key);
-        map.set(key, {
+      const info = inventoryIndex.get(key);
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
           url: key,
           label: defaults.label || info?.name || baseNameFromUrl(key),
           references: new Set(),
           count: 0,
           kind: defaults.kind || info?.type || classifyByExt(key),
-        });
+          thumbUrl: defaults.thumbUrl || info?.thumbUrl || '',
+          tags: new Set(),
+        };
+        map.set(key, entry);
       }
-      return map.get(key) || null;
+      if (!entry.label && (defaults.label || info?.name)) {
+        entry.label = defaults.label || info?.name;
+      }
+      if (!entry.kind && (defaults.kind || info?.type)) {
+        entry.kind = defaults.kind || info?.type || entry.kind;
+      }
+      if (!entry.thumbUrl && (defaults.thumbUrl || info?.thumbUrl)) {
+        entry.thumbUrl = defaults.thumbUrl || info?.thumbUrl || entry.thumbUrl;
+      }
+      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
+      (Array.isArray(defaults.tags) ? defaults.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
+      return entry;
     };
 
     const addUsage = (map, rawUrl, referenceLabel, defaults = {}) => {
@@ -4196,12 +4246,14 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 
     (config.media?.rewardsPool || []).forEach((item) => {
       if (!item?.url) return;
-      addUsage(rewardMap, item.url, item.label || 'Reward slot', { label: item.label || undefined });
+      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
+      addUsage(rewardMap, item.url, item.label || 'Reward slot', { label: item.label || undefined, tags });
     });
 
     (config.media?.penaltiesPool || []).forEach((item) => {
       if (!item?.url) return;
-      addUsage(penaltyMap, item.url, item.label || 'Penalty slot', { label: item.label || undefined });
+      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
+      addUsage(penaltyMap, item.url, item.label || 'Penalty slot', { label: item.label || undefined, tags });
     });
 
     (config.media?.actionMedia || []).forEach((url) => {
@@ -4225,6 +4277,11 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       const thumb = kind === 'audio'
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
+      const tagSet = new Set();
+      if (entry.tags instanceof Set) {
+        entry.tags.forEach((tag) => addTagValue(tagSet, tag));
+      }
+      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(tagSet, tag));
       return {
         url: openUrl,
         label,
@@ -4233,6 +4290,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         kind,
         thumbUrl: thumb,
         removeKey: entry.url,
+        tags: Array.from(tagSet),
       };
     }).sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
@@ -4276,6 +4334,11 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }, [arraysEqual, setConfig]);
 
   const triggerEnabled = !!triggerConfig.enabled;
+
+  const editingIsNew = useMemo(() => {
+    if (!editing) return false;
+    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
+  }, [editing, suite]);
 
   const handleTriggerToggle = useCallback((enabled) => {
     setMediaTriggerPicker('');

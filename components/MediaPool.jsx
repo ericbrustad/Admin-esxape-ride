@@ -62,9 +62,6 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
             <div style={{ fontSize: 12, color: 'var(--appearance-font-color, var(--admin-body-color))', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {m.id}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--admin-muted)', minHeight: 14 }}>
-              {(m.tags || []).join(', ')}
-            </div>
           </div>
         ))}
       </div>

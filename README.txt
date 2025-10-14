@@ -1,7 +1,10 @@
-Branch work — 2025-10-14 20:06:09Z
+Branch work — 2025-10-14 20:33:19Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-14 — Assigned media tagging & mission header adjustments. Commit: 9f79b6d3fa3dbe6560da34d9d37f77d3e1d4be5f.
+  - Direct links: `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`, `pages/index.jsx`
+  - Notes: Surfaced media tags within the Assigned Media tab (for icons, devices, rewards, and penalties), hardened tag lookups to eliminate the browser error in the assigned media view, and moved the mission title input into the overlay header while keeping the mission ID read-only next to Save & Close.
 - 2025-10-14 — Assigned media theming + usage counters polish. Commit: 106ba00d859442d0b4e9add2dd76b53ef16121ab.
   - Direct links: `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
   - Notes: Swapped the assigned-media overview and media pool cards to rely on global appearance variables, added per-section item/use totals, and ensured media previews only render when a file is actually in use (with safety guards on the Open action).
