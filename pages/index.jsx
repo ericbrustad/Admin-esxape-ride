@@ -3302,7 +3302,6 @@ const S = {
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
-  chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
   muted: { color: 'var(--admin-muted)' },
 };
 
@@ -3641,8 +3640,9 @@ function MediaPoolTab({
     const outcomeCorrect = (suite?.missions || []).reduce((acc, m) => acc + (m?.onCorrect?.mediaUrl && same(m.onCorrect.mediaUrl, nurl) ? 1 : 0), 0);
     const outcomeWrong   = (suite?.missions || []).reduce((acc, m) => acc + (m?.onWrong?.mediaUrl   && same(m.onWrong.mediaUrl,   nurl) ? 1 : 0), 0);
     const outcomeAudio   = (suite?.missions || []).reduce((acc, m) => acc + ((m?.onCorrect?.audioUrl && same(m.onCorrect.audioUrl, nurl)) || (m?.onWrong?.audioUrl && same(m.onWrong.audioUrl, nurl)) ? 1 : 0), 0);
+    const actionMedia    = (config?.media?.actionMedia || []).reduce((acc, id) => acc + (same(id, nurl) ? 1 : 0), 0);
 
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, outcomeCorrect, outcomeWrong, outcomeAudio };
+    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, actionMedia, outcomeCorrect, outcomeWrong, outcomeAudio };
   }
 
   function addPoolItem(kind, url) {
@@ -3791,22 +3791,54 @@ function MediaPoolTab({
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {baseNameFromUrl(url)}
                     </div>
-                    {/* Usage chips next to title (per-file, per service) */}
-                    <div style={S.chipRow}>
-                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
-                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
-                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
-                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
-                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
-                      <span style={S.chip} title="On-Correct media uses">OC {use.outcomeCorrect}</span>
-                      <span style={S.chip} title="On-Wrong media uses">OW {use.outcomeWrong}</span>
-                      <span style={S.chip} title="Outcome audio uses (either)">OA {use.outcomeAudio}</span>
-                    </div>
                   </div>
 
                   <MediaPreview url={url} kind={active.key} />
 
-                  
+                  {(() => {
+                    const usageDetails = [
+                      { label: 'Rewards Pool', count: use.rewardsPool },
+                      { label: 'Penalties Pool', count: use.penaltiesPool },
+                      { label: 'Mission Icons', count: use.iconMission },
+                      { label: 'Device Icons', count: use.iconDevice },
+                      { label: 'Reward Icons', count: use.iconReward },
+                      { label: 'Action Media', count: use.actionMedia },
+                      { label: 'Mission Correct Media', count: use.outcomeCorrect },
+                      { label: 'Mission Wrong Media', count: use.outcomeWrong },
+                      { label: 'Mission Outcome Audio', count: use.outcomeAudio },
+                    ].filter(detail => detail.count > 0);
+
+                    if (!usageDetails.length) {
+                      return (
+                        <div style={{ marginTop:10, fontSize:12, color:'var(--admin-muted)' }}>
+                          Not currently assigned in the Assigned Media tab.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ marginTop:10, display:'grid', gap:6, fontSize:12 }}>
+                        {usageDetails.map(detail => (
+                          <div
+                            key={detail.label}
+                            style={{
+                              display:'flex',
+                              alignItems:'center',
+                              justifyContent:'space-between',
+                              padding:'6px 8px',
+                              borderRadius:8,
+                              background:'var(--admin-tab-bg)',
+                              border:'1px solid var(--admin-border-soft)',
+                            }}
+                          >
+                            <span style={{ color:'var(--admin-muted)' }}>{detail.label}</span>
+                            <span style={{ fontWeight:600 }}>{detail.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   {/* Assign actions removed — Media Pool is upload-only */}
 
                 </div>

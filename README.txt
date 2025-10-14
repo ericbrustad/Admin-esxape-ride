@@ -1,6 +1,11 @@
+**Branch: 002-master (work) — 2025-10-14 16:12 UTC**
+
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-14 — Media pool assignment usage detail overhaul. Commit: 4792784ae0b926d3bcf0ff200f6f1109879c11ed.
+  - Direct link: `pages/index.jsx`
+  - Notes: Replaces the media pool assignment chips with a readable list under each preview and counts Action Media assignments so the summary matches the Assigned Media tab.
 - 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
   - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
   - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.
