@@ -1,0 +1,7 @@
+{
+  "name": "canvas",
+  "version": "0.0.0-stub",
+  "description": "Stub canvas implementation for browser-only builds to avoid native binaries.",
+  "main": "index.js",
+  "license": "MIT"
+}
