@@ -839,7 +839,7 @@ useEffect(()=>{
       : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '');
 
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
-  const setDevices = (list) => setConfig({ ...config, devices: list, powerups: list });
+  const setDevices = (list) => setConfig(prev => ({ ...(prev || {}), devices: list, powerups: list }));
 
   function snapshotState() {
     return {
@@ -1007,7 +1007,10 @@ useEffect(()=>{
 
   async function saveAllWithSlug(slug) {
     if (!suite || !config) return false;
-    setStatus('Saving…');
+    setStatus((prev) => {
+      if (typeof prev === 'string' && prev.toLowerCase().includes('publishing')) return prev;
+      return 'Saving…';
+    });
     const url = isDefaultSlug(slug)
       ? `/api/save-bundle`
       : `/api/save-bundle${qs({ slug })}`;
@@ -1101,6 +1104,7 @@ useEffect(()=>{
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
     setSavePubBusy(true);
+    setStatus('Saving & publishing…');
 
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
@@ -1139,7 +1143,11 @@ useEffect(()=>{
       pushHistory();
       setSuite({ version:'0.0.0', missions:[] });
       setConfig(c => ({
-        ...c, devices: [], powerups: [], media: { rewardsPool:[], penaltiesPool:[] }, textRules: [],
+        ...(c || {}),
+        devices: [],
+        powerups: [],
+        media: { rewardsPool:[], penaltiesPool:[] },
+        textRules: [],
       }));
       const saved = await saveAllWithSlug(slug);
       if (saved) { setStatus('✅ Cleared game content'); ok = true; }
@@ -1172,6 +1180,8 @@ useEffect(()=>{
       rewards: { points: 25 },
       correct: { mode: 'none' },
       wrong:   { mode: 'none' },
+      onCorrect: { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false },
+      onWrong:   { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false },
       content: defaultContentForType('multiple_choice'),
       appearanceOverrideEnabled: false,
       appearance: defaultAppearance(),
@@ -1181,18 +1191,32 @@ useEffect(()=>{
     setEditing(draft); setSelected(null); setDirty(true);
   }
   function editExisting(m) {
-    const e = JSON.parse(JSON.stringify(m));
+    if (!m) return;
+    let e;
+    try {
+      e = JSON.parse(JSON.stringify(m));
+    } catch (err) {
+      console.warn('Falling back to shallow mission copy', err);
+      e = { ...(m || {}) };
+    }
     e.appearanceOverrideEnabled = !!e.appearanceOverrideEnabled;
     e.appearance = { ...defaultAppearance(), ...(e.appearance || {}) };
     if (!e.correct) e.correct = { mode: 'none' };
     if (!e.wrong)   e.wrong   = { mode: 'none' };
+    if (!e.onCorrect) e.onCorrect = { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false };
+    if (!e.onWrong)   e.onWrong   = { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false };
     if (e.showContinue === undefined) e.showContinue = true;
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
   function bumpVersion(v) {
-    const p = String(v || '0.0.0').split('.').map(n=>parseInt(n||'0',10)); while (p.length<3) p.push(0); p[2]+=1; return p.join('.');
+    const p = String(v || '0.0.0')
+      .split('.')
+      .map((n) => parseInt(n || '0', 10));
+    while (p.length < 3) p.push(0);
+    p[2] += 1;
+    return p.join('.');
   }
   function saveToList() {
     if (!editing || !suite) return;
@@ -1473,8 +1497,11 @@ useEffect(()=>{
     if (!preset) return;
     const tone = normalizeTone(config?.appearanceTone);
     applyAdminUiThemeForDocument(key, preset.appearance, tone);
-    setConfig(prev => ({ ...prev, appearance: {
-      ...defaultAppearance(), ...preset.appearance }, appearanceSkin: key }));
+    setConfig(prev => ({
+      ...(prev || {}),
+      appearance: { ...defaultAppearance(), ...preset.appearance },
+      appearanceSkin: key,
+    }));
     setDirty(true);
     setStatus(`✅ Applied theme: ${preset.label}`);
   }
@@ -1487,7 +1514,7 @@ useEffect(()=>{
       ? config.appearanceSkin
       : detectAppearanceSkin(appearance, config?.appearanceSkin);
     applyAdminUiThemeForDocument(skinKey, appearance, normalized);
-    setConfig(prev => ({ ...prev, appearanceTone: normalized }));
+    setConfig(prev => ({ ...(prev || {}), appearanceTone: normalized }));
     setDirty(true);
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
@@ -1599,7 +1626,7 @@ useEffect(()=>{
   }
   function useCenterResult(r) {
     const lat = Number(r.lat), lng = Number(r.lon);
-    setConfig(c => ({ ...c, map: { ...(c.map||{}), centerLat: Number(lat.toFixed(6)), centerLng: Number(lng.toFixed(6)) } }));
+    setConfig(c => ({ ...(c || {}), map: { ...((c && c.map) || {}), centerLat: Number(lat.toFixed(6)), centerLng: Number(lng.toFixed(6)) } }));
     setMapResults([]);
   }
 
@@ -1793,138 +1820,46 @@ useEffect(()=>{
     <div style={S.body}>
       <header style={headerStyle}>
         <div style={S.wrap}>
-          <div style={{ display:'flex', gap:16, justifyContent:'space-between', alignItems:'stretch', flexWrap:'wrap', marginBottom:16 }}>
-            <div style={{ flex:'1 1 520px', minWidth:280, display:'flex', flexDirection:'column', gap:12 }}>
+          <div
+            style={{
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'space-between',
+              flexWrap:'wrap',
+              gap:12,
+              marginBottom:16,
+            }}
+          >
+            <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:8 }}>
+              <div style={S.coverBadge}>
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Game cover thumbnail"
+                    style={S.coverBadgeImage}
+                  />
+                ) : (
+                  <span style={S.coverBadgePlaceholder}>No Cover</span>
+                )}
+              </div>
               <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
                 Admin Control Deck
               </div>
-              {showProtectionIndicator && (
-                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                  <div
-                    style={{
-                      display:'flex',
-                      alignItems:'center',
-                      gap:10,
-                      padding:'8px 16px',
-                      borderRadius:999,
-                      border:`1px solid ${protectionIndicatorColor}`,
-                      background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
-                      color: protectionIndicatorColor,
-                      fontWeight:700,
-                      letterSpacing:1,
-                      textTransform:'uppercase',
-                      boxShadow: protectionIndicatorShadow,
-                    }}
-                  >
-                    <span style={{ display:'inline-block', width:16, height:16, borderRadius:'50%', background:protectionIndicatorColor, boxShadow: protectionIndicatorShadow }} />
-                    {protectionIndicatorLabel}
-                  </div>
-                  <button
-                    onClick={toggleProtection}
-                    disabled={protectionState.saving || protectionState.loading}
-                    style={{
-                      ...S.button,
-                      ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
-                      minWidth: 180,
-                      opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
-                    }}
-                  >
-                    {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+              {tabsOrder.map((t)=>{
+                const labelMap = {
+                  'missions':'MISSIONS',
+                  'devices':'DEVICES',
+                  'settings':'SETTINGS',
+                  'text':'TEXT',
+                  'media-pool':'MEDIA POOL',
+                  'assigned':'ASSIGNED MEDIA',
+                };
+                return (
+                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                    {labelMap[t] || t.toUpperCase()}
                   </button>
-                </div>
-              )}
-            </div>
-            {tab === 'settings' && (
-              <div style={S.coverWindow}>
-                <div style={{ fontWeight:700, marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span>Game Cover Image</span>
-                  <span style={{ fontSize:11, color:'var(--admin-muted)' }}>
-                    {coverImageUrl ? 'Active' : 'No image'}
-                  </span>
-                </div>
-                <div
-                  onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
-                  onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
-                  onDrop={(e)=>{
-                    e.preventDefault();
-                    setCoverDropActive(false);
-                    const file = e.dataTransfer?.files?.[0];
-                    if (file) handleCoverFile(file);
-                  }}
-                  style={{ ...S.coverDrop, ...(coverDropActive ? S.coverDropActive : {}) }}
-                >
-                  {coverImageUrl ? (
-                    <img src={coverImageUrl} alt="Cover preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                  ) : (
-                    <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'12px' }}>
-                      Drag & drop artwork
-                    </div>
-                  )}
-                </div>
-                <div style={S.coverActions}>
-                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload</button>
-                  <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
-                    {coverPickerLoading ? 'Loading…' : 'Media Pool'}
-                  </button>
-                  <button
-                    style={{ ...S.button, ...S.buttonDanger }}
-                    onClick={clearCoverImage}
-                    disabled={!config?.game?.coverImage}
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div style={S.coverInfo}>PNG, JPG, or GIF — 16:9 recommended.</div>
-              </div>
-            )}
-          </div>
-          {showProtectionIndicator && protectionError && (
-            <div style={{ color: PROTECTION_COLOR_ALERT, fontSize: 12, marginBottom: 12 }}>
-              {protectionError}
-            </div>
-          )}
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-            {tabsOrder.map((t)=>{
-              const labelMap = {
-                'missions':'MISSIONS',
-                'devices':'DEVICES',
-                'settings':'SETTINGS',
-                'text':'TEXT',
-                'media-pool':'MEDIA POOL',
-                'assigned':'ASSIGNED MEDIA',
-              };
-              return (
-                <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                  {labelMap[t] || t.toUpperCase()}
-                </button>
-              );
-            })}
-            {gameEnabled && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginLeft:8, flexWrap:'wrap' }}>
-                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                  <option value="default">(Default Game)</option>
-                  {games.map(g=>(
-                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                  ))}
-                </select>
-                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
-              </div>
-            )}
-
-            {/* Save & Publish with optional delay */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              {gameEnabled && (
-                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  Deploy delay (sec):
-                  <input
-                    type="number" min={0} max={120}
-                    value={deployDelaySec}
-                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90 }}
-                  />
-                </label>
-              )}
+                );
+              })}
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -1934,23 +1869,92 @@ useEffect(()=>{
                 disabled={savePubBusy}
                 style={{ ...S.button, ...S.buttonSuccess, opacity: savePubBusy ? 0.7 : 1 }}
               >
-                {savePubBusy
-                  ? (gameEnabled ? 'Saving & Publishing…' : 'Saving…')
-                  : (gameEnabled ? '💾 Save & Publish' : '💾 Save')}
+                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
               </button>
+              <a
+                href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
+                target="_blank" rel="noreferrer" style={{ ...S.button }}
+              >
+                View config.json
+              </a>
             </div>
-
-            <a
-              href={isDefault ? '/missions.json' : `/games/${encodeURIComponent(activeSlug)}/missions.json`}
-              target="_blank" rel="noreferrer" style={{ ...S.button }}>
-              View missions.json
-            </a>
-            <a
-              href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
-              target="_blank" rel="noreferrer" style={{ ...S.button }}>
-              View config.json
-            </a>
+            {gameEnabled && (
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginLeft:'auto' }}>
+                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90 }}
+                  />
+                </label>
+              </div>
+            )}
           </div>
+
+          {(showProtectionIndicator || tab === 'settings') && (
+            <div style={{ display:'flex', gap:16, justifyContent:'space-between', alignItems:'stretch', flexWrap:'wrap', marginBottom:16 }}>
+              <div style={{ flex:'1 1 520px', minWidth:280, display:'flex', flexDirection:'column', gap:12 }}>
+                {showProtectionIndicator && (
+                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                    <div
+                      style={{
+                        display:'flex',
+                        alignItems:'center',
+                        gap:10,
+                        padding:'8px 16px',
+                        borderRadius:999,
+                        border:`1px solid ${protectionIndicatorColor}`,
+                        background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
+                        color: protectionIndicatorColor,
+                        fontWeight:700,
+                        letterSpacing:1,
+                        textTransform:'uppercase',
+                        boxShadow: protectionIndicatorShadow,
+                      }}
+                    >
+                      <span style={{ display:'inline-block', width:16, height:16, borderRadius:'50%', background:protectionIndicatorColor, boxShadow: protectionIndicatorShadow }} />
+                      {protectionIndicatorLabel}
+                    </div>
+                    <button
+                      onClick={toggleProtection}
+                      disabled={protectionState.saving || protectionState.loading}
+                      style={{
+                        ...S.button,
+                        ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                        minWidth: 180,
+                        opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
+                      }}
+                    >
+                      {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {tab === 'settings' && (
+                <div style={S.coverSummary}>
+                  <div style={{ fontWeight:700 }}>Cover status</div>
+                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                    {coverImageUrl ? 'Cover art ready — drag a new image below to replace.' : 'No cover selected yet — add artwork in the settings panel.'}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {showProtectionIndicator && protectionError && (
+            <div style={{ color: PROTECTION_COLOR_ALERT, fontSize: 12, marginBottom: 12 }}>
+              {protectionError}
+            </div>
+          )}
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
@@ -2038,7 +2042,7 @@ useEffect(()=>{
               <MapOverview
                 missions={(suite?.missions)||[]}
                 devices={(config?.devices)||[]}
-                icons={config.icons || DEFAULT_ICONS}
+                icons={config?.icons || DEFAULT_ICONS}
                 showRings={showRings}
                 interactive={false}
                 draftDevice={null}
@@ -2121,13 +2125,13 @@ useEffect(()=>{
                         onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
                       >
                         <option value="">(default)</option>
-                        {(config.icons?.missions||[]).map((it)=>(
+                        {(config?.icons?.missions||[]).map((it)=>(
                           <option key={it.key} value={it.key}>{it.name||it.key}</option>
                         ))}
                       </select>
                       <div>
                         {(() => {
-                          const sel = (config.icons?.missions||[]).find(it => it.key === editing.iconKey);
+                          const sel = (config?.icons?.missions||[]).find(it => it.key === editing.iconKey);
                           return sel?.url
                             ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
                             : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
@@ -2613,7 +2617,7 @@ useEffect(()=>{
                       <Field label="Icon">
                         <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
                           <option value="">(default)</option>
-                          {(config.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
+                          {(config?.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
                         </select>
                       </Field>
                       <Field label="Effect (sec)">
@@ -2786,7 +2790,7 @@ useEffect(()=>{
               <MapOverview
                 missions={(suite?.missions)||[]}
                 devices={devices}
-                icons={config.icons||DEFAULT_ICONS}
+                icons={config?.icons||DEFAULT_ICONS}
                 showRings={showRings}
                 mapCenter={mapCenter}
                 mapZoom={mapZoom}
@@ -2814,8 +2818,79 @@ useEffect(()=>{
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <Field label="Game Title"><input style={S.input} value={config.game.title}
-              onChange={(e)=>setConfig({ ...config, game:{ ...config.game, title:e.target.value } })}/></Field>
+            <div style={S.gameTitleRow}>
+              <div style={S.coverThumbFrame}>
+                {coverImageUrl ? (
+                  <img src={coverImageUrl} alt="Game cover preview" style={S.coverThumbImage} />
+                ) : (
+                  <span style={S.coverThumbPlaceholder}>Cover</span>
+                )}
+              </div>
+              <div style={S.gameTitleColumn}>
+                <div style={S.fieldLabel}>Game Title</div>
+                <input
+                  style={S.input}
+                  value={config.game.title}
+                  onChange={(e)=>setConfig(prev => (prev ? { ...prev, game:{ ...(prev.game||{}), title:e.target.value } } : prev))}
+                  placeholder="Untitled Game"
+                />
+              </div>
+            </div>
+            <div style={S.coverControlsRow}>
+              <div
+                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
+                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
+                onDrop={(e)=>{
+                  e.preventDefault();
+                  setCoverDropActive(false);
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) handleCoverFile(file);
+                }}
+                style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
+              >
+                {coverImageUrl ? (
+                  <img src={coverImageUrl} alt="Cover preview" style={S.coverDropImage} />
+                ) : (
+                  <div style={S.coverDropPlaceholder}>
+                    <strong>Drag & drop cover art</strong>
+                    <span>PNG, JPG, or GIF · ideal at 16:9</span>
+                  </div>
+                )}
+              </div>
+              <div style={S.coverActionsColumn}>
+                <div style={S.coverActionButtons}>
+                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
+                  <input
+                    ref={coverFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={(e)=>{
+                      const file = e.target.files?.[0];
+                      if (file) handleCoverFile(file);
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                  <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
+                    {coverPickerLoading ? 'Loading media…' : 'Media pool'}
+                  </button>
+                  <button
+                    style={{ ...S.button, ...S.buttonDanger }}
+                    onClick={clearCoverImage}
+                    disabled={!config?.game?.coverImage}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {uploadStatus && (
+                  <div style={S.coverActionStatus}>{uploadStatus}</div>
+                )}
+                <div style={S.coverActionHint}>
+                  Tip: cover art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: 18 }} />
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -2840,82 +2915,6 @@ useEffect(()=>{
                 Enable Splash (game code & Stripe)
               </label>
             </Field>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Cover Image</h3>
-            <div style={{ display:'grid', gap:12 }}>
-              <div
-                style={{
-                  border:'1px solid #22303c',
-                  borderRadius:12,
-                  minHeight:160,
-                  overflow:'hidden',
-                  background:'#0b0c10',
-                  display:'grid',
-                  placeItems: coverImageUrl ? 'stretch' : 'center',
-                }}
-              >
-                {coverImageUrl ? (
-                  <img
-                    src={coverImageUrl}
-                    alt="Cover preview"
-                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
-                  />
-                ) : (
-                  <div style={{ color:'#9fb0bf', fontSize:13 }}>No cover image selected.</div>
-                )}
-              </div>
-
-              <div
-                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
-                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
-                onDrop={(e)=>{
-                  e.preventDefault();
-                  setCoverDropActive(false);
-                  const file = e.dataTransfer?.files?.[0];
-                  if (file) handleCoverFile(file);
-                }}
-                style={{ ...S.coverDrop, ...(coverDropActive ? S.coverDropActive : {}), minHeight:180, color:'#9fb0bf' }}
-              >
-                <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
-                <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
-              </div>
-
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                <>
-                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display:'none' }}
-                    onChange={(e)=>{
-                      const file = e.target.files?.[0];
-                      if (file) handleCoverFile(file);
-                      if (e.target) e.target.value = '';
-                    }}
-                  />
-                </>
-                <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
-                  {coverPickerLoading ? 'Loading media…' : 'Browse media pool'}
-                </button>
-                <button
-                  style={{ ...S.button, borderColor:'#7a1f1f', background:'#2a1313' }}
-                  onClick={clearCoverImage}
-                  disabled={!config?.game?.coverImage}
-                >
-                  Remove cover
-                </button>
-              </div>
-
-              {uploadStatus && (
-                <div style={{ fontSize:12, color:'#9fb0bf' }}>{uploadStatus}</div>
-              )}
-              <div style={{ fontSize:12, color:'#9fb0bf' }}>
-                Tip: cover art appears behind the header controls and is saved to <code>/media/covers</code>.
-              </div>
-            </div>
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
@@ -3071,13 +3070,17 @@ useEffect(()=>{
               value={config.appearance||defaultAppearance()}
               tone={interfaceTone}
               onChange={(next)=>{
-                setConfig(prev => ({
-                  ...prev,
-                  appearance: next,
-                  appearanceSkin: prev.appearanceSkin && ADMIN_SKIN_TO_UI.has(prev.appearanceSkin)
-                    ? prev.appearanceSkin
-                    : detectAppearanceSkin(next, prev.appearanceSkin),
-                }));
+                setConfig(prev => {
+                  const base = prev || {};
+                  const retainedSkin = base.appearanceSkin && ADMIN_SKIN_TO_UI.has(base.appearanceSkin)
+                    ? base.appearanceSkin
+                    : detectAppearanceSkin(next, base.appearanceSkin);
+                  return {
+                    ...base,
+                    appearance: next,
+                    appearanceSkin: retainedSkin,
+                  };
+                });
                 setDirty(true);
                 setStatus('🎨 Updated appearance settings');
               }}
@@ -3112,7 +3115,7 @@ useEffect(()=>{
         <AssignedMediaPageTab
           config={config}
           setConfig={setConfig}
-          onReapplyDefaults={()=>setConfig(c=>applyDefaultIcons(c))}
+          onReapplyDefaults={()=>setConfig(c=> (c ? applyDefaultIcons(c) : c))}
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
@@ -3440,41 +3443,116 @@ const S = {
     color: '#fff4dd',
     boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
   },
-  coverWindow: {
-    flex: '0 0 300px',
-    minWidth: 260,
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
-    borderRadius: 16,
-    padding: 14,
-    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
-  },
-  coverDrop: {
-    border: '1px dashed var(--admin-border-soft)',
+  coverBadge: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    minHeight: 150,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
     display: 'grid',
     placeItems: 'center',
     overflow: 'hidden',
+  },
+  coverBadgeImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverBadgePlaceholder: {
+    fontSize: 10,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  gameTitleRow: {
+    display: 'flex',
+    gap: 16,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  coverThumbFrame: {
+    width: 96,
+    height: 72,
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+  },
+  coverThumbImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverThumbPlaceholder: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  gameTitleColumn: {
+    flex: '1 1 220px',
+    minWidth: 220,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  coverControlsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'stretch',
+  },
+  coverDropZone: {
+    flex: '1 1 280px',
+    minHeight: 150,
+    border: '1px dashed var(--admin-border-soft)',
+    borderRadius: 14,
     background: 'var(--admin-input-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
     transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
   },
-  coverDropActive: {
+  coverDropZoneActive: {
     border: '1px dashed #3dc97d',
     boxShadow: '0 0 18px rgba(61, 201, 125, 0.45)',
     background: '#13261b',
   },
-  coverActions: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginTop: 12,
-  },
-  coverInfo: {
-    fontSize: 11,
+  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverDropPlaceholder: {
     color: 'var(--admin-muted)',
-    marginTop: 10,
+    fontSize: 12,
     textAlign: 'center',
+    display: 'grid',
+    gap: 6,
+    padding: 16,
+  },
+  coverActionsColumn: {
+    flex: '0 0 220px',
+    minWidth: 200,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  coverActionButtons: {
+    display: 'grid',
+    gap: 8,
+  },
+  coverActionStatus: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  coverActionHint: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  coverSummary: {
+    flex: '1 1 260px',
+    minWidth: 240,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
+    borderRadius: 14,
+    padding: 14,
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   tab: {
     padding: '8px 12px',
@@ -3820,8 +3898,8 @@ function MediaPoolTab({
   // Per-file usage counts
   function usageCounts(url) {
     const nurl = norm(url);
-    const rewardsPool = (config.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
-    const penaltiesPool = (config.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+    const rewardsPool = (config?.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
+    const penaltiesPool = (config?.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
 
     // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
     const iconMission = (suite?.missions || []).reduce((acc, m) => {
@@ -3855,6 +3933,7 @@ function MediaPoolTab({
   function addPoolItem(kind, url) {
     const label = baseNameFromUrl(url);
     setConfig(c => {
+      if (!c) return c;
       const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
       if (kind === 'rewards') m.rewardsPool.push({ url, label });
       if (kind === 'penalties') m.penaltiesPool.push({ url, label });
@@ -3865,6 +3944,7 @@ function MediaPoolTab({
     const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
     const name = baseNameFromUrl(url);
     setConfig(c => {
+      if (!c) return c;
       const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
       const list = icons[kind] || [];
       // allow duplicates (keys must be unique)
@@ -4029,22 +4109,28 @@ function MediaPoolTab({
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
 function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
-  const rewards = config.media?.rewardsPool || [];
-  const penalties = config.media?.penaltiesPool || [];
-  const iconsM = config.icons?.missions || [];
-  const iconsD = config.icons?.devices  || [];
-  const iconsR = config.icons?.rewards  || [];
-  const triggerConfig = mergeTriggerState(config.mediaTriggers);
+  const safeConfig = config || {};
+  const safeMedia = safeConfig.media || {};
+  const safeIcons = safeConfig.icons || {};
+  const rewards = safeMedia.rewardsPool || [];
+  const penalties = safeMedia.penaltiesPool || [];
+  const iconsM = safeIcons.missions || [];
+  const iconsD = safeIcons.devices  || [];
+  const iconsR = safeIcons.rewards  || [];
+  const triggerConfig = mergeTriggerState(safeConfig.mediaTriggers);
 
   function updateMediaTrigger(partial) {
-    setConfig(c => ({
-      ...c,
-      mediaTriggers: mergeTriggerState(c.mediaTriggers, partial),
-    }));
+    setConfig((c) => {
+      const base = c || {};
+      return {
+        ...base,
+        mediaTriggers: mergeTriggerState(base.mediaTriggers, partial),
+      };
+    });
   }
 
-  const iconsDevices = config.icons?.devices || [];
-  const iconsMissions = config.icons?.missions || [];
+  const iconsDevices = safeIcons.devices || [];
+  const iconsMissions = safeIcons.missions || [];
   const mediaOptions = (inventory || []).map((it, idx) => {
     const rawUrl = it?.url || it?.path || it;
     const url = toDirectMediaURL(rawUrl);
@@ -4112,14 +4198,15 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }, [inventory]);
 
   const assignedState = useMemo(() => ({
-    missionIcons: (config.icons?.missions || []).map(icon => icon.key),
-    deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
-    rewardMedia: (config.media?.rewardsPool || []).map(item => item.url),
-    penaltyMedia: (config.media?.penaltiesPool || []).map(item => item.url),
-    actionMedia: config.media?.actionMedia || [],
+    missionIcons: (config?.icons?.missions || []).map(icon => icon.key),
+    deviceIcons: (config?.icons?.devices || []).map(icon => icon.key),
+    rewardMedia: (config?.media?.rewardsPool || []).map(item => item.url),
+    penaltyMedia: (config?.media?.penaltiesPool || []).map(item => item.url),
+    actionMedia: config?.media?.actionMedia || [],
   }), [config]);
 
   const mediaUsageSummary = useMemo(() => {
+    try {
     const normalize = (value) => {
       if (!value) return '';
       try {
@@ -4195,7 +4282,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     const coverMap = new Map();
 
     const missionIconLookup = new Map();
-    (config.icons?.missions || []).forEach((icon) => {
+    (safeIcons.missions || []).forEach((icon) => {
       const url = normalize(icon?.url);
       if (!url) return;
       missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
@@ -4222,13 +4309,14 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     });
 
     const deviceIconLookup = new Map();
-    (config.icons?.devices || []).forEach((icon) => {
+    (safeIcons.devices || []).forEach((icon) => {
       const url = normalize(icon?.url);
       if (!url) return;
       deviceIconLookup.set(icon.key, { url, name: icon.name || icon.key });
     });
 
-    const deviceList = (config?.devices?.length ? config.devices : (config?.powerups || [])) || [];
+    const hasDevices = Array.isArray(safeConfig.devices) && safeConfig.devices.length;
+    const deviceList = (hasDevices ? safeConfig.devices : (safeConfig.powerups || [])) || [];
     deviceList.forEach((device) => {
       if (!device) return;
       const label = device.title || device.name || device.id || 'Device';
@@ -4244,23 +4332,23 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       urls.forEach((url) => addUsage(deviceIconMap, url, label));
     });
 
-    (config.media?.rewardsPool || []).forEach((item) => {
+    (safeMedia.rewardsPool || []).forEach((item) => {
       if (!item?.url) return;
       const tags = Array.isArray(item?.tags) ? item.tags : undefined;
       addUsage(rewardMap, item.url, item.label || 'Reward slot', { label: item.label || undefined, tags });
     });
 
-    (config.media?.penaltiesPool || []).forEach((item) => {
+    (safeMedia.penaltiesPool || []).forEach((item) => {
       if (!item?.url) return;
       const tags = Array.isArray(item?.tags) ? item.tags : undefined;
       addUsage(penaltyMap, item.url, item.label || 'Penalty slot', { label: item.label || undefined, tags });
     });
 
-    (config.media?.actionMedia || []).forEach((url) => {
+    (safeMedia.actionMedia || []).forEach((url) => {
       addUsage(actionMap, url, 'Trigger assignment');
     });
 
-    const coverUrl = normalize(config?.game?.coverImage);
+    const coverUrl = normalize(safeConfig?.game?.coverImage);
     if (coverUrl) {
       const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
       if (entry) {
@@ -4308,6 +4396,20 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       responseAudio: finalize(responseAudioMap),
       coverImages: finalize(coverMap),
     };
+    } catch (err) {
+      console.error('Failed to compute media usage summary', err);
+      return {
+        missionIcons: [],
+        deviceIcons: [],
+        rewardMedia: [],
+        penaltyMedia: [],
+        actionMedia: [],
+        responseCorrect: [],
+        responseWrong: [],
+        responseAudio: [],
+        coverImages: [],
+      };
+    }
   }, [config, suite, mediaPool]);
 
   const arraysEqual = useCallback((a = [], b = []) => {
@@ -4321,12 +4423,13 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
     const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
     setConfig(current => {
-      const prevAction = current.media?.actionMedia || [];
+      const base = current || {};
+      const prevAction = base.media?.actionMedia || [];
       if (arraysEqual(prevAction, nextAction)) return current;
       return {
-        ...current,
+        ...base,
         media: {
-          ...(current.media || {}),
+          ...(base.media || {}),
           actionMedia: [...nextAction],
         },
       };
@@ -4348,6 +4451,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   function removePoolItem(kind, idx) {
     if (!window.confirm('Remove this item from the assigned list?')) return;
     setConfig(c => {
+      if (!c) return c;
       const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
       if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
       if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
@@ -4357,6 +4461,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   function removeIcon(kind, key) {
     if (!window.confirm('Remove this icon from the assigned list?')) return;
     setConfig(c => {
+      if (!c) return c;
       const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
       icons[kind] = icons[kind].filter(i => i.key !== key);
       return { ...c, icons };
