@@ -14,3 +14,8 @@ npm install three @react-three/fiber@^8.15.17 mind-ar@^1.2.2 react@^18.2.0 react
 ```
 
 All packages above ship text-based assets only, preventing native binary downloads and avoiding node-gyp build failures such as the `canvas` module compilation error observed during deployment. The explicit React and React DOM pins ensure compatibility with `@react-three/fiber@^8.15.17` while satisfying frameworks (e.g., Next.js 14) that expect React 18.2 peer dependencies.
+
+## Optional Dependency Guardrails
+- The project now enforces `optional=false` via the repository `.npmrc` file so the `canvas` optional dependency bundled with some AR libraries is never downloaded during CI/CD installs.
+- Keep Node.js at 20.x and npm at 9.x or later to satisfy engine constraints defined in `package.json` without triggering native rebuilds.
+- If a future AR package adds new optional binaries, extend `.npmrc` or replace the dependency with a pure JavaScript alternative before enabling installs.

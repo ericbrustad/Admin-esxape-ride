@@ -2,9 +2,10 @@
   "folder": "Game",
   "enabled": false,
   "status": "off",
-  "lastCheckedAt": "2025-10-14T01:32:02Z",
+  "lastCheckedAt": "2025-10-14T01:45:39Z",
   "notes": [
     "Game folder intentionally disabled to keep experience offline until AR pipeline is validated.",
-    "2025-10-14T01:32:02Z UTC: Status reconfirmed after fiber/react peer alignment update."
+    "2025-10-14T01:32:02Z UTC: Status reconfirmed after fiber/react peer alignment update.",
+    "2025-10-14T01:45:39Z UTC: Game folder left OFF while enforcing non-binary dependency installs via .npmrc."
   ]
 }
