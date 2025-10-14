@@ -1,0 +1,106 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Untitled Game",
+    "type": "Mystery",
+    "tags": [
+      "game-1-thriller-single-player"
+    ],
+    "coverImage": ""
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "rewardsPool": [],
+    "penaltiesPool": []
+  },
+  "icons": {
+    "missions": [
+      {
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ],
+    "devices": [
+      {
+        "key": "smoke-shield",
+        "name": "Smoke Shield",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "roaming-robot",
+        "name": "Roaming Robot",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ]
+  },
+  "appearance": {
+    "fontFamily": "\"Orbitron\", \"Rajdhani\", sans-serif",
+    "fontSizePx": 22,
+    "fontColor": "#1f2a35",
+    "textBgColor": "#f4f8fb",
+    "textBgOpacity": 0.76,
+    "screenBgColor": "#dbe4f1",
+    "screenBgOpacity": 0.45,
+    "screenBgImage": "/media/skins/control-fabric.svg",
+    "screenBgImageEnabled": true,
+    "textAlign": "left",
+    "textVertical": "top",
+    "panelDepth": true
+  },
+  "appearanceSkin": "default",
+  "appearanceTone": "dark",
+  "mediaTriggers": {
+    "enabled": false,
+    "actionType": "media",
+    "actionTarget": "",
+    "actionLabel": "",
+    "actionThumbnail": "",
+    "triggerDeviceId": "",
+    "triggerDeviceLabel": "",
+    "triggeredResponseKey": "",
+    "triggeredMissionId": ""
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  },
+  "geofence": {
+    "mode": "test"
+  }
+}

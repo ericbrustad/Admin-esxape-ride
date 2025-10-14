@@ -1,0 +1,128 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "DEFAULT",
+    "type": "Mystery",
+    "tags": [
+      "default",
+      "default-game"
+    ],
+    "coverImage": ""
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "rewardsPool": [],
+    "penaltiesPool": []
+  },
+  "icons": {
+    "missions": [
+      {
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ],
+    "devices": [
+      {
+        "key": "smoke-shield",
+        "name": "Smoke Shield",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "roaming-robot",
+        "name": "Roaming Robot",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "https://placehold.co/1024x768?text=Mission+Media"
+      }
+    ]
+  },
+  "appearance": {
+    "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 22,
+    "fontColor": "#1f2648",
+    "textBgColor": "#eef1ff",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#d7def6",
+    "screenBgOpacity": 0.5,
+    "screenBgImage": "/media/skins/starfield-soft.svg",
+    "screenBgImageEnabled": true,
+    "textAlign": "center",
+    "textVertical": "top",
+    "panelDepth": true
+  },
+  "appearanceSkin": "starfield",
+  "appearanceTone": "dark",
+  "mediaTriggers": {
+    "enabled": false,
+    "actionType": "media",
+    "actionTarget": "",
+    "actionLabel": "",
+    "actionThumbnail": "",
+    "triggerDeviceId": "",
+    "triggerDeviceLabel": "",
+    "triggeredResponseKey": "",
+    "triggeredMissionId": ""
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  },
+  "geofence": {
+    "mode": "test"
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#f1f5f9",
+      "align": "left",
+      "backgroundColor": "#0f172a",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#f8fafc",
+      "align": "center",
+      "backgroundColor": "#111827",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
+}

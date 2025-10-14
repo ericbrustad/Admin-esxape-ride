@@ -1,0 +1,70 @@
+{
+  "id": "msuite_esx",
+  "version": "0.7.0",
+  "flow": {
+    "mode": "linear",
+    "start": "m01"
+  },
+  "missions": [
+    {
+      "id": "m01",
+      "title": "Riverfront Briefing",
+      "type": "statement",
+      "rewards": {
+        "points": 0
+      },
+      "content": {
+        "text": "Welcome to Mission 004. Your team will sweep the riverfront, decode the signals, and deliver the intel before the clock runs out."
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      }
+    },
+    {
+      "id": "m02",
+      "title": "Bridge Beacon",
+      "type": "multiple_choice",
+      "rewards": {
+        "points": 50
+      },
+      "content": {
+        "question": "Which color light should you follow to reach the coded beacon?",
+        "choices": [
+          "Follow the amber lamps along the west trail",
+          "Track the blue lights facing the river",
+          "Chase the red lights that point to the city",
+          "Ignore the lights and wait for a radio call"
+        ],
+        "correctIndex": 1,
+        "mediaUrl": "https://placehold.co/1024x768?text=Mission+Media",
+        "geofenceEnabled": true,
+        "lat": 44.9805,
+        "lng": -93.2573,
+        "radiusMeters": 30,
+        "cooldownSeconds": 20
+      }
+    },
+    {
+      "id": "m03",
+      "title": "Warehouse Whisper",
+      "type": "short_answer",
+      "rewards": {
+        "points": 75
+      },
+      "content": {
+        "question": "The old warehouse door has four painted icons. Which word is hidden in their initials?",
+        "answer": "PAWS",
+        "acceptable": "P.A.W.S",
+        "mediaUrl": "https://placehold.co/1024x768?text=Mission+Media",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      }
+    }
+  ]
+}

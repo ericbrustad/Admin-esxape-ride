@@ -1,0 +1,40 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "DEFAULT",
+    "type": "Mystery"
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "powerups": [],
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#100f10",
+      "align": "left",
+      "backgroundColor": "#e6eaf9",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#ffffff",
+      "align": "center",
+      "backgroundColor": "#0b0c10",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
+}
