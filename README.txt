@@ -1,6 +1,9 @@
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
+  - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
+  - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.
 - 2025-10-16 — Device editor map controls realignment. Commit: 974ddf67a4a52d773578de28d015c9ff6f455f64.
   - Direct link: `pages/index.jsx`
   - Notes: Keeps the device radius slider and ring selector anchored above the map while grouping Save, Cancel, and Close in the editor header.

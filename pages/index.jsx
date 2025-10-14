@@ -9,6 +9,7 @@ import {
   appearanceBackgroundStyle,
   defaultAppearance,
   surfaceStylesFromAppearance,
+  DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
 
@@ -536,7 +537,8 @@ const APPEARANCE_SKINS = [
 ];
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
-const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get('default') || 'default';
+const DEFAULT_SKIN_PRESET = APPEARANCE_SKIN_MAP.get(DEFAULT_APPEARANCE_SKIN);
+const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get(DEFAULT_APPEARANCE_SKIN) || DEFAULT_APPEARANCE_SKIN;
 
 function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   if (typeof document === 'undefined') return;
@@ -727,7 +729,8 @@ useEffect(()=>{
 
   useEffect(() => {
     if (!config) {
-      applyAdminUiThemeForDocument('default', defaultAppearance(), 'light');
+      const fallbackAppearance = DEFAULT_SKIN_PRESET?.appearance || defaultAppearance();
+      applyAdminUiThemeForDocument(DEFAULT_APPEARANCE_SKIN, fallbackAppearance, 'light');
       return;
     }
     const stored = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
@@ -933,7 +936,10 @@ useEffect(()=>{
           media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: {
-    ...defaultAppearance(), ...dc.appearance, ...(c0.appearance || {}) },
+            ...defaultAppearance(),
+            ...dc.appearance,
+            ...(c0.appearance || {}),
+          },
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
           mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG, ...(c0.mediaTriggers || {}) },
@@ -969,8 +975,11 @@ useEffect(()=>{
       devices: [], powerups: [],
       media: { rewardsPool:[], penaltiesPool:[] },
       icons: DEFAULT_ICONS,
-      appearance: defaultAppearance(),
-      appearanceSkin: 'default',
+      appearanceSkin: DEFAULT_APPEARANCE_SKIN,
+      appearance: {
+        ...defaultAppearance(),
+        ...(DEFAULT_SKIN_PRESET?.appearance || {}),
+      },
       appearanceTone: 'light',
       mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
