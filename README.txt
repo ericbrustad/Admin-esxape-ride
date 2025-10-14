@@ -1,6 +1,13 @@
+Branch work — 2025-10-14 20:06:09Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-14 — Assigned media theming + usage counters polish. Commit: 106ba00d859442d0b4e9add2dd76b53ef16121ab.
+  - Direct links: `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
+  - Notes: Swapped the assigned-media overview and media pool cards to rely on global appearance variables, added per-section item/use totals, and ensured media previews only render when a file is actually in use (with safety guards on the Open action).
+- 2025-10-14 — Mission/device editors and assigned media summary refresh. Commit: 1ef03a49facc444ce13b37412e076e9dd2e585d9.
+  - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`
+  - Notes: Added floating Save/Cancel controls to mission and device editors, introduced a header cover-image window with drag/drop/import options, and moved media usage counts into the Assigned Media tab with per-type summaries.
 - 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
   - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
   - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.
