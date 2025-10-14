@@ -1,7 +1,12 @@
-Branch work — 2025-10-14 20:33:19Z
+Branch work — 2025-10-14 20:59:54Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-14 — Admin deck header realignment & crash guards. Commit: f2d360052ce8e62c7d763e0d5cee3f734a5765d8.
+  - Direct link: `pages/index.jsx`
+  - Notes: Moves SETTINGS/MISSIONS/DEVICES/TEXT/ASSIGNED MEDIA/MEDIA POOL and the 💾 Save control beside the Admin Control Deck
+    heading, removes the "View missions.json" shortcut, and hardens mission creation plus Assigned Media interactions against
+    null-config crashes.
 - 2025-10-14 — Assigned media tagging & mission header adjustments. Commit: 9f79b6d3fa3dbe6560da34d9d37f77d3e1d4be5f.
   - Direct links: `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`, `pages/index.jsx`
   - Notes: Surfaced media tags within the Assigned Media tab (for icons, devices, rewards, and penalties), hardened tag lookups to eliminate the browser error in the assigned media view, and moved the mission title input into the overlay header while keeping the mission ID read-only next to Save & Close.
