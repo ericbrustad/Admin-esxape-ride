@@ -1,0 +1,16 @@
+{
+  "name": "admin-esxape-ride",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Configuration and AR dependency manifest for Admin Escape Ride admin tools.",
+  "scripts": {
+    "build": "echo \"No build pipeline configured\"",
+    "lint": "echo \"No lint configuration available\""
+  },
+  "dependencies": {
+    "@react-three/fiber": "^9.0.0",
+    "mind-ar": "^1.2.2",
+    "three": "^0.165.0",
+    "zustand": "^4.5.0"
+  }
+}
