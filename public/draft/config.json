@@ -10,7 +10,17 @@
       "default",
       "default-game"
     ],
+    "folderEnabled": false,
     "coverImage": ""
+  },
+  "settings": {
+    "gameFolder": {
+      "enabled": false
+    },
+    "passwordProtection": {
+      "enabled": false,
+      "notificationVisibility": "settings-only"
+    }
   },
   "forms": {
     "players": 1
@@ -24,7 +34,14 @@
   "powerups": [],
   "media": {
     "rewardsPool": [],
-    "penaltiesPool": []
+    "penaltiesPool": [],
+    "assigned": {
+      "tagKeys": [
+        "reward-evidence",
+        "reward-clue",
+        "reward-gold-coin"
+      ]
+    }
   },
   "icons": {
     "missions": [
@@ -51,20 +68,23 @@
         "url": "/media/bundles/ROBOT1small.png"
       }
     ],
-    "rewards": [
+    "tags": [
       {
-        "key": "evidence",
-        "name": "Evidence",
+        "key": "reward-evidence",
+        "name": "Reward: Evidence",
+        "type": "reward",
         "url": "/media/bundles/evidence%202.png"
       },
       {
-        "key": "clue",
-        "name": "Clue",
+        "key": "reward-clue",
+        "name": "Reward: Clue",
+        "type": "reward",
         "url": "/media/bundles/CLUEgreen.png"
       },
       {
-        "key": "gold-coin",
-        "name": "Gold Coin",
+        "key": "reward-gold-coin",
+        "name": "Reward: Gold Coin",
+        "type": "reward",
         "url": "/media/bundles/GOLDEN%20COIN.png"
       }
     ]
