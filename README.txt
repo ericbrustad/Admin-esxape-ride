@@ -1,6 +1,12 @@
+Branch: work — 2025-10-15 00:05 UTC
+=================================
+
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Admin dashboard protection bootstrap fix. Commit: ac0bbb8.
+  - Direct links: `pages/index.jsx`, `pages/index.js`
+  - Notes: Moves the admin password state hooks above their effects to avoid runtime TDZ crashes and collapses the duplicate `pages/index.js` implementation into a simple re-export so Next.js no longer sees two `/` routes while the game mirroring flag stays off by default.
 - 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
   - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
   - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.

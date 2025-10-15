@@ -687,23 +687,30 @@ export default function Admin() {
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
+  const [protectionState, setProtectionState] = useState({
+    enabled: false,
+    loading: true,
+    saving: false,
+    updatedAt: null,
+  });
+  const [protectionError, setProtectionError] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
-useEffect(()=>{
-  let mounted = true;
-  (async ()=>{
-    try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
-      if (mounted) setInventory(Array.isArray(items) ? items : []);
-    } catch {
-      if (mounted) setInventory([]);
-    }
-  })();
-  return ()=> { mounted = false; };
-},[]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+        if (mounted) setInventory(Array.isArray(items) ? items : []);
+      } catch {
+        if (mounted) setInventory([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -790,8 +797,6 @@ useEffect(()=>{
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
-  const [protectionError, setProtectionError] = useState('');
 
   // Combined Save & Publish
   const [deployDelaySec, setDeployDelaySec] = useState(5);
