@@ -1,9 +1,12 @@
-work — 2025-10-15 12:55:36Z
+work — 2025-10-15 13:06:07Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Admin meta banner, cover upload repair, and Assigned Media fixes. Commit: ddfa091ed00500a9556641f4e747281d2b514570.
+  - Direct links: `pages/api/admin-meta.js`, `pages/index.jsx`, `components/AssignedMediaTab.jsx`
+  - Notes: Adds a top-of-page branch/deployment banner with timestamps, stabilizes cover drag & drop previews so PNG/JPG art immediately appears in Settings and the Media Pool, resizes the cover workspace, relocates device Save/Close actions beneath the map, and updates Assigned Media to show tag labels with usage counts while restoring the tab from its crash.
 - 2025-10-15 — Cover upload preview and media tab refresh. Commit: 62919ea47e2d9bf30fdefea10945f61e1286f698.
   - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
   - Notes: Adds a live blob preview for cover uploads with a 1 MB guardrail, keeps the banner free of cover art, and moves media usage summaries into Assigned Media while the Media Pool now focuses on thumbnails.

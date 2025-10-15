@@ -284,7 +284,7 @@ export default function AssignedMediaTab({
     noun,
     allowRemove = false,
     onRemove = () => {},
-    showTags = false,
+    showTags = true,
   } = {}) {
     const source = Array.isArray(items) ? items : [];
     const filtered = source.filter((item) => (item?.count || 0) > 0);
@@ -302,6 +302,7 @@ export default function AssignedMediaTab({
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
             {filtered.map((item) => {
+              const itemKey = item.url || item.removeKey || `${item.label || 'item'}-${item.count}`;
               const descriptor = noun ? `${pluralize(noun, item.count)}` : pluralize('use', item.count);
               const referencePreview = item.references?.length ? item.references.slice(0, 3) : [];
               const overflow = item.references && item.references.length > 3
@@ -313,7 +314,7 @@ export default function AssignedMediaTab({
               const shouldShowTags = showTags;
               return (
                 <div
-                  key={item.url}
+                  key={itemKey}
                   style={{
                     background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
                     border: '1px solid var(--admin-border-soft)',
@@ -360,12 +361,15 @@ export default function AssignedMediaTab({
                     <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
                       {tags.length === 0 ? (
                         <div style={{ fontSize: 11, color: 'var(--admin-muted)' }}>
-                          Uncategorized · {item.count} {pluralize('use', item.count)}
+                          <span style={{ fontWeight: 600, color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
+                            Uncategorized
+                          </span>
+                          <span style={{ marginLeft: 6 }}>× {item.count}</span>
                         </div>
                       ) : (
                         tags.map((tag) => (
                           <div
-                            key={`${item.url}-tagline-${tag}`}
+                            key={`${itemKey}-tag-${tag}`}
                             style={{
                               fontSize: 11,
                               color: 'var(--admin-muted)',

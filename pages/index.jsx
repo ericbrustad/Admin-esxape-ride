@@ -130,6 +130,24 @@ function pathFromUrl(u) {
   if (s.startsWith('/public/media/')) return s;
   return ''; // external or unknown
 }
+
+function formatLocalDateTime(value) {
+  if (!value) return '';
+  try {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -707,6 +725,18 @@ export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
 
+  const [adminMeta, setAdminMeta] = useState({
+    branch: '',
+    commit: '',
+    owner: '',
+    repo: '',
+    vercelUrl: '',
+    deploymentUrl: '',
+    deploymentState: '',
+    fetchedAt: '',
+    error: '',
+  });
+
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
   const [showNewGame, setShowNewGame] = useState(false);
@@ -748,6 +778,63 @@ export default function Admin() {
     })();
     return ()=> { mounted = false; };
   },[fetchInventory]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMeta() {
+      const nowIso = new Date().toISOString();
+      try {
+        const [metaRes, vercelRes] = await Promise.all([
+          fetch('/api/admin-meta', { cache: 'no-store', credentials: 'include' }).catch(() => null),
+          fetch('/api/vercel-status?project=game', { cache: 'no-store', credentials: 'include' }).catch(() => null),
+        ]);
+
+        const metaJson = metaRes ? await metaRes.json().catch(() => ({})) : {};
+        const vercelJson = vercelRes ? await vercelRes.json().catch(() => ({})) : {};
+
+        if (cancelled) return;
+
+        const metaOk = metaJson?.ok !== false;
+        const vercelOk = vercelJson?.ok !== false;
+
+        const deploymentUrlRaw = vercelJson?.url || '';
+        const deploymentUrl = typeof deploymentUrlRaw === 'string' && deploymentUrlRaw
+          ? (deploymentUrlRaw.startsWith('http') ? deploymentUrlRaw : `https://${deploymentUrlRaw}`)
+          : '';
+        const deploymentState = vercelJson?.state || (vercelJson?.disabled ? 'DISABLED' : '');
+        const combinedError = (!metaOk && metaJson?.error)
+          || (!vercelOk && (vercelJson?.error || vercelJson?.reason))
+          || '';
+
+        setAdminMeta((prev) => ({
+          branch: metaOk && metaJson?.branch ? metaJson.branch : prev.branch,
+          commit: metaOk && metaJson?.commit ? metaJson.commit : prev.commit,
+          owner: metaOk && metaJson?.owner ? metaJson.owner : prev.owner,
+          repo: metaOk && metaJson?.repo ? metaJson.repo : prev.repo,
+          vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : prev.vercelUrl,
+          deploymentUrl: deploymentUrl || prev.deploymentUrl,
+          deploymentState: deploymentState ? String(deploymentState).toUpperCase() : prev.deploymentState,
+          fetchedAt: nowIso,
+          error: combinedError,
+        }));
+      } catch (err) {
+        if (cancelled) return;
+        setAdminMeta((prev) => ({
+          ...prev,
+          fetchedAt: new Date().toISOString(),
+          error: 'Unable to load deployment status',
+        }));
+      }
+    }
+
+    loadMeta();
+    const timer = setInterval(loadMeta, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1871,6 +1958,8 @@ export default function Admin() {
         setCoverUploadTarget('');
         return;
       }
+      const normalizedPreview = toDirectMediaURL(url) || url;
+      setCoverUploadPreview(normalizedPreview);
       setCoverUploadTarget(url);
       setConfig(prev => {
         if (!prev) return prev;
@@ -1957,6 +2046,11 @@ export default function Admin() {
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Untitled Game';
   const headerStyle = S.header;
+  const metaBranchLabel = adminMeta.branch || 'unknown';
+  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
+  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
+  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
+  const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — drag a new image below to replace.'
     : coverUploadPreview
@@ -1966,6 +2060,35 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
+      <div style={S.metaBanner}>
+        <div style={S.metaBannerLine}>
+          <span><strong>Branch:</strong> {metaBranchLabel}</span>
+          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
+          {adminMeta.repo && (
+            <span style={S.metaMuted}>
+              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
+            </span>
+          )}
+          {metaDeploymentState && (
+            <span>
+              <strong>Deployment:</strong>{' '}
+              {metaDeploymentUrl ? (
+                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                  {metaDeploymentState}
+                </a>
+              ) : (
+                metaDeploymentState
+              )}
+            </span>
+          )}
+          {metaTimestampLabel && (
+            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
+          )}
+          {adminMeta.error && (
+            <span style={S.metaBannerError}>{adminMeta.error}</span>
+          )}
+        </div>
+      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2870,20 +2993,6 @@ export default function Admin() {
                       {devDraft.lat==null ? 'Click the map or search an address to set location'
                         : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
-                    <div style={S.floatingBarBottom}>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingSave }}
-                        onClick={saveDraftDevice}
-                      >
-                        Save and Close
-                      </button>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingCancel }}
-                        onClick={cancelDeviceEditor}
-                      >
-                        Cancel and Close
-                      </button>
-                    </div>
                   </div>
                 );
               })()}
@@ -2942,6 +3051,22 @@ export default function Admin() {
                 readOnly={false}
                 lockToRegion={true}
               />
+              {isDeviceEditorOpen && (
+                <div style={S.deviceMapFooter}>
+                  <button
+                    style={{ ...S.floatingButton, ...S.floatingSave }}
+                    onClick={saveDraftDevice}
+                  >
+                    Save and Close
+                  </button>
+                  <button
+                    style={{ ...S.floatingButton, ...S.floatingCancel }}
+                    onClick={cancelDeviceEditor}
+                  >
+                    Cancel and Close
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         </main>
@@ -3023,7 +3148,7 @@ export default function Admin() {
                   <div style={S.coverActionStatus}>{uploadStatus}</div>
                 )}
                 <div style={S.coverActionHint}>
-                  Tip: cover art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
+                  Tip: cover art only appears in this settings preview and saves to <code>/media/covers</code> for reuse.
                 </div>
               </div>
             </div>
@@ -3482,6 +3607,45 @@ const S = {
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
+  metaBanner: {
+    background: 'var(--admin-header-bg)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    borderBottom: '1px solid var(--admin-border-soft)',
+    padding: '8px 16px',
+  },
+  metaBannerLine: {
+    maxWidth: 1400,
+    margin: '0 auto',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  metaBadge: {
+    padding: '2px 8px',
+    borderRadius: 999,
+    background: 'rgba(59, 130, 246, 0.16)',
+    color: '#9cc0ff',
+    fontSize: 12,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  metaMuted: {
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  metaLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+  },
+  metaBannerError: {
+    color: '#f87171',
+    fontWeight: 600,
+  },
   header: {
     padding: 16,
     background: 'var(--admin-header-bg)',
@@ -3594,6 +3758,13 @@ const S = {
     color: '#fff4dd',
     boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
   },
+  deviceMapFooter: {
+    marginTop: 12,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
   headerTopRow: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -3657,8 +3828,8 @@ const S = {
     color: 'var(--admin-muted)',
   },
   coverThumbFrame: {
-    width: 132,
-    height: 132,
+    width: 160,
+    height: 160,
     borderRadius: 20,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-tab-bg)',
@@ -3692,8 +3863,8 @@ const S = {
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 320px',
-    minHeight: 220,
+    flex: '1 1 360px',
+    minHeight: 260,
     border: '1px dashed var(--admin-border-soft)',
     borderRadius: 14,
     background: 'var(--admin-input-bg)',
