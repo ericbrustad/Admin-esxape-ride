@@ -82,7 +82,7 @@ function classifyByExt(u) {
 }
 
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers']) {
+async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
   const seen = new Set();
   const out = [];
   await Promise.all(dirs.map(async (dir) => {
@@ -149,6 +149,39 @@ async function deleteMediaPath(repoPath) {
     } catch {}
   }
   return false;
+}
+
+async function fileToBase64(file) {
+  if (!file) return '';
+  if (typeof window !== 'undefined' && typeof window.FileReader !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          const base64 = result.split(',')[1] || '';
+          resolve(base64);
+        } else {
+          reject(new Error('Unable to read file contents'));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error('Unable to read file contents'));
+      reader.readAsDataURL(file);
+    });
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(arrayBuffer).toString('base64');
+  }
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  if (typeof btoa === 'function') return btoa(binary);
+  throw new Error('Base64 conversion is not supported in this environment');
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
@@ -663,6 +696,7 @@ function normalizeGameMetadata(cfg, slug = '') {
   }
   game.tags = cleaned;
   game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
+  game.deployEnabled = game.deployEnabled === true;
   base.game = game;
   return base;
 }
@@ -692,18 +726,27 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
-useEffect(()=>{
-  let mounted = true;
-  (async ()=>{
+  const fetchInventory = useCallback(async () => {
     try {
       const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
-      if (mounted) setInventory(Array.isArray(items) ? items : []);
+      return Array.isArray(items) ? items : [];
     } catch {
-      if (mounted) setInventory([]);
+      return [];
     }
-  })();
-  return ()=> { mounted = false; };
-},[]);
+  }, []);
+  const syncInventory = useCallback(async () => {
+    const items = await fetchInventory();
+    setInventory(items);
+    return items;
+  }, [fetchInventory]);
+  useEffect(()=>{
+    let mounted = true;
+    (async ()=>{
+      const items = await fetchInventory();
+      if (mounted) setInventory(items);
+    })();
+    return ()=> { mounted = false; };
+  },[fetchInventory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1103,15 +1146,21 @@ useEffect(()=>{
   async function saveAndPublish() {
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
+    const shouldPublish = gameEnabled && config?.game?.deployEnabled === true;
     setSavePubBusy(true);
-    setStatus('Saving & publishing…');
+    setStatus(shouldPublish ? 'Saving & publishing…' : 'Saving…');
 
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
 
-    if (gameEnabled && deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
+    if (shouldPublish && deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
 
-    if (gameEnabled) await publishWithSlug(slug, 'published');
+    if (shouldPublish) {
+      const published = await publishWithSlug(slug, 'published');
+      if (!published) { setSavePubBusy(false); return; }
+    } else {
+      setStatus('✅ Saved (game deploy disabled)');
+    }
 
     await reloadGamesList();
     setPreviewNonce(n => n + 1);
@@ -1665,11 +1714,17 @@ useEffect(()=>{
   }
 
   async function uploadToRepo(file, subfolder='uploads') {
-    const array  = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(array)));
-    const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+    if (!file) return '';
+    const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
     const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    setUploadStatus(`Uploading ${safeName}…`);
+    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
+    if (isImage && file.size > 1024 * 1024) {
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — images over 1 MB may be slow to sync.`);
+    } else {
+      setUploadStatus(`Uploading ${safeName}…`);
+    }
+    const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
       method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
@@ -1739,10 +1794,26 @@ useEffect(()=>{
     });
   }
 
+  function setDeployEnabled(nextEnabled) {
+    setConfig(prev => {
+      if (!prev) return prev;
+      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
+    });
+    setDirty(true);
+    setStatus(nextEnabled
+      ? 'Game deployment enabled — Save & Publish will deploy the game build.'
+      : 'Game deployment disabled — Save & Publish updates admin data only.');
+  }
+
   async function handleCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    setUploadStatus(`Uploading ${safeName}…`);
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    if (!looksLikeImage) {
+      setUploadStatus(`❌ ${safeName} is not an image file.`);
+      return;
+    }
+    setUploadStatus(`Preparing ${safeName}…`);
     try {
       const url = await uploadToRepo(file, 'covers');
       if (!url) {
@@ -1756,10 +1827,7 @@ useEffect(()=>{
       });
       setDirty(true);
       setUploadStatus(`✅ Uploaded ${safeName}`);
-      try {
-        const refreshed = await listInventory(['uploads','bundles','icons','mediapool','covers']);
-        if (Array.isArray(refreshed)) setInventory(refreshed);
-      } catch {}
+      await syncInventory();
     } catch (err) {
       setUploadStatus(`❌ ${(err?.message) || 'upload failed'}`);
     }
@@ -1805,6 +1873,7 @@ useEffect(()=>{
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Untitled Game';
   const headerStyle = coverImageUrl
     ? {
@@ -1881,12 +1950,21 @@ useEffect(()=>{
                 </select>
                 <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   Deploy delay (sec):
                   <input
                     type="number" min={0} max={120}
                     value={deployDelaySec}
                     onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90 }}
+                    style={{ ...S.input, width:90, opacity: deployGameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled}
                   />
                 </label>
               </div>
@@ -2833,7 +2911,7 @@ useEffect(()=>{
             </div>
             <div style={S.coverControlsRow}>
               <div
-                onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
+                onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
                 onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
                 onDrop={(e)=>{
                   e.preventDefault();
@@ -2901,6 +2979,19 @@ useEffect(()=>{
               />
               <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
                 The current slug and <code>default-game</code> are enforced automatically.
+              </div>
+            </Field>
+            <Field label="Game Deployment">
+              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <input
+                  type="checkbox"
+                  checked={deployGameEnabled}
+                  onChange={(e)=>setDeployEnabled(e.target.checked)}
+                />
+                Enable publishing to the live game build
+              </label>
+              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
               </div>
             </Field>
             <Field label="Stripe Splash Page">
@@ -3102,6 +3193,7 @@ useEffect(()=>{
             const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
             return url;
           }}
+          onInventoryRefresh={syncInventory}
         />
       )}
 
@@ -3927,6 +4019,7 @@ function MediaPoolTab({
   uploadStatus,
   setUploadStatus,
   uploadToRepo,
+  onInventoryRefresh,
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -3949,8 +4042,11 @@ function MediaPoolTab({
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons']);
+      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
       setInv(items || []);
+      if (typeof onInventoryRefresh === 'function') {
+        try { await onInventoryRefresh(); } catch {}
+      }
     } finally { setBusy(false); }
   }
 
@@ -4027,7 +4123,7 @@ function MediaPoolTab({
     if (!file) return;
     const url = await uploadToRepo(file, folder);
     if (url) {
-      refreshInventory();
+      await refreshInventory();
       setAddUrl(url);
     }
   }
@@ -4042,7 +4138,7 @@ function MediaPoolTab({
     setUploadStatus('Deleting…');
     const ok = await deleteMediaPath(path);
     setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
-    if (ok) refreshInventory();
+    if (ok) await refreshInventory();
     return ok;
   }
 
@@ -4059,7 +4155,7 @@ function MediaPoolTab({
       if (ok) okCount++;
     }
     setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
-    refreshInventory();
+    await refreshInventory();
   }
 
   // Group by type

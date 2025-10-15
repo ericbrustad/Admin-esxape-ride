@@ -1,8 +1,12 @@
+work — 2025-10-15 12:21:25Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Disable game deploys and repair image uploads. Commit: e5c57eed043e6dbd4191e93ab4db801b7871ae36.
+  - Direct link: `pages/index.jsx`
+  - Notes: Added a Save & Publish deploy toggle that defaults off to block unintended game pushes, hardened drag & drop cover uploads so PNG/JPG art under 1 MB lands in `/media/covers` and syncs into the Media Pool, and refreshed upload handling to accept more image types without corruption.
 - 2025-10-15 — Removed the config.json quick link from the Admin Control Deck header per QA feedback. Commit: f89ac490b7ce147abe929c38e53b8c1fb470db05.
   - Direct link: `pages/index.jsx`
   - Notes: Keeps the header focused on tab navigation and Save & Publish while leaving the game folder selector and password protection toggle off by default.
