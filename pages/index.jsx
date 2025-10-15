@@ -72,6 +72,17 @@ const EXTS = {
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
+const ADMIN_META_INITIAL_STATE = {
+  branch: '',
+  commit: '',
+  owner: '',
+  repo: '',
+  vercelUrl: '',
+  deploymentUrl: '',
+  deploymentState: '',
+  fetchedAt: '',
+  error: '',
+};
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -725,17 +736,7 @@ export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
 
-  const [adminMeta, setAdminMeta] = useState({
-    branch: '',
-    commit: '',
-    owner: '',
-    repo: '',
-    vercelUrl: '',
-    deploymentUrl: '',
-    deploymentState: '',
-    fetchedAt: '',
-    error: '',
-  });
+  const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -807,24 +808,31 @@ export default function Admin() {
           || (!vercelOk && (vercelJson?.error || vercelJson?.reason))
           || '';
 
-        setAdminMeta((prev) => ({
-          branch: metaOk && metaJson?.branch ? metaJson.branch : prev.branch,
-          commit: metaOk && metaJson?.commit ? metaJson.commit : prev.commit,
-          owner: metaOk && metaJson?.owner ? metaJson.owner : prev.owner,
-          repo: metaOk && metaJson?.repo ? metaJson.repo : prev.repo,
-          vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : prev.vercelUrl,
-          deploymentUrl: deploymentUrl || prev.deploymentUrl,
-          deploymentState: deploymentState ? String(deploymentState).toUpperCase() : prev.deploymentState,
-          fetchedAt: nowIso,
-          error: combinedError,
-        }));
+        setAdminMeta((prev) => {
+          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
+          return {
+            ...base,
+            branch: metaOk && metaJson?.branch ? metaJson.branch : base.branch,
+            commit: metaOk && metaJson?.commit ? metaJson.commit : base.commit,
+            owner: metaOk && metaJson?.owner ? metaJson.owner : base.owner,
+            repo: metaOk && metaJson?.repo ? metaJson.repo : base.repo,
+            vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : base.vercelUrl,
+            deploymentUrl: deploymentUrl || base.deploymentUrl,
+            deploymentState: deploymentState ? String(deploymentState).toUpperCase() : base.deploymentState,
+            fetchedAt: nowIso,
+            error: combinedError || '',
+          };
+        });
       } catch (err) {
         if (cancelled) return;
-        setAdminMeta((prev) => ({
-          ...prev,
-          fetchedAt: new Date().toISOString(),
-          error: 'Unable to load deployment status',
-        }));
+        setAdminMeta((prev) => {
+          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
+          return {
+            ...base,
+            fetchedAt: new Date().toISOString(),
+            error: 'Unable to load deployment status',
+          };
+        });
       }
     }
 
