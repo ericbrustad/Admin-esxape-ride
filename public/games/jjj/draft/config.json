@@ -4,11 +4,10 @@
     "mode": "single"
   },
   "game": {
-    "title": "DEFAULT",
+    "title": "jjj",
     "type": "Mystery",
     "tags": [
-      "default",
-      "default-game"
+      "jjj"
     ],
     "coverImage": ""
   },
@@ -72,29 +71,14 @@
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
     "fontSizePx": 22,
-    "fontColor": "#1f2a35",
-    "textBgColor": "#f4f8fb",
-    "textBgOpacity": 0.76,
-    "screenBgColor": "#dbe4f1",
-    "screenBgOpacity": 0.45,
-    "screenBgImage": "/media/skins/control-fabric.svg",
-    "screenBgImageEnabled": true,
-    "textAlign": "left",
-    "textVertical": "top",
-    "panelDepth": true
-  },
-  "appearanceSkin": "default",
-  "appearanceTone": "dark",
-  "mediaTriggers": {
-    "enabled": false,
-    "actionType": "media",
-    "actionTarget": "",
-    "actionLabel": "",
-    "actionThumbnail": "",
-    "triggerDeviceId": "",
-    "triggerDeviceLabel": "",
-    "triggeredResponseKey": "",
-    "triggeredMissionId": ""
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top"
   },
   "map": {
     "centerLat": 44.9778,
@@ -103,26 +87,5 @@
   },
   "geofence": {
     "mode": "test"
-  },
-  "theme": {
-    "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#f1f5f9",
-      "align": "left",
-      "backgroundColor": "#0f172a",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    },
-    "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#f8fafc",
-      "align": "center",
-      "backgroundColor": "#111827",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    }
-  },
-  "gameOrigin": "http://localhost:4000"
+  }
 }
