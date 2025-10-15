@@ -310,7 +310,7 @@ export default function AssignedMediaTab({
               const tags = Array.isArray(item.tags)
                 ? Array.from(new Set(item.tags.map((tag) => String(tag || '').trim()).filter(Boolean)))
                 : [];
-              const shouldShowTags = showTags && tags.length > 0;
+              const shouldShowTags = showTags;
               return (
                 <div
                   key={item.url}
@@ -345,12 +345,7 @@ export default function AssignedMediaTab({
                       )}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span>{item.label}</span>
-                        {shouldShowTags && tags.map((tag) => (
-                          <TagPill key={`${item.url}-tag-${tag}`}>{tag}</TagPill>
-                        ))}
-                      </div>
+                      <div style={{ fontWeight: 600 }}>{item.label}</div>
                       <div style={{ fontSize: 12, color: 'var(--admin-muted)' }}>
                         Used by {item.count} {descriptor}
                       </div>
@@ -361,6 +356,33 @@ export default function AssignedMediaTab({
                       )}
                     </div>
                   </div>
+                  {shouldShowTags && (
+                    <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+                      {tags.length === 0 ? (
+                        <div style={{ fontSize: 11, color: 'var(--admin-muted)' }}>
+                          Uncategorized · {item.count} {pluralize('use', item.count)}
+                        </div>
+                      ) : (
+                        tags.map((tag) => (
+                          <div
+                            key={`${item.url}-tagline-${tag}`}
+                            style={{
+                              fontSize: 11,
+                              color: 'var(--admin-muted)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <TagPill>{tag}</TagPill>
+                            <span style={{ fontWeight: 600, color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
+                              × {item.count}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <SmallButton
                       onClick={() => {
@@ -432,9 +454,9 @@ export default function AssignedMediaTab({
 
       {/* Assigned Media Overview */}
       <Section title="Assigned Media Overview">
-        {renderUsageSection('Game Banner Image', coverImages, {
-          emptyLabel: 'No banner image assigned.',
-          noun: 'banner assignment',
+        {renderUsageSection('Cover Art', coverImages, {
+          emptyLabel: 'No cover art selected.',
+          noun: 'cover assignment',
         })}
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',

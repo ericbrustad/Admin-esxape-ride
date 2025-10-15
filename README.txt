@@ -1,9 +1,12 @@
-work — 2025-10-15 12:21:25Z
+work — 2025-10-15 12:55:36Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Cover upload preview and media tab refresh. Commit: 62919ea47e2d9bf30fdefea10945f61e1286f698.
+  - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
+  - Notes: Adds a live blob preview for cover uploads with a 1 MB guardrail, keeps the banner free of cover art, and moves media usage summaries into Assigned Media while the Media Pool now focuses on thumbnails.
 - 2025-10-15 — Disable game deploys and repair image uploads. Commit: e5c57eed043e6dbd4191e93ab4db801b7871ae36.
   - Direct link: `pages/index.jsx`
   - Notes: Added a Save & Publish deploy toggle that defaults off to block unintended game pushes, hardened drag & drop cover uploads so PNG/JPG art under 1 MB lands in `/media/covers` and syncs into the Media Pool, and refreshed upload handling to accept more image types without corruption.

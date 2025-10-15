@@ -71,6 +71,7 @@ const EXTS = {
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
+const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -749,6 +750,36 @@ export default function Admin() {
   },[fetchInventory]);
 
   useEffect(() => {
+    return () => {
+      if (
+        coverUploadPreview &&
+        coverUploadPreview.startsWith('blob:') &&
+        typeof URL !== 'undefined' &&
+        typeof URL.revokeObjectURL === 'function'
+      ) {
+        try { URL.revokeObjectURL(coverUploadPreview); } catch {}
+      }
+    };
+  }, [coverUploadPreview]);
+
+  useEffect(() => {
+    if (!coverUploadTarget) return;
+    const safeNormalize = (value) => {
+      try {
+        return toDirectMediaURL(value || '');
+      } catch {
+        return String(value || '');
+      }
+    };
+    const normalizedTarget = safeNormalize(coverUploadTarget);
+    const normalizedCurrent = config?.game?.coverImage ? safeNormalize(config.game.coverImage) : '';
+    if (normalizedTarget && normalizedCurrent && normalizedTarget === normalizedCurrent) {
+      setCoverUploadTarget('');
+      setCoverUploadPreview('');
+    }
+  }, [config?.game?.coverImage, coverUploadTarget]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -815,6 +846,8 @@ export default function Admin() {
   const [coverPickerItems, setCoverPickerItems] = useState([]);
   const [coverPickerLoading, setCoverPickerLoading] = useState(false);
   const [coverDropActive, setCoverDropActive] = useState(false);
+  const [coverUploadPreview, setCoverUploadPreview] = useState('');
+  const [coverUploadTarget, setCoverUploadTarget] = useState('');
   const coverFileInputRef = useRef(null);
   const [gameTagsDraft, setGameTagsDraft] = useState('');
 
@@ -1808,28 +1841,71 @@ export default function Admin() {
   async function handleCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    const looksLikeImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
     if (!looksLikeImage) {
       setUploadStatus(`❌ ${safeName} is not an image file.`);
       return;
     }
+    const sizeBytes = file.size || 0;
+    if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
+      const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
+      setUploadStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 1 MB (PNG or JPG work best).`);
+      setCoverUploadPreview('');
+      setCoverUploadTarget('');
+      return;
+    }
+    let localPreview = '';
+    if (typeof window !== 'undefined' && window.URL && typeof window.URL.createObjectURL === 'function') {
+      try { localPreview = window.URL.createObjectURL(file); } catch { localPreview = ''; }
+    }
+    if (localPreview) {
+      setCoverUploadPreview(localPreview);
+    }
+    setCoverUploadTarget('');
     setUploadStatus(`Preparing ${safeName}…`);
     try {
       const url = await uploadToRepo(file, 'covers');
       if (!url) {
         setUploadStatus(`❌ Upload failed for ${safeName}`);
+        setCoverUploadPreview('');
+        setCoverUploadTarget('');
         return;
       }
+      setCoverUploadTarget(url);
       setConfig(prev => {
         if (!prev) return prev;
         const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
         return next;
       });
       setDirty(true);
-      setUploadStatus(`✅ Uploaded ${safeName}`);
+      setInventory((prev = []) => {
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const normalize = (value) => {
+          try { return toDirectMediaURL(value || ''); } catch { return String(value || ''); }
+        };
+        const normalizedTarget = normalize(url);
+        const already = safePrev.some((item) => {
+          const candidate = item?.url || item?.path || item;
+          return candidate && normalize(candidate) === normalizedTarget;
+        });
+        if (already) return safePrev;
+        return [
+          ...safePrev,
+          {
+            url,
+            path: url,
+            id: url,
+            type: 'image',
+            thumbUrl: url,
+            label: baseNameFromUrl(url),
+          },
+        ];
+      });
       await syncInventory();
     } catch (err) {
       setUploadStatus(`❌ ${(err?.message) || 'upload failed'}`);
+      setCoverUploadPreview('');
+      setCoverUploadTarget('');
     }
   }
 
@@ -1850,6 +1926,8 @@ export default function Admin() {
 
   function applyCoverFromUrl(url) {
     if (!url) return;
+    setCoverUploadPreview('');
+    setCoverUploadTarget(url);
     setConfig(prev => {
       if (!prev) return prev;
       const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: url } }, slugForMeta);
@@ -1860,6 +1938,8 @@ export default function Admin() {
   }
 
   function clearCoverImage() {
+    setCoverUploadPreview('');
+    setCoverUploadTarget('');
     setConfig(prev => {
       if (!prev) return prev;
       const next = normalizeGameMetadata({ ...prev, game: { ...prev.game, coverImage: '' } }, slugForMeta);
@@ -1873,17 +1953,15 @@ export default function Admin() {
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Untitled Game';
-  const headerStyle = coverImageUrl
-    ? {
-        ...S.header,
-        backgroundImage: `linear-gradient(180deg, rgba(11,12,16,0.92) 0%, rgba(11,12,16,0.94) 100%), url(${coverImageUrl})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      }
-    : S.header;
+  const headerStyle = S.header;
+  const coverStatusMessage = coverImageUrl
+    ? 'Cover art ready — drag a new image below to replace.'
+    : coverUploadPreview
+      ? 'Cover preview loaded — Save & Publish to keep this artwork.'
+      : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
@@ -1894,20 +1972,6 @@ export default function Admin() {
             <div style={S.headerTitleColumn}>
               <div style={S.headerGameTitle}>{headerGameTitle}</div>
               <div style={S.headerSubtitle}>Admin Control Deck</div>
-            </div>
-            <div style={S.headerPreviewGroup}>
-              <div style={S.headerPreviewLabel}>Cover</div>
-              <div style={S.coverPreviewFrame}>
-                {coverImageUrl ? (
-                  <img
-                    src={coverImageUrl}
-                    alt="Game cover preview"
-                    style={S.coverPreviewImage}
-                  />
-                ) : (
-                  <span style={S.coverPreviewPlaceholder}>No Cover</span>
-                )}
-              </div>
             </div>
           </div>
           <div style={S.headerNavRow}>
@@ -2014,7 +2078,7 @@ export default function Admin() {
                 <div style={S.coverSummary}>
                   <div style={{ fontWeight:700 }}>Cover status</div>
                   <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
-                    {coverImageUrl ? 'Cover art ready — drag a new image below to replace.' : 'No cover selected yet — add artwork in the settings panel.'}
+                    {coverStatusMessage}
                   </div>
                 </div>
               )}
@@ -2892,8 +2956,8 @@ export default function Admin() {
               <div style={S.coverThumbGroup}>
                 <div style={S.previewLabel}>Cover</div>
                 <div style={S.coverThumbFrame}>
-                  {coverImageUrl ? (
-                    <img src={coverImageUrl} alt="Game cover preview" style={S.coverThumbImage} />
+                  {coverPreviewUrl ? (
+                    <img src={coverPreviewUrl} alt="Game cover preview" style={S.coverThumbImage} />
                   ) : (
                     <span style={S.coverThumbPlaceholder}>Cover</span>
                   )}
@@ -2921,12 +2985,12 @@ export default function Admin() {
                 }}
                 style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
               >
-                {coverImageUrl ? (
-                  <img src={coverImageUrl} alt="Cover preview" style={S.coverDropImage} />
+                {coverPreviewUrl ? (
+                  <img src={coverPreviewUrl} alt="Cover preview" style={S.coverDropImage} />
                 ) : (
                   <div style={S.coverDropPlaceholder}>
                     <strong>Drag & drop cover art</strong>
-                    <span>Any image format · ideal at 16:9</span>
+                    <span>JPG or PNG · under 1&nbsp;MB · ideal at 16:9</span>
                   </div>
                 )}
               </div>
@@ -3537,35 +3601,6 @@ const S = {
     alignItems: 'center',
     marginBottom: 16,
   },
-  headerPreviewGroup: {
-    display: 'grid',
-    gap: 6,
-    justifyItems: 'center',
-  },
-  headerPreviewLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    color: 'var(--admin-muted)',
-  },
-  coverPreviewFrame: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    display: 'grid',
-    placeItems: 'center',
-    overflow: 'hidden',
-    boxShadow: '0 0 22px rgba(0,0,0,0.2)',
-  },
-  coverPreviewImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  coverPreviewPlaceholder: {
-    fontSize: 11,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-  },
   headerTitleColumn: {
     display: 'grid',
     justifyItems: 'start',
@@ -3622,14 +3657,15 @@ const S = {
     color: 'var(--admin-muted)',
   },
   coverThumbFrame: {
-    width: 84,
-    height: 84,
-    borderRadius: 16,
+    width: 132,
+    height: 132,
+    borderRadius: 20,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-tab-bg)',
     display: 'grid',
     placeItems: 'center',
     overflow: 'hidden',
+    boxShadow: '0 0 22px rgba(0,0,0,0.25)',
   },
   coverThumbImage: { width: '100%', height: '100%', objectFit: 'cover' },
   coverThumbPlaceholder: {
@@ -3656,8 +3692,8 @@ const S = {
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 280px',
-    minHeight: 150,
+    flex: '1 1 320px',
+    minHeight: 220,
     border: '1px dashed var(--admin-border-soft)',
     borderRadius: 14,
     background: 'var(--admin-input-bg)',
@@ -3731,7 +3767,6 @@ const S = {
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
-  chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
   muted: { color: 'var(--admin-muted)' },
   subtleActionButton: {
     padding: '4px 12px',
@@ -4050,42 +4085,18 @@ function MediaPoolTab({
     } finally { setBusy(false); }
   }
 
-  function norm(u){ return toDirectMediaURL(String(u||'')).trim(); }
-  function same(a,b){ return norm(a) === norm(b); }
-
-  // Per-file usage counts
-  function usageCounts(url) {
-    const nurl = norm(url);
-    const rewardsPool = (config?.media?.rewardsPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
-    const penaltiesPool = (config?.media?.penaltiesPool || []).reduce((acc, it) => acc + (same(it.url, nurl) ? 1 : 0), 0);
-
-    // Missions using this URL as ICON (via iconUrl or iconKey→icons.missions[].url)
-    const iconMission = (suite?.missions || []).reduce((acc, m) => {
-      const direct = m?.iconUrl;
-      if (direct && same(direct, nurl)) return acc + 1;
-      const key = m?.iconKey;
-      if (!key) return acc;
-      const found = (config?.icons?.missions || []).find(i => i.key === key);
-      return acc + (found && same(found.url, nurl) ? 1 : 0);
-    }, 0);
-
-    // Devices using this URL as ICON (via iconKey→icons.devices[].url)
-    const iconDevice = (config?.devices || []).reduce((acc, d) => {
-      const key = d?.iconKey;
-      if (!key) return acc;
-      const found = (config?.icons?.devices || []).find(i => i.key === key);
-      return acc + (found && same(found.url, nurl) ? 1 : 0);
-    }, 0);
-
-    // Reward Icons entries that point to this URL
-    const iconReward = (config?.icons?.rewards || []).reduce((acc, i) => acc + (same(i.url, nurl) ? 1 : 0), 0);
-
-    // Mission Response media & audio usage
-    const outcomeCorrect = (suite?.missions || []).reduce((acc, m) => acc + (m?.onCorrect?.mediaUrl && same(m.onCorrect.mediaUrl, nurl) ? 1 : 0), 0);
-    const outcomeWrong   = (suite?.missions || []).reduce((acc, m) => acc + (m?.onWrong?.mediaUrl   && same(m.onWrong.mediaUrl,   nurl) ? 1 : 0), 0);
-    const outcomeAudio   = (suite?.missions || []).reduce((acc, m) => acc + ((m?.onCorrect?.audioUrl && same(m.onCorrect.audioUrl, nurl)) || (m?.onWrong?.audioUrl && same(m.onWrong.audioUrl, nurl)) ? 1 : 0), 0);
-
-    return { rewardsPool, penaltiesPool, iconMission, iconDevice, iconReward, outcomeCorrect, outcomeWrong, outcomeAudio };
+  // Per-file usage counts retained for backwards compatibility
+  function usageCounts() {
+    return {
+      rewardsPool: 0,
+      penaltiesPool: 0,
+      iconMission: 0,
+      iconDevice: 0,
+      iconReward: 0,
+      outcomeCorrect: 0,
+      outcomeWrong: 0,
+      outcomeAudio: 0,
+    };
   }
 
   function addPoolItem(kind, url) {
@@ -4229,31 +4240,49 @@ function MediaPoolTab({
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
-              const use = usageCounts(url);
+              const name = baseNameFromUrl(url);
+              const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
+              const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
               return (
-                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom:6 }}>
-                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {baseNameFromUrl(url)}
+                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
+                  {looksImage ? (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: 160,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        border: '1px solid var(--admin-border-soft)',
+                        background: 'var(--admin-input-bg)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <img src={previewCandidate} alt={name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                     </div>
-                    {/* Usage chips next to title (per-file, per service) */}
-                    <div style={S.chipRow}>
-                      <span style={S.chip} title="Rewards Pool uses">R {use.rewardsPool}</span>
-                      <span style={S.chip} title="Penalties Pool uses">P {use.penaltiesPool}</span>
-                      <span style={S.chip} title="Missions using as Icon">IM {use.iconMission}</span>
-                      <span style={S.chip} title="Devices using as Icon">ID {use.iconDevice}</span>
-                      <span style={S.chip} title="Reward Icons entries">IR {use.iconReward}</span>
-                      <span style={S.chip} title="On-Correct media uses">OC {use.outcomeCorrect}</span>
-                      <span style={S.chip} title="On-Wrong media uses">OW {use.outcomeWrong}</span>
-                      <span style={S.chip} title="Outcome audio uses (either)">OA {use.outcomeAudio}</span>
-                    </div>
+                  ) : (
+                    <MediaPreview url={url} kind={active.key} />
+                  )}
+                  <div>
+                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
+                    <div style={{ fontSize:12, color:'var(--admin-muted)', wordBreak:'break-word' }}>{url}</div>
                   </div>
-
-                  <MediaPreview url={url} kind={active.key} />
-
-                  
-                  {/* Assign actions removed — Media Pool is upload-only */}
-
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ ...S.button, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                    >
+                      Open
+                    </a>
+                    <button
+                      style={{ ...S.button, ...S.buttonDanger }}
+                      onClick={()=>deleteOne(url)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}
