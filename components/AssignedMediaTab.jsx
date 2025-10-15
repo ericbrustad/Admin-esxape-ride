@@ -236,6 +236,49 @@ export default function AssignedMediaTab({
         });
       })();
 
+  const taggedUsageCounts = useMemo(() => {
+    const allItems = [
+      ...(coverImages || []),
+      ...(missionUsage || []),
+      ...(deviceUsage || []),
+      ...(rewardUsage || []),
+      ...(penaltyUsage || []),
+      ...(responseCorrectUsage || []),
+      ...(responseWrongUsage || []),
+      ...(responseAudioUsage || []),
+      ...(actionOverview || []),
+    ];
+
+    const responseTrigger = new Set();
+    const geoTrigger = new Set();
+
+    allItems.forEach((item = {}) => {
+      if (!item.count) return;
+      const tagList = Array.isArray(item.tags) ? item.tags : [];
+      tagList
+        .map((tag) => String(tag || '').toLowerCase())
+        .forEach((tag) => {
+          if (tag === 'response-trigger') responseTrigger.add(item.url || item.label);
+          if (tag === 'geotrigger-device') geoTrigger.add(item.url || item.label);
+        });
+    });
+
+    return {
+      responseTriggers: responseTrigger.size,
+      geoTriggers: geoTrigger.size,
+    };
+  }, [
+    coverImages,
+    missionUsage,
+    deviceUsage,
+    rewardUsage,
+    penaltyUsage,
+    responseCorrectUsage,
+    responseWrongUsage,
+    responseAudioUsage,
+    actionOverview,
+  ]);
+
   function renderUsageSection(title, items, {
     emptyLabel,
     noun,
@@ -264,9 +307,10 @@ export default function AssignedMediaTab({
               const overflow = item.references && item.references.length > 3
                 ? ` +${item.references.length - 3}`
                 : '';
-              const tags = showTags && Array.isArray(item.tags)
+              const tags = Array.isArray(item.tags)
                 ? Array.from(new Set(item.tags.map((tag) => String(tag || '').trim()).filter(Boolean)))
                 : [];
+              const shouldShowTags = showTags && tags.length > 0;
               return (
                 <div
                   key={item.url}
@@ -301,20 +345,18 @@ export default function AssignedMediaTab({
                       )}
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600 }}>{item.label}</div>
+                      <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span>{item.label}</span>
+                        {shouldShowTags && tags.map((tag) => (
+                          <TagPill key={`${item.url}-tag-${tag}`}>{tag}</TagPill>
+                        ))}
+                      </div>
                       <div style={{ fontSize: 12, color: 'var(--admin-muted)' }}>
                         Used by {item.count} {descriptor}
                       </div>
                       {referencePreview.length > 0 && (
                         <div style={{ marginTop: 4, fontSize: 11, color: 'var(--admin-muted)' }}>
                           {referencePreview.join(', ')}{overflow}
-                        </div>
-                      )}
-                      {tags.length > 0 && (
-                        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {tags.map((tag) => (
-                            <TagPill key={`${item.url}-tag-${tag}`}>{tag}</TagPill>
-                          ))}
                         </div>
                       )}
                     </div>
@@ -344,6 +386,10 @@ export default function AssignedMediaTab({
 
   return (
     <div style={{ color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        <Pill>Response Triggers · {taggedUsageCounts.responseTriggers}</Pill>
+        <Pill>GeoTrigger Devices · {taggedUsageCounts.geoTriggers}</Pill>
+      </div>
       {/* Trigger Automation */}
       <Section title="Trigger Automation">
         <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8, color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
@@ -386,9 +432,9 @@ export default function AssignedMediaTab({
 
       {/* Assigned Media Overview */}
       <Section title="Assigned Media Overview">
-        {renderUsageSection('Game Cover Image', coverImages, {
-          emptyLabel: 'No cover image assigned.',
-          noun: 'cover assignment',
+        {renderUsageSection('Game Banner Image', coverImages, {
+          emptyLabel: 'No banner image assigned.',
+          noun: 'banner assignment',
         })}
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',

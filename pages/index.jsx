@@ -1805,6 +1805,7 @@ useEffect(()=>{
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const headerGameTitle = (config?.game?.title || '').trim() || 'Untitled Game';
   const headerStyle = coverImageUrl
     ? {
         ...S.header,
@@ -1820,31 +1821,42 @@ useEffect(()=>{
     <div style={S.body}>
       <header style={headerStyle}>
         <div style={S.wrap}>
-          <div
-            style={{
-              display:'flex',
-              alignItems:'center',
-              justifyContent:'space-between',
-              flexWrap:'wrap',
-              gap:12,
-              marginBottom:16,
-            }}
-          >
-            <div style={{ display:'flex', alignItems:'center', flexWrap:'wrap', gap:8 }}>
-              <div style={S.coverBadge}>
+          <div style={S.headerTopRow}>
+            <div style={S.headerPreviewGroup}>
+              <div style={S.headerPreviewLabel}>Banner</div>
+              <div style={S.bannerPreviewFrame}>
                 {coverImageUrl ? (
                   <img
                     src={coverImageUrl}
-                    alt="Game cover thumbnail"
-                    style={S.coverBadgeImage}
+                    alt="Game banner preview"
+                    style={S.bannerPreviewImage}
                   />
                 ) : (
-                  <span style={S.coverBadgePlaceholder}>No Cover</span>
+                  <span style={S.bannerPreviewPlaceholder}>No Banner</span>
                 )}
               </div>
-              <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
-                Admin Control Deck
+            </div>
+            <div style={S.headerTitleColumn}>
+              <div style={S.headerGameTitle}>{headerGameTitle}</div>
+              <div style={S.headerSubtitle}>Admin Control Deck</div>
+            </div>
+            <div style={S.headerPreviewGroup}>
+              <div style={S.headerPreviewLabel}>Cover</div>
+              <div style={S.coverPreviewFrame}>
+                {coverImageUrl ? (
+                  <img
+                    src={coverImageUrl}
+                    alt="Game cover preview"
+                    style={S.coverPreviewImage}
+                  />
+                ) : (
+                  <span style={S.coverPreviewPlaceholder}>No Cover</span>
+                )}
               </div>
+            </div>
+          </div>
+          <div style={S.headerNavRow}>
+            <div style={S.headerNavPrimary}>
               {tabsOrder.map((t)=>{
                 const labelMap = {
                   'missions':'MISSIONS',
@@ -1879,7 +1891,7 @@ useEffect(()=>{
               </a>
             </div>
             {gameEnabled && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginLeft:'auto' }}>
+              <div style={S.headerNavSecondary}>
                 <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                   <option value="default">(Default Game)</option>
@@ -1941,10 +1953,10 @@ useEffect(()=>{
                 )}
               </div>
               {tab === 'settings' && (
-                <div style={S.coverSummary}>
-                  <div style={{ fontWeight:700 }}>Cover status</div>
+                <div style={S.bannerSummary}>
+                  <div style={{ fontWeight:700 }}>Banner status</div>
                   <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
-                    {coverImageUrl ? 'Cover art ready — drag a new image below to replace.' : 'No cover selected yet — add artwork in the settings panel.'}
+                    {coverImageUrl ? 'Banner art ready — drag a new image below to replace.' : 'No banner selected yet — add artwork in the settings panel.'}
                   </div>
                 </div>
               )}
@@ -2819,12 +2831,25 @@ useEffect(()=>{
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
-              <div style={S.coverThumbFrame}>
-                {coverImageUrl ? (
-                  <img src={coverImageUrl} alt="Game cover preview" style={S.coverThumbImage} />
-                ) : (
-                  <span style={S.coverThumbPlaceholder}>Cover</span>
-                )}
+              <div style={S.bannerThumbGroup}>
+                <div style={S.previewLabel}>Banner</div>
+                <div style={S.bannerThumbFrame}>
+                  {coverImageUrl ? (
+                    <img src={coverImageUrl} alt="Game banner preview" style={S.bannerThumbImage} />
+                  ) : (
+                    <span style={S.bannerThumbPlaceholder}>Banner</span>
+                  )}
+                </div>
+              </div>
+              <div style={S.coverThumbGroup}>
+                <div style={S.previewLabel}>Cover</div>
+                <div style={S.coverThumbFrame}>
+                  {coverImageUrl ? (
+                    <img src={coverImageUrl} alt="Game cover preview" style={S.coverThumbImage} />
+                  ) : (
+                    <span style={S.coverThumbPlaceholder}>Cover</span>
+                  )}
+                </div>
               </div>
               <div style={S.gameTitleColumn}>
                 <div style={S.fieldLabel}>Game Title</div>
@@ -2836,7 +2861,7 @@ useEffect(()=>{
                 />
               </div>
             </div>
-            <div style={S.coverControlsRow}>
+            <div style={S.bannerControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
                 onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
@@ -2846,19 +2871,19 @@ useEffect(()=>{
                   const file = e.dataTransfer?.files?.[0];
                   if (file) handleCoverFile(file);
                 }}
-                style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
+                style={{ ...S.bannerDropZone, ...(coverDropActive ? S.bannerDropZoneActive : {}) }}
               >
                 {coverImageUrl ? (
-                  <img src={coverImageUrl} alt="Cover preview" style={S.coverDropImage} />
+                  <img src={coverImageUrl} alt="Banner preview" style={S.bannerDropImage} />
                 ) : (
-                  <div style={S.coverDropPlaceholder}>
-                    <strong>Drag & drop cover art</strong>
+                  <div style={S.bannerDropPlaceholder}>
+                    <strong>Drag & drop banner art</strong>
                     <span>PNG, JPG, or GIF · ideal at 16:9</span>
                   </div>
                 )}
               </div>
-              <div style={S.coverActionsColumn}>
-                <div style={S.coverActionButtons}>
+              <div style={S.bannerActionsColumn}>
+                <div style={S.bannerActionButtons}>
                   <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
                   <input
                     ref={coverFileInputRef}
@@ -2883,10 +2908,10 @@ useEffect(()=>{
                   </button>
                 </div>
                 {uploadStatus && (
-                  <div style={S.coverActionStatus}>{uploadStatus}</div>
+                  <div style={S.bannerActionStatus}>{uploadStatus}</div>
                 )}
-                <div style={S.coverActionHint}>
-                  Tip: cover art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
+                <div style={S.bannerActionHint}>
+                  Tip: banner art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
                 </div>
               </div>
             </div>
@@ -3125,12 +3150,12 @@ useEffect(()=>{
       {coverPickerOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:1600, padding:16 }}>
           <div style={{ ...S.card, width:'min(680px, 94vw)', maxHeight:'80vh', overflowY:'auto' }}>
-            <h3 style={{ marginTop:0 }}>Select Cover Image</h3>
+            <h3 style={{ marginTop:0 }}>Select Banner Image</h3>
             {coverPickerLoading ? (
               <div style={{ color:'#9fb0bf' }}>Loading media…</div>
             ) : coverPickerItems.length === 0 ? (
               <div style={{ color:'#9fb0bf' }}>
-                No cover-ready images found. Upload a new file or add art to the media pool.
+                No banner-ready images found. Upload a new file or add art to the media pool.
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
@@ -3443,34 +3468,142 @@ const S = {
     color: '#fff4dd',
     boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
   },
-  coverBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  headerTopRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  headerPreviewGroup: {
+    display: 'grid',
+    gap: 6,
+    justifyItems: 'center',
+  },
+  headerPreviewLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    color: 'var(--admin-muted)',
+  },
+  bannerPreviewFrame: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+    boxShadow: '0 0 18px rgba(0,0,0,0.18)',
+  },
+  bannerPreviewImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  bannerPreviewPlaceholder: {
+    fontSize: 10,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+  },
+  coverPreviewFrame: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+    boxShadow: '0 0 22px rgba(0,0,0,0.2)',
+  },
+  coverPreviewImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverPreviewPlaceholder: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+  },
+  headerTitleColumn: {
+    display: 'grid',
+    justifyItems: 'center',
+    gap: 4,
+  },
+  headerGameTitle: {
+    fontSize: 24,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    letterSpacing: '0.3em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  headerNavRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+  },
+  headerNavPrimary: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  headerNavSecondary: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginLeft: 'auto',
+  },
+  gameTitleRow: {
+    display: 'flex',
+    gap: 16,
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
+    marginBottom: 16,
+  },
+  bannerThumbGroup: {
+    display: 'grid',
+    gap: 6,
+    justifyItems: 'center',
+  },
+  coverThumbGroup: {
+    display: 'grid',
+    gap: 6,
+    justifyItems: 'center',
+  },
+  previewLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    color: 'var(--admin-muted)',
+  },
+  bannerThumbFrame: {
+    width: 120,
+    height: 68,
+    borderRadius: 14,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-tab-bg)',
     display: 'grid',
     placeItems: 'center',
     overflow: 'hidden',
   },
-  coverBadgeImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  coverBadgePlaceholder: {
-    fontSize: 10,
+  bannerThumbImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  bannerThumbPlaceholder: {
+    fontSize: 12,
     color: 'var(--admin-muted)',
     textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-  },
-  gameTitleRow: {
-    display: 'flex',
-    gap: 16,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginBottom: 16,
+    letterSpacing: '0.12em',
   },
   coverThumbFrame: {
-    width: 96,
-    height: 72,
-    borderRadius: 12,
+    width: 84,
+    height: 84,
+    borderRadius: 16,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-tab-bg)',
     display: 'grid',
@@ -3482,7 +3615,7 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
     textTransform: 'uppercase',
-    letterSpacing: '0.08em',
+    letterSpacing: '0.12em',
   },
   gameTitleColumn: {
     flex: '1 1 220px',
@@ -3495,13 +3628,13 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  coverControlsRow: {
+  bannerControlsRow: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 16,
     alignItems: 'stretch',
   },
-  coverDropZone: {
+  bannerDropZone: {
     flex: '1 1 280px',
     minHeight: 150,
     border: '1px dashed var(--admin-border-soft)',
@@ -3512,13 +3645,13 @@ const S = {
     overflow: 'hidden',
     transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
   },
-  coverDropZoneActive: {
+  bannerDropZoneActive: {
     border: '1px dashed #3dc97d',
     boxShadow: '0 0 18px rgba(61, 201, 125, 0.45)',
     background: '#13261b',
   },
-  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  coverDropPlaceholder: {
+  bannerDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  bannerDropPlaceholder: {
     color: 'var(--admin-muted)',
     fontSize: 12,
     textAlign: 'center',
@@ -3526,26 +3659,26 @@ const S = {
     gap: 6,
     padding: 16,
   },
-  coverActionsColumn: {
+  bannerActionsColumn: {
     flex: '0 0 220px',
     minWidth: 200,
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
   },
-  coverActionButtons: {
+  bannerActionButtons: {
     display: 'grid',
     gap: 8,
   },
-  coverActionStatus: {
+  bannerActionStatus: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  coverActionHint: {
+  bannerActionHint: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  coverSummary: {
+  bannerSummary: {
     flex: '1 1 260px',
     minWidth: 240,
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
@@ -4350,10 +4483,10 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 
     const coverUrl = normalize(safeConfig?.game?.coverImage);
     if (coverUrl) {
-      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
+      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game banner art' });
       if (entry) {
         entry.count = Math.max(1, entry.count);
-        entry.references.add('Active cover image');
+        entry.references.add('Active banner image');
       }
     }
 

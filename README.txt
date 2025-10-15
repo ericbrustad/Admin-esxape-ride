@@ -1,7 +1,11 @@
+BANNER, COVER, MEDIA COUNT — 2025-10-15 11:20:21Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Banner terminology refresh & assigned media usage counters. Commit: 0ee8fe81a2c7c96dee0eec8be60999cafbe94774.
+  - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
+  - Notes: Renamed the game settings cover UX to a banner workflow with centered title + dual previews in the admin header, duplicated the banner preview as a Cover thumbnail beside the read-only heading, shifted media counts into Assigned Media with tag-aligned listings, and preserved the Game folder and password protection toggles in their off states.
 - 2025-10-14 — Save & Publish polish + mission/media crash fix. Commit: 9070d1e1f29cd810a96624809cc1d449a2f352bf.
   - Direct link: `pages/index.jsx`
   - Notes: Locks the main header action to “Save & Publish” with a live cover thumbnail, rebuilds the Game Settings cover picker with drag & drop/upload/media pool options alongside the title, and adds defensive mission plus assigned-media logic to eliminate the client-side exception while data is loading.
