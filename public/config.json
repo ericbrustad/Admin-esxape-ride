@@ -5,12 +5,7 @@
   },
   "game": {
     "title": "DEFAULT",
-    "type": "Mystery",
-    "tags": [
-      "default",
-      "default-game"
-    ],
-    "coverImage": ""
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
@@ -25,18 +20,18 @@
     "splash": {
       "fontFamily": "Georgia, serif",
       "fontSize": 24,
-      "textColor": "#f1f5f9",
+      "textColor": "#100f10",
       "align": "left",
-      "backgroundColor": "#0f172a",
+      "backgroundColor": "#e6eaf9",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     },
     "missionDefault": {
       "fontFamily": "system-ui, Arial, sans-serif",
       "fontSize": 18,
-      "textColor": "#f8fafc",
+      "textColor": "#ffffff",
       "align": "center",
-      "backgroundColor": "#111827",
+      "backgroundColor": "#0b0c10",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }

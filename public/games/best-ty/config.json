@@ -5,11 +5,7 @@
   },
   "game": {
     "title": "best ty",
-    "type": "Mystery",
-    "tags": [
-      "best-ty"
-    ],
-    "coverImage": ""
+    "type": "Mystery"
   },
   "forms": {
     "players": 1

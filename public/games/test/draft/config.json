@@ -5,11 +5,7 @@
   },
   "game": {
     "title": "test",
-    "type": "Mystery",
-    "tags": [
-      "test"
-    ],
-    "coverImage": ""
+    "type": "Mystery"
   },
   "forms": {
     "players": 1

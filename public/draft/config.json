@@ -5,12 +5,7 @@
   },
   "game": {
     "title": "DEFAULT",
-    "type": "Mystery",
-    "tags": [
-      "default",
-      "default-game"
-    ],
-    "coverImage": ""
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
@@ -20,11 +15,68 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "smoke bomb",
+      "type": "smoke",
+      "iconKey": "dev-smoke",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978045,
+      "lng": -93.265462
+    },
+    {
+      "id": "d02",
+      "title": "roaming robot",
+      "type": "clone",
+      "iconKey": "dev-clone",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.978194,
+      "lng": -93.265266
+    }
+  ],
   "media": {
-    "rewardsPool": [],
-    "penaltiesPool": []
+    "rewards": [
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "ability": "Adds a coin to your wallet.",
+        "thumbUrl": "/media/bundles/GOLDEN%20COIN.png"
+      }
+    ],
+    "pool": [
+      "/media/bundles/ROBOT1small.png",
+      "/media/bundles/SMOKE%20BOMB.png",
+      "/media/bundles/evidence%202.png",
+      "/media/bundles/CLUEgreen.png",
+      "/media/bundles/GOLDEN%20COIN.png",
+      "/media/bundles/trivia%20icon.png",
+      "/media/bundles/trivia%20yellow.png"
+    ]
   },
   "icons": {
     "missions": [
@@ -41,14 +93,14 @@
     ],
     "devices": [
       {
-        "key": "smoke-shield",
-        "name": "Smoke Shield",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
-      },
-      {
-        "key": "roaming-robot",
+        "key": "dev-clone",
         "name": "Roaming Robot",
         "url": "/media/bundles/ROBOT1small.png"
+      },
+      {
+        "key": "dev-smoke",
+        "name": "Smoke Shield",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
       }
     ],
     "rewards": [
@@ -72,54 +124,31 @@
   "appearance": {
     "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
     "fontSizePx": 22,
-    "fontColor": "#1f2a35",
-    "textBgColor": "#f4f8fb",
-    "textBgOpacity": 0.76,
-    "screenBgColor": "#dbe4f1",
-    "screenBgOpacity": 0.45,
-    "screenBgImage": "/media/skins/control-fabric.svg",
-    "screenBgImageEnabled": true,
-    "textAlign": "left",
-    "textVertical": "top",
-    "panelDepth": true
-  },
-  "appearanceSkin": "default",
-  "appearanceTone": "dark",
-  "mediaTriggers": {
-    "enabled": false,
-    "actionType": "media",
-    "actionTarget": "",
-    "actionLabel": "",
-    "actionThumbnail": "",
-    "triggerDeviceId": "",
-    "triggerDeviceLabel": "",
-    "triggeredResponseKey": "",
-    "triggeredMissionId": ""
-  },
-  "map": {
-    "centerLat": 44.9778,
-    "centerLng": -93.265,
-    "defaultZoom": 13
-  },
-  "geofence": {
-    "mode": "test"
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
+    "screenBgImage": "",
+    "textAlign": "center",
+    "textVertical": "top"
   },
   "theme": {
     "splash": {
       "fontFamily": "Georgia, serif",
       "fontSize": 24,
-      "textColor": "#f1f5f9",
+      "textColor": "#100f10",
       "align": "left",
-      "backgroundColor": "#0f172a",
+      "backgroundColor": "#e6eaf9",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     },
     "missionDefault": {
       "fontFamily": "system-ui, Arial, sans-serif",
       "fontSize": 18,
-      "textColor": "#f8fafc",
+      "textColor": "#ffffff",
       "align": "center",
-      "backgroundColor": "#111827",
+      "backgroundColor": "#0b0c10",
       "backgroundImageUrl": "",
       "backgroundSize": "cover"
     }

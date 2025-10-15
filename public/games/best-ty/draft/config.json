@@ -5,11 +5,7 @@
   },
   "game": {
     "title": "best ty",
-    "type": "Mystery",
-    "tags": [
-      "best-ty"
-    ],
-    "coverImage": ""
+    "type": "Mystery"
   },
   "forms": {
     "players": 1
@@ -19,8 +15,50 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "ddd",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    },
+    {
+      "id": "d02",
+      "title": "ddd",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "ddd",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    },
+    {
+      "id": "d02",
+      "title": "ddd",
+      "type": "smoke",
+      "iconKey": "smoke-shield",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -69,18 +107,17 @@
     ]
   },
   "appearance": {
-    "fontFamily": "Arial, Helvetica, sans-serif",
+    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
     "fontSizePx": 22,
-    "fontColor": "#ffe3ff",
-    "textBgColor": "#3b0f4e",
-    "textBgOpacity": 0.5,
-    "screenBgColor": "#0a0216",
-    "screenBgOpacity": 0.82,
+    "fontColor": "#ffffff",
+    "textBgColor": "#000000",
+    "textBgOpacity": 0,
+    "screenBgColor": "#000000",
+    "screenBgOpacity": 0,
     "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top"
   },
-  "appearanceSkin": "neon-grid",
   "map": {
     "centerLat": 44.9778,
     "centerLng": -93.265,
