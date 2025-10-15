@@ -3,6 +3,7 @@ import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
+import SafeBoundary from '../components/SafeBoundary';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -917,6 +918,8 @@ export default function Admin() {
   const [coverDropActive, setCoverDropActive] = useState(false);
   const [coverUploadPreview, setCoverUploadPreview] = useState('');
   const [coverUploadTarget, setCoverUploadTarget] = useState('');
+  const [missionResponsesError, setMissionResponsesError] = useState(null);
+  const [assignedMediaError, setAssignedMediaError] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -2691,7 +2694,19 @@ export default function Admin() {
                   </div>
 
                   {/* Mission Response (Correct/Wrong): below map, above Continue */}
-                  <InlineMissionResponses editing={editing} setEditing={setEditing} inventory={inventory} />
+                  <SafeBoundary
+                    fallback={missionResponsesFallback}
+                    onError={(error) => {
+                      console.error('Mission responses render failure', error);
+                      setMissionResponsesError(error);
+                      const message = error?.message || error || 'unknown error';
+                      setStatus(`❌ Mission responses failed to load: ${message}`);
+                    }}
+                    onReset={() => setMissionResponsesError(null)}
+                    resetKeys={[missionResponsesError, editing, inventory]}
+                  >
+                    <InlineMissionResponses editing={editing} setEditing={setEditing} inventory={inventory} />
+                  </SafeBoundary>
 
                   <hr style={S.hr} />
                   <label style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -3947,6 +3962,19 @@ const S = {
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   muted: { color: 'var(--admin-muted)' },
+  errorPanel: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 14,
+    padding: 16,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    display: 'grid',
+    gap: 10,
+  },
+  errorPanelTitle: { fontWeight: 700, fontSize: 16 },
+  errorPanelMessage: { fontSize: 13, color: 'var(--admin-muted)', whiteSpace: 'pre-wrap' },
+  errorPanelActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   subtleActionButton: {
     padding: '4px 12px',
     borderRadius: 999,
@@ -4778,6 +4806,48 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     }
   }, [config, suite, mediaPool]);
 
+  const assignedMediaFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Assigned Media failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the Assigned Media tab.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setAssignedMediaError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setAssignedMediaError]);
+
+  const missionResponsesFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setMissionResponsesError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setMissionResponsesError]);
+
   const arraysEqual = useCallback((a = [], b = []) => {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i += 1) {
@@ -4837,14 +4907,26 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   return (
     <main style={S.wrap}>
       <div style={S.card}>
-        <AssignedMediaTab
-          mediaPool={mediaPool}
-          assigned={assignedState}
-          onChange={handleAssignedStateChange}
-          triggerEnabled={triggerEnabled}
-          setTriggerEnabled={handleTriggerToggle}
-          usageSummary={mediaUsageSummary}
-        />
+        <SafeBoundary
+          fallback={assignedMediaFallback}
+          onError={(error) => {
+            console.error('Assigned Media render failure', error);
+            setAssignedMediaError(error);
+            const message = error?.message || error || 'unknown error';
+            setStatus(`❌ Assigned Media failed to load: ${message}`);
+          }}
+          onReset={() => setAssignedMediaError(null)}
+          resetKeys={[assignedMediaError, assignedState, mediaUsageSummary, inventory]}
+        >
+          <AssignedMediaTab
+            mediaPool={mediaPool}
+            assigned={assignedState}
+            onChange={handleAssignedStateChange}
+            triggerEnabled={triggerEnabled}
+            setTriggerEnabled={handleTriggerToggle}
+            usageSummary={mediaUsageSummary}
+          />
+        </SafeBoundary>
 
         {triggerEnabled && (
           <>

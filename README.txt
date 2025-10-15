@@ -1,9 +1,12 @@
-work — 2025-10-15 14:09:01Z
+work — 2025-10-15 14:32:40Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Assigned Media & mission error guards plus inline upload base64 fix. Commit: c02c87eaa1d6cf520eb96746d4c3807e8784423f
+  - Direct links: `pages/index.jsx`, `components/InlineMissionResponses.jsx`, `components/SafeBoundary.jsx`, `.npmrc`
+  - Notes: Wraps the mission response editor and Assigned Media tab in a reusable safe boundary so runtime issues render inline with a retry button instead of crashing the page, switches mission drag-and-drop uploads to a chunked base64 reader to keep PNG/JPG assets under 1 MB from breaking, and resets npm to the public registry for connectivity checks. Note to review @ 2025-10-15 14:32:40Z.
 - 2025-10-15 — Admin protection state guard & npm proxy note. Commit: fc04b5884f75dee9b4ed0cf773549de2669533b9
   - Direct links: `pages/index.jsx`, `.npmrc`
   - Notes: Moves the password protection hooks ahead of the loader effect to stop the Admin dashboard from throwing a ReferenceError on load and drops a local npm registry override so installs can be pointed at an allowed mirror when access is restored. Note to review @ 2025-10-15 14:05:44Z.
