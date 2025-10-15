@@ -56,11 +56,13 @@ export default async function handler(req, res) {
       const key = name.toLowerCase();
       if (seenByName.has(key)) continue;
       seenByName.add(key);
+      const relativePath = path.posix.join('public', 'media', dir, name);
       out.push({
         name,
         url: `/media/${dir}/${encodeURIComponent(name)}`,
         type,
         source: 'admin',
+        path: relativePath,
       });
     }
 
@@ -77,6 +79,7 @@ export default async function handler(req, res) {
           url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
           type,
           source: 'game',
+          path: '',
         });
       }
     }

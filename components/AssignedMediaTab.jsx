@@ -114,27 +114,6 @@ function SmallButton({ children, onClick, tone = 'primary' }) {
   );
 }
 
-function TagPill({ children }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 8px',
-        borderRadius: 999,
-        background: 'var(--admin-chip-bg)',
-        border: 'var(--admin-border-soft)',
-        fontSize: 11,
-        color: 'var(--admin-muted)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-      }}
-    >
-      #{children}
-    </span>
-  );
-}
-
 export default function AssignedMediaTab({
   mediaPool = [],
   assigned = {},
@@ -285,6 +264,7 @@ export default function AssignedMediaTab({
     allowRemove = false,
     onRemove = () => {},
     showTags = true,
+    showThumbnail = true,
   } = {}) {
     const source = Array.isArray(items) ? items : [];
     const filtered = source.filter((item) => (item?.count || 0) > 0);
@@ -324,27 +304,29 @@ export default function AssignedMediaTab({
                     gap: 10,
                   }}
                 >
-                  <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 12, alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 10,
-                        overflow: 'hidden',
-                        display: 'grid',
-                        placeItems: 'center',
-                        background: 'var(--admin-input-bg)',
-                        border: '1px solid var(--admin-border-soft)',
-                      }}
-                    >
-                      {item.thumbUrl ? (
-                        <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : item.kind === 'audio' ? (
-                        <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>No preview</span>
-                      )}
-                    </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: showThumbnail ? '64px 1fr' : '1fr', gap: 12, alignItems: 'center' }}>
+                    {showThumbnail && (
+                      <div
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: 10,
+                          overflow: 'hidden',
+                          display: 'grid',
+                          placeItems: 'center',
+                          background: 'var(--admin-input-bg)',
+                          border: '1px solid var(--admin-border-soft)',
+                        }}
+                      >
+                        {item.thumbUrl ? (
+                          <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : item.kind === 'audio' ? (
+                          <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>No preview</span>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <div style={{ fontWeight: 600 }}>{item.label}</div>
                       <div style={{ fontSize: 12, color: 'var(--admin-muted)' }}>
@@ -378,7 +360,9 @@ export default function AssignedMediaTab({
                               gap: 6,
                             }}
                           >
-                            <TagPill>{tag}</TagPill>
+                            <span style={{ fontWeight: 600, color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
+                              {tag}
+                            </span>
                             <span style={{ fontWeight: 600, color: 'var(--appearance-font-color, var(--admin-body-color))' }}>
                               × {item.count}
                             </span>
@@ -461,6 +445,7 @@ export default function AssignedMediaTab({
         {renderUsageSection('Cover Art', coverImages, {
           emptyLabel: 'No cover art selected.',
           noun: 'cover assignment',
+          showThumbnail: false,
         })}
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',

@@ -1,9 +1,12 @@
-work — 2025-10-15 14:49:27Z
+work — 2025-10-15 15:13:39Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Header blur, cover save workflow, and media deletion fix. Commit: 97242a44ebaa6cbc54e9227762a211b57cb39e90
+  - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/InlineMissionResponses.jsx`, `pages/api/list-media.js`
+  - Notes: Centered the Admin Control Deck title on a blurred header band with a brighter Save & Publish button, expanded the cover workspace with a dedicated Save Cover Image action, removed thumbnail clutter, hardened mission response rendering, and made Media Pool deletions respect repository paths. Note to review @ 2025-10-15 15:13:39Z.
 - 2025-10-15 — Mission response inventory guards. Commit: 6eefb17e218f1a40bdcfa303fafbe8ccb56d6743
   - Direct links: `components/InlineMissionResponses.jsx`
   - Notes: Sanitizes the mission response media grid so null or string-only inventory items can't crash new mission drafts and keeps the drag-and-drop selector stable for PNG/JPG uploads under 1 MB.

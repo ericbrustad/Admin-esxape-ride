@@ -725,7 +725,11 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push('default-game');
     seen.add('default-game');
   }
+  const normalizedTitle = (game.title || '').toString().trim();
+  const normalizedType = (game.type || '').toString().trim();
   game.tags = cleaned;
+  game.title = normalizedTitle || 'Default Game';
+  game.type = normalizedType || 'Mystery';
   game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
   game.deployEnabled = game.deployEnabled === true;
   base.game = game;
@@ -1142,7 +1146,7 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:true, mode:'single' },
-      game:   { title:'Untitled Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
+      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -2048,14 +2052,25 @@ export default function Admin() {
     setDirty(true);
   }
 
+  async function saveCoverImageOnly() {
+    const slug = activeSlug || 'default';
+    setStatus('Saving cover image…');
+    const saved = await saveAllWithSlug(slug);
+    if (saved) {
+      setStatus('✅ Cover image saved');
+      await syncInventory();
+    }
+  }
+
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
+  const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
   const deployGameEnabled = config?.game?.deployEnabled === true;
-  const headerGameTitle = (config?.game?.title || '').trim() || 'Untitled Game';
+  const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
@@ -2063,11 +2078,31 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const coverStatusMessage = coverImageUrl
-    ? 'Cover art ready — drag a new image below to replace.'
+    ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
-      ? 'Cover preview loaded — Save & Publish to keep this artwork.'
+      ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
       : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
+  const selectGameOptions = useMemo(() => {
+    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
+    const extra = Array.isArray(games)
+      ? games
+          .filter((g) => g && g.slug && g.slug !== 'default')
+          .map((g) => ({
+            value: g.slug,
+            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
+          }))
+      : [];
+    const seen = new Set();
+    const combined = [];
+    [...baseOptions, ...extra].forEach((option) => {
+      if (!option || !option.value) return;
+      if (seen.has(option.value)) return;
+      seen.add(option.value);
+      combined.push(option);
+    });
+    return combined;
+  }, [games]);
 
   return (
     <div style={S.body}>
@@ -2132,9 +2167,9 @@ export default function Admin() {
                   setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
                 disabled={savePubBusy}
-                style={{ ...S.button, ...S.buttonSuccess, opacity: savePubBusy ? 0.7 : 1 }}
+                style={{ ...S.button, ...S.savePublishButton, opacity: savePubBusy ? 0.65 : 1 }}
               >
-                {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
+                {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
             {gameEnabled && (
@@ -3101,16 +3136,6 @@ export default function Admin() {
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
-              <div style={S.coverThumbGroup}>
-                <div style={S.previewLabel}>Cover</div>
-                <div style={S.coverThumbFrame}>
-                  {coverPreviewUrl ? (
-                    <img src={coverPreviewUrl} alt="Game cover preview" style={S.coverThumbImage} />
-                  ) : (
-                    <span style={S.coverThumbPlaceholder}>Cover</span>
-                  )}
-                </div>
-              </div>
               <div style={S.gameTitleColumn}>
                 <div style={S.fieldLabel}>Game Title</div>
                 <input
@@ -3144,6 +3169,13 @@ export default function Admin() {
               </div>
               <div style={S.coverActionsColumn}>
                 <div style={S.coverActionButtons}>
+                  <button
+                    style={{ ...S.button, ...S.saveCoverButton, opacity: hasCoverForSave ? 1 : 0.45 }}
+                    onClick={saveCoverImageOnly}
+                    disabled={!hasCoverForSave}
+                  >
+                    Save Cover Image
+                  </button>
                   <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
                   <input
                     ref={coverFileInputRef}
@@ -3171,11 +3203,25 @@ export default function Admin() {
                   <div style={S.coverActionStatus}>{uploadStatus}</div>
                 )}
                 <div style={S.coverActionHint}>
-                  Tip: cover art only appears in this settings preview and saves to <code>/media/covers</code> for reuse.
+                  Tip: <strong>Save Cover Image</strong> stores this artwork right away and also copies it to <code>/media/covers</code> for reuse.
                 </div>
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
+            <Field label="Select Game">
+              <select
+                style={S.input}
+                value={activeSlug}
+                onChange={(e)=>setActiveSlug(e.target.value)}
+              >
+                {selectGameOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+                Switch between saved games from right here in settings.
+              </div>
+            </Field>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -3631,10 +3677,12 @@ const S = {
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
   metaBanner: {
-    background: 'var(--admin-header-bg)',
+    background: 'rgba(7, 12, 18, 0.82)',
+    backdropFilter: 'blur(14px)',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid var(--admin-border-soft)',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
     padding: '8px 16px',
+    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
   },
   metaBannerLine: {
     maxWidth: 1400,
@@ -3643,7 +3691,7 @@ const S = {
     flexWrap: 'wrap',
     gap: 12,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
   },
   metaBadge: {
     padding: '2px 8px',
@@ -3670,12 +3718,14 @@ const S = {
     fontWeight: 600,
   },
   header: {
-    padding: 16,
-    background: 'var(--admin-header-bg)',
-    borderBottom: 'var(--admin-header-border)',
+    padding: 20,
+    background: 'rgba(8, 13, 19, 0.9)',
+    backdropFilter: 'blur(20px)',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
     position: 'sticky',
     top: 0,
     zIndex: 40,
+    boxShadow: '0 28px 40px rgba(2, 6, 12, 0.45)',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
@@ -3740,6 +3790,7 @@ const S = {
     background: 'var(--admin-button-bg)',
     color: 'var(--admin-button-color)',
     cursor: 'pointer',
+    fontWeight: 600,
     transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
     boxShadow: 'var(--admin-glass-sheen)',
   },
@@ -3788,16 +3839,36 @@ const S = {
     gap: 12,
     flexWrap: 'wrap',
   },
+  saveCoverButton: {
+    background: 'linear-gradient(92deg, #047857, #34d399)',
+    border: '1px solid rgba(52, 211, 153, 0.6)',
+    color: '#ecfdf5',
+    boxShadow: '0 16px 28px rgba(5, 150, 105, 0.35)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    fontWeight: 700,
+  },
+  savePublishButton: {
+    background: 'linear-gradient(95deg, #2563eb, #38bdf8)',
+    border: '1px solid rgba(59, 130, 246, 0.6)',
+    color: '#f8fafc',
+    boxShadow: '0 20px 36px rgba(37, 99, 235, 0.45)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    fontWeight: 800,
+    padding: '12px 20px',
+  },
   headerTopRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: 24,
+    display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: 16,
+    textAlign: 'center',
+    gap: 6,
+    marginBottom: 20,
   },
   headerTitleColumn: {
     display: 'grid',
-    justifyItems: 'start',
+    justifyItems: 'center',
     gap: 4,
   },
   headerGameTitle: {
@@ -3814,59 +3885,30 @@ const S = {
   },
   headerNavRow: {
     display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: 'column',
     alignItems: 'center',
+    gap: 16,
   },
   headerNavPrimary: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   headerNavSecondary: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
-    marginLeft: 'auto',
+    justifyContent: 'center',
   },
   gameTitleRow: {
     display: 'flex',
-    gap: 16,
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'stretch',
     marginBottom: 16,
-  },
-  coverThumbGroup: {
-    display: 'grid',
-    gap: 6,
-    justifyItems: 'center',
-  },
-  previewLabel: {
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    color: 'var(--admin-muted)',
-  },
-  coverThumbFrame: {
-    width: 160,
-    height: 160,
-    borderRadius: 20,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    display: 'grid',
-    placeItems: 'center',
-    overflow: 'hidden',
-    boxShadow: '0 0 22px rgba(0,0,0,0.25)',
-  },
-  coverThumbImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  coverThumbPlaceholder: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
   },
   gameTitleColumn: {
     flex: '1 1 220px',
@@ -3882,44 +3924,47 @@ const S = {
   coverControlsRow: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 18,
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 360px',
-    minHeight: 260,
-    border: '1px dashed var(--admin-border-soft)',
-    borderRadius: 14,
-    background: 'var(--admin-input-bg)',
+    flex: '1 1 380px',
+    minHeight: 280,
+    border: '1px dashed rgba(94, 234, 212, 0.35)',
+    borderRadius: 20,
+    background: 'rgba(15, 23, 42, 0.75)',
     display: 'grid',
     placeItems: 'center',
     overflow: 'hidden',
     transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
   },
   coverDropZoneActive: {
-    border: '1px dashed #3dc97d',
-    boxShadow: '0 0 18px rgba(61, 201, 125, 0.45)',
-    background: '#13261b',
+    border: '1px dashed rgba(94, 234, 212, 0.8)',
+    boxShadow: '0 0 24px rgba(94, 234, 212, 0.35)',
+    background: 'rgba(15, 32, 27, 0.85)',
   },
   coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
   coverDropPlaceholder: {
-    color: 'var(--admin-muted)',
-    fontSize: 12,
+    color: '#9fb0bf',
+    fontSize: 13,
     textAlign: 'center',
     display: 'grid',
     gap: 6,
     padding: 16,
+    justifyItems: 'center',
+    letterSpacing: '0.05em',
   },
   coverActionsColumn: {
-    flex: '0 0 220px',
-    minWidth: 200,
+    flex: '0 0 240px',
+    minWidth: 220,
     display: 'flex',
     flexDirection: 'column',
-    gap: 10,
+    gap: 12,
   },
   coverActionButtons: {
     display: 'grid',
-    gap: 8,
+    gap: 10,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
   },
   coverActionStatus: {
     fontSize: 12,
@@ -4346,15 +4391,18 @@ function MediaPoolTab({
     }
   }
 
-  async function deleteOne(url) {
-    const path = pathFromUrl(url);
-    if (!path) {
+  async function deleteOne(item) {
+    const targetUrl = typeof item === 'string' ? item : (item?.url || item?.id || '');
+    const repoPath = typeof item === 'string'
+      ? pathFromUrl(item)
+      : (item?.path || pathFromUrl(item?.url || item?.id || ''));
+    if (!repoPath) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
     }
-    if (!window.confirm(`Delete this media file?\n${url}`)) return false;
+    if (!window.confirm(`Delete this media file?\n${targetUrl}`)) return false;
     setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(path);
+    const ok = await deleteMediaPath(repoPath);
     setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
     if (ok) await refreshInventory();
     return ok;
@@ -4366,7 +4414,7 @@ function MediaPoolTab({
     setUploadStatus('Deleting group…');
     let okCount = 0;
     for (const it of list) {
-      const path = pathFromUrl(it.url);
+      const path = it?.path || pathFromUrl(it?.url || it?.id || '');
       if (!path) continue;
       // eslint-disable-next-line no-await-in-loop
       const ok = await deleteMediaPath(path);
@@ -4485,7 +4533,7 @@ function MediaPoolTab({
                     </a>
                     <button
                       style={{ ...S.button, ...S.buttonDanger }}
-                      onClick={()=>deleteOne(url)}
+                      onClick={()=>deleteOne(it)}
                     >
                       Delete
                     </button>
@@ -4587,6 +4635,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         thumbUrl: thumb,
         url: directUrl,
         openUrl: rawUrl || directUrl,
+        path: item?.path || '',
       };
     }).filter(Boolean);
   }, [inventory]);

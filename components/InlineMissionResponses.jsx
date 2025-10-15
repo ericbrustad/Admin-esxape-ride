@@ -413,6 +413,14 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     );
   }
 
+  if (!editing) {
+    return (
+      <div style={{ marginTop: 12, color: '#9fb0bf', fontSize: 12 }}>
+        Select a mission to configure response media.
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginTop:12 }}>
       <ResponseEditor sideKey="onCorrect" title="Correct Response" />
