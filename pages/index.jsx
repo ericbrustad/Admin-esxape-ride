@@ -3827,13 +3827,16 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   const iconsM = config.icons?.missions || [];
   const iconsD = config.icons?.devices  || [];
   const iconsR = config.icons?.rewards  || [];
-  const triggerConfig = mergeTriggerState(config.mediaTriggers);
+  const triggerConfig = mergeTriggerState(config?.mediaTriggers);
 
   function updateMediaTrigger(partial) {
-    setConfig(c => ({
-      ...c,
-      mediaTriggers: mergeTriggerState(c.mediaTriggers, partial),
-    }));
+    setConfig(c => {
+      if (!c) return c;
+      return {
+        ...c,
+        mediaTriggers: mergeTriggerState(c.mediaTriggers, partial),
+      };
+    });
   }
 
   const iconsDevices = config.icons?.devices || [];
@@ -3904,13 +3907,17 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     }).filter(Boolean);
   }, [inventory]);
 
-  const assignedState = useMemo(() => ({
-    missionIcons: (config.icons?.missions || []).map(icon => icon.key),
-    deviceIcons: (config.icons?.devices || []).map(icon => icon.key),
-    rewardMedia: (config.media?.rewardsPool || []).map(item => item.url),
-    penaltyMedia: (config.media?.penaltiesPool || []).map(item => item.url),
-    actionMedia: config.media?.actionMedia || [],
-  }), [config]);
+  const assignedState = useMemo(() => {
+    const icons = config?.icons || {};
+    const media = config?.media || {};
+    return {
+      missionIcons: (icons.missions || []).map(icon => icon.key),
+      deviceIcons: (icons.devices || []).map(icon => icon.key),
+      rewardMedia: (media.rewardsPool || []).map(item => item.url),
+      penaltyMedia: (media.penaltiesPool || []).map(item => item.url),
+      actionMedia: media.actionMedia || [],
+    };
+  }, [config]);
 
   const arraysEqual = useCallback((a = [], b = []) => {
     if (a.length !== b.length) return false;
@@ -3923,6 +3930,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
     const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
     setConfig(current => {
+      if (!current) return current;
       const prevAction = current.media?.actionMedia || [];
       if (arraysEqual(prevAction, nextAction)) return current;
       return {

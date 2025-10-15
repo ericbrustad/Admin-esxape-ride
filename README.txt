@@ -1,6 +1,12 @@
+Branch: fix/assigned-media-tab-guard — 2025-10-15 00:35 UTC
+
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Assigned media trigger guard prevents config-less crashes. Commit: 405ea8a
+  - Direct links: `pages/index.jsx`, `next.config.js`, `public/admin-protection.json`
+  - Notes: Adds null-safe checks before reading trigger settings so the Devices, Media Pool, and Assigned Media tabs no longer throw when config data is still loading.
+  - Notes: Confirmed deployment toggles remain off — see `next.config.js` for `GAME_ENABLED` and `public/admin-protection.json` for `protected: false`.
 - 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
   - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
   - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.
