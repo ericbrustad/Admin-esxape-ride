@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 
 /**
  * InlineMissionResponses.jsx
@@ -36,12 +36,50 @@ function classifyByExt(u) {
   return "other";
 }
 
+function fallbackLabelFromUrl(u) {
+  if (!u) return "media";
+  try {
+    const base = typeof window !== "undefined" ? window.location.origin : "http://local";
+    const parsed = new URL(u, base);
+    const leaf = parsed.pathname.split("/").pop() || "media";
+    const cleaned = leaf.replace(/[-_]+/g, " ").trim();
+    return cleaned || leaf;
+  } catch {
+    const leaf = String(u).split("/").pop() || "media";
+    const cleaned = leaf.replace(/[-_]+/g, " ").trim();
+    return cleaned || leaf;
+  }
+}
+
 export default function InlineMissionResponses({ editing, setEditing, inventory = [] }) {
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
+
+  const normalizedInventory = useMemo(() => {
+    if (!Array.isArray(inventory)) return [];
+    return inventory
+      .map((item, idx) => {
+        if (!item) return null;
+        const rawUrl = typeof item === "string"
+          ? item
+          : item.url || item.path || item.href || "";
+        const directUrl = toDirectMediaURL(rawUrl);
+        if (!directUrl) return null;
+        const label = (typeof item === "object" && item !== null)
+          ? (item.label || item.name || item.title)
+          : null;
+        return {
+          original: item,
+          url: directUrl,
+          label: label || fallbackLabelFromUrl(directUrl) || `Media ${idx + 1}`,
+          kind: classifyByExt(directUrl),
+        };
+      })
+      .filter(Boolean);
+  }, [inventory]);
 
   useEffect(() => {
     let mounted = true;
@@ -172,9 +210,8 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   }, [dropRef, editing]);
 
   function filteredInventory() {
-    if (!Array.isArray(inventory)) return [];
-    if (mediaFilter === "auto") return inventory;
-    return inventory.filter(it => classifyByExt(it.url) === mediaFilter);
+    if (mediaFilter === "auto") return normalizedInventory;
+    return normalizedInventory.filter((entry) => entry.kind === mediaFilter);
   }
 
   function chooseMediaForSide(side, url) {
@@ -198,31 +235,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
   function toggleEngage(side, on) {
     updateSide(side, { enabled: !!on });
-  }
-
-  function renderMediaTile(it) {
-    const url = toDirectMediaURL(it.url || it.path || it);
-    const kind = classifyByExt(url);
-    return (
-      <div key={url} style={{ border:'1px solid #233036', borderRadius:8, padding:8, display:'grid', gap:6 }}>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <div style={{ width:64, height:48, borderRadius:6, overflow:'hidden', background:'#0b0c10', display:'grid', placeItems:'center' }}>
-            {kind === "image" || kind === "gif" ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-             : kind === "video" ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline /> 
-             : kind === "audio" ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-             : <div style={{ fontSize:12, color:'#9fb0bf' }}>File</div>}
-          </div>
-          <div style={{ flex:1, overflow:'hidden' }}>
-            <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-            <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
-          </div>
-        </div>
-        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-          <button style={styles.smallButton} onClick={()=>{ setSelectedPreviewUrl(url); }}>Preview</button>
-          <button style={styles.smallButton} onClick={()=>chooseMediaForSide(currentSideRef.current, url)}>Select</button>
-        </div>
-      </div>
-    );
   }
 
   const currentSideRef = useRef("onCorrect"); // used by select buttons inside tiles
@@ -336,22 +348,23 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
           {/* media grid */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:8 }}>
-            {filteredInventory().map((it, idx)=>{
-              const url = toDirectMediaURL(it.url || it);
+            {filteredInventory().map((entry, idx) => {
+              const url = entry.url;
+              const kind = entry.kind;
               const isSelected = (url === (mediaUrl || audioUrl));
               return (
                 <div key={idx} style={{ border: isSelected ? '2px solid #1aa654' : '1px solid #153033', borderRadius:8, padding:6, background: isSelected ? 'rgba(34,197,94,0.04)' : 'transparent' }}>
                   <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                     <div style={{ width:56, height:44, borderRadius:6, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
-                      {(classifyByExt(url) === 'image' || classifyByExt(url) === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                        : (classifyByExt(url) === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
-                        : (classifyByExt(url) === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-                        : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(it.label||'file').slice(0,8)}</div>
+                      {(kind === 'image' || kind === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        : (kind === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
+                        : (kind === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
+                        : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(entry.label || 'file').slice(0,8)}</div>
                       }
                     </div>
                     <div style={{ flex:1, overflow:'hidden' }}>
-                      <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{it.label || (it.url||it).split('/').pop()}</div>
-                      <div style={{ fontSize:12, color:'#9fb0bf' }}>{classifyByExt(url)}</div>
+                      <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{entry.label}</div>
+                      <div style={{ fontSize:12, color:'#9fb0bf' }}>{kind}</div>
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
@@ -362,7 +375,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               );
             })}
           </div>
-
           {/* selected preview */}
           {selectedPreviewUrl && (
             <div style={{ marginTop:10 }}>

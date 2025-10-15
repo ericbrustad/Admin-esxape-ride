@@ -1,9 +1,13 @@
-work — 2025-10-15 14:32:40Z
+work — 2025-10-15 14:49:27Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Mission response inventory guards. Commit: 6eefb17e218f1a40bdcfa303fafbe8ccb56d6743
+  - Direct links: `components/InlineMissionResponses.jsx`
+  - Notes: Sanitizes the mission response media grid so null or string-only inventory items can't crash new mission drafts and keeps the drag-and-drop selector stable for PNG/JPG uploads under 1 MB.
+  - Note to review @ 2025-10-15 14:49:27Z.
 - 2025-10-15 — Assigned Media & mission error guards plus inline upload base64 fix. Commit: c02c87eaa1d6cf520eb96746d4c3807e8784423f
   - Direct links: `pages/index.jsx`, `components/InlineMissionResponses.jsx`, `components/SafeBoundary.jsx`, `.npmrc`
   - Notes: Wraps the mission response editor and Assigned Media tab in a reusable safe boundary so runtime issues render inline with a retry button instead of crashing the page, switches mission drag-and-drop uploads to a chunked base64 reader to keep PNG/JPG assets under 1 MB from breaking, and resets npm to the public registry for connectivity checks. Note to review @ 2025-10-15 14:32:40Z.
