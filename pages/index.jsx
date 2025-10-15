@@ -1342,6 +1342,11 @@ useEffect(()=>{
     setDeviceTriggerPicker('');
     setStatus(unchanged ? 'ℹ️ Device draft unchanged' : '↩️ Device changes reset');
   }
+  function cancelDeviceEditor() {
+    setDeviceTriggerPicker('');
+    closeDeviceEditor();
+    setStatus('🚫 Device edit cancelled');
+  }
   function saveDraftDevice() {
     const normalized = {
       title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
@@ -1682,8 +1687,19 @@ useEffect(()=>{
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(config.appearanceTone);
-  const protectionIndicatorColor = protectionState.enabled ? 'var(--admin-success-color)' : 'var(--admin-danger-color)';
+  const PROTECTION_COLOR_SAFE = '#2dd4bf';
+  const PROTECTION_COLOR_ALERT = '#ff4d57';
+  const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
+  const protectionIndicatorShadow = protectionState.enabled
+    ? '0 0 14px rgba(45, 212, 191, 0.55)'
+    : '0 0 18px rgba(255, 77, 87, 0.75)';
+  const protectionIndicatorLabel = protectionState.loading
+    ? 'Checking…'
+    : protectionState.enabled
+      ? 'Protected'
+      : 'Not Protected';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
+  const showProtectionIndicator = tab === 'settings';
 
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
@@ -1777,46 +1793,93 @@ useEffect(()=>{
     <div style={S.body}>
       <header style={headerStyle}>
         <div style={S.wrap}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:16 }}>
-            <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
-              Admin Control Deck
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-              <div
-                style={{
-                  display:'flex',
-                  alignItems:'center',
-                  gap:8,
-                  padding:'6px 14px',
-                  borderRadius:999,
-                  border:`1px solid ${protectionIndicatorColor}`,
-                  background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
-                  color: protectionIndicatorColor,
-                  fontWeight:700,
-                  letterSpacing:1,
-                  textTransform:'uppercase',
-                  boxShadow:'0 0 12px currentColor',
-                }}
-              >
-                <span style={{ display:'inline-block', width:14, height:14, borderRadius:'50%', background:'currentColor', boxShadow:'0 0 12px currentColor' }} />
-                {protectionState.loading ? 'Checking…' : protectionState.enabled ? 'Protected' : 'Not Protected'}
+          <div style={{ display:'flex', gap:16, justifyContent:'space-between', alignItems:'stretch', flexWrap:'wrap', marginBottom:16 }}>
+            <div style={{ flex:'1 1 520px', minWidth:280, display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ fontSize:14, letterSpacing:2, textTransform:'uppercase', color:'var(--admin-muted)', fontWeight:700 }}>
+                Admin Control Deck
               </div>
-              <button
-                onClick={toggleProtection}
-                disabled={protectionState.saving || protectionState.loading}
-                style={{
-                  ...S.button,
-                  ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
-                  minWidth: 180,
-                  opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
-                }}
-              >
-                {protectionState.saving ? 'Updating…' : protectionToggleLabel}
-              </button>
+              {showProtectionIndicator && (
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <div
+                    style={{
+                      display:'flex',
+                      alignItems:'center',
+                      gap:10,
+                      padding:'8px 16px',
+                      borderRadius:999,
+                      border:`1px solid ${protectionIndicatorColor}`,
+                      background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
+                      color: protectionIndicatorColor,
+                      fontWeight:700,
+                      letterSpacing:1,
+                      textTransform:'uppercase',
+                      boxShadow: protectionIndicatorShadow,
+                    }}
+                  >
+                    <span style={{ display:'inline-block', width:16, height:16, borderRadius:'50%', background:protectionIndicatorColor, boxShadow: protectionIndicatorShadow }} />
+                    {protectionIndicatorLabel}
+                  </div>
+                  <button
+                    onClick={toggleProtection}
+                    disabled={protectionState.saving || protectionState.loading}
+                    style={{
+                      ...S.button,
+                      ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
+                      minWidth: 180,
+                      opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
+                    }}
+                  >
+                    {protectionState.saving ? 'Updating…' : protectionToggleLabel}
+                  </button>
+                </div>
+              )}
             </div>
+            {tab === 'settings' && (
+              <div style={S.coverWindow}>
+                <div style={{ fontWeight:700, marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>Game Cover Image</span>
+                  <span style={{ fontSize:11, color:'var(--admin-muted)' }}>
+                    {coverImageUrl ? 'Active' : 'No image'}
+                  </span>
+                </div>
+                <div
+                  onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
+                  onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
+                  onDrop={(e)=>{
+                    e.preventDefault();
+                    setCoverDropActive(false);
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file) handleCoverFile(file);
+                  }}
+                  style={{ ...S.coverDrop, ...(coverDropActive ? S.coverDropActive : {}) }}
+                >
+                  {coverImageUrl ? (
+                    <img src={coverImageUrl} alt="Cover preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  ) : (
+                    <div style={{ color:'var(--admin-muted)', fontSize:12, textAlign:'center', padding:'12px' }}>
+                      Drag & drop artwork
+                    </div>
+                  )}
+                </div>
+                <div style={S.coverActions}>
+                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload</button>
+                  <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
+                    {coverPickerLoading ? 'Loading…' : 'Media Pool'}
+                  </button>
+                  <button
+                    style={{ ...S.button, ...S.buttonDanger }}
+                    onClick={clearCoverImage}
+                    disabled={!config?.game?.coverImage}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div style={S.coverInfo}>PNG, JPG, or GIF — 16:9 recommended.</div>
+              </div>
+            )}
           </div>
-          {protectionError && (
-            <div style={{ color: 'var(--admin-danger-color)', fontSize: 12, marginBottom: 12 }}>
+          {showProtectionIndicator && protectionError && (
+            <div style={{ color: PROTECTION_COLOR_ALERT, fontSize: 12, marginBottom: 12 }}>
               {protectionError}
             </div>
           )}
@@ -1999,16 +2062,47 @@ useEffect(()=>{
             {editing && (
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
-                  <div style={{ position:'sticky', top:0, zIndex:5, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', paddingBottom:8, marginBottom:8, borderBottom:'1px solid var(--admin-border-soft)' }}>
-                    <h3 style={{ margin:'8px 0' }}>Edit Mission</h3>
-                    <div style={{ display:'flex', gap:8 }}>
-                      <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                      <button style={S.button} onClick={cancelEdit}>Close</button>
+                  <div style={S.floatingBarTop}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
+                        Save and Close
+                      </button>
+                      <div style={{ fontSize: 12, color: 'var(--admin-muted)', fontWeight: 600 }}>
+                        ID:
+                        <span style={{ marginLeft: 6, fontFamily: 'var(--admin-font-mono, ui-monospace)' }}>
+                          {editing.id || '—'}
+                        </span>
+                      </div>
                     </div>
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        flex: 1,
+                        margin: '0 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <h3 style={{ margin: '0', fontSize: 18 }}>
+                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                      </h3>
+                      <input
+                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
+                        value={editing.title || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, title: e.target.value });
+                          setDirty(true);
+                        }}
+                        placeholder="Mission title"
+                      />
+                    </div>
+                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
+                      Cancel and Close
+                    </button>
                   </div>
 
-                  <Field label="ID"><input style={S.input} value={editing.id} onChange={(e)=>{ setEditing({ ...editing, id:e.target.value }); setDirty(true); }}/></Field>
-                  <Field label="Title"><input style={S.input} value={editing.title} onChange={(e)=>{ setEditing({ ...editing, title:e.target.value }); setDirty(true); }}/></Field>
                   <Field label="Type">
                     <select style={S.input} value={editing.type}
                       onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
@@ -2351,9 +2445,13 @@ useEffect(()=>{
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  <div style={{ display:'flex', gap:8, marginTop:12 }}>
-                    <button style={S.button} onClick={saveToList}>💾 Save Mission</button>
-                    <button style={S.button} onClick={cancelEdit}>Close</button>
+                  <div style={S.floatingBarBottom}>
+                    <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
+                      Save and Close
+                    </button>
+                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
+                      Cancel and Close
+                    </button>
                   </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
                 </div>
@@ -2469,33 +2567,36 @@ useEffect(()=>{
                 const resolvedPreview = previewThumb ? toDirectMediaURL(previewThumb) : '';
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, marginBottom:12, flexWrap:'wrap' }}>
-                      <div>
-                        <h4 style={{ margin:'0 0 4px 0' }}>{deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}</h4>
+                    <div style={S.floatingBarTop}>
+                      <button
+                        style={{ ...S.floatingButton, ...S.floatingSave }}
+                        onClick={saveDraftDevice}
+                      >
+                        Save and Close
+                      </button>
+                      <div style={{ flex:1, textAlign:'center', margin:'0 16px' }}>
+                        <h4 style={{ margin:'0 0 4px 0' }}>
+                          {deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}
+                        </h4>
                         {deviceEditorMode === 'edit' && devDraft.id && (
                           <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
                         )}
+                        <div style={{ marginTop:6 }}>
+                          <button
+                            type="button"
+                            style={S.subtleActionButton}
+                            onClick={resetDeviceEditor}
+                          >
+                            Reset draft
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'flex-end' }}>
-                        <button
-                          style={{ ...S.button, padding:'6px 12px' }}
-                          onClick={resetDeviceEditor}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          style={{ ...S.button, padding:'6px 12px' }}
-                          onClick={closeDeviceEditor}
-                        >
-                          Close
-                        </button>
-                        <button
-                          style={{ ...S.button, ...S.buttonSuccess, padding:'6px 12px' }}
-                          onClick={saveDraftDevice}
-                        >
-                          💾 Save & Close
-                        </button>
-                      </div>
+                      <button
+                        style={{ ...S.floatingButton, ...S.floatingCancel }}
+                        onClick={cancelDeviceEditor}
+                      >
+                        Cancel and Close
+                      </button>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -2631,6 +2732,20 @@ useEffect(()=>{
                       {devDraft.lat==null ? 'Click the map or search an address to set location'
                         : <>lat {Number(devDraft.lat).toFixed(6)}, lng {Number(devDraft.lng).toFixed(6)}</>}
                     </div>
+                    <div style={S.floatingBarBottom}>
+                      <button
+                        style={{ ...S.floatingButton, ...S.floatingSave }}
+                        onClick={saveDraftDevice}
+                      >
+                        Save and Close
+                      </button>
+                      <button
+                        style={{ ...S.floatingButton, ...S.floatingCancel }}
+                        onClick={cancelDeviceEditor}
+                      >
+                        Cancel and Close
+                      </button>
+                    </div>
                   </div>
                 );
               })()}
@@ -2761,14 +2876,7 @@ useEffect(()=>{
                   const file = e.dataTransfer?.files?.[0];
                   if (file) handleCoverFile(file);
                 }}
-                style={{
-                  border:`1px dashed ${coverDropActive ? '#3a8f5c' : '#2a323b'}`,
-                  background: coverDropActive ? '#14231a' : '#0b0c10',
-                  borderRadius:12,
-                  padding:16,
-                  textAlign:'center',
-                  color:'#9fb0bf',
-                }}
+                style={{ ...S.coverDrop, ...(coverDropActive ? S.coverDropActive : {}), minHeight:180, color:'#9fb0bf' }}
               >
                 <div style={{ fontWeight:600, color:'#e9eef2' }}>Drag & drop cover art</div>
                 <div style={{ fontSize:12, marginTop:4 }}>PNG, JPG, or GIF — optimised for 16:9 headers.</div>
@@ -3249,6 +3357,31 @@ const S = {
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
+  floatingBarTop: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 30,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    flexWrap: 'wrap',
+    padding: '12px 0',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    borderBottom: '1px solid var(--admin-border-soft)',
+  },
+  floatingBarBottom: {
+    position: 'sticky',
+    bottom: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    padding: '12px 0',
+    marginTop: 18,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    borderTop: '1px solid var(--admin-border-soft)',
+  },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
   input: {
     width: '100%',
@@ -3279,6 +3412,70 @@ const S = {
     background: 'var(--admin-success-bg)',
     color: 'var(--admin-body-color)',
   },
+  floatingButton: {
+    padding: '10px 18px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-color)',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+    minWidth: 160,
+    letterSpacing: 0.5,
+    boxShadow: 'var(--admin-glass-sheen)',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
+  },
+  floatingSave: {
+    background: 'linear-gradient(92deg, #1f7a32, #2dd36f)',
+    border: '1px solid rgba(56, 161, 105, 0.8)',
+    color: '#e9ffe9',
+    boxShadow: '0 0 18px rgba(56, 161, 105, 0.55)',
+  },
+  floatingCancel: {
+    background: 'linear-gradient(92deg, #7a2d00, #ff8800)',
+    border: '1px solid rgba(255, 136, 0, 0.8)',
+    color: '#fff4dd',
+    boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
+  },
+  coverWindow: {
+    flex: '0 0 300px',
+    minWidth: 260,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
+    borderRadius: 16,
+    padding: 14,
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  coverDrop: {
+    border: '1px dashed var(--admin-border-soft)',
+    borderRadius: 12,
+    minHeight: 150,
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+    background: 'var(--admin-input-bg)',
+    transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
+  },
+  coverDropActive: {
+    border: '1px dashed #3dc97d',
+    boxShadow: '0 0 18px rgba(61, 201, 125, 0.45)',
+    background: '#13261b',
+  },
+  coverActions: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  coverInfo: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    marginTop: 10,
+    textAlign: 'center',
+  },
   tab: {
     padding: '8px 12px',
     borderRadius: 12,
@@ -3304,6 +3501,16 @@ const S = {
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' },
   muted: { color: 'var(--admin-muted)' },
+  subtleActionButton: {
+    padding: '4px 12px',
+    borderRadius: 999,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-muted)',
+    cursor: 'pointer',
+    fontSize: 12,
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
 };
 
 /* MapOverview — shows missions + devices */
@@ -3919,6 +4126,197 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     };
   }, [config]);
 
+  const mediaUsageSummary = useMemo(() => {
+    const normalize = (value) => {
+      if (!value) return '';
+      try {
+        const direct = toDirectMediaURL(value) || String(value);
+        return String(direct).trim();
+      } catch {
+        return String(value || '').trim();
+      }
+    };
+
+    const inventoryIndex = new Map(
+      (mediaPool || [])
+        .map((item) => {
+          const key = normalize(item?.id || item?.url);
+          return key ? [key, item] : null;
+        })
+        .filter(Boolean)
+    );
+
+    const addTagValue = (set, value) => {
+      if (!set) return;
+      const normalizedTag = String(value || '').trim();
+      if (!normalizedTag) return;
+      set.add(normalizedTag);
+    };
+
+    const ensureEntry = (map, rawUrl, defaults = {}) => {
+      const key = normalize(rawUrl);
+      if (!key) return null;
+      const info = inventoryIndex.get(key);
+      let entry = map.get(key);
+      if (!entry) {
+        entry = {
+          url: key,
+          label: defaults.label || info?.name || baseNameFromUrl(key),
+          references: new Set(),
+          count: 0,
+          kind: defaults.kind || info?.type || classifyByExt(key),
+          thumbUrl: defaults.thumbUrl || info?.thumbUrl || '',
+          tags: new Set(),
+        };
+        map.set(key, entry);
+      }
+      if (!entry.label && (defaults.label || info?.name)) {
+        entry.label = defaults.label || info?.name;
+      }
+      if (!entry.kind && (defaults.kind || info?.type)) {
+        entry.kind = defaults.kind || info?.type || entry.kind;
+      }
+      if (!entry.thumbUrl && (defaults.thumbUrl || info?.thumbUrl)) {
+        entry.thumbUrl = defaults.thumbUrl || info?.thumbUrl || entry.thumbUrl;
+      }
+      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
+      (Array.isArray(defaults.tags) ? defaults.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
+      return entry;
+    };
+
+    const addUsage = (map, rawUrl, referenceLabel, defaults = {}) => {
+      const entry = ensureEntry(map, rawUrl, defaults);
+      if (!entry) return;
+      entry.count += 1;
+      if (referenceLabel) entry.references.add(referenceLabel);
+    };
+
+    const missionIconMap = new Map();
+    const deviceIconMap = new Map();
+    const rewardMap = new Map();
+    const penaltyMap = new Map();
+    const actionMap = new Map();
+    const responseCorrectMap = new Map();
+    const responseWrongMap = new Map();
+    const responseAudioMap = new Map();
+    const coverMap = new Map();
+
+    const missionIconLookup = new Map();
+    (config.icons?.missions || []).forEach((icon) => {
+      const url = normalize(icon?.url);
+      if (!url) return;
+      missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
+    });
+
+    (suite?.missions || []).forEach((mission) => {
+      if (!mission) return;
+      const title = mission.title || mission.id || 'Mission';
+      const iconUrls = new Set();
+      if (mission.iconUrl) {
+        const direct = normalize(mission.iconUrl);
+        if (direct) iconUrls.add(direct);
+      }
+      if (mission.iconKey && missionIconLookup.has(mission.iconKey)) {
+        const found = missionIconLookup.get(mission.iconKey);
+        if (found?.url) iconUrls.add(found.url);
+      }
+      iconUrls.forEach((url) => addUsage(missionIconMap, url, title));
+
+      if (mission.onCorrect?.mediaUrl) addUsage(responseCorrectMap, mission.onCorrect.mediaUrl, `${title} — Correct`);
+      if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
+      if (mission.onCorrect?.audioUrl) addUsage(responseAudioMap, mission.onCorrect.audioUrl, `${title} — Correct`);
+      if (mission.onWrong?.audioUrl) addUsage(responseAudioMap, mission.onWrong.audioUrl, `${title} — Wrong`);
+    });
+
+    const deviceIconLookup = new Map();
+    (config.icons?.devices || []).forEach((icon) => {
+      const url = normalize(icon?.url);
+      if (!url) return;
+      deviceIconLookup.set(icon.key, { url, name: icon.name || icon.key });
+    });
+
+    const deviceList = (config?.devices?.length ? config.devices : (config?.powerups || [])) || [];
+    deviceList.forEach((device) => {
+      if (!device) return;
+      const label = device.title || device.name || device.id || 'Device';
+      const urls = new Set();
+      if (device.iconUrl) {
+        const direct = normalize(device.iconUrl);
+        if (direct) urls.add(direct);
+      }
+      if (device.iconKey && deviceIconLookup.has(device.iconKey)) {
+        const found = deviceIconLookup.get(device.iconKey);
+        if (found?.url) urls.add(found.url);
+      }
+      urls.forEach((url) => addUsage(deviceIconMap, url, label));
+    });
+
+    (config.media?.rewardsPool || []).forEach((item) => {
+      if (!item?.url) return;
+      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
+      addUsage(rewardMap, item.url, item.label || 'Reward slot', { label: item.label || undefined, tags });
+    });
+
+    (config.media?.penaltiesPool || []).forEach((item) => {
+      if (!item?.url) return;
+      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
+      addUsage(penaltyMap, item.url, item.label || 'Penalty slot', { label: item.label || undefined, tags });
+    });
+
+    (config.media?.actionMedia || []).forEach((url) => {
+      addUsage(actionMap, url, 'Trigger assignment');
+    });
+
+    const coverUrl = normalize(config?.game?.coverImage);
+    if (coverUrl) {
+      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
+      if (entry) {
+        entry.count = Math.max(1, entry.count);
+        entry.references.add('Active cover image');
+      }
+    }
+
+    const finalize = (map) => Array.from(map.values()).map((entry) => {
+      const info = inventoryIndex.get(entry.url);
+      const label = entry.label || info?.name || baseNameFromUrl(entry.url);
+      const kind = entry.kind || info?.type || classifyByExt(entry.url);
+      const openUrl = info?.openUrl || entry.url;
+      const thumb = kind === 'audio'
+        ? ''
+        : (info?.thumbUrl || entry.thumbUrl || openUrl);
+      const tagSet = new Set();
+      if (entry.tags instanceof Set) {
+        entry.tags.forEach((tag) => addTagValue(tagSet, tag));
+      }
+      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(tagSet, tag));
+      return {
+        url: openUrl,
+        label,
+        count: entry.count,
+        references: Array.from(entry.references || []),
+        kind,
+        thumbUrl: thumb,
+        removeKey: entry.url,
+        tags: Array.from(tagSet),
+      };
+    }).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+
+    return {
+      missionIcons: finalize(missionIconMap),
+      deviceIcons: finalize(deviceIconMap),
+      rewardMedia: finalize(rewardMap),
+      penaltyMedia: finalize(penaltyMap),
+      actionMedia: finalize(actionMap),
+      responseCorrect: finalize(responseCorrectMap),
+      responseWrong: finalize(responseWrongMap),
+      responseAudio: finalize(responseAudioMap),
+      coverImages: finalize(coverMap),
+    };
+  }, [config, suite, mediaPool]);
+
   const arraysEqual = useCallback((a = [], b = []) => {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i += 1) {
@@ -3944,6 +4342,11 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }, [arraysEqual, setConfig]);
 
   const triggerEnabled = !!triggerConfig.enabled;
+
+  const editingIsNew = useMemo(() => {
+    if (!editing) return false;
+    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
+  }, [editing, suite]);
 
   const handleTriggerToggle = useCallback((enabled) => {
     setMediaTriggerPicker('');
@@ -3977,6 +4380,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
           onChange={handleAssignedStateChange}
           triggerEnabled={triggerEnabled}
           setTriggerEnabled={handleTriggerToggle}
+          usageSummary={mediaUsageSummary}
         />
 
         {triggerEnabled && (
