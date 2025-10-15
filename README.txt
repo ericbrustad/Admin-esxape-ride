@@ -1,8 +1,11 @@
-BANNER, COVER, MEDIA COUNT — 2025-10-15 11:38:21Z
+BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Removed the config.json quick link from the Admin Control Deck header per QA feedback. Commit: f89ac490b7ce147abe929c38e53b8c1fb470db05.
+  - Direct link: `pages/index.jsx`
+  - Notes: Keeps the header focused on tab navigation and Save & Publish while leaving the game folder selector and password protection toggle off by default.
 - 2025-10-15 — Cover workflow alignment & header preview cleanup. Commit: d173490c16c7aad4de654476372e23ccfd78adc1.
   - Direct link: `pages/index.jsx`
   - Notes: Replaced the banner preview with a single cover tile beside the Admin Control Deck title, retitled the settings upload tools to “Cover”, expanded accepted image formats, and updated instructional copy to highlight cover placement.

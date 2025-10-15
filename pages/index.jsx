@@ -1869,12 +1869,6 @@ useEffect(()=>{
               >
                 {savePubBusy ? 'Saving & Publishing…' : '💾 Save & Publish'}
               </button>
-              <a
-                href={isDefault ? '/api/config' : `/api/config${qs({ slug: activeSlug })}`}
-                target="_blank" rel="noreferrer" style={{ ...S.button }}
-              >
-                View config.json
-              </a>
             </div>
             {gameEnabled && (
               <div style={S.headerNavSecondary}>
