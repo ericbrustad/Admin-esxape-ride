@@ -844,6 +844,10 @@ export default function Admin() {
     };
   }, []);
 
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionError, setProtectionError] = useState('');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -959,10 +963,6 @@ export default function Admin() {
   const [devDraft, setDevDraft] = useState(() => createDeviceDraft());
   const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
-
-  const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
-  const [protectionError, setProtectionError] = useState('');
 
   // Combined Save & Publish
   const [deployDelaySec, setDeployDelaySec] = useState(5);
