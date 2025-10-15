@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "Secret Agent PAWS",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "secret-agent-paws"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1

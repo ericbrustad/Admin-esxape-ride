@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "mike",
-    "type": "Chase"
+    "type": "Chase",
+    "tags": [
+      "mike"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1

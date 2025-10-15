@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "jjj",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "jjj"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1

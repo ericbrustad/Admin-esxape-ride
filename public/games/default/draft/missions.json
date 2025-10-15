@@ -16,11 +16,7 @@
       "content": {
         "question": "hi",
         "answer": "hello",
-        "acceptable": [
-          "hello",
-          "hi",
-          "hey"
-        ],
+        "acceptable": "yes",
         "mediaUrl": "",
         "geofenceEnabled": true,
         "lat": 44.9778,
@@ -38,8 +34,10 @@
         "screenBgColor": "#000000",
         "screenBgOpacity": 0,
         "screenBgImage": "",
+        "screenBgImageEnabled": true,
         "textAlign": "center",
-        "textVertical": "top"
+        "textVertical": "top",
+        "panelDepth": true
       },
       "correct": {
         "mode": "none"

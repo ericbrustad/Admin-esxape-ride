@@ -5,7 +5,11 @@
   },
   "game": {
     "title": "Untitled Game",
-    "type": "Mystery"
+    "type": "Mystery",
+    "tags": [
+      "new-game-5"
+    ],
+    "coverImage": ""
   },
   "forms": {
     "players": 1
