@@ -4,13 +4,13 @@
     "mode": "single"
   },
   "game": {
-    "title": "mars",
+    "title": "Untitled Game",
     "type": "Mystery",
     "tags": [
       "default",
       "default-game"
     ],
-    "coverImage": "/media/covers/1760299015178-Gemini_Generated_Image_xrws2nxrws2nxrws.jpg"
+    "coverImage": "/media/uploads/1759945867484-panda_cute.jpg"
   },
   "forms": {
     "players": 1
