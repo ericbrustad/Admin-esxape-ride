@@ -1,8 +1,11 @@
-BANNER, COVER, MEDIA COUNT — 2025-10-15 11:20:21Z
+BANNER, COVER, MEDIA COUNT — 2025-10-15 11:38:21Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Cover workflow alignment & header preview cleanup. Commit: d173490c16c7aad4de654476372e23ccfd78adc1.
+  - Direct link: `pages/index.jsx`
+  - Notes: Replaced the banner preview with a single cover tile beside the Admin Control Deck title, retitled the settings upload tools to “Cover”, expanded accepted image formats, and updated instructional copy to highlight cover placement.
 - 2025-10-15 — Banner terminology refresh & assigned media usage counters. Commit: 0ee8fe81a2c7c96dee0eec8be60999cafbe94774.
   - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`
   - Notes: Renamed the game settings cover UX to a banner workflow with centered title + dual previews in the admin header, duplicated the banner preview as a Cover thumbnail beside the read-only heading, shifted media counts into Assigned Media with tag-aligned listings, and preserved the Game folder and password protection toggles in their off states.

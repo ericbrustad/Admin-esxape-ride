@@ -66,7 +66,7 @@ function hexToRgb(hex) {
   } catch { return '0,0,0'; }
 }
 const EXTS = {
-  image: /\.(png|jpg|jpeg|webp)$/i,
+  image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
@@ -1822,20 +1822,6 @@ useEffect(()=>{
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
-            <div style={S.headerPreviewGroup}>
-              <div style={S.headerPreviewLabel}>Banner</div>
-              <div style={S.bannerPreviewFrame}>
-                {coverImageUrl ? (
-                  <img
-                    src={coverImageUrl}
-                    alt="Game banner preview"
-                    style={S.bannerPreviewImage}
-                  />
-                ) : (
-                  <span style={S.bannerPreviewPlaceholder}>No Banner</span>
-                )}
-              </div>
-            </div>
             <div style={S.headerTitleColumn}>
               <div style={S.headerGameTitle}>{headerGameTitle}</div>
               <div style={S.headerSubtitle}>Admin Control Deck</div>
@@ -1953,10 +1939,10 @@ useEffect(()=>{
                 )}
               </div>
               {tab === 'settings' && (
-                <div style={S.bannerSummary}>
-                  <div style={{ fontWeight:700 }}>Banner status</div>
+                <div style={S.coverSummary}>
+                  <div style={{ fontWeight:700 }}>Cover status</div>
                   <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
-                    {coverImageUrl ? 'Banner art ready — drag a new image below to replace.' : 'No banner selected yet — add artwork in the settings panel.'}
+                    {coverImageUrl ? 'Cover art ready — drag a new image below to replace.' : 'No cover selected yet — add artwork in the settings panel.'}
                   </div>
                 </div>
               )}
@@ -2831,16 +2817,6 @@ useEffect(()=>{
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
-              <div style={S.bannerThumbGroup}>
-                <div style={S.previewLabel}>Banner</div>
-                <div style={S.bannerThumbFrame}>
-                  {coverImageUrl ? (
-                    <img src={coverImageUrl} alt="Game banner preview" style={S.bannerThumbImage} />
-                  ) : (
-                    <span style={S.bannerThumbPlaceholder}>Banner</span>
-                  )}
-                </div>
-              </div>
               <div style={S.coverThumbGroup}>
                 <div style={S.previewLabel}>Cover</div>
                 <div style={S.coverThumbFrame}>
@@ -2861,7 +2837,7 @@ useEffect(()=>{
                 />
               </div>
             </div>
-            <div style={S.bannerControlsRow}>
+            <div style={S.coverControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); setCoverDropActive(true); }}
                 onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
@@ -2871,19 +2847,19 @@ useEffect(()=>{
                   const file = e.dataTransfer?.files?.[0];
                   if (file) handleCoverFile(file);
                 }}
-                style={{ ...S.bannerDropZone, ...(coverDropActive ? S.bannerDropZoneActive : {}) }}
+                style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
               >
                 {coverImageUrl ? (
-                  <img src={coverImageUrl} alt="Banner preview" style={S.bannerDropImage} />
+                  <img src={coverImageUrl} alt="Cover preview" style={S.coverDropImage} />
                 ) : (
-                  <div style={S.bannerDropPlaceholder}>
-                    <strong>Drag & drop banner art</strong>
-                    <span>PNG, JPG, or GIF · ideal at 16:9</span>
+                  <div style={S.coverDropPlaceholder}>
+                    <strong>Drag & drop cover art</strong>
+                    <span>Any image format · ideal at 16:9</span>
                   </div>
                 )}
               </div>
-              <div style={S.bannerActionsColumn}>
-                <div style={S.bannerActionButtons}>
+              <div style={S.coverActionsColumn}>
+                <div style={S.coverActionButtons}>
                   <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
                   <input
                     ref={coverFileInputRef}
@@ -2908,10 +2884,10 @@ useEffect(()=>{
                   </button>
                 </div>
                 {uploadStatus && (
-                  <div style={S.bannerActionStatus}>{uploadStatus}</div>
+                  <div style={S.coverActionStatus}>{uploadStatus}</div>
                 )}
-                <div style={S.bannerActionHint}>
-                  Tip: banner art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
+                <div style={S.coverActionHint}>
+                  Tip: cover art also appears beside the Admin Control Deck title and saves to <code>/media/covers</code>.
                 </div>
               </div>
             </div>
@@ -3150,12 +3126,12 @@ useEffect(()=>{
       {coverPickerOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:1600, padding:16 }}>
           <div style={{ ...S.card, width:'min(680px, 94vw)', maxHeight:'80vh', overflowY:'auto' }}>
-            <h3 style={{ marginTop:0 }}>Select Banner Image</h3>
+            <h3 style={{ marginTop:0 }}>Select Cover Image</h3>
             {coverPickerLoading ? (
               <div style={{ color:'#9fb0bf' }}>Loading media…</div>
             ) : coverPickerItems.length === 0 ? (
               <div style={{ color:'#9fb0bf' }}>
-                No banner-ready images found. Upload a new file or add art to the media pool.
+                No cover-ready images found. Upload a new file or add art to the media pool.
               </div>
             ) : (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:12 }}>
@@ -3470,11 +3446,10 @@ const S = {
   },
   headerTopRow: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: 16,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 24,
     alignItems: 'center',
     marginBottom: 16,
-    textAlign: 'center',
   },
   headerPreviewGroup: {
     display: 'grid',
@@ -3487,27 +3462,9 @@ const S = {
     letterSpacing: '0.12em',
     color: 'var(--admin-muted)',
   },
-  bannerPreviewFrame: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    display: 'grid',
-    placeItems: 'center',
-    overflow: 'hidden',
-    boxShadow: '0 0 18px rgba(0,0,0,0.18)',
-  },
-  bannerPreviewImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  bannerPreviewPlaceholder: {
-    fontSize: 10,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.1em',
-  },
   coverPreviewFrame: {
-    width: 56,
-    height: 56,
+    width: 72,
+    height: 72,
     borderRadius: 18,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-tab-bg)',
@@ -3525,7 +3482,7 @@ const S = {
   },
   headerTitleColumn: {
     display: 'grid',
-    justifyItems: 'center',
+    justifyItems: 'start',
     gap: 4,
   },
   headerGameTitle: {
@@ -3564,13 +3521,8 @@ const S = {
     display: 'flex',
     gap: 16,
     flexWrap: 'wrap',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     marginBottom: 16,
-  },
-  bannerThumbGroup: {
-    display: 'grid',
-    gap: 6,
-    justifyItems: 'center',
   },
   coverThumbGroup: {
     display: 'grid',
@@ -3582,23 +3534,6 @@ const S = {
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
     color: 'var(--admin-muted)',
-  },
-  bannerThumbFrame: {
-    width: 120,
-    height: 68,
-    borderRadius: 14,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    display: 'grid',
-    placeItems: 'center',
-    overflow: 'hidden',
-  },
-  bannerThumbImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  bannerThumbPlaceholder: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
   },
   coverThumbFrame: {
     width: 84,
@@ -3628,13 +3563,13 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  bannerControlsRow: {
+  coverControlsRow: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 16,
     alignItems: 'stretch',
   },
-  bannerDropZone: {
+  coverDropZone: {
     flex: '1 1 280px',
     minHeight: 150,
     border: '1px dashed var(--admin-border-soft)',
@@ -3645,13 +3580,13 @@ const S = {
     overflow: 'hidden',
     transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
   },
-  bannerDropZoneActive: {
+  coverDropZoneActive: {
     border: '1px dashed #3dc97d',
     boxShadow: '0 0 18px rgba(61, 201, 125, 0.45)',
     background: '#13261b',
   },
-  bannerDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  bannerDropPlaceholder: {
+  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverDropPlaceholder: {
     color: 'var(--admin-muted)',
     fontSize: 12,
     textAlign: 'center',
@@ -3659,26 +3594,26 @@ const S = {
     gap: 6,
     padding: 16,
   },
-  bannerActionsColumn: {
+  coverActionsColumn: {
     flex: '0 0 220px',
     minWidth: 200,
     display: 'flex',
     flexDirection: 'column',
     gap: 10,
   },
-  bannerActionButtons: {
+  coverActionButtons: {
     display: 'grid',
     gap: 8,
   },
-  bannerActionStatus: {
+  coverActionStatus: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  bannerActionHint: {
+  coverActionHint: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  bannerSummary: {
+  coverSummary: {
     flex: '1 1 260px',
     minWidth: 240,
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
@@ -4483,10 +4418,10 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 
     const coverUrl = normalize(safeConfig?.game?.coverImage);
     if (coverUrl) {
-      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game banner art' });
+      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
       if (entry) {
         entry.count = Math.max(1, entry.count);
-        entry.references.add('Active banner image');
+        entry.references.add('Active cover image');
       }
     }
 
