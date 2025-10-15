@@ -1,9 +1,12 @@
-work — 2025-10-15 15:13:39Z
+work — 2025-10-15 15:32:10Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
+  - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
+  - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.
 - 2025-10-15 — Header blur, cover save workflow, and media deletion fix. Commit: 97242a44ebaa6cbc54e9227762a211b57cb39e90
   - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `components/InlineMissionResponses.jsx`, `pages/api/list-media.js`
   - Notes: Centered the Admin Control Deck title on a blurred header band with a brighter Save & Publish button, expanded the cover workspace with a dedicated Save Cover Image action, removed thumbnail clutter, hardened mission response rendering, and made Media Pool deletions respect repository paths. Note to review @ 2025-10-15 15:13:39Z.

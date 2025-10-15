@@ -1,5 +1,25 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
+const DEFAULT_SIDE_STATE = {
+  statement: "",
+  mediaUrl: "",
+  audioUrl: "",
+  durationSeconds: 0,
+  buttonText: "OK",
+  enabled: false,
+  deviceId: undefined,
+  deviceLabel: undefined,
+};
+
+function normalizeMission(editing) {
+  const base = (editing && typeof editing === "object") ? editing : {};
+  return {
+    ...base,
+    onCorrect: { ...DEFAULT_SIDE_STATE, ...(base.onCorrect || {}) },
+    onWrong: { ...DEFAULT_SIDE_STATE, ...(base.onWrong || {}) },
+  };
+}
+
 /**
  * InlineMissionResponses.jsx
  *
@@ -52,6 +72,7 @@ function fallbackLabelFromUrl(u) {
 }
 
 export default function InlineMissionResponses({ editing, setEditing, inventory = [] }) {
+  const safeEditing = useMemo(() => normalizeMission(editing), [editing]);
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
@@ -101,20 +122,17 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   }, []);
 
   function ensureSide(side) {
-    if (!editing) return {};
-    const s = editing[side] || {};
-    return s;
+    return safeEditing[side] || { ...DEFAULT_SIDE_STATE };
   }
 
   function updateSide(side, next) {
-    const cur = editing || {};
-    const nextObj = { ...(cur[side] || {}), ...next };
-    // ensure presence on mission object and mark mission as having responses
-    const updated = { ...cur, [side]: nextObj };
-    // mark mission-level triggers/markers
-    const hasTrigger = ((updated.onCorrect && updated.onCorrect.enabled) || (updated.onWrong && updated.onWrong.enabled));
-    updated._hasResponseTrigger = hasTrigger; // an internal marker the parent can use to render badges
-    setEditing(updated);
+    const cur = (editing && typeof editing === "object") ? editing : {};
+    const safeSide = ensureSide(side);
+    const nextObj = { ...safeSide, ...next };
+    const normalized = normalizeMission({ ...cur, [side]: nextObj });
+    const hasTrigger = ((normalized.onCorrect && normalized.onCorrect.enabled) || (normalized.onWrong && normalized.onWrong.enabled));
+    normalized._hasResponseTrigger = hasTrigger;
+    setEditing(normalized);
   }
 
   function readFileAsBase64(file) {
