@@ -845,36 +845,6 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (
-        coverUploadPreview &&
-        coverUploadPreview.startsWith('blob:') &&
-        typeof URL !== 'undefined' &&
-        typeof URL.revokeObjectURL === 'function'
-      ) {
-        try { URL.revokeObjectURL(coverUploadPreview); } catch {}
-      }
-    };
-  }, [coverUploadPreview]);
-
-  useEffect(() => {
-    if (!coverUploadTarget) return;
-    const safeNormalize = (value) => {
-      try {
-        return toDirectMediaURL(value || '');
-      } catch {
-        return String(value || '');
-      }
-    };
-    const normalizedTarget = safeNormalize(coverUploadTarget);
-    const normalizedCurrent = config?.game?.coverImage ? safeNormalize(config.game.coverImage) : '';
-    if (normalizedTarget && normalizedCurrent && normalizedTarget === normalizedCurrent) {
-      setCoverUploadTarget('');
-      setCoverUploadPreview('');
-    }
-  }, [config?.game?.coverImage, coverUploadTarget]);
-
-  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -943,6 +913,36 @@ export default function Admin() {
   const [coverDropActive, setCoverDropActive] = useState(false);
   const [coverUploadPreview, setCoverUploadPreview] = useState('');
   const [coverUploadTarget, setCoverUploadTarget] = useState('');
+
+  useEffect(() => {
+    return () => {
+      if (
+        coverUploadPreview &&
+        coverUploadPreview.startsWith('blob:') &&
+        typeof URL !== 'undefined' &&
+        typeof URL.revokeObjectURL === 'function'
+      ) {
+        try { URL.revokeObjectURL(coverUploadPreview); } catch {}
+      }
+    };
+  }, [coverUploadPreview]);
+
+  useEffect(() => {
+    if (!coverUploadTarget) return;
+    const safeNormalize = (value) => {
+      try {
+        return toDirectMediaURL(value || '');
+      } catch {
+        return String(value || '');
+      }
+    };
+    const normalizedTarget = safeNormalize(coverUploadTarget);
+    const normalizedCurrent = config?.game?.coverImage ? safeNormalize(config.game.coverImage) : '';
+    if (normalizedTarget && normalizedCurrent && normalizedTarget === normalizedCurrent) {
+      setCoverUploadTarget('');
+      setCoverUploadPreview('');
+    }
+  }, [config?.game?.coverImage, coverUploadTarget]);
   const coverFileInputRef = useRef(null);
   const [gameTagsDraft, setGameTagsDraft] = useState('');
 
