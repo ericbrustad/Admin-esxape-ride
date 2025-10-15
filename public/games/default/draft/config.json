@@ -3,6 +3,10 @@
     "enabled": true,
     "mode": "single"
   },
+  "flags": {
+    "gameFolderEnabled": false,
+    "passwordToggle": false
+  },
   "game": {
     "title": "Untitled Game",
     "type": "Mystery",

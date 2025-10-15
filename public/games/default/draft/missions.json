@@ -24,6 +24,33 @@
         "radiusMeters": 25,
         "cooldownSeconds": 30
       },
+      "combinedTasks": [
+        {
+          "sourceCommit": "ea8b2a4",
+          "title": "Trivia Icon Upload",
+          "summary": "Added the trivia_yellow.png media resource so the mission art bundle stays current."
+        },
+        {
+          "sourceCommit": "ca43199",
+          "title": "Cover Artwork Upload",
+          "summary": "Delivered the download.jpg cover asset for future game presentation updates."
+        },
+        {
+          "sourceCommit": "0f93bda",
+          "title": "Legacy Config Refresh",
+          "summary": "Saved the admin legacy configuration bundle from October 14, 2025."
+        },
+        {
+          "sourceCommit": "d331f96",
+          "title": "Legacy Missions Refresh",
+          "summary": "Saved the admin legacy missions bundle to align with the updated configuration."
+        },
+        {
+          "sourceCommit": "6834910",
+          "title": "Current Config Refresh",
+          "summary": "Saved the admin configuration bundle so the live game profile matched the legacy export."
+        }
+      ],
       "appearanceOverrideEnabled": false,
       "appearance": {
         "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
