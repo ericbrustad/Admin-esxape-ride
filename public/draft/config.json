@@ -10,7 +10,8 @@
       "default",
       "default-game"
     ],
-    "coverImage": "/media/uploads/1759945867484-panda_cute.jpg"
+    "coverImage": "/media/covers/1760532373127-casper.jpg",
+    "deployEnabled": false
   },
   "forms": {
     "players": 1
