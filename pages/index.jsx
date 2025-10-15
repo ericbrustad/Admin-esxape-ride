@@ -2048,8 +2048,8 @@ export default function Admin() {
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
-  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
+  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — drag a new image below to replace.'

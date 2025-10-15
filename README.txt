@@ -1,9 +1,12 @@
-work — 2025-10-15 13:06:07Z
+work — 2025-10-15 13:24:05Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Admin landing crash fix and Assigned Media recovery. Commit: 65c62abe2882c3fd4360dc1236288862ab78b9a1
+  - Direct links: `pages/index.jsx`
+  - Notes: Restores the admin dashboard, mission modal, and Assigned Media tab by fixing the deployment banner reference order so the page no longer throws an application error. Note to review @ 2025-10-15 13:24:05Z.
 - 2025-10-15 — Admin meta banner, cover upload repair, and Assigned Media fixes. Commit: ddfa091ed00500a9556641f4e747281d2b514570.
   - Direct links: `pages/api/admin-meta.js`, `pages/index.jsx`, `components/AssignedMediaTab.jsx`
   - Notes: Adds a top-of-page branch/deployment banner with timestamps, stabilizes cover drag & drop previews so PNG/JPG art immediately appears in Settings and the Media Pool, resizes the cover workspace, relocates device Save/Close actions beneath the map, and updates Assigned Media to show tag labels with usage counts while restoring the tab from its crash.
