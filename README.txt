@@ -1,9 +1,12 @@
-work — 2025-10-15 15:32:10Z
+work — 2025-10-15 21:53:17Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-15 — Custom App rename so Next.js accepts global styles. Commit: c154aad6de81cd748a2c7312519ffed6b0d9a9e3
+  - Direct links: `pages/_app.js`
+  - Notes: Renamed the custom App entrypoint to `_app.js` so Next.js 14+ no longer rejects the global stylesheet import during build; verify the admin shell renders without the global CSS compilation error. Note to review @ 2025-10-15 21:53:17Z.
 - 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
   - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
   - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.
