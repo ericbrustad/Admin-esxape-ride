@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 const ADMIN_PROTECTION_PATH = path.join(process.cwd(), 'public', 'admin-protection.json');
 const GAME_PROTECTION_PATHS = [
@@ -32,9 +33,10 @@ async function readProtection(filePath) {
     return {
       protected: normalizeProtectedFlag(data.protected),
       updatedAt: data.updatedAt || null,
+      passwordHash: typeof data.passwordHash === 'string' ? data.passwordHash : '',
     };
   } catch (err) {
-    return { protected: false, updatedAt: null };
+    return { protected: false, updatedAt: null, passwordHash: '' };
   }
 }
 
@@ -46,13 +48,14 @@ async function readFirstAvailable(paths) {
       return {
         protected: normalizeProtectedFlag(data.protected),
         updatedAt: data.updatedAt || null,
+        passwordHash: typeof data.passwordHash === 'string' ? data.passwordHash : '',
       };
     } catch (err) {
       // Continue trying other candidates when the file is missing or invalid.
     }
   }
 
-  return { protected: false, updatedAt: null };
+  return { protected: false, updatedAt: null, passwordHash: '' };
 }
 
 async function readGameProtection() {
@@ -71,14 +74,25 @@ async function syncGameProtection(targetState, nowIso) {
     return current;
   }
 
+  const requestedProtected = typeof targetState === 'object' && targetState !== null
+    ? targetState.protected
+    : targetState;
+  const requestedHash = typeof targetState === 'object' && targetState !== null
+    ? targetState.passwordHash
+    : undefined;
+
   const nextState = {
-    protected: normalizeProtectedFlag(targetState),
+    protected: normalizeProtectedFlag(requestedProtected),
     updatedAt: nowIso || new Date().toISOString(),
+    passwordHash: typeof requestedHash === 'string'
+      ? requestedHash
+      : current.passwordHash || '',
   };
 
   if (
     current.protected === nextState.protected &&
-    current.updatedAt === nextState.updatedAt
+    current.updatedAt === nextState.updatedAt &&
+    current.passwordHash === nextState.passwordHash
   ) {
     return current;
   }
@@ -96,6 +110,19 @@ async function syncGameProtection(targetState, nowIso) {
   return nextState;
 }
 
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function passwordsMatch(hash, password) {
+  if (!hash) return false;
+  const compare = hashPassword(password);
+  const left = Buffer.from(hash, 'hex');
+  const right = Buffer.from(compare, 'hex');
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const adminState = await readProtection(ADMIN_PROTECTION_PATH);
@@ -105,6 +132,7 @@ export default async function handler(req, res) {
       updatedAt: adminState.updatedAt,
       gameProtected: !!gameState.protected,
       gameUpdatedAt: gameState.updatedAt,
+      passwordSet: !!adminState.passwordHash,
     });
   }
 
@@ -112,11 +140,48 @@ export default async function handler(req, res) {
     try {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const target = normalizeProtectedFlag(body.protected, false);
+      const password = typeof body.password === 'string' ? body.password : '';
+      const confirmPassword = typeof body.confirmPassword === 'string' ? body.confirmPassword : '';
+
+      const current = await readProtection(ADMIN_PROTECTION_PATH);
       const nowIso = new Date().toISOString();
-      const adminState = { protected: target, updatedAt: nowIso };
+
+      if (!password.trim()) {
+        return res.status(400).json({ error: 'Password required' });
+      }
+
+      if (target) {
+        if (current.passwordHash) {
+          if (!passwordsMatch(current.passwordHash, password)) {
+            return res.status(401).json({ error: 'Incorrect password' });
+          }
+        } else {
+          if (password.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+          }
+          if (password !== confirmPassword) {
+            return res.status(400).json({ error: 'Passwords do not match' });
+          }
+        }
+      } else {
+        if (!current.passwordHash) {
+          return res.status(400).json({ error: 'Protection has no password set yet' });
+        }
+        if (!passwordsMatch(current.passwordHash, password)) {
+          return res.status(401).json({ error: 'Incorrect password' });
+        }
+      }
+
+      const passwordHash = current.passwordHash || hashPassword(password);
+      const adminState = { protected: target, updatedAt: nowIso, passwordHash };
       await writeProtection(ADMIN_PROTECTION_PATH, adminState);
-      const gameState = await syncGameProtection(target, nowIso);
-      return res.status(200).json({ ...adminState, gameProtected: gameState.protected });
+      const gameState = await syncGameProtection(adminState, nowIso);
+      return res.status(200).json({
+        protected: adminState.protected,
+        updatedAt: adminState.updatedAt,
+        gameProtected: gameState.protected,
+        passwordSet: true,
+      });
     } catch (err) {
       return res.status(400).json({ error: err?.message || 'Invalid request body' });
     }
