@@ -1,9 +1,12 @@
-work — 2025-10-15 15:32:10Z
+work — 2025-10-16 01:37:48Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Document default root vs online game storage paths. Commit: HEAD (Document default vs online game storage)
+  - Direct links: `public/config.json`, `public/missions.json`, `public/games/default/`, `public/games/index.json`, `public/draft/`
+  - Notes: Clarifies that the Default Game served at the root uses `public/config.json` and `public/missions.json`, while published slugs and the live deployment picker draw from `public/games/<slug>/` (with listings in `public/games/index.json`) and staging drafts in `public/draft/`. Note to review @ 2025-10-16 01:37:48Z.
 - 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
   - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
   - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.
