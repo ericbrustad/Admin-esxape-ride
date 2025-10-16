@@ -5,7 +5,7 @@ export const config = { matcher: '/:path*' };
 const ADMIN_CHECK_HEADER = 'x-admin-protection-check';
 const CACHE_TTL_MS = 15_000;
 
-const protectionCache = { enabled: false, expiresAt: 0 };
+const protectionCache = { enabled: false, expiresAt: 1 };
 
 function unauthorized(realm = 'Esx Admin') {
   return new Response('Auth required', {
