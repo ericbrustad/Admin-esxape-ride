@@ -1,0 +1,7 @@
+node_modules/
+.next/
+public/game/node_modules/
+game/node_modules/
+.env.local
+.vercel
+.DS_Store
