@@ -2,7 +2,13 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 const ADMIN_PROTECTION_PATH = path.join(process.cwd(), 'public', 'admin-protection.json');
-const GAME_PROTECTION_PATH = path.join(process.cwd(), 'game', 'public', 'admin-protection.json');
+const GAME_PROTECTION_PATH = path.join(
+  process.cwd(),
+  'public',
+  'game',
+  'public',
+  'admin-protection.json',
+);
 
 async function ensureDir(filePath) {
   const dir = path.dirname(filePath);
@@ -27,12 +33,25 @@ async function writeProtection(filePath, state) {
   await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf8');
 }
 
-async function syncGameProtection(nowIso) {
+async function syncGameProtection(targetState, nowIso) {
   const current = await readProtection(GAME_PROTECTION_PATH);
-  if (!current.protected && current.updatedAt && !nowIso) {
+
+  if (typeof targetState === 'undefined') {
     return current;
   }
-  const nextState = { protected: false, updatedAt: nowIso || new Date().toISOString() };
+
+  const nextState = {
+    protected: !!targetState,
+    updatedAt: nowIso || new Date().toISOString(),
+  };
+
+  if (
+    current.protected === nextState.protected &&
+    current.updatedAt === nextState.updatedAt
+  ) {
+    return current;
+  }
+
   await writeProtection(GAME_PROTECTION_PATH, nextState);
   return nextState;
 }
@@ -40,7 +59,7 @@ async function syncGameProtection(nowIso) {
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const adminState = await readProtection(ADMIN_PROTECTION_PATH);
-    const gameState = await syncGameProtection(null);
+    const gameState = await syncGameProtection();
     return res.status(200).json({
       protected: adminState.protected,
       updatedAt: adminState.updatedAt,
@@ -56,7 +75,7 @@ export default async function handler(req, res) {
       const nowIso = new Date().toISOString();
       const adminState = { protected: target, updatedAt: nowIso };
       await writeProtection(ADMIN_PROTECTION_PATH, adminState);
-      const gameState = await syncGameProtection(nowIso);
+      const gameState = await syncGameProtection(target, nowIso);
       return res.status(200).json({ ...adminState, gameProtected: gameState.protected });
     } catch (err) {
       return res.status(400).json({ error: err?.message || 'Invalid request body' });
