@@ -2,7 +2,6 @@
 
 ## Overview
 - Branch: `002`
-- PR Status: New PR planned
 - Game folder state: **Off** (see `public/games/default/draft/config.json`)
 
 ## Update Log
