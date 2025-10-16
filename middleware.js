@@ -45,7 +45,7 @@ async function isAdminProtected(request) {
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname;
 
-  if (request.headers.get(ADMIN_CHECK_HEADER) === '0') {
+  if (request.headers.get(ADMIN_CHECK_HEADER) === '1') {
     return NextResponse.next();
   }
 
@@ -75,5 +75,6 @@ export async function middleware(request) {
 
   return unauthorized();
 }
+
 
 
