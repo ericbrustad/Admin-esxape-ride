@@ -1869,6 +1869,27 @@ export default function Admin() {
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
+  const selectGameOptions = useMemo(() => {
+    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
+    const extra = Array.isArray(games)
+      ? games
+          .filter((g) => g && g.slug && g.slug !== 'default')
+          .map((g) => ({
+            value: g.slug,
+            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
+          }))
+      : [];
+    const seen = new Set();
+    const combined = [];
+    [...baseOptions, ...extra].forEach((option) => {
+      if (!option || !option.value) return;
+      if (seen.has(option.value)) return;
+      seen.add(option.value);
+      combined.push(option);
+    });
+    return combined;
+  }, [games]);
+
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
@@ -2083,26 +2104,6 @@ export default function Admin() {
       ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
       : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
-  const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
-    });
-    return combined;
-  }, [games]);
 
   return (
     <div style={S.body}>

@@ -1,9 +1,11 @@
-work — 2025-10-16 00:46:47Z
+work — 2025-10-16 13:05:37Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
-## Update Log
+- 2025-10-16 — Admin client boot fix & config fallback. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/config.js`
+  - Notes: Moves the game selector memo outside the loading guard so React's hook order never shifts during the first render, adds a filesystem fallback when GitHub credentials are missing so `/api/config` returns 200 locally, and verified the admin banner still surfaces the branch/deployment header. Note to review @ 2025-10-16 13:05:37Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
