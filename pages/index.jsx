@@ -2077,6 +2077,14 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaRepoSlug = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
+  const metaRepoBaseUrl = adminMeta.owner && adminMeta.repo
+    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
+    : '';
+  const metaMainBranchUrl = metaRepoBaseUrl ? `${metaRepoBaseUrl}/tree/main` : '';
+  const metaMainXBranchUrl = metaRepoBaseUrl ? `${metaRepoBaseUrl}/tree/MainX` : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2110,9 +2118,21 @@ export default function Admin() {
         <div style={S.metaBannerLine}>
           <span><strong>Branch:</strong> {metaBranchLabel}</span>
           {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
+          {metaRepoSlug && (
             <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
+              {metaRepoSlug}
+            </span>
+          )}
+          {metaRepoBaseUrl && (
+            <span>
+              <strong>Branches:</strong>{' '}
+              <a href={metaMainXBranchUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                MainX
+              </a>
+              {' · '}
+              <a href={metaMainBranchUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                main
+              </a>
             </span>
           )}
           {metaDeploymentState && (

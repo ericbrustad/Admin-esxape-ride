@@ -1,9 +1,12 @@
-work — 2025-10-15 15:32:10Z
+work — 2025-10-16 01:40:16Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Direct branch links for MainX and main. Commit: 3e1b10791d8ebc0df593bf19a05c8b824027136b
+  - Direct links: `pages/index.jsx`
+  - Notes: Adds GitHub shortcuts for the MainX and main branches inside the admin banner so release managers can jump straight to branch history while keeping the repository slug visible alongside deployment data. Note to review @ 2025-10-16 01:40:16Z.
 - 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
   - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
   - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.
