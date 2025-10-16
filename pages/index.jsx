@@ -1300,7 +1300,6 @@ export default function Admin() {
     }
 
     await reloadGamesList();
-    setPreviewNonce(n => n + 1);
     setSavePubBusy(false);
   }
 
@@ -1343,7 +1342,6 @@ export default function Admin() {
       await reloadGamesList();
       setActiveSlug('default');
       setStatus('✅ Game deleted');
-      setPreviewNonce(n => n + 1);
     } else {
       setStatus('❌ Delete failed: ' + (lastErr || 'unknown error'));
     }
