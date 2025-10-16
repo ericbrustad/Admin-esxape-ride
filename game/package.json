@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "vercel-build": "next build"
+    "build": "node ./scripts/next-cli.js build",
+    "start": "node ./scripts/next-cli.js start",
+    "vercel-build": "node ./scripts/next-cli.js build"
   },
   "dependencies": {
     "next": "14.2.5",

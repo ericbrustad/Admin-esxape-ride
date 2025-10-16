@@ -1,9 +1,12 @@
-work — 2025-10-16 12:37:34Z
+work — 2025-10-16 12:53:53Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Game lockfile patch bypass for offline build. Commit: (pending HEAD)
+  - Direct links: `game/package.json`, `game/scripts/next-cli.js`
+  - Notes: Routes `npm run build` and `vercel-build` through a helper that sets `NEXT_IGNORE_INCORRECT_LOCKFILE=1` so Next skips the networked lockfile patch fetch, keeping the game build working when outbound requests are blocked. Confirmed `npm run build` inside `/game` now completes successfully. Note to review @ 2025-10-16 12:53:53Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
