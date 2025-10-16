@@ -731,7 +731,7 @@ function normalizeGameMetadata(cfg, slug = '') {
   game.title = normalizedTitle || 'Default Game';
   game.type = normalizedType || 'Mystery';
   game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
-  game.deployEnabled = game.deployEnabled === true;
+  game.deployEnabled = false;
   base.game = game;
   return base;
 }
@@ -1930,14 +1930,23 @@ export default function Admin() {
   }
 
   function setDeployEnabled(nextEnabled) {
+    if (nextEnabled) {
+      setConfig(prev => {
+        if (!prev) return prev;
+        if (prev.game?.deployEnabled === false) return prev;
+        return { ...prev, game: { ...(prev.game || {}), deployEnabled: false } };
+      });
+      setStatus('Game deployment is locked off — Save & Publish updates admin data only.');
+      return;
+    }
+
     setConfig(prev => {
       if (!prev) return prev;
-      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
+      if (prev.game?.deployEnabled === false) return prev;
+      return { ...prev, game: { ...(prev.game || {}), deployEnabled: false } };
     });
     setDirty(true);
-    setStatus(nextEnabled
-      ? 'Game deployment enabled — Save & Publish will deploy the game build.'
-      : 'Game deployment disabled — Save & Publish updates admin data only.');
+    setStatus('Game deployment disabled — Save & Publish updates admin data only.');
   }
 
   async function handleCoverFile(file) {
@@ -2069,7 +2078,7 @@ export default function Admin() {
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = config?.game?.deployEnabled === true;
+  const deployGameEnabled = false;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
@@ -2187,9 +2196,14 @@ export default function Admin() {
                     type="checkbox"
                     checked={deployGameEnabled}
                     onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled
+                    aria-disabled="true"
                   />
-                  Deploy game build
+                  Deploy game build (locked off)
                 </label>
+                <div style={{ fontSize:11, color:'var(--admin-muted)' }}>
+                  Game deployments are disabled per admin request. Save &amp; Publish will only update dashboard data.
+                </div>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   Deploy delay (sec):
                   <input
@@ -3245,11 +3259,13 @@ export default function Admin() {
                   type="checkbox"
                   checked={deployGameEnabled}
                   onChange={(e)=>setDeployEnabled(e.target.checked)}
+                  disabled
+                  aria-disabled="true"
                 />
-                Enable publishing to the live game build
+                Enable publishing to the live game build (locked off)
               </label>
               <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
-                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
+                Game deployments are disabled in this environment. Save &amp; Publish will only update admin data.
               </div>
             </Field>
             <Field label="Stripe Splash Page">

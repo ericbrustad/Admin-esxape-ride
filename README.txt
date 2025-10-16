@@ -1,9 +1,12 @@
-work — 2025-10-16 00:46:47Z
+work — 2025-10-16 12:35:31Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Lock game deployment toggle and keep Save & Publish admin-only. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `README.txt`
+  - Notes: Forces the Deploy game build switch off with a locked indicator so publishing never ships the game bundle and reiterates the environment-wide deploy hold in the admin logs. Note to review @ 2025-10-16 12:35:31Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
