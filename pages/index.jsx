@@ -995,6 +995,7 @@ export default function Admin() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
+  const adminDataReady = Boolean(suite && config);
 
   useEffect(() => {
     const tags = Array.isArray(config?.game?.tags) ? config.game.tags : [];
@@ -1878,18 +1879,11 @@ export default function Admin() {
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
-  if (!suite || !config) {
-    return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
-          Loading… (pulling config & missions)
-        </div>
-      </main>
-    );
-  }
-
-  const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
-  const mapZoom = Number(config.map?.defaultZoom)||13;
+  const mapCenter = {
+    lat: Number(config?.map?.centerLat ?? 44.9778),
+    lng: Number(config?.map?.centerLng ?? -93.2650),
+  };
+  const mapZoom = Number(config?.map?.defaultZoom ?? 13);
 
   const missionRadiusDisabled = (selectedMissionIdx==null);
   const missionRadiusValue = selectedMissionIdx!=null
@@ -1902,17 +1896,17 @@ export default function Admin() {
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
 
-  const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
+  const storedAppearanceSkin = config?.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
     ? config.appearanceSkin
     : null;
-  const detectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const detectedAppearanceSkin = detectAppearanceSkin(config?.appearance, config?.appearanceSkin);
   const selectedAppearanceSkin = storedAppearanceSkin || detectedAppearanceSkin;
   const selectedAppearanceSkinLabel = storedAppearanceSkin
     ? `${APPEARANCE_SKIN_MAP.get(storedAppearanceSkin)?.label || storedAppearanceSkin}${detectedAppearanceSkin === 'custom' ? ' (modified)' : ''}`
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
-  const interfaceTone = normalizeTone(config.appearanceTone);
+  const interfaceTone = normalizeTone(config?.appearanceTone);
   const PROTECTION_COLOR_SAFE = '#2dd4bf';
   const PROTECTION_COLOR_ALERT = '#ff4d57';
   const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
@@ -2134,6 +2128,24 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+
+  if (!adminDataReady) {
+    return (
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid var(--admin-border-soft)',
+            background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+            boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+          }}
+        >
+          Loading… (pulling config & missions)
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div style={S.body}>

@@ -1,9 +1,12 @@
-work — 2025-10-16 03:41:44Z
+work — 2025-10-16 04:01:12Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Stabilized admin hook order during loading. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `README.txt`
+  - Notes: Ensured the Admin dashboard always runs its hook chain before showing the loading screen so React no longer raises error #310 on first load, using null-safe defaults until config + missions arrive. Note to review @ 2025-10-16 04:01:12Z.
 - 2025-10-16 — Removed drag-and-drop cover upload prompt. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `README.txt`
   - Notes: Replaced the cover drag-and-drop dropzone with a static preview frame so uploads run through the explicit buttons while keeping the Game folder and password toggles off. Note to review @ 2025-10-16 03:41:44Z.
