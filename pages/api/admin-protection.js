@@ -12,12 +12,25 @@ async function ensureDir(filePath) {
   await fs.mkdir(dir, { recursive: true });
 }
 
+function normalizeProtectedFlag(value, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return false;
+    if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) return false;
+  }
+  if (value == null) return fallback;
+  return Boolean(value);
+}
+
 async function readProtection(filePath) {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const data = JSON.parse(raw);
     return {
-      protected: !!data.protected,
+      protected: normalizeProtectedFlag(data.protected),
       updatedAt: data.updatedAt || null,
     };
   } catch (err) {
@@ -31,7 +44,7 @@ async function readFirstAvailable(paths) {
       const raw = await fs.readFile(filePath, 'utf8');
       const data = JSON.parse(raw);
       return {
-        protected: !!data.protected,
+        protected: normalizeProtectedFlag(data.protected),
         updatedAt: data.updatedAt || null,
       };
     } catch (err) {
@@ -59,7 +72,7 @@ async function syncGameProtection(targetState, nowIso) {
   }
 
   const nextState = {
-    protected: !!targetState,
+    protected: normalizeProtectedFlag(targetState),
     updatedAt: nowIso || new Date().toISOString(),
   };
 
@@ -98,7 +111,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const target = !!body.protected;
+      const target = normalizeProtectedFlag(body.protected, false);
       const nowIso = new Date().toISOString();
       const adminState = { protected: target, updatedAt: nowIso };
       await writeProtection(ADMIN_PROTECTION_PATH, adminState);
