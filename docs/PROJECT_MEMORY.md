@@ -2,10 +2,16 @@
 
 (Last updated: <replace with date>)
 
+## Quick Reference
+**Online Version Branch:** The production deployment runs from the **`main`** branch.
+- You can verify the current branch by viewing the banner at the top of the admin dashboard
+- See [DEPLOYMENT.md](../DEPLOYMENT.md) for detailed deployment information
+
 ## Architecture
 - Repo: Admin-esxape-ride
 - Admin at repo root (Vercel: admin-esxape-ride)
 - Game in /game (Vercel: game-esxape-ride)
+- **Production Branch:** main (both Admin and Game deploy from the `main` branch)
 - Admin ENV: NEXT_PUBLIC_GAME_ORIGIN=https://game.esxaperide.com, GITHUB_* (owner, name, branch=main, token, base_dir='')
 - Game ENV: may use NEXT_PUBLIC_GAME_ORIGIN for own links
 - Game mirroring can be toggled in the repo's `.env` file. Leave `GAME_ENABLED`/`NEXT_PUBLIC_GAME_ENABLED` at `0` (default) to
