@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
@@ -155,6 +154,7 @@ function formatLocalDateTime(value) {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
+      timeZoneName: 'short',
     });
   } catch {
     return '';
@@ -753,7 +753,6 @@ export default function Admin() {
   const [newAlertMin, setNewAlertMin] = useState(10);
 
   const [showRings, setShowRings] = useState(true);
-  const [testChannel, setTestChannel] = useState('draft');
 
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
@@ -803,14 +802,17 @@ export default function Admin() {
 
         const metaOk = metaJson?.ok !== false;
         const vercelOk = vercelJson?.ok !== false;
+        const vercelDisabled = vercelJson?.disabled === true;
 
         const deploymentUrlRaw = vercelJson?.url || '';
         const deploymentUrl = typeof deploymentUrlRaw === 'string' && deploymentUrlRaw
           ? (deploymentUrlRaw.startsWith('http') ? deploymentUrlRaw : `https://${deploymentUrlRaw}`)
           : '';
-        const deploymentState = vercelJson?.state || (vercelJson?.disabled ? 'DISABLED' : '');
+        const deploymentState = vercelDisabled
+          ? 'DISABLED'
+          : (vercelJson?.state || '');
         const combinedError = (!metaOk && metaJson?.error)
-          || (!vercelOk && (vercelJson?.error || vercelJson?.reason))
+          || (!vercelOk && !vercelDisabled && (vercelJson?.error || vercelJson?.reason))
           || '';
 
         setAdminMeta((prev) => {
@@ -822,8 +824,10 @@ export default function Admin() {
             owner: metaOk && metaJson?.owner ? metaJson.owner : base.owner,
             repo: metaOk && metaJson?.repo ? metaJson.repo : base.repo,
             vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : base.vercelUrl,
-            deploymentUrl: deploymentUrl || base.deploymentUrl,
-            deploymentState: deploymentState ? String(deploymentState).toUpperCase() : base.deploymentState,
+            deploymentUrl: vercelDisabled ? '' : (deploymentUrl || base.deploymentUrl),
+            deploymentState: deploymentState
+              ? String(deploymentState).toUpperCase()
+              : (vercelDisabled ? 'DISABLED' : base.deploymentState),
             fetchedAt: nowIso,
             error: combinedError || '',
           };
@@ -987,9 +991,6 @@ export default function Admin() {
   const [mapSearching, setMapSearching] = useState(false);
   const [mapResults, setMapResults] = useState([]);
 
-  // Test preview nonce (force iframe reload)
-  const [previewNonce, setPreviewNonce] = useState(0);
-
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -1010,11 +1011,6 @@ export default function Admin() {
   }, []);
   useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
   useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
-
-  const gameBase =
-    ((typeof window !== 'undefined'
-      ? (window.__GAME_ORIGIN__ || process.env.NEXT_PUBLIC_GAME_ORIGIN)
-      : process.env.NEXT_PUBLIC_GAME_ORIGIN) || (config?.gameOrigin) || '');
 
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig(prev => ({ ...(prev || {}), devices: list, powerups: list }));
@@ -1072,6 +1068,12 @@ export default function Admin() {
       } catch {}
     })();
   }, [gameEnabled]);
+
+  useEffect(() => {
+    if (!gameEnabled && activeSlug !== 'default') {
+      setActiveSlug('default');
+    }
+  }, [gameEnabled, activeSlug]);
 
   /* load suite/config when slug changes */
   useEffect(() => {
@@ -3508,40 +3510,6 @@ export default function Admin() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* TEST */}
-      {tab==='test' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-              <h3 style={{ margin:0 }}>Play Test</h3>
-              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                <label>Channel:&nbsp;
-                  <select value={testChannel} onChange={(e)=>setTestChannel(e.target.value)} style={S.input}>
-                    <option value="draft">draft</option>
-                    <option value="published">published</option>
-                  </select>
-                </label>
-                <button style={S.button} onClick={()=>setPreviewNonce(n=>n+1)}>Reload preview</button>
-                <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
-              </div>
-            </div>
-            {!gameBase && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
-            {gameBase && (
-              <iframe
-                key={previewNonce} // hard refresh on nonce change
-                src={`${gameBase}/?${new URLSearchParams({
-                  ...(activeSlugForClient ? { slug: activeSlugForClient } : {}),
-                  channel: testChannel,
-                  preview: '1',
-                  cb: String(Date.now())
-                }).toString()}`}
-                style={{ width:'100%', height:'70vh', border:'1px solid var(--admin-border-soft)', borderRadius:12 }}
-              />
-            )}
-          </div>
-        </main>
       )}
 
       {/* New Game modal */}

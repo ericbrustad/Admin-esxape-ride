@@ -1,9 +1,12 @@
-work — 2025-10-16 00:46:47Z
+work — 2025-10-16 02:08:36Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Meta banner git fallback & removed unused test preview. Commit: (pending HEAD)
+  - Direct links: `pages/api/admin-meta.js`, `pages/index.jsx`
+  - Notes: The deployment banner now pulls the active git branch/commit even when environment vars are missing, shows timezone-aware timestamps, treats missing Vercel credentials as a disabled state instead of an error, and removes the unused Test preview panel to cut extra DOM nodes while keeping the Game folder and password toggles off by default. Note to review @ 2025-10-16 02:08:36Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
