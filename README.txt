@@ -1,9 +1,12 @@
-work — 2025-10-16 04:05:00Z
+work — 2025-10-16 03:30:26Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Admin meta fallback refresh when games list updates. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `README.txt`
+  - Notes: Replaced the removed preview nonce refresher with a local admin meta timestamp update every time the games list reloads so Save & Publish and delete flows still surface a fresh "Updated" banner without invoking undefined setters. Note to review @ 2025-10-16 03:30:26Z.
 - 2025-10-16 — Meta banner headline & deployment timestamp refresh. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `README.txt`
   - Notes: Elevated the branch/deployment headline so the admin banner always shows the current branch, deployment target, and a timestamp at the very top, keeping the preview nonce hooks retired to prevent undefined setter calls. Note to review @ 2025-10-16 04:05:00Z.

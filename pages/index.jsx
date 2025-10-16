@@ -1273,12 +1273,17 @@ export default function Admin() {
   }
 
   async function reloadGamesList() {
-    if (!gameEnabled) { setGames([]); return; }
+    if (!gameEnabled) {
+      setGames([]);
+      setMetaLocalTimestamp(formatLocalDateTime(new Date()));
+      return;
+    }
     try {
       const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
       const j = await r.json();
       if (j.ok) setGames(j.games || []);
     } catch {}
+    setMetaLocalTimestamp(formatLocalDateTime(new Date()));
   }
 
   async function saveAndPublish() {
