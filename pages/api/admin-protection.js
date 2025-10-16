@@ -2,13 +2,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 const ADMIN_PROTECTION_PATH = path.join(process.cwd(), 'public', 'admin-protection.json');
-const GAME_PROTECTION_PATH = path.join(
-  process.cwd(),
-  'public',
-  'game',
-  'public',
-  'admin-protection.json',
-);
+const GAME_PROTECTION_PATHS = [
+  path.join(process.cwd(), 'public', 'game', 'public', 'admin-protection.json'),
+  path.join(process.cwd(), 'game', 'public', 'admin-protection.json'),
+];
 
 async function ensureDir(filePath) {
   const dir = path.dirname(filePath);
@@ -28,13 +25,34 @@ async function readProtection(filePath) {
   }
 }
 
+async function readFirstAvailable(paths) {
+  for (const filePath of paths) {
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      const data = JSON.parse(raw);
+      return {
+        protected: !!data.protected,
+        updatedAt: data.updatedAt || null,
+      };
+    } catch (err) {
+      // Continue trying other candidates when the file is missing or invalid.
+    }
+  }
+
+  return { protected: false, updatedAt: null };
+}
+
+async function readGameProtection() {
+  return readFirstAvailable(GAME_PROTECTION_PATHS);
+}
+
 async function writeProtection(filePath, state) {
   await ensureDir(filePath);
   await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf8');
 }
 
 async function syncGameProtection(targetState, nowIso) {
-  const current = await readProtection(GAME_PROTECTION_PATH);
+  const current = await readGameProtection();
 
   if (typeof targetState === 'undefined') {
     return current;
@@ -52,7 +70,16 @@ async function syncGameProtection(targetState, nowIso) {
     return current;
   }
 
-  await writeProtection(GAME_PROTECTION_PATH, nextState);
+  await Promise.all(
+    GAME_PROTECTION_PATHS.map(async (filePath) => {
+      try {
+        await writeProtection(filePath, nextState);
+      } catch (err) {
+        // Ignore missing optional paths so the primary copy is still updated.
+      }
+    }),
+  );
+
   return nextState;
 }
 

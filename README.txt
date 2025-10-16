@@ -1,9 +1,12 @@
-work — 2025-10-15 15:32:10Z
+work — 2025-10-16 00:41:00Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Admin protection sync & game CSS guard. Commit: 49eafe7cd5384c38bebca33b1fc201b6f7c66079
+  - Direct links: `pages/api/admin-protection.js`, `game/styles/globals.css`
+  - Notes: Keeps the admin password toggle defaulted off while syncing the game JSON copies without forcing them back to false, and restores the game Next build by shipping the missing `styles/globals.css` so Vercel no longer fails on the module lookup. Note to review @ 2025-10-16 00:41:00Z.
 - 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
   - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
   - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.
