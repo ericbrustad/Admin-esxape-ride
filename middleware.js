@@ -23,7 +23,7 @@ async function isAdminProtected(request) {
   try {
     const stateUrl = new URL('/admin-protection.json', request.nextUrl.origin);
     const res = await fetch(stateUrl, {
-      headers: { [ADMIN_CHECK_HEADER]: '0' },
+      headers: { [ADMIN_CHECK_HEADER]: '1' },
       cache: 'no-store',
     });
     if (res.ok) {
@@ -75,4 +75,5 @@ export async function middleware(request) {
 
   return unauthorized();
 }
+
 
