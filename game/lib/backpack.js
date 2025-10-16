@@ -1,11 +1,23 @@
 // Simple localStorage-based backpack & progress, namespaced by slug.
 const SKEY = (slug) => `esx.backpack.${slug || 'default'}`;
 
+function getStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch {}
+  return null;
+}
+
 function read(slug) {
-  try { return JSON.parse(localStorage.getItem(SKEY(slug))) || {}; } catch { return {}; }
+  const store = getStorage();
+  if (!store) return {};
+  try { return JSON.parse(store.getItem(SKEY(slug))) || {}; } catch { return {}; }
 }
 function write(slug, data) {
-  localStorage.setItem(SKEY(slug), JSON.stringify(data || {}));
+  const store = getStorage();
+  if (!store) return;
+  try { store.setItem(SKEY(slug), JSON.stringify(data || {})); } catch {}
 }
 
 export function initBackpack(slug) {
