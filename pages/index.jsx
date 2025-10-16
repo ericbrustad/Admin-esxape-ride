@@ -757,6 +757,7 @@ export default function Admin() {
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
+  const [metaLocalTimestamp, setMetaLocalTimestamp] = useState('');
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1342,6 +1343,10 @@ export default function Admin() {
       await reloadGamesList();
       setActiveSlug('default');
       setStatus('✅ Game deleted');
+      setSelected(null);
+      setEditing(null);
+      setSelectedDevIdx(null);
+      setSelectedMissionIdx(null);
     } else {
       setStatus('❌ Delete failed: ' + (lastErr || 'unknown error'));
     }
@@ -2077,6 +2082,28 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaHeadlineTimestamp = metaTimestampLabel || metaLocalTimestamp;
+  const metaDeploymentHost = useMemo(() => {
+    if (!metaDeploymentUrl) return '';
+    try {
+      const url = new URL(metaDeploymentUrl);
+      const host = url.host || '';
+      const path = url.pathname && url.pathname !== '/' ? url.pathname : '';
+      return `${host}${path}`;
+    } catch {
+      return metaDeploymentUrl.replace(/^https?:\/\//i, '');
+    }
+  }, [metaDeploymentUrl]);
+  const metaDeploymentHeadline = metaDeploymentUrl
+    ? (metaDeploymentState ? `${metaDeploymentState} • ${metaDeploymentHost}` : metaDeploymentHost)
+    : metaDeploymentState;
+  useEffect(() => {
+    if (metaTimestampLabel) {
+      setMetaLocalTimestamp('');
+      return;
+    }
+    setMetaLocalTimestamp(formatLocalDateTime(new Date()));
+  }, [metaTimestampLabel]);
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2107,28 +2134,40 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <div style={S.metaBanner}>
+        <div style={S.metaBannerHeadline}>
+          <div style={S.metaHeadlineGroup}>
+            <span style={S.metaHeadlineLabel}>Branch</span>
+            <span style={S.metaHeadlineValue}>{metaBranchLabel}</span>
+            {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
+          </div>
+          <div style={S.metaHeadlineGroup}>
+            {metaDeploymentHeadline && (
+              metaDeploymentUrl ? (
+                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaHeadlineLink}>
+                  {metaDeploymentHeadline}
+                </a>
+              ) : (
+                <span style={S.metaHeadlineValue}>{metaDeploymentHeadline}</span>
+              )
+            )}
+            {metaHeadlineTimestamp && (
+              <span style={S.metaHeadlineTime}>Updated {metaHeadlineTimestamp}</span>
+            )}
+          </div>
+        </div>
         <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
           {adminMeta.repo && (
             <span style={S.metaMuted}>
               {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
             </span>
           )}
-          {metaDeploymentState && (
+          {adminMeta.vercelUrl && !metaDeploymentUrl && (
             <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
+              <strong>Vercel:</strong>{' '}
+              <a href={adminMeta.vercelUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                {adminMeta.vercelUrl.replace(/^https?:\/\//i, '')}
+              </a>
             </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
           )}
           {adminMeta.error && (
             <span style={S.metaBannerError}>{adminMeta.error}</span>
@@ -3647,8 +3686,48 @@ const S = {
     backdropFilter: 'blur(14px)',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
     borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
+    padding: '12px 16px 10px',
     boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
+  },
+  metaBannerHeadline: {
+    maxWidth: 1400,
+    margin: '0 auto 6px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaHeadlineGroup: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 10,
+    alignItems: 'center',
+    fontSize: 14,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  metaHeadlineLabel: {
+    fontWeight: 600,
+    opacity: 0.8,
+  },
+  metaHeadlineValue: {
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+  },
+  metaHeadlineLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    fontWeight: 700,
+    textDecoration: 'none',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  metaHeadlineTime: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
   },
   metaBannerLine: {
     maxWidth: 1400,

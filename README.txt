@@ -1,9 +1,12 @@
-work — 2025-10-16 02:08:36Z
+work — 2025-10-16 04:05:00Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Meta banner headline & deployment timestamp refresh. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `README.txt`
+  - Notes: Elevated the branch/deployment headline so the admin banner always shows the current branch, deployment target, and a timestamp at the very top, keeping the preview nonce hooks retired to prevent undefined setter calls. Note to review @ 2025-10-16 04:05:00Z.
 - 2025-10-16 — Meta banner git fallback & removed unused test preview. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-meta.js`, `pages/index.jsx`
   - Notes: The deployment banner now pulls the active git branch/commit even when environment vars are missing, shows timezone-aware timestamps, treats missing Vercel credentials as a disabled state instead of an error, and removes the unused Test preview panel to cut extra DOM nodes while keeping the Game folder and password toggles off by default. Note to review @ 2025-10-16 02:08:36Z.
