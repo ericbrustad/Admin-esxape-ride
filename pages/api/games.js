@@ -65,14 +65,22 @@ function defaultSuite(title, type) {
   };
 }
 
-function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
+function defaultConfig(title, gameType, mode = 'single', slugTag = '', extras = {}) {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
   const normSlug = (slugTag || slugify(title)).toLowerCase();
   const tags = normSlug ? [normSlug] : [];
   if (normSlug === 'default' && !tags.includes('default-game')) tags.push('default-game');
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
-    game: { title, type: gameType || 'Mystery', tags, coverImage: '' },
+    game: {
+      title,
+      type: gameType || 'Mystery',
+      tags,
+      coverImage: extras.coverImage || '',
+      shortDescription: extras.shortDescription || '',
+      longDescription: extras.longDescription || '',
+      slug: normSlug,
+    },
     forms: { players },              // 1 | 2 | 4
     textRules: []
   };
@@ -99,7 +107,15 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { title, type, mode = 'single' } = req.body || {};
+      const {
+        title,
+        type,
+        mode = 'single',
+        slug: requestedSlug,
+        shortDescription = '',
+        longDescription = '',
+        coverImage = '',
+      } = req.body || {};
       if (!title) return res.status(400).json({ ok: false, error: 'title required' });
 
       // load index & ensure unique slug
@@ -107,14 +123,22 @@ export default async function handler(req, res) {
       const list = file ? JSON.parse(file.text || '[]') : [];
       const taken = new Set(list.map(g => g.slug));
 
-      let base = slugify(title);
+      let base = slugify(requestedSlug || title);
       let slug = base || 'game';
       let i = 2;
       while (taken.has(slug)) slug = `${base}-${i++}`;
 
+      const trimmedShort = String(shortDescription || '').trim();
+      const trimmedLong = String(longDescription || '').trim();
+      const normalizedCover = String(coverImage || '').trim();
+
       // create suite + config
       const suite  = defaultSuite(title, type);
-      const config = defaultConfig(title, type, mode, slug);
+      const config = defaultConfig(title, type, mode, slug, {
+        shortDescription: trimmedShort,
+        longDescription: trimmedLong,
+        coverImage: normalizedCover,
+      });
 
       await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
         `feat: create game ${slug} missions.json`);
@@ -122,7 +146,16 @@ export default async function handler(req, res) {
         `feat: create game ${slug} config.json`);
 
       // update index.json
-      const item = { slug, title, type: type || 'Mystery', mode, createdAt: new Date().toISOString() };
+      const item = {
+        slug,
+        title,
+        type: type || 'Mystery',
+        mode,
+        shortDescription: trimmedShort,
+        longDescription: trimmedLong,
+        coverImage: normalizedCover,
+        createdAt: new Date().toISOString(),
+      };
       const next = [...list, item];
       await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
 

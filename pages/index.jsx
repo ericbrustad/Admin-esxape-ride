@@ -66,6 +66,13 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
+function isIconMediaFile(file) {
+  if (!file) return false;
+  const type = (file.type || '').toLowerCase();
+  if (type.startsWith('image/')) return true;
+  const name = (file.name || '').toLowerCase();
+  return /\.gif(\?|#|$)/.test(name);
+}
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
   gif: /\.(gif)$/i,
@@ -161,22 +168,18 @@ function formatLocalDateTime(value) {
   }
 }
 async function deleteMediaPath(repoPath) {
-  const endpoints = [
-    '/api/delete-media',
-    '/api/delete',
-    '/api/media/delete',
-    '/api/repo-delete',
-    '/api/github/delete',
-  ];
+  if (!repoPath) return false;
+  const endpoints = ['/api/media/delete'];
   for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        credentials:'include',
-        body: JSON.stringify({ path: repoPath })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ path: repoPath }),
       });
       if (r.ok) return true;
+      if (r.status === 404) continue; // legacy fallback not available
     } catch {}
   }
   return false;
@@ -727,13 +730,30 @@ function normalizeGameMetadata(cfg, slug = '') {
   }
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
+  const normalizedCover = typeof game.coverImage === 'string' ? game.coverImage.trim() : '';
+  const normalizedShort = typeof game.shortDescription === 'string' ? game.shortDescription.trim() : '';
+  const normalizedLong = typeof game.longDescription === 'string' ? game.longDescription.trim() : '';
+  const normalizedPlayers = Number(game.playerCount || 1);
   game.tags = cleaned;
   game.title = normalizedTitle || 'Default Game';
   game.type = normalizedType || 'Mystery';
-  game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
+  game.coverImage = normalizedCover;
+  game.shortDescription = normalizedShort;
+  game.longDescription = normalizedLong;
+  game.playerCount = [1, 2, 4].includes(normalizedPlayers) ? normalizedPlayers : 1;
+  game.slug = normalizedSlug;
   game.deployEnabled = game.deployEnabled === true;
   base.game = game;
   return base;
+}
+
+function slugifyTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
 }
 
 /* ───────────────────────── Root ───────────────────────── */
@@ -751,6 +771,209 @@ export default function Admin() {
   const [newMode, setNewMode] = useState('single');
   const [newDurationMin, setNewDurationMin] = useState(0);
   const [newAlertMin, setNewAlertMin] = useState(10);
+  const [newGameSlug, setNewGameSlug] = useState('');
+  const [newSlugTouched, setNewSlugTouched] = useState(false);
+  const [newShortDesc, setNewShortDesc] = useState('');
+  const [newLongDesc, setNewLongDesc] = useState('');
+  const [newCoverPreview, setNewCoverPreview] = useState('');
+  const [newCoverFile, setNewCoverFile] = useState(null);
+  const [newCoverSelectedUrl, setNewCoverSelectedUrl] = useState('');
+  const [newCoverOptions, setNewCoverOptions] = useState([]);
+  const [newCoverLookupLoading, setNewCoverLookupLoading] = useState(false);
+  const [newGameStatus, setNewGameStatus] = useState('');
+  const [newGameBusy, setNewGameBusy] = useState(false);
+  const [newCoverDropActive, setNewCoverDropActive] = useState(false);
+  const newGameCoverInputRef = useRef(null);
+
+  const [missionActionFlash, setMissionActionFlash] = useState(false);
+  const [deviceActionFlash, setDeviceActionFlash] = useState(false);
+  const [newMissionButtonFlash, setNewMissionButtonFlash] = useState(false);
+  const [addDeviceButtonFlash, setAddDeviceButtonFlash] = useState(false);
+  const missionFlashTimeout = useRef(null);
+  const deviceFlashTimeout = useRef(null);
+  const missionButtonTimeout = useRef(null);
+  const deviceButtonTimeout = useRef(null);
+
+  const [protectionPrompt, setProtectionPrompt] = useState({
+    open: false,
+    mode: 'enable',
+    requireConfirm: false,
+    password: '',
+    confirm: '',
+    error: '',
+  });
+
+  function resetNewGameForm() {
+    setNewTitle('');
+    setNewType('Mystery');
+    setNewMode('single');
+    setNewDurationMin(0);
+    setNewAlertMin(10);
+    setNewGameSlug('');
+    setNewSlugTouched(false);
+    setNewShortDesc('');
+    setNewLongDesc('');
+    setNewCoverPreview('');
+    setNewCoverFile(null);
+    setNewCoverSelectedUrl('');
+    setNewCoverOptions([]);
+    setNewCoverLookupLoading(false);
+    setNewGameStatus('');
+    setNewGameBusy(false);
+    setNewCoverDropActive(false);
+    if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
+  }
+
+  function handleNewGameModalClose() {
+    setShowNewGame(false);
+    resetNewGameForm();
+  }
+
+  function handleNewSlugInput(value) {
+    setNewSlugTouched(true);
+    setNewGameSlug(slugifyTitle(value));
+  }
+
+  function clearNewGameCover() {
+    setNewCoverPreview('');
+    setNewCoverFile(null);
+    setNewCoverSelectedUrl('');
+  }
+
+  async function handleNewGameCoverFile(file) {
+    if (!file) return;
+    const safeName = file.name || 'cover';
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    if (!looksLikeImage) {
+      setNewGameStatus(`❌ ${safeName} must be an image file.`);
+      return;
+    }
+    const sizeBytes = file.size || 0;
+    if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
+      const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
+      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 1 MB.`);
+      return;
+    }
+    try {
+      const previewUrl = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
+        ? URL.createObjectURL(file)
+        : '';
+      setNewCoverPreview(previewUrl);
+      setNewCoverFile(file);
+      setNewCoverSelectedUrl('');
+      setNewGameStatus('✅ Cover ready — it will upload when you create the game.');
+    } catch (err) {
+      setNewGameStatus(`❌ Unable to preview ${safeName}`);
+    }
+  }
+
+  async function loadNewCoverOptions() {
+    setNewCoverLookupLoading(true);
+    try {
+      const items = await listInventory(['covers','mediapool','uploads']);
+      const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
+      setNewCoverOptions(filtered);
+      if (!filtered.length) {
+        setNewGameStatus('No reusable covers found yet. Try uploading one.');
+      }
+    } catch (err) {
+      setNewGameStatus('❌ Unable to load media pool covers.');
+      setNewCoverOptions([]);
+    } finally {
+      setNewCoverLookupLoading(false);
+    }
+  }
+
+  function applyNewCoverFromUrl(url) {
+    if (!url) return;
+    const direct = toDirectMediaURL(url);
+    setNewCoverSelectedUrl(url);
+    setNewCoverPreview(direct);
+    setNewCoverFile(null);
+    setNewGameStatus('✅ Using cover from the media pool.');
+  }
+
+  async function handleCreateNewGame() {
+    if (newGameBusy) return;
+    const title = newTitle.trim();
+    if (!title) {
+      setNewGameStatus('❌ Title is required.');
+      return;
+    }
+    const slugInput = (newGameSlug || slugifyTitle(title) || 'game').trim();
+    if (!slugInput) {
+      setNewGameStatus('❌ Please provide a slug for this game.');
+      return;
+    }
+    setNewGameBusy(true);
+    setNewGameStatus('Creating game…');
+    let coverPath = newCoverSelectedUrl;
+    try {
+      if (!coverPath && newCoverFile) {
+        coverPath = await uploadToRepo(newCoverFile, 'covers');
+        if (!coverPath) throw new Error('Cover upload failed');
+      }
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title,
+          type: newType,
+          mode: newMode,
+          slug: slugInput,
+          shortDescription: newShortDesc.trim(),
+          longDescription: newLongDesc.trim(),
+          coverImage: coverPath,
+          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+        }),
+      });
+      const data = await res.json().catch(() => ({ ok: false }));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data?.error || 'create failed');
+      }
+      await reloadGamesList();
+      setActiveSlug(data.slug || slugInput || 'default');
+      setStatus(`✅ Created game “${title}”`);
+      setNewGameStatus('✅ Game created! Loading…');
+      handleNewGameModalClose();
+    } catch (err) {
+      setNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`);
+    } finally {
+      setNewGameBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (newSlugTouched) return;
+    setNewGameSlug(slugifyTitle(newTitle));
+  }, [newTitle, newSlugTouched]);
+
+  useEffect(() => {
+    return () => {
+      [missionFlashTimeout, deviceFlashTimeout, missionButtonTimeout, deviceButtonTimeout].forEach((ref) => {
+        if (ref.current) {
+          clearTimeout(ref.current);
+          ref.current = null;
+        }
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!newCoverPreview) return undefined;
+    if (
+      newCoverPreview.startsWith('blob:') &&
+      typeof URL !== 'undefined' &&
+      typeof URL.revokeObjectURL === 'function'
+    ) {
+      const preview = newCoverPreview;
+      return () => {
+        try { URL.revokeObjectURL(preview); } catch {}
+      };
+    }
+    return undefined;
+  }, [newCoverPreview]);
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
@@ -850,7 +1073,7 @@ export default function Admin() {
   }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
   const [protectionError, setProtectionError] = useState('');
 
   useEffect(() => {
@@ -861,7 +1084,13 @@ export default function Admin() {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (res.ok) {
-          setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+          setProtectionState({
+            enabled: !!data.protected,
+            loading: false,
+            saving: false,
+            updatedAt: data.updatedAt || null,
+            passwordSet: !!data.passwordSet,
+          });
           setProtectionError('');
         } else {
           throw new Error(data?.error || 'Failed to load protection status');
@@ -925,6 +1154,33 @@ export default function Admin() {
   const [missionResponsesError, setMissionResponsesError] = useState(null);
   const [assignedMediaError, setAssignedMediaError] = useState(null);
 
+  const editingIsNew = useMemo(() => {
+    if (!editing) return false;
+    const missionList = Array.isArray(suite?.missions) ? suite.missions : [];
+    return !missionList.some((mission) => mission?.id === editing.id);
+  }, [editing, suite?.missions]);
+
+  const missionResponsesFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setMissionResponsesError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setMissionResponsesError]);
+
   useEffect(() => {
     return () => {
       if (
@@ -979,8 +1235,6 @@ export default function Admin() {
   const [selectedPinSize, setSelectedPinSize] = useState(28);
   const defaultPinSize = 24;
 
-  // Undo/Redo
-  const historyRef = useRef({ past: [], future: [] });
 
   // Settings → Region search
   const [mapSearchQ, setMapSearchQ] = useState('');
@@ -1018,48 +1272,6 @@ export default function Admin() {
 
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig(prev => ({ ...(prev || {}), devices: list, powerups: list }));
-
-  function snapshotState() {
-    return {
-      missions: JSON.parse(JSON.stringify(suite?.missions || [])),
-      devices: JSON.parse(JSON.stringify(getDevices() || [])),
-    };
-  }
-  function pushHistory() {
-    if (!suite || !config) return;
-    historyRef.current.past.push(snapshotState());
-    historyRef.current.future = [];
-  }
-  function canUndo() { return historyRef.current.past.length > 0; }
-  function canRedo() { return historyRef.current.future.length > 0; }
-  function undo() {
-    if (!canUndo()) return;
-    const current = snapshotState();
-    const prev = historyRef.current.past.pop();
-    historyRef.current.future.push(current);
-    setSuite((s) => ({ ...s, missions: prev.missions }));
-    setDevices(prev.devices);
-    setStatus('↶ Undid last change');
-  }
-  function redo() {
-    if (!canRedo()) return;
-    const current = snapshotState();
-    const next = historyRef.current.future.pop();
-    historyRef.current.past.push(current);
-    setSuite((s) => ({ ...s, missions: next.missions }));
-    setDevices(next.devices);
-    setStatus('↷ Redid last change');
-  }
-  useEffect(() => {
-    function onKey(e) {
-      const z = e.key === 'z' || e.key === 'Z';
-      const y = e.key === 'y' || e.key === 'Y';
-      if ((e.ctrlKey || e.metaKey) && z) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-      else if ((e.ctrlKey || e.metaKey) && y) { e.preventDefault(); redo(); }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
 
   /* load games */
   useEffect(() => {
@@ -1129,6 +1341,15 @@ export default function Admin() {
         merged.appearanceSkin = storedSkin || detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
 
         merged = applyDefaultIcons(merged);
+        const splash = merged.splash || {};
+        const normalizedSplashMode = typeof splash.mode === 'string'
+          ? splash.mode.toLowerCase()
+          : '';
+        merged.splash = {
+          ...splash,
+          enabled: splash.enabled !== false,
+          mode: normalizedSplashMode === 'live' ? 'live' : 'test',
+        };
         merged = normalizeGameMetadata(merged, slugForMeta);
 
         setSuite(normalized);
@@ -1145,8 +1366,8 @@ export default function Admin() {
 
   function defaultConfig() {
     return {
-      splash: { enabled:true, mode:'single' },
-      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
+      splash: { enabled:true, mode:'test' },
+      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'', playerCount:1 },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1324,7 +1545,6 @@ export default function Admin() {
     }
 
     if (!ok) {
-      pushHistory();
       setSuite({ version:'0.0.0', missions:[] });
       setConfig(c => ({
         ...(c || {}),
@@ -1333,6 +1553,7 @@ export default function Admin() {
         media: { rewardsPool:[], penaltiesPool:[] },
         textRules: [],
       }));
+      setDirty(true);
       const saved = await saveAllWithSlug(slug);
       if (saved) { setStatus('✅ Cleared game content'); ok = true; }
     }
@@ -1356,6 +1577,15 @@ export default function Admin() {
     return base + String(i).padStart(2,'0');
   }
   function startNew() {
+    if (missionButtonTimeout.current) {
+      clearTimeout(missionButtonTimeout.current);
+      missionButtonTimeout.current = null;
+    }
+    setNewMissionButtonFlash(true);
+    missionButtonTimeout.current = setTimeout(() => {
+      setNewMissionButtonFlash(false);
+      missionButtonTimeout.current = null;
+    }, 420);
     const draft = {
       id: suggestId(),
       title: 'New Mission',
@@ -1393,7 +1623,14 @@ export default function Admin() {
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
     setEditing(e); setSelected(m.id); setDirty(false);
   }
-  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
+  function cancelEdit() {
+    setEditing(null); setSelected(null); setDirty(false);
+    setMissionActionFlash(false);
+    if (missionFlashTimeout.current) {
+      clearTimeout(missionFlashTimeout.current);
+      missionFlashTimeout.current = null;
+    }
+  }
   function bumpVersion(v) {
     const p = String(v || '0.0.0')
       .split('.')
@@ -1426,22 +1663,33 @@ export default function Admin() {
     setSelected(editing.id); setEditing(null); setDirty(false);
     setStatus('✅ Mission saved');
   }
+  function handleMissionSave() {
+    if (missionFlashTimeout.current) {
+      clearTimeout(missionFlashTimeout.current);
+      missionFlashTimeout.current = null;
+    }
+    setMissionActionFlash(true);
+    missionFlashTimeout.current = setTimeout(() => {
+      setMissionActionFlash(false);
+      missionFlashTimeout.current = null;
+    }, 420);
+    saveToList();
+  }
   function removeMission(id) {
     if (!suite) return;
-    pushHistory();
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
+    setDirty(true);
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
     if (!suite) return;
-    pushHistory();
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
     setSuite({ ...suite, missions: list });
+    setDirty(true);
   }
   function duplicateMission(idx) {
-    pushHistory();
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
@@ -1449,6 +1697,7 @@ export default function Admin() {
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
+    setDirty(true);
     setStatus('✅ Duplicated');
   }
 
@@ -1512,6 +1761,15 @@ export default function Admin() {
     return `d${String(i).padStart(2, '0')}`;
   }
   function addDevice() {
+    if (deviceButtonTimeout.current) {
+      clearTimeout(deviceButtonTimeout.current);
+      deviceButtonTimeout.current = null;
+    }
+    setAddDeviceButtonFlash(true);
+    deviceButtonTimeout.current = setTimeout(() => {
+      setAddDeviceButtonFlash(false);
+      deviceButtonTimeout.current = null;
+    }, 420);
     setDeviceEditorMode('new');
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
@@ -1554,6 +1812,11 @@ export default function Admin() {
     setDeviceTriggerPicker('');
     closeDeviceEditor();
     setStatus('🚫 Device edit cancelled');
+    setDeviceActionFlash(false);
+    if (deviceFlashTimeout.current) {
+      clearTimeout(deviceFlashTimeout.current);
+      deviceFlashTimeout.current = null;
+    }
   }
   function saveDraftDevice() {
     const normalized = {
@@ -1573,11 +1836,11 @@ export default function Admin() {
       const lng = Number(Number(devDraft.lng).toFixed(6));
       const list = [...(devices || [])];
       const item = { id: suggestDeviceId(list), ...normalized, lat, lng };
-      pushHistory();
       const next = [...list, item];
       setDevices(next);
       setSelectedDevIdx(next.length - 1);
       setSelectedMissionIdx(null);
+      setDirty(true);
       setStatus('✅ Device added');
       closeDeviceEditor();
       return;
@@ -1589,12 +1852,24 @@ export default function Admin() {
       if (!existing) return;
       const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
       const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
-      pushHistory();
       list[index] = { ...existing, ...normalized, lat, lng };
       setDevices(list);
+      setDirty(true);
       setStatus('✅ Device updated');
       closeDeviceEditor();
     }
+  }
+  function handleDeviceSave() {
+    if (deviceFlashTimeout.current) {
+      clearTimeout(deviceFlashTimeout.current);
+      deviceFlashTimeout.current = null;
+    }
+    setDeviceActionFlash(true);
+    deviceFlashTimeout.current = setTimeout(() => {
+      setDeviceActionFlash(false);
+      deviceFlashTimeout.current = null;
+    }, 420);
+    saveDraftDevice();
   }
   function duplicateDevice(idx) {
     const list = [...(devices || [])];
@@ -1603,9 +1878,9 @@ export default function Admin() {
     const copy = JSON.parse(JSON.stringify(src));
     copy.id = suggestDeviceId(list);
     copy.title = (src.title || src.id || 'Device') + ' (copy)';
-    pushHistory();
     list.splice(idx + 1, 0, copy);
     setDevices(list);
+    setDirty(true);
     const newIndex = idx + 1;
     setSelectedDevIdx(newIndex);
     setSelectedMissionIdx(null);
@@ -1618,9 +1893,9 @@ export default function Admin() {
     const list = [...(devices || [])];
     if (idx == null || idx < 0 || idx >= list.length) return;
     const currentSelected = selectedDevIdx;
-    pushHistory();
     list.splice(idx, 1);
     setDevices(list);
+    setDirty(true);
     if (currentSelected === idx) {
       setSelectedDevIdx(null);
       if (isDeviceEditorOpen && deviceEditorMode === 'edit') closeDeviceEditor();
@@ -1636,8 +1911,8 @@ export default function Admin() {
     if (target < 0 || target >= list.length) return;
     const [row] = list.splice(idx, 1);
     list.splice(target, 0, row);
-    pushHistory();
     setDevices(list);
+    setDirty(true);
     const currentSelected = selectedDevIdx;
     if (currentSelected === idx) {
       setSelectedDevIdx(target);
@@ -1655,9 +1930,9 @@ export default function Admin() {
     if (!existing) return;
     const latFixed = Number(lat.toFixed(6));
     const lngFixed = Number(lng.toFixed(6));
-    pushHistory();
     list[selectedDevIdx] = { ...existing, lat: latFixed, lng: lngFixed };
     setDevices(list);
+    setDirty(true);
     if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
       setDevDraft(d => ({ ...d, lat: latFixed, lng: lngFixed }));
     }
@@ -1668,9 +1943,9 @@ export default function Admin() {
     const existing = list[selectedDevIdx];
     if (!existing) return;
     const nextRadius = clamp(Number(r || 0), 1, 2000);
-    pushHistory();
     list[selectedDevIdx] = { ...existing, pickupRadius: nextRadius };
     setDevices(list);
+    setDirty(true);
     if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
       setDevDraft(d => ({ ...d, pickupRadius: nextRadius }));
     }
@@ -1703,27 +1978,65 @@ export default function Admin() {
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
-  async function toggleProtection() {
+  function openProtectionPrompt() {
     const target = !protectionState.enabled;
     setProtectionError('');
+    setProtectionPrompt({
+      open: true,
+      mode: target ? 'enable' : 'disable',
+      requireConfirm: target && !protectionState.passwordSet,
+      password: '',
+      confirm: '',
+      error: '',
+    });
+  }
+
+  function closeProtectionPrompt() {
+    setProtectionPrompt(prev => ({ ...prev, open: false, password: '', confirm: '', error: '' }));
+    setProtectionState(prev => ({ ...prev, saving: false }));
+  }
+
+  async function submitProtectionPrompt() {
+    const { mode, password, confirm, requireConfirm } = protectionPrompt;
+    if (!password.trim()) {
+      setProtectionPrompt(prev => ({ ...prev, error: 'Password required' }));
+      return;
+    }
+    if (requireConfirm && password !== confirm) {
+      setProtectionPrompt(prev => ({ ...prev, error: 'Passwords must match to enable protection' }));
+      return;
+    }
+    setProtectionError('');
     setProtectionState(prev => ({ ...prev, saving: true }));
+    setProtectionPrompt(prev => ({ ...prev, error: '' }));
     try {
       const res = await fetch('/api/admin-protection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ protected: target }),
+        body: JSON.stringify({
+          protected: mode === 'enable',
+          password,
+          ...(requireConfirm ? { confirmPassword: confirm } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || res.statusText || 'Toggle failed');
       }
-      setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+      setProtectionState({
+        enabled: !!data.protected,
+        loading: false,
+        saving: false,
+        updatedAt: data.updatedAt || null,
+        passwordSet: data.passwordSet !== false,
+      });
       setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
+      setProtectionPrompt({ open: false, mode: 'enable', requireConfirm: false, password: '', confirm: '', error: '' });
     } catch (err) {
       setProtectionState(prev => ({ ...prev, saving: false }));
       const msg = err?.message || 'Toggle failed';
-      setProtectionError(msg);
+      setProtectionPrompt(prev => ({ ...prev, error: msg }));
       setStatus('❌ Failed to toggle admin protection');
     }
   }
@@ -1731,7 +2044,6 @@ export default function Admin() {
   // Missions selection operations (Missions tab only)
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
-    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
@@ -1741,11 +2053,11 @@ export default function Admin() {
     c.radiusMeters = clamp(Number(c.radiusMeters || 25), 5, 500);
     list[selectedMissionIdx] = { ...m, content: c };
     setSuite({ ...suite, missions: list });
+    setDirty(true);
     setStatus(`Moved mission #${selectedMissionIdx+1}`);
   }
   function setSelectedMissionRadius(r) {
     if (selectedMissionIdx == null) return;
-    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
@@ -1757,6 +2069,7 @@ export default function Admin() {
     }
     list[selectedMissionIdx] = { ...m, content: c };
     setSuite({ ...suite, missions: list });
+    setDirty(true);
   }
 
   // Address search (Devices tab)
@@ -1869,6 +2182,27 @@ export default function Admin() {
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
+  const selectGameOptions = useMemo(() => {
+    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
+    const extra = Array.isArray(games)
+      ? games
+          .filter((g) => g && g.slug && g.slug !== 'default')
+          .map((g) => ({
+            value: g.slug,
+            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
+          }))
+      : [];
+    const seen = new Set();
+    const combined = [];
+    [...baseOptions, ...extra].forEach((option) => {
+      if (!option || !option.value) return;
+      if (seen.has(option.value)) return;
+      seen.add(option.value);
+      combined.push(option);
+    });
+    return combined;
+  }, [games]);
+
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
@@ -1904,17 +2238,17 @@ export default function Admin() {
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(config.appearanceTone);
-  const PROTECTION_COLOR_SAFE = '#2dd4bf';
+  const PROTECTION_COLOR_SAFE = '#16f78f';
   const PROTECTION_COLOR_ALERT = '#ff4d57';
   const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
   const protectionIndicatorShadow = protectionState.enabled
-    ? '0 0 14px rgba(45, 212, 191, 0.55)'
+    ? '0 0 22px rgba(22, 247, 143, 0.65)'
     : '0 0 18px rgba(255, 77, 87, 0.75)';
   const protectionIndicatorLabel = protectionState.loading
     ? 'Checking…'
     : protectionState.enabled
-      ? 'Protected'
-      : 'Not Protected';
+      ? 'Protection Enabled'
+      : 'Protection Disabled';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
   const showProtectionIndicator = tab === 'settings';
 
@@ -2070,7 +2404,14 @@ export default function Admin() {
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
   const deployGameEnabled = config?.game?.deployEnabled === true;
+  const playerCount = [1, 2, 4].includes(Number(config?.game?.playerCount))
+    ? Number(config.game.playerCount)
+    : 1;
+  const splashMode = config?.splash?.mode === 'live' ? 'live' : 'test';
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
+  const headerCoverThumb = config?.game?.coverImage
+    ? toDirectMediaURL(config.game.coverImage)
+    : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
@@ -2083,26 +2424,6 @@ export default function Admin() {
       ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
       : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
-  const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
-    });
-    return combined;
-  }, [games]);
 
   return (
     <div style={S.body}>
@@ -2138,9 +2459,22 @@ export default function Admin() {
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
-            <div style={S.headerTitleColumn}>
-              <div style={S.headerGameTitle}>{headerGameTitle}</div>
-              <div style={S.headerSubtitle}>Admin Control Deck</div>
+            <div style={S.headerTitleGroup}>
+              <div style={S.headerCoverFrame}>
+                {headerCoverThumb ? (
+                  <img
+                    src={headerCoverThumb}
+                    alt="Active game cover"
+                    style={S.headerCoverThumb}
+                  />
+                ) : (
+                  <div style={S.headerCoverPlaceholder}>No Cover</div>
+                )}
+              </div>
+              <div style={S.headerTitleColumn}>
+                <div style={S.headerGameTitle}>{headerGameTitle}</div>
+                <div style={S.headerSubtitle}>Admin Control Deck</div>
+              </div>
             </div>
           </div>
           <div style={S.headerNavRow}>
@@ -2181,7 +2515,6 @@ export default function Admin() {
                     <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                   ))}
                 </select>
-                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   <input
                     type="checkbox"
@@ -2229,7 +2562,7 @@ export default function Admin() {
                       {protectionIndicatorLabel}
                     </div>
                     <button
-                      onClick={toggleProtection}
+                      onClick={openProtectionPrompt}
                       disabled={protectionState.saving || protectionState.loading}
                       style={{
                         ...S.button,
@@ -2267,10 +2600,18 @@ export default function Admin() {
         <main style={S.wrapGrid2}>
           {/* Left list */}
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button onClick={startNew} style={S.button}>+ New Mission</button>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
+            <div style={S.sidebarBar}>
+              <div style={S.noteText}>Launch a brand-new mission in this timeline.</div>
+              <button
+                onClick={startNew}
+                style={{
+                  ...S.action3DButton,
+                  ...(newMissionButtonFlash ? S.action3DFlash : {}),
+                }}
+                title="Create a new mission and open the editor"
+              >
+                + New Mission
+              </button>
             </div>
             <input
               placeholder="Search…"
@@ -2370,30 +2711,23 @@ export default function Admin() {
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
                   <div style={S.floatingBarTop}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
-                        Save and Close
+                    <div style={S.overlayBarSide}>
+                      <button
+                        style={S.cancelGlowButton}
+                        onClick={cancelEdit}
+                        title="Close the mission editor without saving"
+                      >
+                        Cancel & Close
                       </button>
-                      <div style={{ fontSize: 12, color: 'var(--admin-muted)', fontWeight: 600 }}>
-                        ID:
-                        <span style={{ marginLeft: 6, fontFamily: 'var(--admin-font-mono, ui-monospace)' }}>
-                          {editing.id || '—'}
-                        </span>
-                      </div>
+                      <div style={S.noteText}>Exit safely without saving changes.</div>
                     </div>
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        flex: 1,
-                        margin: '0 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
+                    <div style={S.overlayCenter}>
+                      <div style={S.overlayIdRow}>
+                        <span style={S.overlayIdLabel}>Mission ID</span>
+                        <code style={S.overlayIdValue}>{editing.id || '—'}</code>
+                      </div>
                       <h3 style={{ margin: '0', fontSize: 18 }}>
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                        {editingIsNew ? 'New Mission' : 'Save & Close'}
                       </h3>
                       <input
                         style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
@@ -2404,10 +2738,21 @@ export default function Admin() {
                         }}
                         placeholder="Mission title"
                       />
+                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
                     </div>
-                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
-                      Cancel and Close
-                    </button>
+                    <div style={S.overlayBarSide}>
+                      <button
+                        style={{
+                          ...S.action3DButton,
+                          ...(missionActionFlash ? S.action3DFlash : {}),
+                        }}
+                        onClick={handleMissionSave}
+                        title={editingIsNew ? 'Save this new mission to the list' : 'Save changes and close'}
+                      >
+                        {editingIsNew ? 'Save New Mission' : 'Save & Close'}
+                      </button>
+                      <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
+                    </div>
                   </div>
 
                   <Field label="Type">
@@ -2764,14 +3109,6 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  <div style={S.floatingBarBottom}>
-                    <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
-                      Save and Close
-                    </button>
-                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
-                      Cancel and Close
-                    </button>
-                  </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
                 </div>
               </div>
@@ -2784,11 +3121,6 @@ export default function Admin() {
       {tab==='devices' && (
         <main style={S.wrapGrid2}>
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
-            </div>
-
             <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
               <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
                 <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
@@ -2806,11 +3138,29 @@ export default function Admin() {
               </div>
             </div>
 
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={S.button} onClick={addDevice}>+ Add Device</button>
-              {selectedDevIdx!=null && (
-                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}>Clear selection</button>
-              )}
+            <div style={S.sidebarBar}>
+              <div style={S.noteText}>Deploy devices and markers from this control strip.</div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                {selectedDevIdx!=null && (
+                  <button
+                    style={S.button}
+                    onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}
+                    title="Deselect the highlighted device"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                <button
+                  style={{
+                    ...S.action3DButton,
+                    ...(addDeviceButtonFlash ? S.action3DFlash : {}),
+                  }}
+                  onClick={addDevice}
+                  title="Create a new device draft"
+                >
+                  + Add Device
+                </button>
+              </div>
             </div>
 
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -2887,35 +3237,49 @@ export default function Admin() {
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
                     <div style={S.floatingBarTop}>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingSave }}
-                        onClick={saveDraftDevice}
-                      >
-                        Save and Close
-                      </button>
-                      <div style={{ flex:1, textAlign:'center', margin:'0 16px' }}>
-                        <h4 style={{ margin:'0 0 4px 0' }}>
-                          {deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}
+                      <div style={S.overlayBarSide}>
+                        <button
+                          style={S.cancelGlowButton}
+                          onClick={cancelDeviceEditor}
+                          title="Close the device editor without saving"
+                        >
+                          Cancel & Close
+                        </button>
+                        <div style={S.noteText}>Use when you need to exit without storing updates.</div>
+                      </div>
+                      <div style={S.overlayCenter}>
+                        <div style={S.overlayIdRow}>
+                          <span style={S.overlayIdLabel}>Device ID</span>
+                          <code style={S.overlayIdValue}>{devDraft.id || '—'}</code>
+                        </div>
+                        <h4 style={{ margin:'0 0 6px 0' }}>
+                          {deviceEditorMode === 'new' ? 'New Device' : 'Save & Close'}
                         </h4>
-                        {deviceEditorMode === 'edit' && devDraft.id && (
-                          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
-                        )}
-                        <div style={{ marginTop:6 }}>
+                        <div style={{ marginTop:4 }}>
                           <button
                             type="button"
                             style={S.subtleActionButton}
                             onClick={resetDeviceEditor}
+                            title="Restore the draft to its last saved state"
                           >
                             Reset draft
                           </button>
                         </div>
+                        <div style={S.noteText}>Update the title, type, or trigger settings before saving.</div>
                       </div>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingCancel }}
-                        onClick={cancelDeviceEditor}
-                      >
-                        Cancel and Close
-                      </button>
+                      <div style={S.overlayBarSide}>
+                        <button
+                          style={{
+                            ...S.action3DButton,
+                            ...(deviceActionFlash ? S.action3DFlash : {}),
+                          }}
+                          onClick={handleDeviceSave}
+                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Save changes and close'}
+                        >
+                          {deviceEditorMode === 'new' ? 'Save New Device' : 'Save & Close'}
+                        </button>
+                        <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
+                      </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -3110,18 +3474,25 @@ export default function Admin() {
                 lockToRegion={true}
               />
               {isDeviceEditorOpen && (
-                <div style={S.deviceMapFooter}>
+                <div style={S.mapFooterActions}>
                   <button
-                    style={{ ...S.floatingButton, ...S.floatingSave }}
-                    onClick={saveDraftDevice}
+                    type="button"
+                    style={S.cancelGlowButton}
+                    onClick={cancelDeviceEditor}
+                    title="Close the device editor without saving"
                   >
-                    Save and Close
+                    Cancel & Close
                   </button>
                   <button
-                    style={{ ...S.floatingButton, ...S.floatingCancel }}
-                    onClick={cancelDeviceEditor}
+                    type="button"
+                    style={{
+                      ...S.action3DButton,
+                      ...(deviceActionFlash ? S.action3DFlash : {}),
+                    }}
+                    onClick={handleDeviceSave}
+                    title={deviceEditorMode === 'new' ? 'Save this new device' : 'Save changes and close'}
                   >
-                    Cancel and Close
+                    {deviceEditorMode === 'new' ? 'Save New Device' : 'Save & Close'}
                   </button>
                 </div>
               )}
@@ -3135,15 +3506,41 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
+            <Field label="Select Your Game">
+              <select
+                style={S.input}
+                value={activeSlug}
+                onChange={(e)=>setActiveSlug(e.target.value)}
+              >
+                {selectGameOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <div style={S.noteText}>
+                Select your game save profile. “Default Game (root)” is the fallback escape ride.
+              </div>
+            </Field>
+            <div style={S.savedGamesActions}>
+              <button
+                type="button"
+                style={{ ...S.button, ...S.buttonSuccess }}
+                onClick={()=>setShowNewGame(true)}
+              >
+                + New Game
+              </button>
+              <div style={S.noteText}>Launches the creation window for naming, slugging, and choosing cover art.</div>
+            </div>
+            <div style={{ marginTop: 18 }} />
             <div style={S.gameTitleRow}>
-              <div style={S.gameTitleColumn}>
+              <div style={S.readonlyField}>
                 <div style={S.fieldLabel}>Game Title</div>
-                <input
-                  style={S.input}
-                  value={config.game.title}
-                  onChange={(e)=>setConfig(prev => (prev ? { ...prev, game:{ ...(prev.game||{}), title:e.target.value } } : prev))}
-                  placeholder="Untitled Game"
-                />
+                <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
+                <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+              </div>
+              <div style={S.readonlyField}>
+                <div style={S.fieldLabel}>Slug</div>
+                <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
+                <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
               </div>
             </div>
             <div style={S.coverControlsRow}>
@@ -3207,26 +3604,27 @@ export default function Admin() {
                 </div>
               </div>
             </div>
-            <div style={{ marginTop: 18 }} />
-            <Field label="Select Game">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
-                Switch between saved games from right here in settings.
-              </div>
-            </Field>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
                 {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
               </select>
+              <div style={S.noteText}>Pick the base structure for missions and pacing.</div>
+            </Field>
+            <Field label="Number of Players">
+              <select
+                style={S.input}
+                value={playerCount}
+                onChange={(e)=>{
+                  const next = Number(e.target.value);
+                  setConfig({ ...config, game:{ ...config.game, playerCount: next } });
+                }}
+              >
+                {[1,2,4].map((count)=>(
+                  <option key={count} value={count}>{count}</option>
+                ))}
+              </select>
+              <div style={S.noteText}>Choose solo, duo, or four-player escape rides.</div>
             </Field>
             <Field label="Game Tags (comma separated)">
               <input
@@ -3235,7 +3633,7 @@ export default function Admin() {
                 onChange={(e)=>updateGameTagsDraft(e.target.value)}
                 placeholder="default-game, mystery"
               />
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+              <div style={S.noteText}>
                 The current slug and <code>default-game</code> are enforced automatically.
               </div>
             </Field>
@@ -3248,7 +3646,7 @@ export default function Admin() {
                 />
                 Enable publishing to the live game build
               </label>
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+              <div style={S.noteText}>
                 When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
               </div>
             </Field>
@@ -3258,6 +3656,31 @@ export default function Admin() {
                   onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
                 Enable Splash (game code & Stripe)
               </label>
+              <div style={S.noteText}>Toggles the landing experience with access code + payment prompts.</div>
+              <div style={S.toggleWrap}>
+                {[
+                  { key: 'test', label: 'Test Mode' },
+                  { key: 'live', label: 'Live Mode' },
+                ].map((option) => {
+                  const active = splashMode === option.key;
+                  return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={()=>setConfig({ ...config, splash:{ ...config.splash, mode: option.key } })}
+                      style={{
+                        ...S.toggleOption,
+                        ...(active ? S.toggleOptionActive : {}),
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={S.noteText}>
+                Test Mode keeps Stripe in sandbox. Live Mode activates production checkout for teams.
+              </div>
             </Field>
           </div>
 
@@ -3464,6 +3887,11 @@ export default function Admin() {
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
+          assignedMediaError={assignedMediaError}
+          onAssignedMediaError={setAssignedMediaError}
+          onClearAssignedMediaError={() => setAssignedMediaError(null)}
+          onStatus={setStatus}
+          onUploadIcon={async (file) => uploadToRepo(file, 'icons')}
         />
       )}
 
@@ -3544,45 +3972,241 @@ export default function Admin() {
         </main>
       )}
 
+      {protectionPrompt.open && (
+        <div style={{ ...S.modalBackdrop, zIndex: 4200 }}>
+          <div style={{ ...S.card, ...S.modalCard }}>
+            <div style={S.modalTopBar}>
+              <button style={S.cancelGlowButton} onClick={closeProtectionPrompt}>Cancel & Close</button>
+              <div style={S.modalTitle}>
+                {protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection'}
+              </div>
+              <button
+                style={S.modalCloseButton}
+                onClick={closeProtectionPrompt}
+                aria-label="Close protection dialog"
+              >
+                ×
+              </button>
+            </div>
+            <form
+              style={S.modalContent}
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitProtectionPrompt();
+              }}
+            >
+              <div style={S.noteText}>
+                {protectionPrompt.mode === 'enable'
+                  ? 'Set a password to require authentication before anyone enters the Admin Control Deck.'
+                  : 'Confirm the current password to disable the lock and return to open access.'}
+              </div>
+              <Field label="Password">
+                <input
+                  type="password"
+                  style={S.input}
+                  value={protectionPrompt.password}
+                  onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, password: e.target.value }))}
+                  placeholder="Enter password"
+                  autoFocus
+                />
+              </Field>
+              {protectionPrompt.requireConfirm && (
+                <Field label="Confirm Password">
+                  <input
+                    type="password"
+                    style={S.input}
+                    value={protectionPrompt.confirm}
+                    onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, confirm: e.target.value }))}
+                    placeholder="Re-enter password"
+                  />
+                </Field>
+              )}
+              {protectionPrompt.error && (
+                <div style={{ ...S.modalStatus, color: PROTECTION_COLOR_ALERT }}>
+                  {protectionPrompt.error}
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:12 }}>
+                <button
+                  type="submit"
+                  style={{
+                    ...S.button,
+                    ...(protectionPrompt.mode === 'enable' ? S.buttonSuccess : S.buttonDanger),
+                    minWidth: 220,
+                    opacity: protectionState.saving ? 0.7 : 1,
+                    cursor: protectionState.saving ? 'wait' : 'pointer',
+                  }}
+                  disabled={protectionState.saving}
+                >
+                  {protectionState.saving
+                    ? 'Saving…'
+                    : (protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* New Game modal */}
       {gameEnabled && showNewGame && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Create New Game</h3>
-            <Field label="Game Title"><input style={S.input} value={newTitle} onChange={(e)=>setNewTitle(e.target.value)}/></Field>
-            <Field label="Game Type">
-              <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
-                {GAME_TYPES.map((t)=><option key={t} value={t}>{t}</option>)}
-              </select>
-            </Field>
-            <Field label="Mode">
-              <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
-                <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
-                <option value="multi">Multiple (4)</option>
-              </select>
-            </Field>
-            <Field label="Duration (minutes — 0 = infinite; count UP)">
-              <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin}
-                onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}/>
-            </Field>
-            <Field label="Alert before end (minutes)">
-              <input type="number" min={1} max={120} style={S.input} value={newAlertMin}
-                onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}/>
-            </Field>
-            <div style={{ display:'flex', gap:8, marginTop:12 }}>
-              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
-              <button style={S.button} onClick={async ()=>{
-                if (!newTitle.trim()) return;
-                const r = await fetch('/api/games', {
-                  method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-                  body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
-                });
-                const j = await r.json().catch(()=>({ ok:false }));
-                if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
-                await reloadGamesList();
-                setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
-              }}>Create</button>
+        <div style={S.modalBackdrop}>
+          <div style={{ ...S.card, ...S.modalCard }}>
+            <div style={S.modalTopBar}>
+              <button style={S.cancelGlowButton} onClick={handleNewGameModalClose}>Cancel & Close</button>
+              <div style={S.modalTitle}>Create New Game</div>
+              <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
+            </div>
+            <div style={S.modalContent}>
+              <Field label="Game Title">
+                <input
+                  style={S.input}
+                  value={newTitle}
+                  onChange={(e)=>setNewTitle(e.target.value)}
+                  placeholder="Starship Escape"
+                />
+                <div style={S.noteText}>This name appears wherever the game is listed.</div>
+              </Field>
+              <Field label="Slug (folder name)">
+                <input
+                  style={S.input}
+                  value={newGameSlug}
+                  onChange={(e)=>handleNewSlugInput(e.target.value)}
+                  placeholder="starship-escape"
+                />
+                <div style={S.noteText}>Stored at <code>/public/games/[slug]</code> alongside missions and config.</div>
+              </Field>
+              <Field label="Game Type">
+                <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
+                  {GAME_TYPES.map((t)=>(<option key={t} value={t}>{t}</option>))}
+                </select>
+                <div style={S.noteText}>Select a template for default mission pacing.</div>
+              </Field>
+              <Field label="Mode">
+                <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
+                  <option value="single">Single Player</option>
+                  <option value="head2head">Head to Head (2)</option>
+                  <option value="multi">Multiple (4)</option>
+                </select>
+                <div style={S.noteText}>Defines how many players join each session.</div>
+              </Field>
+              <Field label="Duration (minutes — 0 = infinite)">
+                <input
+                  type="number"
+                  min={0}
+                  max={24*60}
+                  style={S.input}
+                  value={newDurationMin}
+                  onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}
+                />
+                <div style={S.noteText}>Players see this countdown during the mission.</div>
+              </Field>
+              <Field label="Alert before end (minutes)">
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  style={S.input}
+                  value={newAlertMin}
+                  onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}
+                />
+                <div style={S.noteText}>Send a warning before time is up.</div>
+              </Field>
+              <Field label="Short Description">
+                <textarea
+                  style={{ ...S.input, minHeight: 80 }}
+                  value={newShortDesc}
+                  onChange={(e)=>setNewShortDesc(e.target.value)}
+                  placeholder="One-sentence teaser for listings"
+                />
+                <div style={S.noteText}>Great for cards, previews, and quick share links.</div>
+              </Field>
+              <Field label="Long Description">
+                <textarea
+                  style={{ ...S.input, minHeight: 140 }}
+                  value={newLongDesc}
+                  onChange={(e)=>setNewLongDesc(e.target.value)}
+                  placeholder="Give players the full briefing for this escape ride"
+                />
+                <div style={S.noteText}>Appears on marketing pages and internal docs.</div>
+              </Field>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Cover Image</div>
+                <div
+                  onDragOver={(e)=>{ e.preventDefault(); setNewCoverDropActive(true); }}
+                  onDragLeave={(e)=>{ e.preventDefault(); setNewCoverDropActive(false); }}
+                  onDrop={(e)=>{
+                    e.preventDefault();
+                    setNewCoverDropActive(false);
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file) handleNewGameCoverFile(file);
+                  }}
+                  style={{ ...S.coverDropZone, ...(newCoverDropActive ? S.coverDropZoneActive : {}) }}
+                >
+                  {newCoverPreview ? (
+                    <img src={newCoverPreview} alt="New game cover" style={S.coverDropImage} />
+                  ) : (
+                    <div style={S.coverDropPlaceholder}>
+                      <strong>Drag & drop cover art</strong>
+                      <span>PNG or JPG · under 1 MB · shows beside the admin header</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                  <button type="button" style={S.button} onClick={()=>newGameCoverInputRef.current?.click()}>Upload cover</button>
+                  <input
+                    ref={newGameCoverInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={(e)=>{
+                      const file = e.target.files?.[0];
+                      if (file) handleNewGameCoverFile(file);
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                  <button type="button" style={S.button} onClick={loadNewCoverOptions} disabled={newCoverLookupLoading}>
+                    {newCoverLookupLoading ? 'Loading…' : 'Import from Media Pool'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...S.buttonDanger }}
+                    onClick={clearNewGameCover}
+                    disabled={!newCoverPreview && !newCoverSelectedUrl}
+                  >
+                    Clear cover
+                  </button>
+                </div>
+                <div style={S.noteText}>Upload new artwork or reuse an existing asset.</div>
+                {newCoverOptions.length > 0 && (
+                  <div style={S.modalCoverGrid}>
+                    {newCoverOptions.map((item) => (
+                      <button
+                        key={item.url}
+                        type="button"
+                        onClick={()=>applyNewCoverFromUrl(item.url)}
+                        style={{
+                          ...S.modalCoverButton,
+                          ...(newCoverSelectedUrl === item.url ? S.modalCoverButtonActive : {}),
+                        }}
+                      >
+                        <img src={toDirectMediaURL(item.url)} alt={item.name || item.url} style={S.modalCoverThumb} />
+                        <div style={S.modalCoverLabel}>{item.name || item.url}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {newGameStatus && <div style={S.modalStatus}>{newGameStatus}</div>}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:12, flexWrap:'wrap' }}>
+                <button
+                  style={{ ...S.action3DButton, ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}) }}
+                  onClick={handleCreateNewGame}
+                  disabled={newGameBusy}
+                >
+                  {newGameBusy ? 'Creating…' : 'Save New Game'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3740,6 +4364,17 @@ const S = {
     overflow: 'auto',
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
+  sidebarBar: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: '0 12px 24px rgba(8, 13, 19, 0.35)',
+  },
   card: {
     position: 'relative',
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
@@ -3773,7 +4408,15 @@ const S = {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     borderTop: '1px solid var(--admin-border-soft)',
   },
+  mapFooterActions: {
+    marginTop: 12,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
+  noteText: { marginTop: 6, fontSize: 12, color: 'var(--admin-muted)' },
   input: {
     width: '100%',
     padding: '10px 12px',
@@ -3832,6 +4475,35 @@ const S = {
     color: '#fff4dd',
     boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
   },
+  action3DButton: {
+    padding: '12px 20px',
+    borderRadius: 16,
+    border: '1px solid rgba(34, 197, 94, 0.85)',
+    background: 'linear-gradient(165deg, #0b4224, #22c55e)',
+    color: '#ecfdf5',
+    fontWeight: 800,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    boxShadow: '0 18px 28px rgba(12, 83, 33, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.15)',
+    cursor: 'pointer',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  },
+  action3DFlash: {
+    boxShadow: '0 0 28px rgba(34, 197, 94, 0.75), 0 22px 34px rgba(12, 83, 33, 0.55)',
+    transform: 'translateY(-2px)',
+  },
+  cancelGlowButton: {
+    padding: '10px 18px',
+    borderRadius: 999,
+    border: '1px solid rgba(248, 113, 113, 0.6)',
+    background: 'linear-gradient(140deg, #4c0519, #f87171)',
+    color: '#ffe4e6',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 22px rgba(248, 113, 113, 0.55)',
+    cursor: 'pointer',
+  },
   deviceMapFooter: {
     marginTop: 12,
     display: 'flex',
@@ -3866,9 +4538,35 @@ const S = {
     gap: 6,
     marginBottom: 20,
   },
+  headerTitleGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerCoverFrame: {
+    width: 68,
+    height: 68,
+    borderRadius: 16,
+    overflow: 'hidden',
+    border: '1px solid rgba(148, 163, 184, 0.4)',
+    background: 'rgba(15, 23, 42, 0.7)',
+    display: 'grid',
+    placeItems: 'center',
+    boxShadow: '0 18px 32px rgba(2, 6, 12, 0.55)',
+  },
+  headerCoverThumb: { width: '100%', height: '100%', objectFit: 'cover' },
+  headerCoverPlaceholder: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    textAlign: 'center',
+    padding: '0 6px',
+  },
   headerTitleColumn: {
     display: 'grid',
-    justifyItems: 'center',
+    justifyItems: 'flex-start',
+    textAlign: 'left',
     gap: 4,
   },
   headerGameTitle: {
@@ -3904,22 +4602,71 @@ const S = {
     justifyContent: 'center',
   },
   gameTitleRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: 16,
     alignItems: 'stretch',
     marginBottom: 16,
-  },
-  gameTitleColumn: {
-    flex: '1 1 220px',
-    minWidth: 220,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
   },
   fieldLabel: {
     fontSize: 12,
     color: 'var(--admin-muted)',
+  },
+  readonlyField: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    padding: '12px 16px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  readonlyValue: {
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '0.06em',
+    wordBreak: 'break-word',
+  },
+  readonlyCode: {
+    display: 'inline-block',
+    padding: '4px 10px',
+    borderRadius: 999,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+  },
+  savedGamesActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  toggleWrap: {
+    display: 'inline-flex',
+    borderRadius: 999,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    marginTop: 12,
+    boxShadow: '0 12px 22px rgba(8, 13, 19, 0.35)',
+  },
+  toggleOption: {
+    padding: '8px 18px',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    transition: 'background 0.2s ease, color 0.2s ease',
+  },
+  toggleOptionActive: {
+    background: 'var(--admin-accent)',
+    color: '#0b1116',
   },
   coverControlsRow: {
     display: 'flex',
@@ -3974,6 +4721,23 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
+  iconDropZone: {
+    border: '1px dashed var(--admin-border-soft)',
+    borderRadius: 16,
+    padding: 16,
+    display: 'grid',
+    gap: 8,
+    justifyItems: 'center',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
+    marginBottom: 8,
+  },
+  iconDropZoneActive: {
+    border: '1px dashed rgba(59, 130, 246, 0.85)',
+    boxShadow: '0 0 24px rgba(59, 130, 246, 0.25)',
+    background: 'rgba(22, 36, 54, 0.92)',
+  },
   coverSummary: {
     flex: '1 1 260px',
     minWidth: 240,
@@ -4005,6 +4769,41 @@ const S = {
   },
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  overlayBarSide: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+    minWidth: 180,
+  },
+  overlayCenter: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    textAlign: 'center',
+  },
+  overlayIdRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  overlayIdLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  overlayIdValue: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--admin-body-color)',
+    background: 'var(--admin-tab-bg)',
+    padding: '4px 12px',
+    borderRadius: 999,
+  },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   muted: { color: 'var(--admin-muted)' },
   errorPanel: {
@@ -4029,6 +4828,98 @@ const S = {
     cursor: 'pointer',
     fontSize: 12,
     boxShadow: 'var(--admin-glass-sheen)',
+  },
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(5, 12, 20, 0.82)',
+    backdropFilter: 'blur(14px)',
+    display: 'grid',
+    placeItems: 'center',
+    padding: 24,
+    zIndex: 4000,
+  },
+  modalCard: {
+    width: 'min(720px, 96vw)',
+    maxHeight: '82vh',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  modalTopBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    position: 'sticky',
+    top: 0,
+    zIndex: 5,
+  },
+  modalTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  modalCloseButton: {
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--admin-muted)',
+    fontSize: 28,
+    lineHeight: 1,
+    cursor: 'pointer',
+    padding: 4,
+  },
+  modalContent: {
+    padding: '20px 24px 24px',
+    display: 'grid',
+    gap: 16,
+    maxHeight: 'calc(82vh - 72px)',
+    overflowY: 'auto',
+  },
+  modalCoverGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalCoverButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 14,
+    padding: 12,
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease',
+  },
+  modalCoverButtonActive: {
+    border: '1px solid rgba(59, 130, 246, 0.85)',
+    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.35)',
+  },
+  modalCoverThumb: {
+    width: '100%',
+    height: 120,
+    objectFit: 'cover',
+    borderRadius: 10,
+    background: '#0f172a',
+  },
+  modalCoverLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textAlign: 'left',
+    wordBreak: 'break-word',
+  },
+  modalStatus: {
+    fontSize: 13,
+    color: 'var(--admin-muted)',
+    minHeight: 20,
   },
 };
 
@@ -4090,6 +4981,8 @@ function MapOverview({
     map._layerGroup.clearLayers();
     const layer=map._layerGroup;
     const bounds=L.latLngBounds([]);
+    const missionSigParts = [];
+    const deviceSigParts = [];
 
     // Missions
     (missions||[]).forEach((m,idx)=>{
@@ -4109,6 +5002,12 @@ function MapOverview({
         marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
       }
       bounds.extend(pos);
+      missionSigParts.push([
+        m?.id || idx,
+        Number(pos[0].toFixed(4)),
+        Number(pos[1].toFixed(4)),
+        clamp(Number(m.content?.radiusMeters || 0), 0, 5000),
+      ]);
     });
 
     // Devices
@@ -4129,6 +5028,12 @@ function MapOverview({
         marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
       }
       bounds.extend(pos);
+      deviceSigParts.push([
+        d?.id || idx,
+        Number(pos[0].toFixed(4)),
+        Number(pos[1].toFixed(4)),
+        clamp(Number(d.pickupRadius || 0), 0, 5000),
+      ]);
     });
 
     // Draft device (Devices tab)
@@ -4143,6 +5048,15 @@ function MapOverview({
       bounds.extend(pos);
     }
 
+    const draftSig = (!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number')
+      ? [
+          Number(Number(draftDevice.lat).toFixed(4)),
+          Number(Number(draftDevice.lng).toFixed(4)),
+          clamp(Number(draftDevice.radius || draftDevice.pickupRadius || 0), 0, 5000),
+        ]
+      : null;
+    const dataSignature = JSON.stringify({ missions: missionSigParts, devices: deviceSigParts, draft: draftSig });
+
     // Click handler
     if (map._clickHandler) map.off('click', map._clickHandler);
     map._clickHandler = (e) => {
@@ -4154,13 +5068,18 @@ function MapOverview({
     };
     map.on('click', map._clickHandler);
 
+    const shouldRefit = !map._lastFitSignature || map._lastFitSignature !== dataSignature;
     if (lockToRegion) {
-      map.setView(initialCenter, initialZoom);
-    } else if(bounds.isValid()) {
+      if (!map._lockedInitialView) {
+        map.setView(initialCenter, initialZoom);
+        map._lockedInitialView = true;
+      }
+    } else if(bounds.isValid() && shouldRefit) {
       map.fitBounds(bounds.pad(0.2));
-    } else {
+    } else if (!map._lastFitSignature && !bounds.isValid()) {
       map.setView(initialCenter, initialZoom);
     }
+    map._lastFitSignature = dataSignature;
   },[
     leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
     selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
@@ -4549,7 +5468,19 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({
+  config,
+  setConfig,
+  onReapplyDefaults,
+  inventory = [],
+  devices = [],
+  missions = [],
+  assignedMediaError = null,
+  onAssignedMediaError = () => {},
+  onClearAssignedMediaError = () => {},
+  onStatus = () => {},
+  onUploadIcon = async () => '',
+}) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const safeConfig = config || {};
   const safeMedia = safeConfig.media || {};
@@ -4560,6 +5491,73 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   const iconsD = safeIcons.devices  || [];
   const iconsR = safeIcons.rewards  || [];
   const triggerConfig = mergeTriggerState(safeConfig.mediaTriggers);
+  const missionList = Array.isArray(missions) ? missions : [];
+  const [iconStatus, setIconStatus] = useState({ missions: '', devices: '', rewards: '' });
+
+  const addIconToConfig = useCallback((kind, url, nameHint = '') => {
+    setConfig((current) => {
+      if (!current) return current;
+      const icons = {
+        missions: [...(current.icons?.missions || [])],
+        devices: [...(current.icons?.devices || [])],
+        rewards: [...(current.icons?.rewards || [])],
+      };
+      if (!icons[kind]) icons[kind] = [];
+      const list = icons[kind];
+      const rawName = (nameHint || baseNameFromUrl(url) || '').trim();
+      const baseKey = rawName
+        ? rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48)
+        : 'icon';
+      let finalKey = baseKey || `icon-${Date.now()}`;
+      let suffix = 1;
+      while (list.find((item) => item.key === finalKey)) {
+        suffix += 1;
+        finalKey = `${baseKey || 'icon'}-${suffix}`;
+      }
+      const entry = {
+        key: finalKey,
+        name: rawName || finalKey,
+        url,
+      };
+      icons[kind] = [...list, entry];
+      return { ...current, icons };
+    });
+  }, [setConfig]);
+
+  const handleIconUpload = useCallback(async (kind, fileList) => {
+    if (typeof onUploadIcon !== 'function') {
+      setIconStatus((prev) => ({ ...prev, [kind]: '⚠️ Upload service unavailable.' }));
+      return;
+    }
+    const files = Array.from(fileList || []).filter(isIconMediaFile);
+    if (!files.length) {
+      setIconStatus((prev) => ({ ...prev, [kind]: '⚠️ Drop PNG, JPG, or GIF files to add icons.' }));
+      return;
+    }
+    setIconStatus((prev) => ({ ...prev, [kind]: `Uploading ${files.length} file${files.length > 1 ? 's' : ''}…` }));
+    let success = 0;
+    for (const file of files) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const url = await onUploadIcon(file);
+        if (url) {
+          addIconToConfig(kind, url, file.name);
+          success += 1;
+        }
+      } catch (err) {
+        console.error('Icon upload failed', err);
+      }
+    }
+    if (success > 0) {
+      const message = `✅ Added ${success} icon${success > 1 ? 's' : ''}`;
+      setIconStatus((prev) => ({ ...prev, [kind]: message }));
+      if (typeof onStatus === 'function') onStatus(message);
+    } else {
+      const message = '❌ Icon upload failed — please try again.';
+      setIconStatus((prev) => ({ ...prev, [kind]: message }));
+      if (typeof onStatus === 'function') onStatus(message);
+    }
+  }, [onUploadIcon, addIconToConfig, onStatus]);
 
   function updateMediaTrigger(partial) {
     setConfig((c) => {
@@ -4587,7 +5585,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     const thumbnail = toDirectMediaURL(d?.iconUrl || iconEntry?.url || '');
     return { id, label, thumbnail, meta: d };
   });
-  const missionOptions = (missions || []).map((m, idx) => {
+  const missionOptions = missionList.map((m, idx) => {
     const id = m?.id || `mission-${idx}`;
     const label = m?.title || id;
     const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
@@ -4595,7 +5593,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     return { id, label, thumbnail, meta: m };
   });
   const responseOptions = [];
-  (missions || []).forEach((m) => {
+  missionList.forEach((m) => {
     if (!m) return;
     const baseLabel = m.title || m.id || 'Mission';
     const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
@@ -4731,7 +5729,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
     });
 
-    (suite?.missions || []).forEach((mission) => {
+    missionList.forEach((mission) => {
       if (!mission) return;
       const title = mission.title || mission.id || 'Mission';
       const iconUrls = new Set();
@@ -4853,7 +5851,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         coverImages: [],
       };
     }
-  }, [config, suite, mediaPool]);
+  }, [config, missionList, mediaPool]);
 
   const assignedMediaFallback = useCallback(({ error, reset }) => (
     <div style={S.errorPanel}>
@@ -4866,7 +5864,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
           type="button"
           style={S.button}
           onClick={() => {
-            setAssignedMediaError(null);
+            onClearAssignedMediaError();
             reset();
           }}
         >
@@ -4874,28 +5872,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         </button>
       </div>
     </div>
-  ), [setAssignedMediaError]);
-
-  const missionResponsesFallback = useCallback(({ error, reset }) => (
-    <div style={S.errorPanel}>
-      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
-      <div style={S.errorPanelMessage}>
-        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
-      </div>
-      <div style={S.errorPanelActions}>
-        <button
-          type="button"
-          style={S.button}
-          onClick={() => {
-            setMissionResponsesError(null);
-            reset();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  ), [setMissionResponsesError]);
+  ), [onClearAssignedMediaError]);
 
   const arraysEqual = useCallback((a = [], b = []) => {
     if (a.length !== b.length) return false;
@@ -4922,11 +5899,6 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }, [arraysEqual, setConfig]);
 
   const triggerEnabled = !!triggerConfig.enabled;
-
-  const editingIsNew = useMemo(() => {
-    if (!editing) return false;
-    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
-  }, [editing, suite]);
 
   const handleTriggerToggle = useCallback((enabled) => {
     setMediaTriggerPicker('');
@@ -4960,11 +5932,11 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
           fallback={assignedMediaFallback}
           onError={(error) => {
             console.error('Assigned Media render failure', error);
-            setAssignedMediaError(error);
+            onAssignedMediaError(error);
             const message = error?.message || error || 'unknown error';
-            setStatus(`❌ Assigned Media failed to load: ${message}`);
+            onStatus(`❌ Assigned Media failed to load: ${message}`);
           }}
-          onReset={() => setAssignedMediaError(null)}
+          onReset={onClearAssignedMediaError}
           resetKeys={[assignedMediaError, assignedState, mediaUsageSummary, inventory]}
         >
           <AssignedMediaTab
@@ -5080,16 +6052,22 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
           title={`Mission Icons (${iconsM.length})`}
           items={iconsM}
           onRemove={(key)=>removeIcon('missions', key)}
+          onUpload={(files)=>handleIconUpload('missions', files)}
+          status={iconStatus.missions}
         />
         <IconGroup
           title={`Device Icons (${iconsD.length})`}
           items={iconsD}
           onRemove={(key)=>removeIcon('devices', key)}
+          onUpload={(files)=>handleIconUpload('devices', files)}
+          status={iconStatus.devices}
         />
         <IconGroup
           title={`Reward Icons (${iconsR.length})`}
           items={iconsR}
           onRemove={(key)=>removeIcon('rewards', key)}
+          onUpload={(files)=>handleIconUpload('rewards', files)}
+          status={iconStatus.rewards}
         />
       </div>
 
@@ -5114,10 +6092,42 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 }
 
 /* Shared pieces for Assigned Media */
-function IconGroup({ title, items, onRemove }) {
+function IconGroup({ title, items, onRemove, onUpload, status }) {
+  const inputRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  const triggerUpload = (files) => {
+    if (onUpload && files && files.length) {
+      onUpload(files);
+    }
+  };
+
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
+      {onUpload && (
+        <div
+          onDragOver={(e)=>{ e.preventDefault(); setDragActive(true); }}
+          onDragLeave={(e)=>{ e.preventDefault(); setDragActive(false); }}
+          onDrop={(e)=>{ e.preventDefault(); setDragActive(false); triggerUpload(e.dataTransfer?.files); }}
+          style={{ ...S.iconDropZone, ...(dragActive ? S.iconDropZoneActive : {}) }}
+        >
+          <div style={{ fontWeight:600 }}>Drag &amp; drop PNG, JPG, or GIF icons</div>
+          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Imports save into <code>/media/icons</code>.</div>
+          <button type="button" style={S.button} onClick={()=>inputRef.current?.click()}>
+            Upload icon
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,.gif"
+            multiple
+            style={{ display:'none' }}
+            onChange={(e)=>{ triggerUpload(e.target.files); if (e.target) e.target.value=''; }}
+          />
+        </div>
+      )}
+      {status && <div style={{ ...S.noteText, marginTop: 6 }}>{status}</div>}
       {items.length === 0 && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>No icons yet.</div>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
         {items.map((it)=>(

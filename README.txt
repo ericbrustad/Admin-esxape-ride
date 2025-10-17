@@ -1,9 +1,28 @@
-work — 2025-10-16 00:46:47Z
+work — 2025-10-17 01:50:59Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Settings stack polish, stable devices map, and icon uploads. Commit: 11f7843d468c9559bf632573a84ee719bff3e1de
+  - Direct links: `pages/index.jsx`
+  - Notes: Moves the “Select Your Game” selector above the settings card with a player-count dropdown and splash Test/Live toggle, keeps the devices map from zooming away by locking the initial fit and adds save/cancel buttons below the map, and enables drag-and-drop uploads for mission, device, and reward icons directly inside Assigned Media. Note to review @ 2025-10-17 01:50:59Z.
+- 2025-10-17 — Assigned Media props plumbing & mission launch guard. Commit: 4ff0d9196a75b9dcd275fcfa29ce2a15e04b25be
+  - Direct links: `pages/index.jsx`
+  - Notes: Exposes the parent error/status handlers to `AssignedMediaPageTab` so the tab no longer crashes when loading, restores
+    the `missionResponsesFallback` guard inside the main admin flow, recalculates the mission editor's "new" state at the page
+    level, and verified Assigned Media plus New Mission overlays render in the dev preview. Note to review @ 2025-10-17 00:26:18Z.
+- 2025-10-16 — Assigned Media mission guard & media delete API cleanup. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Stops the Assigned Media tab from referencing an undefined `suite` during render by scoping all usage to the missions
+    provided by the admin dashboard, eliminating the React ReferenceError, and trims the media deletion helper to the single
+    `/api/media/delete` endpoint so the browser no longer spams 405 errors while loading. Note to review @ 2025-10-16 21:43:50Z.
+- 2025-10-16 — Hook order guard & local config fallback. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/config.js`, `.gitignore`
+  - Notes: Ensures the admin dashboard always calls its hooks in a stable order so React no longer crashes on load, adds a filesystem fallback for `/api/config` when GitHub env vars are missing so development stays functional, and reintroduces a `.gitignore` for node_modules/. Note to review @ 2025-10-16 21:15:54Z.
+- 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
+  - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
