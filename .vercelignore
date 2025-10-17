@@ -1,0 +1,4 @@
+# Prevent Vercel from attempting to build the legacy game Next.js app
+# while keeping the admin dashboard deployment focused on the root project.
+game/
+
