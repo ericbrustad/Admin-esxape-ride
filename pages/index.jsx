@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
-import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
   appearanceBackgroundStyle,
@@ -84,6 +84,27 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
+
+const AppearanceEditor = dynamic(
+  () => import('../components/ui-kit').then((mod) => mod.AppearanceEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 12,
+          border: '1px solid var(--admin-border-soft)',
+          background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+          color: 'var(--admin-muted)',
+          fontSize: 12,
+        }}
+      >
+        Loading appearance controls…
+      </div>
+    ),
+  },
+);
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -904,6 +925,48 @@ export default function Admin() {
     config?.appearanceTone,
   ]);
 
+  const metaBranchLabel = adminMeta.branch || 'unknown';
+  const metaCommitFull = adminMeta.commit || '';
+  const metaCommitShort = metaCommitFull ? String(metaCommitFull).slice(0, 7) : '';
+  const metaRepoLabel = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
+  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
+  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
+  const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaBanner = (
+    <div style={S.metaBanner}>
+      <div style={S.metaBannerLine}>
+        <span>
+          <strong>Branch:</strong> {metaBranchLabel}
+        </span>
+        {metaCommitShort && (
+          <span style={S.metaBadge} title={metaCommitFull}>
+            #{metaCommitShort}
+          </span>
+        )}
+        {metaRepoLabel && <span style={S.metaMuted}>{metaRepoLabel}</span>}
+        {metaDeploymentState && (
+          <span>
+            <strong>Deployment:</strong>{' '}
+            {metaDeploymentUrl ? (
+              <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                {metaDeploymentState}
+              </a>
+            ) : (
+              metaDeploymentState
+            )}
+          </span>
+        )}
+        {metaTimestampLabel && (
+          <span>
+            <strong>Checked:</strong> {metaTimestampLabel}
+          </span>
+        )}
+        {adminMeta.error && <span style={S.metaBannerError}>{adminMeta.error}</span>}
+      </div>
+    </div>
+  );
 
   const [dirty, setDirty]       = useState(false);
   const [missionTriggerPicker, setMissionTriggerPicker] = useState('');
@@ -1871,11 +1934,14 @@ export default function Admin() {
 
   if (!suite || !config) {
     return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
-          Loading… (pulling config & missions)
-        </div>
-      </main>
+      <div style={S.body}>
+        {metaBanner}
+        <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+          <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
+            Loading… (pulling config & missions)
+          </div>
+        </main>
+      </div>
     );
   }
 
@@ -2072,11 +2138,6 @@ export default function Admin() {
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
-  const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
-  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
-  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
-  const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2106,35 +2167,7 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
-            </span>
-          )}
-          {metaDeploymentState && (
-            <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
-            </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
-          )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
-      </div>
+      {metaBanner}
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
