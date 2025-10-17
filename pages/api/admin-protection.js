@@ -79,7 +79,7 @@ async function readFirstAvailable(paths) {
         passwordHash: typeof data.passwordHash === 'string' ? data.passwordHash : '',
       };
     } catch (err) {
-      // Continue trying other candidates when the file is missing or invalid.
+      // Continue trying other paths when the file is missing or invalid.
     }
   }
 
