@@ -1,9 +1,12 @@
-work — 2025-10-17 09:46:06Z
+work — 2025-10-17 10:40:43Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Assigned media cover tagging & header theming refresh. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`, `README.txt`
+  - Notes: Restores the Assigned Media tab by normalizing media inventory data, shrinks both cover drop zones, ensures saved cover uploads land in the media pool with a **cover** tag, surfaces the cover preview inside Assigned Media, and syncs the admin header chrome with the active appearance theme while trimming the old cover status panel. Note to review @ 2025-10-17 10:40:43Z.
 - 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
   - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
   - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.

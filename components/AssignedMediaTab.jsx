@@ -445,7 +445,7 @@ export default function AssignedMediaTab({
         {renderUsageSection('Cover Art', coverImages, {
           emptyLabel: 'No cover art selected.',
           noun: 'cover assignment',
-          showThumbnail: false,
+          showThumbnail: true,
         })}
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',

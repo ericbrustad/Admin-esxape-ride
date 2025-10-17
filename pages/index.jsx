@@ -1300,14 +1300,37 @@ export default function Admin() {
   const [editing, setEditing]   = useState(null);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
+  const normalizeInventoryItem = useCallback((item) => {
+    if (!item) return null;
+    const pathCandidate = item.path || item.url || '';
+    const urlCandidate = item.url || item.path || '';
+    const directUrl = urlCandidate ? toDirectMediaURL(urlCandidate) : '';
+    const normalizedPath = String(pathCandidate || '').toLowerCase();
+    const tagSet = new Set(Array.isArray(item.tags) ? item.tags : []);
+    if (normalizedPath.includes('/media/covers/') || normalizedPath.includes('/covers/')) {
+      tagSet.add('cover');
+    }
+    const normalized = {
+      ...item,
+      id: item.id || directUrl || urlCandidate,
+      url: item.url || urlCandidate || directUrl,
+      openUrl: item.openUrl || directUrl || urlCandidate,
+      thumbUrl: item.thumbUrl || directUrl,
+      tags: Array.from(tagSet),
+    };
+    return normalized;
+  }, []);
   const fetchInventory = useCallback(async () => {
     try {
       const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
-      return Array.isArray(items) ? items : [];
+      const normalized = (Array.isArray(items) ? items : [])
+        .map((item) => normalizeInventoryItem(item))
+        .filter(Boolean);
+      return normalized;
     } catch {
       return [];
     }
-  }, []);
+  }, [normalizeInventoryItem]);
   const syncInventory = useCallback(async () => {
     const items = await fetchInventory();
     setInventory(items);
@@ -2629,18 +2652,23 @@ export default function Admin() {
           const candidate = item?.url || item?.path || item;
           return candidate && normalize(candidate) === normalizedTarget;
         });
-        if (already) return safePrev;
-        return [
-          ...safePrev,
-          {
-            url,
-            path: url,
-            id: url,
-            type: 'image',
-            thumbUrl: url,
-            label: baseNameFromUrl(url),
-          },
-        ];
+        const nextList = already
+          ? safePrev
+          : [
+              ...safePrev,
+              {
+                url,
+                path: url,
+                id: url,
+                type: 'image',
+                thumbUrl: normalizedPreview,
+                label: baseNameFromUrl(url),
+                tags: ['cover'],
+              },
+            ];
+        return nextList
+          .map((item) => normalizeInventoryItem(item))
+          .filter(Boolean);
       });
       await syncInventory();
     } catch (err) {
@@ -2729,11 +2757,6 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
-  const coverStatusMessage = coverImageUrl
-    ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
-    : coverUploadPreview
-      ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
-      : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
@@ -2932,14 +2955,6 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {tab === 'settings' && (
-                <div style={S.coverSummary}>
-                  <div style={{ fontWeight:700 }}>Cover status</div>
-                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
-                    {coverStatusMessage}
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {showProtectionIndicator && protectionError && (
@@ -4640,14 +4655,15 @@ const S = {
   },
   header: {
     padding: 20,
-    background: 'var(--admin-header-bg)',
+    background: 'var(--appearance-panel-bg, var(--admin-header-bg))',
     backdropFilter: 'var(--admin-header-blur, blur(20px))',
-    borderBottom: 'var(--admin-header-border)',
+    borderBottom: 'var(--appearance-panel-border, var(--admin-header-border))',
     position: 'sticky',
     top: 0,
     zIndex: 40,
-    boxShadow: 'var(--admin-header-shadow)',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-header-shadow))',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
@@ -4839,11 +4855,12 @@ const S = {
     height: 68,
     borderRadius: 16,
     overflow: 'hidden',
-    border: 'var(--admin-header-frame-border, var(--admin-border-soft))',
-    background: 'var(--admin-header-frame-bg, var(--admin-tab-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-header-frame-border, var(--admin-border-soft)))',
+    background: 'var(--appearance-panel-bg, var(--admin-header-frame-bg, var(--admin-tab-bg)))',
     display: 'grid',
     placeItems: 'center',
-    boxShadow: 'var(--admin-header-frame-shadow, var(--admin-glass-sheen))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-header-frame-shadow, var(--admin-glass-sheen)))',
+    transition: 'background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
   },
   headerCoverThumb: { width: '100%', height: '100%', objectFit: 'cover' },
   headerCoverPlaceholder: {
@@ -4870,7 +4887,8 @@ const S = {
     fontSize: 13,
     letterSpacing: '0.3em',
     textTransform: 'uppercase',
-    color: 'var(--admin-muted)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    opacity: 0.7,
   },
   headerNavRow: {
     display: 'flex',
@@ -4942,8 +4960,12 @@ const S = {
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 380px',
-    minHeight: 280,
+    flex: '1 1 320px',
+    width: '100%',
+    maxWidth: 520,
+    minHeight: 220,
+    maxHeight: 320,
+    aspectRatio: '16 / 9',
     border: '1px dashed rgba(94, 234, 212, 0.35)',
     borderRadius: 20,
     background: 'rgba(15, 23, 42, 0.75)',
@@ -4957,10 +4979,10 @@ const S = {
     boxShadow: '0 0 24px rgba(94, 234, 212, 0.35)',
     background: 'rgba(15, 32, 27, 0.85)',
   },
-  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   coverDropPlaceholder: {
     color: '#9fb0bf',
-    fontSize: 13,
+    fontSize: 12,
     textAlign: 'center',
     display: 'grid',
     gap: 6,
@@ -4969,7 +4991,7 @@ const S = {
     letterSpacing: '0.05em',
   },
   coverActionsColumn: {
-    flex: '0 0 240px',
+    flex: '0 1 240px',
     minWidth: 220,
     display: 'flex',
     flexDirection: 'column',
@@ -4987,15 +5009,6 @@ const S = {
   coverActionHint: {
     fontSize: 12,
     color: 'var(--admin-muted)',
-  },
-  coverSummary: {
-    flex: '1 1 260px',
-    minWidth: 240,
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
-    borderRadius: 14,
-    padding: 14,
-    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   tab: {
     padding: '8px 12px',
@@ -5934,7 +5947,12 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 
     const coverUrl = normalize(safeConfig?.game?.coverImage);
     if (coverUrl) {
-      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
+      const entry = ensureEntry(coverMap, coverUrl, {
+        label: 'Game cover art',
+        kind: 'image',
+        thumbUrl: toDirectMediaURL(coverUrl),
+        tags: ['cover'],
+      });
       if (entry) {
         entry.count = Math.max(1, entry.count);
         entry.references.add('Active cover image');
