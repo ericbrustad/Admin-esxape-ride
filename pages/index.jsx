@@ -2077,6 +2077,21 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const conversationLog = useMemo(
+    () => [
+      {
+        speaker: 'User',
+        message:
+          'make the frozen header area part of the assigned skin preference. be sure that new media and assigned media pages load with error.',
+      },
+      {
+        speaker: 'GPT',
+        message:
+          'Applying skin-aware styling to the header, validating media tabs, and surfacing repository deployment metadata with timestamps.',
+      },
+    ],
+    []
+  );
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2261,6 +2276,19 @@ export default function Admin() {
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
+      {conversationLog.length > 0 && (
+        <div style={S.devLog}>
+          <div style={S.devLogHeader}>Dev Conversation Log</div>
+          <div style={S.devLogBody}>
+            {conversationLog.map((entry, idx) => (
+              <div key={`${entry.speaker}-${idx}`} style={S.devLogLine}>
+                <span style={S.devLogSpeaker}>{entry.speaker}:</span>
+                <span>{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -3677,12 +3705,12 @@ const S = {
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
   metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
+    background: 'var(--appearance-panel-bg, rgba(7, 12, 18, 0.82))',
     backdropFilter: 'blur(14px)',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+    borderBottom: 'var(--appearance-panel-border, 1px solid rgba(148, 163, 184, 0.2))',
     padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
+    boxShadow: 'var(--appearance-panel-shadow, 0 18px 36px rgba(2, 6, 12, 0.45))',
   },
   metaBannerLine: {
     maxWidth: 1400,
@@ -3719,13 +3747,47 @@ const S = {
   },
   header: {
     padding: 20,
-    background: 'rgba(8, 13, 19, 0.9)',
+    background: 'var(--appearance-panel-bg, rgba(8, 13, 19, 0.9))',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
     backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+    borderBottom: 'var(--appearance-panel-border, 1px solid rgba(148, 163, 184, 0.2))',
     position: 'sticky',
     top: 0,
     zIndex: 40,
-    boxShadow: '0 28px 40px rgba(2, 6, 12, 0.45)',
+    boxShadow: 'var(--appearance-panel-shadow, 0 28px 40px rgba(2, 6, 12, 0.45))',
+  },
+  devLog: {
+    maxWidth: 1400,
+    margin: '12px auto 24px auto',
+    padding: 16,
+    borderRadius: 16,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  devLogHeader: {
+    fontSize: 12,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    fontWeight: 700,
+    color: 'var(--admin-muted)',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  devLogBody: {
+    display: 'grid',
+    gap: 6,
+  },
+  devLogLine: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    fontSize: 13,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  devLogSpeaker: {
+    fontWeight: 600,
+    color: 'var(--admin-muted)',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
