@@ -1074,6 +1074,7 @@ function slugifyTitle(value) {
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
+  const isSettingsTab = tab === 'settings';
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
@@ -1295,6 +1296,14 @@ export default function Admin() {
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
+  useEffect(() => {
+    if (!isSettingsTab && status) {
+      const normalized = status.toLowerCase();
+      if (normalized.startsWith('✅ applied theme:') || normalized.includes('appearance')) {
+        setStatus('');
+      }
+    }
+  }, [isSettingsTab, status]);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -2786,10 +2795,12 @@ export default function Admin() {
               )}
             </span>
           )}
-          <span>
-            <strong>Game Mirror:</strong>{' '}
-            {gameEnabled ? 'ENABLED' : 'DISABLED'}
-          </span>
+          {isSettingsTab && (
+            <span>
+              <strong>Game Mirror:</strong>{' '}
+              {gameEnabled ? 'ENABLED' : 'DISABLED'}
+            </span>
+          )}
         </div>
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
           {metaDeploymentLinkLabel && (
@@ -2858,39 +2869,41 @@ export default function Admin() {
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
-            <div style={S.headerNavSecondary}>
-              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
-                {games.map(g=>(
-                  <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                ))}
-              </select>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  disabled={!gameEnabled}
-                />
-                Deploy game build
-              </label>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
-                <input
-                  type="number" min={0} max={120}
-                  value={deployDelaySec}
-                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
-                  disabled={!deployGameEnabled || !gameEnabled}
-                />
-              </label>
-              {!gameEnabled && (
-                <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
-                  ⚠️ Game folder mirroring disabled — deploy controls are read-only.
-                </span>
-              )}
-            </div>
+            {isSettingsTab && (
+              <div style={S.headerNavSecondary}>
+                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled={!gameEnabled}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled || !gameEnabled}
+                  />
+                </label>
+                {!gameEnabled && (
+                  <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
+                    ⚠️ Game folder mirroring disabled — deploy controls are read-only.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {(showProtectionIndicator || tab === 'settings') && (
@@ -2947,7 +2960,9 @@ export default function Admin() {
               {protectionError}
             </div>
           )}
-          <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          {status && (
+            <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          )}
         </div>
       </header>
 
