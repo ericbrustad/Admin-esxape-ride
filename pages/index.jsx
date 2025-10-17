@@ -1076,6 +1076,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
+  const [supabaseHealth, setSupabaseHealth] = useState({ status: 'unknown', ok: null, message: '', checkedAt: '', table: '' });
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -1380,6 +1381,43 @@ export default function Admin() {
 
     loadMeta();
     const timer = setInterval(loadMeta, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSupabaseHealth() {
+      try {
+        const res = await fetch('/api/directories?health=1', { cache: 'no-store', credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+
+        const ok = res.ok && data?.ok !== false;
+        setSupabaseHealth({
+          status: typeof data?.status === 'string' ? data.status : ok ? 'connected' : 'error',
+          ok,
+          message: typeof data?.message === 'string' ? data.message : ok ? 'Supabase reachable' : 'Unable to verify Supabase connection',
+          checkedAt: typeof data?.checkedAt === 'string' ? data.checkedAt : new Date().toISOString(),
+          table: typeof data?.table === 'string' ? data.table : '',
+        });
+      } catch (err) {
+        if (cancelled) return;
+        setSupabaseHealth({
+          status: 'network-error',
+          ok: false,
+          message: err?.message || 'Failed to reach Supabase health endpoint',
+          checkedAt: new Date().toISOString(),
+          table: '',
+        });
+      }
+    }
+
+    loadSupabaseHealth();
+    const timer = setInterval(loadSupabaseHealth, 60000);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -2729,6 +2767,26 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
+  const supabaseStatusLabel = (supabaseHealth.status || 'unknown').replace(/[-_]+/g, ' ').toUpperCase();
+  const supabaseCheckedLabel = supabaseHealth.checkedAt ? formatLocalDateTime(supabaseHealth.checkedAt) : '';
+  const supabaseTone = useMemo(() => {
+    if (supabaseHealth.ok) {
+      return { bg: 'rgba(34, 197, 94, 0.22)', color: '#bef264' };
+    }
+    switch (supabaseHealth.status) {
+      case 'missing-credentials':
+        return { bg: 'rgba(234, 179, 8, 0.22)', color: '#facc15' };
+      case 'table-missing':
+        return { bg: 'rgba(249, 115, 22, 0.22)', color: '#fdba74' };
+      case 'unauthorized':
+      case 'request-failed':
+      case 'network-error':
+      case 'error':
+        return { bg: 'rgba(248, 113, 113, 0.22)', color: '#fca5a5' };
+      default:
+        return { bg: 'rgba(148, 163, 184, 0.22)', color: '#e2e8f0' };
+    }
+  }, [supabaseHealth]);
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2786,6 +2844,12 @@ export default function Admin() {
               )}
             </span>
           )}
+          <span style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <strong>Supabase:</strong>{' '}
+            <span style={{ ...S.metaStatusBadge, background: supabaseTone.bg, color: supabaseTone.color }}>
+              {supabaseStatusLabel}
+            </span>
+          </span>
           <span>
             <strong>Game Mirror:</strong>{' '}
             {gameEnabled ? 'ENABLED' : 'DISABLED'}
@@ -2802,6 +2866,15 @@ export default function Admin() {
           )}
           {metaTimestampLabel && (
             <span><strong>Checked:</strong> {metaTimestampLabel}</span>
+          )}
+          {supabaseHealth.table && (
+            <span><strong>Supabase table:</strong> {supabaseHealth.table}</span>
+          )}
+          {supabaseHealth.message && (
+            <span><strong>Supabase note:</strong> {supabaseHealth.message}</span>
+          )}
+          {supabaseCheckedLabel && (
+            <span><strong>Supabase checked:</strong> {supabaseCheckedLabel}</span>
           )}
           {adminMeta.error && (
             <span style={S.metaBannerError}>{adminMeta.error}</span>
@@ -4622,6 +4695,16 @@ const S = {
     fontSize: 12,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
+  },
+  metaStatusBadge: {
+    padding: '2px 10px',
+    borderRadius: 999,
+    background: 'rgba(148, 163, 184, 0.22)',
+    color: '#e2e8f0',
+    fontSize: 12,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    fontWeight: 700,
   },
   metaMuted: {
     color: 'var(--admin-muted)',

@@ -1,4 +1,4 @@
-work — 2025-10-17 09:46:06Z
+work — 2025-10-17 16:39:04Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
@@ -7,6 +7,9 @@ Device & Response UI Package
 - 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
   - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
   - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.
+- 2025-10-17 — Supabase directory health monitor & banner status pill. Commit: (pending HEAD)
+  - Direct links: `lib/supabase-directory.js`, `pages/api/directories.js`, `pages/index.jsx`, `docs/logs/2025-10-17-supabase-log.md`
+  - Notes: Adds a Supabase REST helper plus `/api/directories` endpoint to begin the directory sync pipeline, surfaces connection health (credentials, table availability, auth errors) at the top of the admin dashboard alongside repo metadata, and records this GPT session in the logs for future reference. Note to review @ 2025-10-17 16:39:04Z.
 - 2025-10-17 — Admin header theming & unique skin palettes. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `styles/globals.css`
   - Notes: Syncs the dashboard header chrome and Save & Publish controls with each appearance preset using theme-specific CSS variables, gives every skin a bespoke palette that matches its name so presets no longer share the same look, and ships default fallbacks to keep server renders aligned. Note to review @ 2025-10-17 05:17:32Z.
