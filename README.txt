@@ -1,9 +1,12 @@
-work — 2025-10-17 09:46:06Z
+work — 2025-10-17 12:40:32Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Mission response drop guard for drag uploads. Commit: (pending HEAD)
+  - Direct links: `components/InlineMissionResponses.jsx`
+  - Notes: Prevents the mission response drag-and-drop uploader from throwing when browsers omit a DataTransfer payload, keeping the New Mission overlay and Assigned Media tab from crashing after drag gestures. Note to review @ 2025-10-17 12:40:32Z.
 - 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
   - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
   - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.

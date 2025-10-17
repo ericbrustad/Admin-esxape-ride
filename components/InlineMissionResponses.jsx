@@ -204,7 +204,9 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     function onDrop(e) {
       e.preventDefault();
       e.stopPropagation();
-      const f = e.dataTransfer?.files?.[0];
+      const dataTransfer = e.dataTransfer || null;
+      const fileList = dataTransfer && dataTransfer.files ? dataTransfer.files : null;
+      const f = fileList && fileList.length ? fileList[0] : null;
       if (f) {
         (async () => {
           const url = await uploadFileAsMedia(f, "uploads");
@@ -218,7 +220,17 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         })();
       }
     }
-    function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }
+    function onDragOver(e) {
+      e.preventDefault();
+      const dataTransfer = e.dataTransfer;
+      if (dataTransfer) {
+        try {
+          dataTransfer.dropEffect = "copy";
+        } catch (err) {
+          console.warn("Unable to set dropEffect", err);
+        }
+      }
+    }
     el.addEventListener("drop", onDrop);
     el.addEventListener("dragover", onDragOver);
     return () => {
