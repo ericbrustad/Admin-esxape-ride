@@ -1,9 +1,12 @@
-work — 2025-10-16 21:15:54Z
+work — 2025-10-17 05:17:32Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Admin header theming & unique skin palettes. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `styles/globals.css`
+  - Notes: Syncs the dashboard header chrome and Save & Publish controls with each appearance preset using theme-specific CSS variables, gives every skin a bespoke palette that matches its name so presets no longer share the same look, and ships default fallbacks to keep server renders aligned. Note to review @ 2025-10-17 05:17:32Z.
 - 2025-10-16 — Hook order guard & local config fallback. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `pages/api/config.js`, `.gitignore`
   - Notes: Ensures the admin dashboard always calls its hooks in a stable order so React no longer crashes on load, adds a filesystem fallback for `/api/config` when GitHub env vars are missing so development stays functional, and reintroduces a `.gitignore` for node_modules/. Note to review @ 2025-10-16 21:15:54Z.
