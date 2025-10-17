@@ -1,9 +1,12 @@
-work — 2025-10-16 19:48:15Z
+work — 2025-10-16 20:14:58Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-16 — Saved-game dropdown stabilization and header slug preview fix. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Ensures the saved-game selector and cover slug badge always initialize before mission data by keeping the new header initials memo and slug dropdown hooks outside the loading guard, preventing the React #310 hook-order crash while the Game folder remains disabled and the password toggle stays off. Note to review @ 2025-10-16 20:14:58Z.
 - 2025-10-16 — Game header slug badges & saved game placement. Commit: 1b6dbe16b5af7073a4b5f4f5d636a257fe0593fb
   - Direct links: `pages/index.jsx`
   - Notes: Moves the saved game selector into the Game Settings title block with slug badges, adds the cover thumbnail beside the Admin Control Deck heading, stores the active slug in config metadata, and relocates deploy delay controls so Save/Publish continues to honor per-game assets. Note to review @ 2025-10-16 19:48:15Z.
