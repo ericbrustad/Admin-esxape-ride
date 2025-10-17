@@ -26,22 +26,70 @@ export default function Game() {
   const [backpackOpen, setBackpackOpen] = useState(false);
 
   const { slug, channel } = useMemo(() => {
-    const u = new URL(window.location.href);
-    return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
+    if (typeof window === 'undefined') {
+      return { slug: 'default', channel: 'published' };
+    }
+
+    try {
+      const u = new URL(window.location.href);
+      const slugParam = u.searchParams.get('slug');
+      const channelParam = u.searchParams.get('channel');
+      return {
+        slug: (slugParam || '').trim() || 'default',
+        channel: channelParam === 'draft' ? 'draft' : 'published',
+      };
+    } catch {
+      return { slug: 'default', channel: 'published' };
+    }
   }, []);
 
   useEffect(() => { initBackpack(slug); }, [slug]);
 
-  useEffect(() => { (async () => {
-    try {
-      const base = channel === 'published' ? 'published' : 'draft';
-      const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
-      const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
-      setSuite(ms); setConfig(cfg); setStatus('');
-    } catch (e) {
-      setStatus('Failed to load game.');
-    }
-  })(); }, [slug, channel]);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!slug) {
+        setStatus('No game selected.');
+        setSuite(null);
+        setConfig(null);
+        return;
+      }
+
+      try {
+        setStatus('Loading…');
+        const query = new URLSearchParams({ slug, channel });
+        const res = await fetch(`/api/content?${query.toString()}`, { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+
+        if (cancelled) return;
+
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error || 'Failed to load content');
+        }
+
+        const missionsJson = data?.missions || null;
+        const configJson = data?.config || null;
+
+        if (!missionsJson) {
+          throw new Error('Missing missions payload');
+        }
+
+        setSuite(missionsJson);
+        setConfig(configJson || {});
+        setStatus('');
+      } catch (e) {
+        if (cancelled) return;
+        setSuite(null);
+        setConfig(null);
+        setStatus('Failed to load game.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, channel]);
 
   if (!suite || !config) {
     return <main style={outer}><div style={card}>{status}</div></main>;
