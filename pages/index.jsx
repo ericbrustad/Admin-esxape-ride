@@ -1562,28 +1562,14 @@ export default function Admin() {
 
   /* load games */
   useEffect(() => {
-    let cancelled = false;
+    if (!gameEnabled) { setGames([]); return; }
     (async () => {
       try {
         const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
-        if (!r.ok) {
-          const text = await r.text();
-          throw new Error(text || `HTTP ${r.status}`);
-        }
         const j = await r.json();
-        if (cancelled) return;
-        if (j.ok) {
-          setGames(Array.isArray(j.games) ? j.games : []);
-        } else if (j?.error) {
-          setStatus(prev => prev || `⚠️ ${j.error}`);
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setGames([]);
-        setStatus(prev => prev || `⚠️ Unable to load games list (${err?.message || 'network error'})`);
-      }
+        if (j.ok) setGames(j.games || []);
+      } catch {}
     })();
-    return () => { cancelled = true; };
   }, [gameEnabled]);
 
   /* load suite/config when slug changes */
@@ -1783,21 +1769,12 @@ export default function Admin() {
   }
 
   async function reloadGamesList() {
+    if (!gameEnabled) { setGames([]); return; }
     try {
       const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
-      if (!r.ok) {
-        const txt = await r.text();
-        throw new Error(txt || `HTTP ${r.status}`);
-      }
       const j = await r.json();
-      if (j.ok) {
-        setGames(Array.isArray(j.games) ? j.games : []);
-      } else if (j?.error) {
-        setStatus(`⚠️ ${j.error}`);
-      }
-    } catch (err) {
-      setStatus(`⚠️ Unable to refresh games list (${err?.message || 'network error'})`);
-    }
+      if (j.ok) setGames(j.games || []);
+    } catch {}
   }
 
   async function saveAndPublish() {
@@ -1826,6 +1803,7 @@ export default function Admin() {
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
+    if (!gameEnabled) { setConfirmDeleteOpen(false); return; }
     const slug = activeSlug || 'default';
     const urlTry = [
       `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
@@ -2564,17 +2542,14 @@ export default function Admin() {
   }
 
   function setDeployEnabled(nextEnabled) {
-    const effective = gameEnabled ? nextEnabled : false;
     setConfig(prev => {
       if (!prev) return prev;
-      return { ...prev, game: { ...(prev.game || {}), deployEnabled: effective } };
+      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
     });
     setDirty(true);
-    setStatus(effective
+    setStatus(nextEnabled
       ? 'Game deployment enabled — Save & Publish will deploy the game build.'
-      : (gameEnabled
-        ? 'Game deployment disabled — Save & Publish updates admin data only.'
-        : 'Game project mirror disabled — Save & Publish updates admin data only.'));
+      : 'Game deployment disabled — Save & Publish updates admin data only.');
   }
 
   async function handleCoverFile(file) {
@@ -2713,22 +2688,10 @@ export default function Admin() {
     : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitFull = adminMeta.commit || '';
-  const metaCommitShort = metaCommitFull ? String(metaCommitFull).slice(0, 7) : '';
-  const metaRepoLabel = adminMeta.repo ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}` : '';
-  const metaRepoUrl = adminMeta.owner && adminMeta.repo
-    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
-    : '';
-  const metaBranchUrl = metaRepoUrl && adminMeta.branch
-    ? `${metaRepoUrl}/tree/${encodeURIComponent(adminMeta.branch)}`
-    : '';
-  const metaCommitUrl = metaRepoUrl && metaCommitFull
-    ? `${metaRepoUrl}/commit/${metaCommitFull}`
-    : '';
+  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
-  const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2739,39 +2702,12 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <div style={S.metaBanner}>
-        <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
-          {metaRepoLabel && (
-            <span>
-              <strong>Repo:</strong>{' '}
-              {metaRepoUrl ? (
-                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaRepoLabel}
-                </a>
-              ) : (
-                metaRepoLabel
-              )}
-            </span>
-          )}
-          <span>
-            <strong>Branch:</strong>{' '}
-            {metaBranchUrl ? (
-              <a href={metaBranchUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                {metaBranchLabel}
-              </a>
-            ) : (
-              metaBranchLabel
-            )}
-          </span>
-          {metaCommitFull && (
-            <span>
-              <strong>Commit:</strong>{' '}
-              {metaCommitUrl ? (
-                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaCommitShort || metaCommitFull.slice(0, 7)}
-                </a>
-              ) : (
-                metaCommitShort || metaCommitFull.slice(0, 7)
-              )}
+        <div style={S.metaBannerLine}>
+          <span><strong>Branch:</strong> {metaBranchLabel}</span>
+          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
+          {adminMeta.repo && (
+            <span style={S.metaMuted}>
+              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
             </span>
           )}
           {metaDeploymentState && (
@@ -2784,20 +2720,6 @@ export default function Admin() {
               ) : (
                 metaDeploymentState
               )}
-            </span>
-          )}
-          <span>
-            <strong>Game Mirror:</strong>{' '}
-            {gameEnabled ? 'ENABLED' : 'DISABLED'}
-          </span>
-        </div>
-        <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
-          {metaDeploymentLinkLabel && (
-            <span>
-              <strong>Preview:</strong>{' '}
-              <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                {metaDeploymentLinkLabel}
-              </a>
             </span>
           )}
           {metaTimestampLabel && (
@@ -2858,39 +2780,35 @@ export default function Admin() {
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
-            <div style={S.headerNavSecondary}>
-              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
-                {games.map(g=>(
-                  <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                ))}
-              </select>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  disabled={!gameEnabled}
-                />
-                Deploy game build
-              </label>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
-                <input
-                  type="number" min={0} max={120}
-                  value={deployDelaySec}
-                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
-                  disabled={!deployGameEnabled || !gameEnabled}
-                />
-              </label>
-              {!gameEnabled && (
-                <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
-                  ⚠️ Game folder mirroring disabled — deploy controls are read-only.
-                </span>
-              )}
-            </div>
+            {gameEnabled && (
+              <div style={S.headerNavSecondary}>
+                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90, opacity: deployGameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {(showProtectionIndicator || tab === 'settings') && (
@@ -3630,13 +3548,9 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new'
-                            ? 'Save the new device and close the editor'
-                            : 'Save your changes and close the editor'}
+                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Commit device updates'}
                         >
-                          {deviceEditorMode === 'new'
-                            ? 'Save New Device and Close'
-                            : 'Save Changes and Close'}
+                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
                         </button>
                         <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
                       </div>
@@ -4039,12 +3953,14 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={()=> setConfirmDeleteOpen(true)}
-              >
-                🗑 Delete Game
-              </button>
+              {gameEnabled && (
+                <button
+                  style={{ ...S.button, ...S.buttonDanger }}
+                  onClick={()=> setConfirmDeleteOpen(true)}
+                >
+                  🗑 Delete Game
+                </button>
+              )}
               <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
             </div>
           </div>
@@ -4340,7 +4256,7 @@ export default function Admin() {
       )}
 
       {/* New Game modal */}
-      {showNewGame && (
+      {gameEnabled && showNewGame && (
         <div style={S.modalBackdrop}>
           <div style={{ ...S.card, ...S.modalCard }}>
             <div style={S.modalTopBar}>
@@ -4349,12 +4265,6 @@ export default function Admin() {
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
-              {!gameEnabled && (
-                <div style={{ ...S.noteText, background:'var(--admin-tab-bg)', padding:10, borderRadius:8, border:'1px solid var(--admin-border-soft)' }}>
-                  Game folder mirroring is disabled. New games will update admin data only.
-                </div>
-              )}
-
               <Field label="Game Title">
                 <input
                   style={S.input}
@@ -4510,7 +4420,7 @@ export default function Admin() {
       )}
 
       {/* Delete confirm modal */}
-      {confirmDeleteOpen && (
+      {gameEnabled && confirmDeleteOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>

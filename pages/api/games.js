@@ -6,13 +6,7 @@ const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
 const token  = process.env.GITHUB_TOKEN;
-const branch = (
-  process.env.REPO_BRANCH ||
-  process.env.GITHUB_BRANCH ||
-  process.env.VERCEL_GIT_COMMIT_REF ||
-  process.env.COMMIT_REF ||
-  'main'
-);
+const branch = process.env.REPO_BRANCH || 'main';
 
 const authHeaders = {
   Authorization: `Bearer ${token}`,
@@ -94,6 +88,10 @@ function defaultConfig(title, gameType, mode = 'single', slugTag = '', extras = 
 
 // [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
+  if (!GAME_ENABLED) {
+    if (req.method === 'GET') return res.json({ ok: true, games: [] });
+    return res.status(403).json({ ok: false, error: 'Game project disabled' });
+  }
 
   if (!token || !owner || !repo) {
     return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
@@ -104,7 +102,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const file = await getFile(indexPath);
     const list = file ? JSON.parse(file.text || '[]') : [];
-    return res.json({ ok: true, games: list, gameProjectEnabled: GAME_ENABLED });
+    return res.json({ ok: true, games: list });
   }
 
   if (req.method === 'POST') {
@@ -161,7 +159,7 @@ export default async function handler(req, res) {
       const next = [...list, item];
       await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
 
-      return res.json({ ok: true, slug, game: item, gameProjectEnabled: GAME_ENABLED });
+      return res.json({ ok: true, slug, game: item });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ ok: false, error: String(err.message || err) });

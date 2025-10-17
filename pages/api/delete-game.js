@@ -5,13 +5,7 @@ const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
 const token  = process.env.GITHUB_TOKEN;
-const branch = (
-  process.env.REPO_BRANCH ||
-  process.env.GITHUB_BRANCH ||
-  process.env.VERCEL_GIT_COMMIT_REF ||
-  process.env.COMMIT_REF ||
-  'main'
-);
+const branch = process.env.REPO_BRANCH || 'main';
 
 const authHeaders = {
   Authorization: `Bearer ${token}`,
@@ -41,6 +35,9 @@ async function del(path, sha, message) {
 }
 
 export default async function handler(req, res) {
+  if (!GAME_ENABLED) {
+    return res.status(403).json({ ok: false, error: 'Game project disabled' });
+  }
   if (req.method !== 'POST') { res.setHeader('Allow','POST'); return res.status(405).end(); }
   const { slug } = req.body || {};
   if (!slug) return res.status(400).json({ ok: false, error: 'Missing slug' });
@@ -72,7 +69,7 @@ export default async function handler(req, res) {
     const next = Array.isArray(list) ? list.filter(x => x.slug !== slug) : [];
     await put('public/games/index.json', JSON.stringify(next, null, 2), `chore: update games index (delete ${slug})`, idx.sha);
 
-    return res.json({ ok: true, slug, gameProjectEnabled: GAME_ENABLED });
+    return res.json({ ok: true, slug });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ ok: false, error: String(e.message || e) });
