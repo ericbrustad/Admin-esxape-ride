@@ -360,6 +360,39 @@ function createDeviceDraft(overrides = {}) {
   merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
   return merged;
 }
+const BASE_UI_THEME = {
+  headerBg: 'linear-gradient(135deg, rgba(226, 234, 247, 0.92), rgba(197, 210, 232, 0.88))',
+  headerBorder: '1px solid rgba(99, 127, 170, 0.38)',
+  headerShadow: '0 32px 64px rgba(28, 52, 84, 0.35)',
+  headerBlur: 'blur(18px)',
+  headerFrameBg: 'linear-gradient(145deg, rgba(236, 243, 255, 0.9), rgba(206, 218, 240, 0.85))',
+  headerFrameBorder: '1px solid rgba(120, 150, 190, 0.4)',
+  headerFrameShadow: '0 18px 32px rgba(62, 99, 149, 0.35)',
+  tabBg: 'linear-gradient(135deg, rgba(228, 236, 250, 0.82), rgba(203, 214, 236, 0.78))',
+  tabActiveBg: 'linear-gradient(140deg, #2563eb, #60a5fa)',
+  buttonBg: 'linear-gradient(135deg, rgba(217, 228, 245, 0.9), rgba(188, 205, 232, 0.86))',
+  buttonBorder: '1px solid rgba(99, 127, 170, 0.45)',
+  glassSheen: '0 14px 30px rgba(54, 83, 137, 0.25)',
+  borderSoft: 'rgba(120, 150, 190, 0.38)',
+  chipBg: 'rgba(120, 150, 190, 0.2)',
+  chipBorder: '1px solid rgba(120, 150, 190, 0.35)',
+  linkColor: '#2563eb',
+  accent: '#2563eb',
+  dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+  dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+  successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+  successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+  saveGradient: 'linear-gradient(95deg, #2563eb, #38bdf8)',
+  saveBorder: '1px solid rgba(59, 130, 246, 0.6)',
+  saveShadow: '0 20px 36px rgba(37, 99, 235, 0.45)',
+};
+
+function createUiTheme(overrides = {}) {
+  return { ...BASE_UI_THEME, ...overrides };
+}
+
+const DEFAULT_UI_THEME = createUiTheme();
+
 const APPEARANCE_SKINS = [
   {
     key: 'default',
@@ -377,6 +410,27 @@ const APPEARANCE_SKINS = [
       screenBgImageEnabled: true,
       textAlign: 'left',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(135deg, rgba(234, 240, 251, 0.94), rgba(204, 216, 234, 0.9))',
+      headerBorder: '1px solid rgba(116, 144, 186, 0.45)',
+      headerShadow: '0 34px 62px rgba(45, 75, 120, 0.32)',
+      headerFrameBg: 'linear-gradient(145deg, rgba(242, 247, 255, 0.95), rgba(214, 224, 241, 0.88))',
+      headerFrameBorder: '1px solid rgba(128, 156, 204, 0.45)',
+      headerFrameShadow: '0 20px 34px rgba(72, 104, 154, 0.32)',
+      tabBg: 'linear-gradient(135deg, rgba(228, 235, 249, 0.86), rgba(202, 214, 236, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #2563eb, #60a5fa)',
+      buttonBg: 'linear-gradient(135deg, rgba(222, 232, 247, 0.92), rgba(193, 207, 232, 0.88))',
+      buttonBorder: '1px solid rgba(128, 156, 204, 0.45)',
+      glassSheen: '0 14px 34px rgba(66, 98, 150, 0.26)',
+      borderSoft: 'rgba(138, 162, 206, 0.38)',
+      chipBg: 'rgba(138, 162, 206, 0.2)',
+      chipBorder: '1px solid rgba(138, 162, 206, 0.35)',
+      linkColor: '#2563eb',
+      accent: '#2563eb',
+      saveGradient: 'linear-gradient(100deg, #2563eb, #60a5fa)',
+      saveBorder: '1px solid rgba(116, 144, 186, 0.6)',
+      saveShadow: '0 20px 36px rgba(68, 104, 160, 0.32)',
+    }),
   },
   {
     key: 'space-military',
@@ -397,6 +451,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(9, 18, 32, 0.96), rgba(26, 48, 74, 0.88))',
+      headerBorder: '1px solid rgba(68, 112, 178, 0.55)',
+      headerShadow: '0 42px 72px rgba(5, 12, 24, 0.68)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(12, 26, 44, 0.96), rgba(32, 60, 96, 0.88))',
+      headerFrameBorder: '1px solid rgba(82, 140, 210, 0.65)',
+      headerFrameShadow: '0 24px 36px rgba(10, 24, 48, 0.62)',
+      tabBg: 'linear-gradient(135deg, rgba(16, 32, 54, 0.86), rgba(34, 60, 94, 0.86))',
+      tabActiveBg: 'linear-gradient(145deg, #0ea5e9, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(12, 28, 48, 0.92), rgba(28, 52, 86, 0.88))',
+      buttonBorder: '1px solid rgba(64, 116, 188, 0.62)',
+      glassSheen: '0 18px 40px rgba(6, 20, 36, 0.6)',
+      borderSoft: 'rgba(64, 100, 148, 0.5)',
+      chipBg: 'rgba(56, 101, 162, 0.28)',
+      chipBorder: '1px solid rgba(66, 118, 188, 0.48)',
+      linkColor: '#7dd3fc',
+      accent: '#38bdf8',
+      saveGradient: 'linear-gradient(115deg, #0ea5e9, #38bdf8)',
+      saveBorder: '1px solid rgba(64, 130, 200, 0.7)',
+      saveShadow: '0 24px 40px rgba(12, 40, 78, 0.6)',
+    }),
   },
   {
     key: 'military-desert',
@@ -417,6 +492,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(130deg, rgba(248, 231, 196, 0.94), rgba(224, 193, 141, 0.9))',
+      headerBorder: '1px solid rgba(148, 110, 68, 0.52)',
+      headerShadow: '0 38px 68px rgba(107, 82, 45, 0.4)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(245, 220, 180, 0.92), rgba(229, 197, 152, 0.86))',
+      headerFrameBorder: '1px solid rgba(168, 128, 72, 0.55)',
+      headerFrameShadow: '0 20px 32px rgba(122, 82, 40, 0.42)',
+      tabBg: 'linear-gradient(135deg, rgba(242, 214, 168, 0.86), rgba(228, 190, 132, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #d97706, #fbbf24)',
+      buttonBg: 'linear-gradient(135deg, rgba(243, 215, 170, 0.9), rgba(227, 189, 128, 0.86))',
+      buttonBorder: '1px solid rgba(182, 134, 72, 0.55)',
+      glassSheen: '0 16px 34px rgba(182, 121, 54, 0.32)',
+      borderSoft: 'rgba(182, 134, 72, 0.42)',
+      chipBg: 'rgba(214, 162, 90, 0.24)',
+      chipBorder: '1px solid rgba(184, 132, 68, 0.45)',
+      linkColor: '#b45309',
+      accent: '#d97706',
+      saveGradient: 'linear-gradient(110deg, #b45309, #f97316)',
+      saveBorder: '1px solid rgba(210, 140, 80, 0.55)',
+      saveShadow: '0 20px 32px rgba(182, 120, 58, 0.4)',
+    }),
   },
   {
     key: 'forest-outpost',
@@ -437,6 +533,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'left',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(135deg, rgba(36, 64, 46, 0.92), rgba(20, 42, 28, 0.9))',
+      headerBorder: '1px solid rgba(56, 102, 74, 0.48)',
+      headerShadow: '0 40px 70px rgba(12, 30, 20, 0.55)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(32, 58, 42, 0.94), rgba(18, 40, 28, 0.88))',
+      headerFrameBorder: '1px solid rgba(72, 122, 92, 0.55)',
+      headerFrameShadow: '0 22px 34px rgba(12, 30, 20, 0.5)',
+      tabBg: 'linear-gradient(135deg, rgba(44, 80, 56, 0.86), rgba(28, 60, 38, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #16a34a, #4ade80)',
+      buttonBg: 'linear-gradient(135deg, rgba(38, 74, 48, 0.9), rgba(24, 52, 32, 0.88))',
+      buttonBorder: '1px solid rgba(66, 122, 88, 0.55)',
+      glassSheen: '0 18px 36px rgba(12, 36, 22, 0.5)',
+      borderSoft: 'rgba(76, 128, 96, 0.46)',
+      chipBg: 'rgba(74, 122, 94, 0.28)',
+      chipBorder: '1px solid rgba(74, 122, 94, 0.45)',
+      linkColor: '#34d399',
+      accent: '#22c55e',
+      saveGradient: 'linear-gradient(120deg, #16a34a, #4ade80)',
+      saveBorder: '1px solid rgba(52, 140, 96, 0.6)',
+      saveShadow: '0 24px 38px rgba(14, 44, 24, 0.55)',
+    }),
   },
   {
     key: 'starfield',
@@ -457,6 +574,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(150deg, rgba(27, 33, 68, 0.94), rgba(18, 26, 58, 0.9))',
+      headerBorder: '1px solid rgba(90, 112, 198, 0.55)',
+      headerShadow: '0 42px 74px rgba(10, 14, 38, 0.58)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(36, 44, 88, 0.96), rgba(24, 30, 64, 0.92))',
+      headerFrameBorder: '1px solid rgba(108, 132, 220, 0.58)',
+      headerFrameShadow: '0 24px 38px rgba(14, 18, 48, 0.54)',
+      tabBg: 'linear-gradient(135deg, rgba(34, 44, 88, 0.85), rgba(22, 30, 68, 0.83))',
+      tabActiveBg: 'linear-gradient(145deg, #6366f1, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(28, 36, 78, 0.92), rgba(18, 26, 62, 0.9))',
+      buttonBorder: '1px solid rgba(104, 132, 220, 0.58)',
+      glassSheen: '0 18px 38px rgba(12, 16, 42, 0.55)',
+      borderSoft: 'rgba(104, 132, 220, 0.46)',
+      chipBg: 'rgba(104, 132, 220, 0.26)',
+      chipBorder: '1px solid rgba(104, 132, 220, 0.45)',
+      linkColor: '#93c5fd',
+      accent: '#6366f1',
+      saveGradient: 'linear-gradient(115deg, #4c51bf, #38bdf8)',
+      saveBorder: '1px solid rgba(108, 132, 220, 0.6)',
+      saveShadow: '0 24px 40px rgba(18, 24, 68, 0.58)',
+    }),
   },
   {
     key: 'cartoon-bubbles',
@@ -477,6 +615,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(255, 229, 255, 0.94), rgba(240, 205, 255, 0.9))',
+      headerBorder: '1px solid rgba(171, 119, 206, 0.5)',
+      headerShadow: '0 34px 64px rgba(120, 64, 160, 0.32)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(255, 235, 255, 0.95), rgba(245, 210, 255, 0.88))',
+      headerFrameBorder: '1px solid rgba(190, 132, 220, 0.5)',
+      headerFrameShadow: '0 22px 34px rgba(140, 82, 190, 0.32)',
+      tabBg: 'linear-gradient(135deg, rgba(250, 228, 255, 0.88), rgba(238, 206, 255, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #d946ef, #f472b6)',
+      buttonBg: 'linear-gradient(135deg, rgba(250, 226, 255, 0.92), rgba(236, 200, 255, 0.88))',
+      buttonBorder: '1px solid rgba(200, 144, 220, 0.48)',
+      glassSheen: '0 14px 34px rgba(184, 104, 204, 0.28)',
+      borderSoft: 'rgba(200, 150, 220, 0.42)',
+      chipBg: 'rgba(214, 162, 230, 0.28)',
+      chipBorder: '1px solid rgba(200, 150, 220, 0.42)',
+      linkColor: '#f472b6',
+      accent: '#d946ef',
+      saveGradient: 'linear-gradient(120deg, #d946ef, #f472b6)',
+      saveBorder: '1px solid rgba(208, 128, 220, 0.58)',
+      saveShadow: '0 20px 34px rgba(184, 96, 204, 0.32)',
+    }),
   },
   {
     key: 'chrome-luminous',
@@ -497,6 +656,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(145deg, rgba(226, 238, 255, 0.94), rgba(198, 210, 230, 0.9))',
+      headerBorder: '1px solid rgba(126, 152, 190, 0.45)',
+      headerShadow: '0 36px 66px rgba(45, 70, 110, 0.32)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(236, 244, 255, 0.96), rgba(204, 216, 236, 0.9))',
+      headerFrameBorder: '1px solid rgba(142, 170, 210, 0.45)',
+      headerFrameShadow: '0 22px 36px rgba(52, 82, 128, 0.34)',
+      tabBg: 'linear-gradient(135deg, rgba(228, 238, 252, 0.86), rgba(206, 218, 236, 0.82))',
+      tabActiveBg: 'linear-gradient(145deg, #38bdf8, #818cf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(220, 232, 248, 0.92), rgba(198, 210, 234, 0.88))',
+      buttonBorder: '1px solid rgba(136, 162, 202, 0.48)',
+      glassSheen: '0 18px 38px rgba(68, 98, 140, 0.3)',
+      borderSoft: 'rgba(140, 170, 210, 0.42)',
+      chipBg: 'rgba(168, 190, 226, 0.24)',
+      chipBorder: '1px solid rgba(140, 170, 210, 0.42)',
+      linkColor: '#60a5fa',
+      accent: '#38bdf8',
+      saveGradient: 'linear-gradient(115deg, #38bdf8, #818cf8)',
+      saveBorder: '1px solid rgba(148, 170, 210, 0.55)',
+      saveShadow: '0 22px 38px rgba(72, 102, 148, 0.3)',
+    }),
   },
   {
     key: 'desert-horizon',
@@ -517,6 +697,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(135deg, rgba(255, 225, 196, 0.94), rgba(246, 196, 160, 0.9))',
+      headerBorder: '1px solid rgba(196, 124, 92, 0.5)',
+      headerShadow: '0 36px 62px rgba(158, 96, 62, 0.35)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(255, 232, 210, 0.95), rgba(244, 204, 170, 0.88))',
+      headerFrameBorder: '1px solid rgba(210, 140, 100, 0.5)',
+      headerFrameShadow: '0 20px 32px rgba(162, 102, 68, 0.35)',
+      tabBg: 'linear-gradient(135deg, rgba(252, 222, 192, 0.86), rgba(242, 198, 160, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #f97316, #facc15)',
+      buttonBg: 'linear-gradient(135deg, rgba(250, 220, 192, 0.9), rgba(240, 196, 156, 0.86))',
+      buttonBorder: '1px solid rgba(210, 144, 102, 0.52)',
+      glassSheen: '0 16px 34px rgba(210, 132, 84, 0.3)',
+      borderSoft: 'rgba(210, 144, 102, 0.42)',
+      chipBg: 'rgba(222, 162, 110, 0.26)',
+      chipBorder: '1px solid rgba(210, 144, 102, 0.44)',
+      linkColor: '#f97316',
+      accent: '#f97316',
+      saveGradient: 'linear-gradient(120deg, #f97316, #facc15)',
+      saveBorder: '1px solid rgba(232, 146, 104, 0.55)',
+      saveShadow: '0 20px 34px rgba(210, 128, 82, 0.32)',
+    }),
   },
   {
     key: 'forest-meadow',
@@ -537,6 +738,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'left',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(54, 84, 44, 0.92), rgba(34, 58, 30, 0.9))',
+      headerBorder: '1px solid rgba(74, 122, 64, 0.48)',
+      headerShadow: '0 40px 70px rgba(20, 36, 18, 0.52)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(48, 78, 38, 0.94), rgba(32, 58, 28, 0.9))',
+      headerFrameBorder: '1px solid rgba(96, 146, 84, 0.52)',
+      headerFrameShadow: '0 22px 34px rgba(20, 36, 18, 0.48)',
+      tabBg: 'linear-gradient(135deg, rgba(64, 100, 52, 0.86), rgba(42, 74, 38, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #22c55e, #a3e635)',
+      buttonBg: 'linear-gradient(135deg, rgba(58, 92, 48, 0.9), rgba(38, 62, 34, 0.88))',
+      buttonBorder: '1px solid rgba(88, 138, 70, 0.52)',
+      glassSheen: '0 18px 36px rgba(18, 34, 18, 0.48)',
+      borderSoft: 'rgba(102, 152, 86, 0.42)',
+      chipBg: 'rgba(108, 160, 90, 0.26)',
+      chipBorder: '1px solid rgba(98, 148, 84, 0.44)',
+      linkColor: '#4ade80',
+      accent: '#22c55e',
+      saveGradient: 'linear-gradient(120deg, #22c55e, #a3e635)',
+      saveBorder: '1px solid rgba(118, 168, 94, 0.55)',
+      saveShadow: '0 24px 36px rgba(26, 52, 24, 0.5)',
+    }),
   },
   {
     key: 'starfield-dawn',
@@ -557,6 +779,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(150deg, rgba(222, 209, 255, 0.94), rgba(192, 178, 246, 0.9))',
+      headerBorder: '1px solid rgba(142, 116, 208, 0.5)',
+      headerShadow: '0 40px 68px rgba(94, 72, 168, 0.38)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(232, 220, 255, 0.95), rgba(204, 190, 248, 0.9))',
+      headerFrameBorder: '1px solid rgba(156, 132, 216, 0.5)',
+      headerFrameShadow: '0 22px 36px rgba(104, 82, 176, 0.38)',
+      tabBg: 'linear-gradient(135deg, rgba(230, 218, 255, 0.88), rgba(204, 190, 246, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #7c3aed, #f472b6)',
+      buttonBg: 'linear-gradient(135deg, rgba(226, 214, 255, 0.92), rgba(202, 188, 246, 0.88))',
+      buttonBorder: '1px solid rgba(156, 132, 216, 0.5)',
+      glassSheen: '0 18px 38px rgba(128, 96, 198, 0.32)',
+      borderSoft: 'rgba(156, 132, 216, 0.42)',
+      chipBg: 'rgba(176, 150, 224, 0.26)',
+      chipBorder: '1px solid rgba(156, 132, 216, 0.44)',
+      linkColor: '#a855f7',
+      accent: '#7c3aed',
+      saveGradient: 'linear-gradient(120deg, #7c3aed, #f472b6)',
+      saveBorder: '1px solid rgba(162, 132, 224, 0.55)',
+      saveShadow: '0 22px 36px rgba(118, 88, 196, 0.36)',
+    }),
   },
   {
     key: 'cartoon-parade',
@@ -577,6 +820,27 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(255, 224, 244, 0.94), rgba(255, 200, 214, 0.9))',
+      headerBorder: '1px solid rgba(220, 110, 150, 0.5)',
+      headerShadow: '0 34px 60px rgba(200, 80, 130, 0.32)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(255, 232, 248, 0.95), rgba(252, 208, 220, 0.88))',
+      headerFrameBorder: '1px solid rgba(224, 126, 160, 0.48)',
+      headerFrameShadow: '0 20px 32px rgba(210, 90, 148, 0.3)',
+      tabBg: 'linear-gradient(135deg, rgba(255, 226, 242, 0.86), rgba(253, 204, 220, 0.82))',
+      tabActiveBg: 'linear-gradient(145deg, #f97316, #ec4899)',
+      buttonBg: 'linear-gradient(135deg, rgba(255, 224, 240, 0.92), rgba(250, 200, 216, 0.88))',
+      buttonBorder: '1px solid rgba(232, 132, 168, 0.48)',
+      glassSheen: '0 16px 34px rgba(232, 96, 160, 0.28)',
+      borderSoft: 'rgba(232, 140, 170, 0.42)',
+      chipBg: 'rgba(238, 162, 186, 0.26)',
+      chipBorder: '1px solid rgba(232, 140, 170, 0.42)',
+      linkColor: '#ec4899',
+      accent: '#f97316',
+      saveGradient: 'linear-gradient(120deg, #f97316, #ec4899)',
+      saveBorder: '1px solid rgba(236, 134, 170, 0.55)',
+      saveShadow: '0 20px 34px rgba(220, 96, 146, 0.32)',
+    }),
   },
   {
     key: 'arctic-lab',
@@ -597,10 +861,34 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(145deg, rgba(210, 240, 252, 0.94), rgba(178, 224, 244, 0.9))',
+      headerBorder: '1px solid rgba(88, 150, 190, 0.48)',
+      headerShadow: '0 36px 64px rgba(46, 100, 132, 0.32)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(220, 244, 255, 0.95), rgba(190, 230, 246, 0.9))',
+      headerFrameBorder: '1px solid rgba(104, 170, 206, 0.48)',
+      headerFrameShadow: '0 22px 34px rgba(52, 112, 146, 0.34)',
+      tabBg: 'linear-gradient(135deg, rgba(214, 240, 252, 0.86), rgba(184, 226, 244, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #06b6d4, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(210, 236, 250, 0.92), rgba(184, 220, 240, 0.88))',
+      buttonBorder: '1px solid rgba(108, 180, 214, 0.48)',
+      glassSheen: '0 18px 36px rgba(46, 120, 152, 0.3)',
+      borderSoft: 'rgba(108, 180, 214, 0.42)',
+      chipBg: 'rgba(124, 192, 220, 0.24)',
+      chipBorder: '1px solid rgba(108, 180, 214, 0.42)',
+      linkColor: '#06b6d4',
+      accent: '#06b6d4',
+      saveGradient: 'linear-gradient(120deg, #06b6d4, #38bdf8)',
+      saveBorder: '1px solid rgba(116, 188, 220, 0.55)',
+      saveShadow: '0 22px 36px rgba(64, 132, 168, 0.32)',
+    }),
   },
 ];
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
+const UI_THEME_MAP = new Map(
+  APPEARANCE_SKINS.map((skin) => [skin.uiKey || skin.key, skin.ui || DEFAULT_UI_THEME]),
+);
 const DEFAULT_SKIN_PRESET = APPEARANCE_SKIN_MAP.get(DEFAULT_APPEARANCE_SKIN);
 const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get(DEFAULT_APPEARANCE_SKIN) || DEFAULT_APPEARANCE_SKIN;
 
@@ -650,6 +938,37 @@ function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   body.style.setProperty('--admin-input-border', inputBorder);
   body.style.setProperty('--admin-input-color', textColor);
   body.style.setProperty('--admin-button-color', buttonColor);
+  const uiTheme = UI_THEME_MAP.get(uiKey) || DEFAULT_UI_THEME;
+  const themeVariables = {
+    '--admin-header-bg': uiTheme.headerBg,
+    '--admin-header-border': uiTheme.headerBorder,
+    '--admin-header-shadow': uiTheme.headerShadow,
+    '--admin-header-blur': uiTheme.headerBlur,
+    '--admin-header-frame-bg': uiTheme.headerFrameBg,
+    '--admin-header-frame-border': uiTheme.headerFrameBorder,
+    '--admin-header-frame-shadow': uiTheme.headerFrameShadow,
+    '--admin-tab-bg': uiTheme.tabBg,
+    '--admin-tab-active-bg': uiTheme.tabActiveBg,
+    '--admin-button-bg': uiTheme.buttonBg,
+    '--admin-button-border': uiTheme.buttonBorder,
+    '--admin-glass-sheen': uiTheme.glassSheen,
+    '--admin-border-soft': uiTheme.borderSoft,
+    '--admin-chip-bg': uiTheme.chipBg,
+    '--admin-chip-border': uiTheme.chipBorder,
+    '--admin-link-color': uiTheme.linkColor,
+    '--admin-accent': uiTheme.accent,
+    '--admin-danger-bg': uiTheme.dangerBg,
+    '--admin-danger-border': uiTheme.dangerBorder,
+    '--admin-success-bg': uiTheme.successBg,
+    '--admin-success-border': uiTheme.successBorder,
+    '--admin-save-gradient': uiTheme.saveGradient,
+    '--admin-save-border': uiTheme.saveBorder,
+    '--admin-save-shadow': uiTheme.saveShadow,
+  };
+  Object.entries(themeVariables).forEach(([cssVar, value]) => {
+    if (value) body.style.setProperty(cssVar, value);
+    else body.style.removeProperty(cssVar);
+  });
   if (appearance?.screenBgImage && appearance?.screenBgImageEnabled !== false) {
     body.style.setProperty('--appearance-panel-surface', 'none');
   } else {
@@ -727,13 +1046,28 @@ function normalizeGameMetadata(cfg, slug = '') {
   }
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
+  const normalizedCover = typeof game.coverImage === 'string' ? game.coverImage.trim() : '';
+  const normalizedShort = typeof game.shortDescription === 'string' ? game.shortDescription.trim() : '';
+  const normalizedLong = typeof game.longDescription === 'string' ? game.longDescription.trim() : '';
   game.tags = cleaned;
   game.title = normalizedTitle || 'Default Game';
   game.type = normalizedType || 'Mystery';
-  game.coverImage = typeof game.coverImage === 'string' ? game.coverImage : '';
+  game.coverImage = normalizedCover;
+  game.shortDescription = normalizedShort;
+  game.longDescription = normalizedLong;
+  game.slug = normalizedSlug;
   game.deployEnabled = game.deployEnabled === true;
   base.game = game;
   return base;
+}
+
+function slugifyTitle(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
 }
 
 /* ───────────────────────── Root ───────────────────────── */
@@ -751,6 +1085,209 @@ export default function Admin() {
   const [newMode, setNewMode] = useState('single');
   const [newDurationMin, setNewDurationMin] = useState(0);
   const [newAlertMin, setNewAlertMin] = useState(10);
+  const [newGameSlug, setNewGameSlug] = useState('');
+  const [newSlugTouched, setNewSlugTouched] = useState(false);
+  const [newShortDesc, setNewShortDesc] = useState('');
+  const [newLongDesc, setNewLongDesc] = useState('');
+  const [newCoverPreview, setNewCoverPreview] = useState('');
+  const [newCoverFile, setNewCoverFile] = useState(null);
+  const [newCoverSelectedUrl, setNewCoverSelectedUrl] = useState('');
+  const [newCoverOptions, setNewCoverOptions] = useState([]);
+  const [newCoverLookupLoading, setNewCoverLookupLoading] = useState(false);
+  const [newGameStatus, setNewGameStatus] = useState('');
+  const [newGameBusy, setNewGameBusy] = useState(false);
+  const [newCoverDropActive, setNewCoverDropActive] = useState(false);
+  const newGameCoverInputRef = useRef(null);
+
+  const [missionActionFlash, setMissionActionFlash] = useState(false);
+  const [deviceActionFlash, setDeviceActionFlash] = useState(false);
+  const [newMissionButtonFlash, setNewMissionButtonFlash] = useState(false);
+  const [addDeviceButtonFlash, setAddDeviceButtonFlash] = useState(false);
+  const missionFlashTimeout = useRef(null);
+  const deviceFlashTimeout = useRef(null);
+  const missionButtonTimeout = useRef(null);
+  const deviceButtonTimeout = useRef(null);
+
+  const [protectionPrompt, setProtectionPrompt] = useState({
+    open: false,
+    mode: 'enable',
+    requireConfirm: false,
+    password: '',
+    confirm: '',
+    error: '',
+  });
+
+  function resetNewGameForm() {
+    setNewTitle('');
+    setNewType('Mystery');
+    setNewMode('single');
+    setNewDurationMin(0);
+    setNewAlertMin(10);
+    setNewGameSlug('');
+    setNewSlugTouched(false);
+    setNewShortDesc('');
+    setNewLongDesc('');
+    setNewCoverPreview('');
+    setNewCoverFile(null);
+    setNewCoverSelectedUrl('');
+    setNewCoverOptions([]);
+    setNewCoverLookupLoading(false);
+    setNewGameStatus('');
+    setNewGameBusy(false);
+    setNewCoverDropActive(false);
+    if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
+  }
+
+  function handleNewGameModalClose() {
+    setShowNewGame(false);
+    resetNewGameForm();
+  }
+
+  function handleNewSlugInput(value) {
+    setNewSlugTouched(true);
+    setNewGameSlug(slugifyTitle(value));
+  }
+
+  function clearNewGameCover() {
+    setNewCoverPreview('');
+    setNewCoverFile(null);
+    setNewCoverSelectedUrl('');
+  }
+
+  async function handleNewGameCoverFile(file) {
+    if (!file) return;
+    const safeName = file.name || 'cover';
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    if (!looksLikeImage) {
+      setNewGameStatus(`❌ ${safeName} must be an image file.`);
+      return;
+    }
+    const sizeBytes = file.size || 0;
+    if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
+      const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
+      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 1 MB.`);
+      return;
+    }
+    try {
+      const previewUrl = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
+        ? URL.createObjectURL(file)
+        : '';
+      setNewCoverPreview(previewUrl);
+      setNewCoverFile(file);
+      setNewCoverSelectedUrl('');
+      setNewGameStatus('✅ Cover ready — it will upload when you create the game.');
+    } catch (err) {
+      setNewGameStatus(`❌ Unable to preview ${safeName}`);
+    }
+  }
+
+  async function loadNewCoverOptions() {
+    setNewCoverLookupLoading(true);
+    try {
+      const items = await listInventory(['covers','mediapool','uploads']);
+      const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
+      setNewCoverOptions(filtered);
+      if (!filtered.length) {
+        setNewGameStatus('No reusable covers found yet. Try uploading one.');
+      }
+    } catch (err) {
+      setNewGameStatus('❌ Unable to load media pool covers.');
+      setNewCoverOptions([]);
+    } finally {
+      setNewCoverLookupLoading(false);
+    }
+  }
+
+  function applyNewCoverFromUrl(url) {
+    if (!url) return;
+    const direct = toDirectMediaURL(url);
+    setNewCoverSelectedUrl(url);
+    setNewCoverPreview(direct);
+    setNewCoverFile(null);
+    setNewGameStatus('✅ Using cover from the media pool.');
+  }
+
+  async function handleCreateNewGame() {
+    if (newGameBusy) return;
+    const title = newTitle.trim();
+    if (!title) {
+      setNewGameStatus('❌ Title is required.');
+      return;
+    }
+    const slugInput = (newGameSlug || slugifyTitle(title) || 'game').trim();
+    if (!slugInput) {
+      setNewGameStatus('❌ Please provide a slug for this game.');
+      return;
+    }
+    setNewGameBusy(true);
+    setNewGameStatus('Creating game…');
+    let coverPath = newCoverSelectedUrl;
+    try {
+      if (!coverPath && newCoverFile) {
+        coverPath = await uploadToRepo(newCoverFile, 'covers');
+        if (!coverPath) throw new Error('Cover upload failed');
+      }
+      const res = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          title,
+          type: newType,
+          mode: newMode,
+          slug: slugInput,
+          shortDescription: newShortDesc.trim(),
+          longDescription: newLongDesc.trim(),
+          coverImage: coverPath,
+          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+        }),
+      });
+      const data = await res.json().catch(() => ({ ok: false }));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data?.error || 'create failed');
+      }
+      await reloadGamesList();
+      setActiveSlug(data.slug || slugInput || 'default');
+      setStatus(`✅ Created game “${title}”`);
+      setNewGameStatus('✅ Game created! Loading…');
+      handleNewGameModalClose();
+    } catch (err) {
+      setNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`);
+    } finally {
+      setNewGameBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (newSlugTouched) return;
+    setNewGameSlug(slugifyTitle(newTitle));
+  }, [newTitle, newSlugTouched]);
+
+  useEffect(() => {
+    return () => {
+      [missionFlashTimeout, deviceFlashTimeout, missionButtonTimeout, deviceButtonTimeout].forEach((ref) => {
+        if (ref.current) {
+          clearTimeout(ref.current);
+          ref.current = null;
+        }
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!newCoverPreview) return undefined;
+    if (
+      newCoverPreview.startsWith('blob:') &&
+      typeof URL !== 'undefined' &&
+      typeof URL.revokeObjectURL === 'function'
+    ) {
+      const preview = newCoverPreview;
+      return () => {
+        try { URL.revokeObjectURL(preview); } catch {}
+      };
+    }
+    return undefined;
+  }, [newCoverPreview]);
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
@@ -850,7 +1387,7 @@ export default function Admin() {
   }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
+  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
   const [protectionError, setProtectionError] = useState('');
 
   useEffect(() => {
@@ -861,7 +1398,13 @@ export default function Admin() {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (res.ok) {
-          setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+          setProtectionState({
+            enabled: !!data.protected,
+            loading: false,
+            saving: false,
+            updatedAt: data.updatedAt || null,
+            passwordSet: !!data.passwordSet,
+          });
           setProtectionError('');
         } else {
           throw new Error(data?.error || 'Failed to load protection status');
@@ -979,8 +1522,6 @@ export default function Admin() {
   const [selectedPinSize, setSelectedPinSize] = useState(28);
   const defaultPinSize = 24;
 
-  // Undo/Redo
-  const historyRef = useRef({ past: [], future: [] });
 
   // Settings → Region search
   const [mapSearchQ, setMapSearchQ] = useState('');
@@ -1019,58 +1560,30 @@ export default function Admin() {
   const getDevices = () => (config?.devices?.length ? config.devices : (config?.powerups || []));
   const setDevices = (list) => setConfig(prev => ({ ...(prev || {}), devices: list, powerups: list }));
 
-  function snapshotState() {
-    return {
-      missions: JSON.parse(JSON.stringify(suite?.missions || [])),
-      devices: JSON.parse(JSON.stringify(getDevices() || [])),
-    };
-  }
-  function pushHistory() {
-    if (!suite || !config) return;
-    historyRef.current.past.push(snapshotState());
-    historyRef.current.future = [];
-  }
-  function canUndo() { return historyRef.current.past.length > 0; }
-  function canRedo() { return historyRef.current.future.length > 0; }
-  function undo() {
-    if (!canUndo()) return;
-    const current = snapshotState();
-    const prev = historyRef.current.past.pop();
-    historyRef.current.future.push(current);
-    setSuite((s) => ({ ...s, missions: prev.missions }));
-    setDevices(prev.devices);
-    setStatus('↶ Undid last change');
-  }
-  function redo() {
-    if (!canRedo()) return;
-    const current = snapshotState();
-    const next = historyRef.current.future.pop();
-    historyRef.current.past.push(current);
-    setSuite((s) => ({ ...s, missions: next.missions }));
-    setDevices(next.devices);
-    setStatus('↷ Redid last change');
-  }
-  useEffect(() => {
-    function onKey(e) {
-      const z = e.key === 'z' || e.key === 'Z';
-      const y = e.key === 'y' || e.key === 'Y';
-      if ((e.ctrlKey || e.metaKey) && z) { e.preventDefault(); e.shiftKey ? redo() : undo(); }
-      else if ((e.ctrlKey || e.metaKey) && y) { e.preventDefault(); redo(); }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   /* load games */
   useEffect(() => {
-    if (!gameEnabled) { setGames([]); return; }
+    let cancelled = false;
     (async () => {
       try {
         const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+        if (!r.ok) {
+          const text = await r.text();
+          throw new Error(text || `HTTP ${r.status}`);
+        }
         const j = await r.json();
-        if (j.ok) setGames(j.games || []);
-      } catch {}
+        if (cancelled) return;
+        if (j.ok) {
+          setGames(Array.isArray(j.games) ? j.games : []);
+        } else if (j?.error) {
+          setStatus(prev => prev || `⚠️ ${j.error}`);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setGames([]);
+        setStatus(prev => prev || `⚠️ Unable to load games list (${err?.message || 'network error'})`);
+      }
     })();
+    return () => { cancelled = true; };
   }, [gameEnabled]);
 
   /* load suite/config when slug changes */
@@ -1270,12 +1783,21 @@ export default function Admin() {
   }
 
   async function reloadGamesList() {
-    if (!gameEnabled) { setGames([]); return; }
     try {
       const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(txt || `HTTP ${r.status}`);
+      }
       const j = await r.json();
-      if (j.ok) setGames(j.games || []);
-    } catch {}
+      if (j.ok) {
+        setGames(Array.isArray(j.games) ? j.games : []);
+      } else if (j?.error) {
+        setStatus(`⚠️ ${j.error}`);
+      }
+    } catch (err) {
+      setStatus(`⚠️ Unable to refresh games list (${err?.message || 'network error'})`);
+    }
   }
 
   async function saveAndPublish() {
@@ -1304,7 +1826,6 @@ export default function Admin() {
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
-    if (!gameEnabled) { setConfirmDeleteOpen(false); return; }
     const slug = activeSlug || 'default';
     const urlTry = [
       `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
@@ -1324,7 +1845,6 @@ export default function Admin() {
     }
 
     if (!ok) {
-      pushHistory();
       setSuite({ version:'0.0.0', missions:[] });
       setConfig(c => ({
         ...(c || {}),
@@ -1333,6 +1853,7 @@ export default function Admin() {
         media: { rewardsPool:[], penaltiesPool:[] },
         textRules: [],
       }));
+      setDirty(true);
       const saved = await saveAllWithSlug(slug);
       if (saved) { setStatus('✅ Cleared game content'); ok = true; }
     }
@@ -1356,6 +1877,15 @@ export default function Admin() {
     return base + String(i).padStart(2,'0');
   }
   function startNew() {
+    if (missionButtonTimeout.current) {
+      clearTimeout(missionButtonTimeout.current);
+      missionButtonTimeout.current = null;
+    }
+    setNewMissionButtonFlash(true);
+    missionButtonTimeout.current = setTimeout(() => {
+      setNewMissionButtonFlash(false);
+      missionButtonTimeout.current = null;
+    }, 420);
     const draft = {
       id: suggestId(),
       title: 'New Mission',
@@ -1393,7 +1923,14 @@ export default function Admin() {
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
     setEditing(e); setSelected(m.id); setDirty(false);
   }
-  function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
+  function cancelEdit() {
+    setEditing(null); setSelected(null); setDirty(false);
+    setMissionActionFlash(false);
+    if (missionFlashTimeout.current) {
+      clearTimeout(missionFlashTimeout.current);
+      missionFlashTimeout.current = null;
+    }
+  }
   function bumpVersion(v) {
     const p = String(v || '0.0.0')
       .split('.')
@@ -1426,22 +1963,33 @@ export default function Admin() {
     setSelected(editing.id); setEditing(null); setDirty(false);
     setStatus('✅ Mission saved');
   }
+  function handleMissionSave() {
+    if (missionFlashTimeout.current) {
+      clearTimeout(missionFlashTimeout.current);
+      missionFlashTimeout.current = null;
+    }
+    setMissionActionFlash(true);
+    missionFlashTimeout.current = setTimeout(() => {
+      setMissionActionFlash(false);
+      missionFlashTimeout.current = null;
+    }, 420);
+    saveToList();
+  }
   function removeMission(id) {
     if (!suite) return;
-    pushHistory();
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
+    setDirty(true);
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
     if (!suite) return;
-    pushHistory();
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
     setSuite({ ...suite, missions: list });
+    setDirty(true);
   }
   function duplicateMission(idx) {
-    pushHistory();
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
@@ -1449,6 +1997,7 @@ export default function Admin() {
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
+    setDirty(true);
     setStatus('✅ Duplicated');
   }
 
@@ -1512,6 +2061,15 @@ export default function Admin() {
     return `d${String(i).padStart(2, '0')}`;
   }
   function addDevice() {
+    if (deviceButtonTimeout.current) {
+      clearTimeout(deviceButtonTimeout.current);
+      deviceButtonTimeout.current = null;
+    }
+    setAddDeviceButtonFlash(true);
+    deviceButtonTimeout.current = setTimeout(() => {
+      setAddDeviceButtonFlash(false);
+      deviceButtonTimeout.current = null;
+    }, 420);
     setDeviceEditorMode('new');
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
@@ -1554,6 +2112,11 @@ export default function Admin() {
     setDeviceTriggerPicker('');
     closeDeviceEditor();
     setStatus('🚫 Device edit cancelled');
+    setDeviceActionFlash(false);
+    if (deviceFlashTimeout.current) {
+      clearTimeout(deviceFlashTimeout.current);
+      deviceFlashTimeout.current = null;
+    }
   }
   function saveDraftDevice() {
     const normalized = {
@@ -1573,11 +2136,11 @@ export default function Admin() {
       const lng = Number(Number(devDraft.lng).toFixed(6));
       const list = [...(devices || [])];
       const item = { id: suggestDeviceId(list), ...normalized, lat, lng };
-      pushHistory();
       const next = [...list, item];
       setDevices(next);
       setSelectedDevIdx(next.length - 1);
       setSelectedMissionIdx(null);
+      setDirty(true);
       setStatus('✅ Device added');
       closeDeviceEditor();
       return;
@@ -1589,12 +2152,24 @@ export default function Admin() {
       if (!existing) return;
       const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
       const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
-      pushHistory();
       list[index] = { ...existing, ...normalized, lat, lng };
       setDevices(list);
+      setDirty(true);
       setStatus('✅ Device updated');
       closeDeviceEditor();
     }
+  }
+  function handleDeviceSave() {
+    if (deviceFlashTimeout.current) {
+      clearTimeout(deviceFlashTimeout.current);
+      deviceFlashTimeout.current = null;
+    }
+    setDeviceActionFlash(true);
+    deviceFlashTimeout.current = setTimeout(() => {
+      setDeviceActionFlash(false);
+      deviceFlashTimeout.current = null;
+    }, 420);
+    saveDraftDevice();
   }
   function duplicateDevice(idx) {
     const list = [...(devices || [])];
@@ -1603,9 +2178,9 @@ export default function Admin() {
     const copy = JSON.parse(JSON.stringify(src));
     copy.id = suggestDeviceId(list);
     copy.title = (src.title || src.id || 'Device') + ' (copy)';
-    pushHistory();
     list.splice(idx + 1, 0, copy);
     setDevices(list);
+    setDirty(true);
     const newIndex = idx + 1;
     setSelectedDevIdx(newIndex);
     setSelectedMissionIdx(null);
@@ -1618,9 +2193,9 @@ export default function Admin() {
     const list = [...(devices || [])];
     if (idx == null || idx < 0 || idx >= list.length) return;
     const currentSelected = selectedDevIdx;
-    pushHistory();
     list.splice(idx, 1);
     setDevices(list);
+    setDirty(true);
     if (currentSelected === idx) {
       setSelectedDevIdx(null);
       if (isDeviceEditorOpen && deviceEditorMode === 'edit') closeDeviceEditor();
@@ -1636,8 +2211,8 @@ export default function Admin() {
     if (target < 0 || target >= list.length) return;
     const [row] = list.splice(idx, 1);
     list.splice(target, 0, row);
-    pushHistory();
     setDevices(list);
+    setDirty(true);
     const currentSelected = selectedDevIdx;
     if (currentSelected === idx) {
       setSelectedDevIdx(target);
@@ -1655,9 +2230,9 @@ export default function Admin() {
     if (!existing) return;
     const latFixed = Number(lat.toFixed(6));
     const lngFixed = Number(lng.toFixed(6));
-    pushHistory();
     list[selectedDevIdx] = { ...existing, lat: latFixed, lng: lngFixed };
     setDevices(list);
+    setDirty(true);
     if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
       setDevDraft(d => ({ ...d, lat: latFixed, lng: lngFixed }));
     }
@@ -1668,9 +2243,9 @@ export default function Admin() {
     const existing = list[selectedDevIdx];
     if (!existing) return;
     const nextRadius = clamp(Number(r || 0), 1, 2000);
-    pushHistory();
     list[selectedDevIdx] = { ...existing, pickupRadius: nextRadius };
     setDevices(list);
+    setDirty(true);
     if (isDeviceEditorOpen && deviceEditorMode === 'edit') {
       setDevDraft(d => ({ ...d, pickupRadius: nextRadius }));
     }
@@ -1703,27 +2278,65 @@ export default function Admin() {
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
-  async function toggleProtection() {
+  function openProtectionPrompt() {
     const target = !protectionState.enabled;
     setProtectionError('');
+    setProtectionPrompt({
+      open: true,
+      mode: target ? 'enable' : 'disable',
+      requireConfirm: target && !protectionState.passwordSet,
+      password: '',
+      confirm: '',
+      error: '',
+    });
+  }
+
+  function closeProtectionPrompt() {
+    setProtectionPrompt(prev => ({ ...prev, open: false, password: '', confirm: '', error: '' }));
+    setProtectionState(prev => ({ ...prev, saving: false }));
+  }
+
+  async function submitProtectionPrompt() {
+    const { mode, password, confirm, requireConfirm } = protectionPrompt;
+    if (!password.trim()) {
+      setProtectionPrompt(prev => ({ ...prev, error: 'Password required' }));
+      return;
+    }
+    if (requireConfirm && password !== confirm) {
+      setProtectionPrompt(prev => ({ ...prev, error: 'Passwords must match to enable protection' }));
+      return;
+    }
+    setProtectionError('');
     setProtectionState(prev => ({ ...prev, saving: true }));
+    setProtectionPrompt(prev => ({ ...prev, error: '' }));
     try {
       const res = await fetch('/api/admin-protection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ protected: target }),
+        body: JSON.stringify({
+          protected: mode === 'enable',
+          password,
+          ...(requireConfirm ? { confirmPassword: confirm } : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || res.statusText || 'Toggle failed');
       }
-      setProtectionState({ enabled: !!data.protected, loading: false, saving: false, updatedAt: data.updatedAt || null });
+      setProtectionState({
+        enabled: !!data.protected,
+        loading: false,
+        saving: false,
+        updatedAt: data.updatedAt || null,
+        passwordSet: data.passwordSet !== false,
+      });
       setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
+      setProtectionPrompt({ open: false, mode: 'enable', requireConfirm: false, password: '', confirm: '', error: '' });
     } catch (err) {
       setProtectionState(prev => ({ ...prev, saving: false }));
       const msg = err?.message || 'Toggle failed';
-      setProtectionError(msg);
+      setProtectionPrompt(prev => ({ ...prev, error: msg }));
       setStatus('❌ Failed to toggle admin protection');
     }
   }
@@ -1731,7 +2344,6 @@ export default function Admin() {
   // Missions selection operations (Missions tab only)
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
-    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
@@ -1741,11 +2353,11 @@ export default function Admin() {
     c.radiusMeters = clamp(Number(c.radiusMeters || 25), 5, 500);
     list[selectedMissionIdx] = { ...m, content: c };
     setSuite({ ...suite, missions: list });
+    setDirty(true);
     setStatus(`Moved mission #${selectedMissionIdx+1}`);
   }
   function setSelectedMissionRadius(r) {
     if (selectedMissionIdx == null) return;
-    pushHistory();
     const list = [...(suite?.missions || [])];
     const m = list[selectedMissionIdx]; if (!m) return;
     const c = { ...(m.content || {}) };
@@ -1757,6 +2369,7 @@ export default function Admin() {
     }
     list[selectedMissionIdx] = { ...m, content: c };
     setSuite({ ...suite, missions: list });
+    setDirty(true);
   }
 
   // Address search (Devices tab)
@@ -1869,6 +2482,27 @@ export default function Admin() {
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
+  const selectGameOptions = useMemo(() => {
+    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
+    const extra = Array.isArray(games)
+      ? games
+          .filter((g) => g && g.slug && g.slug !== 'default')
+          .map((g) => ({
+            value: g.slug,
+            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
+          }))
+      : [];
+    const seen = new Set();
+    const combined = [];
+    [...baseOptions, ...extra].forEach((option) => {
+      if (!option || !option.value) return;
+      if (seen.has(option.value)) return;
+      seen.add(option.value);
+      combined.push(option);
+    });
+    return combined;
+  }, [games]);
+
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
@@ -1904,17 +2538,17 @@ export default function Admin() {
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(config.appearanceTone);
-  const PROTECTION_COLOR_SAFE = '#2dd4bf';
+  const PROTECTION_COLOR_SAFE = '#16f78f';
   const PROTECTION_COLOR_ALERT = '#ff4d57';
   const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
   const protectionIndicatorShadow = protectionState.enabled
-    ? '0 0 14px rgba(45, 212, 191, 0.55)'
+    ? '0 0 22px rgba(22, 247, 143, 0.65)'
     : '0 0 18px rgba(255, 77, 87, 0.75)';
   const protectionIndicatorLabel = protectionState.loading
     ? 'Checking…'
     : protectionState.enabled
-      ? 'Protected'
-      : 'Not Protected';
+      ? 'Protection Enabled'
+      : 'Protection Disabled';
   const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
   const showProtectionIndicator = tab === 'settings';
 
@@ -1930,14 +2564,17 @@ export default function Admin() {
   }
 
   function setDeployEnabled(nextEnabled) {
+    const effective = gameEnabled ? nextEnabled : false;
     setConfig(prev => {
       if (!prev) return prev;
-      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
+      return { ...prev, game: { ...(prev.game || {}), deployEnabled: effective } };
     });
     setDirty(true);
-    setStatus(nextEnabled
+    setStatus(effective
       ? 'Game deployment enabled — Save & Publish will deploy the game build.'
-      : 'Game deployment disabled — Save & Publish updates admin data only.');
+      : (gameEnabled
+        ? 'Game deployment disabled — Save & Publish updates admin data only.'
+        : 'Game project mirror disabled — Save & Publish updates admin data only.'));
   }
 
   async function handleCoverFile(file) {
@@ -2071,48 +2708,70 @@ export default function Admin() {
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
+  const headerCoverThumb = config?.game?.coverImage
+    ? toDirectMediaURL(config.game.coverImage)
+    : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
+  const metaCommitFull = adminMeta.commit || '';
+  const metaCommitShort = metaCommitFull ? String(metaCommitFull).slice(0, 7) : '';
+  const metaRepoLabel = adminMeta.repo ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}` : '';
+  const metaRepoUrl = adminMeta.owner && adminMeta.repo
+    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
+    : '';
+  const metaBranchUrl = metaRepoUrl && adminMeta.branch
+    ? `${metaRepoUrl}/tree/${encodeURIComponent(adminMeta.branch)}`
+    : '';
+  const metaCommitUrl = metaRepoUrl && metaCommitFull
+    ? `${metaRepoUrl}/commit/${metaCommitFull}`
+    : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
       ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
       : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
-  const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
-    });
-    return combined;
-  }, [games]);
 
   return (
     <div style={S.body}>
       <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
+        <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
+          {metaRepoLabel && (
+            <span>
+              <strong>Repo:</strong>{' '}
+              {metaRepoUrl ? (
+                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                  {metaRepoLabel}
+                </a>
+              ) : (
+                metaRepoLabel
+              )}
+            </span>
+          )}
+          <span>
+            <strong>Branch:</strong>{' '}
+            {metaBranchUrl ? (
+              <a href={metaBranchUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                {metaBranchLabel}
+              </a>
+            ) : (
+              metaBranchLabel
+            )}
+          </span>
+          {metaCommitFull && (
+            <span>
+              <strong>Commit:</strong>{' '}
+              {metaCommitUrl ? (
+                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                  {metaCommitShort || metaCommitFull.slice(0, 7)}
+                </a>
+              ) : (
+                metaCommitShort || metaCommitFull.slice(0, 7)
+              )}
             </span>
           )}
           {metaDeploymentState && (
@@ -2127,6 +2786,20 @@ export default function Admin() {
               )}
             </span>
           )}
+          <span>
+            <strong>Game Mirror:</strong>{' '}
+            {gameEnabled ? 'ENABLED' : 'DISABLED'}
+          </span>
+        </div>
+        <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
+          {metaDeploymentLinkLabel && (
+            <span>
+              <strong>Preview:</strong>{' '}
+              <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                {metaDeploymentLinkLabel}
+              </a>
+            </span>
+          )}
           {metaTimestampLabel && (
             <span><strong>Checked:</strong> {metaTimestampLabel}</span>
           )}
@@ -2138,9 +2811,22 @@ export default function Admin() {
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
-            <div style={S.headerTitleColumn}>
-              <div style={S.headerGameTitle}>{headerGameTitle}</div>
-              <div style={S.headerSubtitle}>Admin Control Deck</div>
+            <div style={S.headerTitleGroup}>
+              <div style={S.headerCoverFrame}>
+                {headerCoverThumb ? (
+                  <img
+                    src={headerCoverThumb}
+                    alt="Active game cover"
+                    style={S.headerCoverThumb}
+                  />
+                ) : (
+                  <div style={S.headerCoverPlaceholder}>No Cover</div>
+                )}
+              </div>
+              <div style={S.headerTitleColumn}>
+                <div style={S.headerGameTitle}>{headerGameTitle}</div>
+                <div style={S.headerSubtitle}>Admin Control Deck</div>
+              </div>
             </div>
           </div>
           <div style={S.headerNavRow}>
@@ -2172,7 +2858,7 @@ export default function Admin() {
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
-            {gameEnabled && (
+            {tab !== 'settings' && (
               <div style={S.headerNavSecondary}>
                 <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
@@ -2181,12 +2867,12 @@ export default function Admin() {
                     <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                   ))}
                 </select>
-                <button style={S.button} onClick={()=>setShowNewGame(true)}>+ New Game</button>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   <input
                     type="checkbox"
                     checked={deployGameEnabled}
                     onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled={!gameEnabled}
                   />
                   Deploy game build
                 </label>
@@ -2196,10 +2882,15 @@ export default function Admin() {
                     type="number" min={0} max={120}
                     value={deployDelaySec}
                     onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90, opacity: deployGameEnabled ? 1 : 0.45 }}
-                    disabled={!deployGameEnabled}
+                    style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled || !gameEnabled}
                   />
                 </label>
+                {!gameEnabled && (
+                  <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
+                    ⚠️ Game folder mirroring disabled — deploy controls are read-only.
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -2229,7 +2920,7 @@ export default function Admin() {
                       {protectionIndicatorLabel}
                     </div>
                     <button
-                      onClick={toggleProtection}
+                      onClick={openProtectionPrompt}
                       disabled={protectionState.saving || protectionState.loading}
                       style={{
                         ...S.button,
@@ -2243,7 +2934,7 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {tab === 'settings' && (
+              {tab !== 'settings' && (
                 <div style={S.coverSummary}>
                   <div style={{ fontWeight:700 }}>Cover status</div>
                   <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
@@ -2267,10 +2958,18 @@ export default function Admin() {
         <main style={S.wrapGrid2}>
           {/* Left list */}
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button onClick={startNew} style={S.button}>+ New Mission</button>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
+            <div style={S.sidebarBar}>
+              <div style={S.noteText}>Launch a brand-new mission in this timeline.</div>
+              <button
+                onClick={startNew}
+                style={{
+                  ...S.action3DButton,
+                  ...(newMissionButtonFlash ? S.action3DFlash : {}),
+                }}
+                title="Create a new mission and open the editor"
+              >
+                + New Mission
+              </button>
             </div>
             <input
               placeholder="Search…"
@@ -2370,28 +3069,21 @@ export default function Admin() {
               <div style={S.overlay}>
                 <div style={{ ...S.card, width:'min(860px, 94vw)', maxHeight:'82vh', overflowY:'auto', position:'relative' }}>
                   <div style={S.floatingBarTop}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
-                        Save and Close
+                    <div style={S.overlayBarSide}>
+                      <button
+                        style={S.cancelGlowButton}
+                        onClick={cancelEdit}
+                        title="Close the mission editor without saving"
+                      >
+                        Cancel & Close
                       </button>
-                      <div style={{ fontSize: 12, color: 'var(--admin-muted)', fontWeight: 600 }}>
-                        ID:
-                        <span style={{ marginLeft: 6, fontFamily: 'var(--admin-font-mono, ui-monospace)' }}>
-                          {editing.id || '—'}
-                        </span>
-                      </div>
+                      <div style={S.noteText}>Exit safely without saving changes.</div>
                     </div>
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        flex: 1,
-                        margin: '0 16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
+                    <div style={S.overlayCenter}>
+                      <div style={S.overlayIdRow}>
+                        <span style={S.overlayIdLabel}>Mission ID</span>
+                        <code style={S.overlayIdValue}>{editing.id || '—'}</code>
+                      </div>
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
@@ -2404,10 +3096,21 @@ export default function Admin() {
                         }}
                         placeholder="Mission title"
                       />
+                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
                     </div>
-                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
-                      Cancel and Close
-                    </button>
+                    <div style={S.overlayBarSide}>
+                      <button
+                        style={{
+                          ...S.action3DButton,
+                          ...(missionActionFlash ? S.action3DFlash : {}),
+                        }}
+                        onClick={handleMissionSave}
+                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
+                      >
+                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                      </button>
+                      <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
+                    </div>
                   </div>
 
                   <Field label="Type">
@@ -2764,14 +3467,6 @@ export default function Admin() {
                       onChange={(next)=>{ setEditing({ ...editing, appearance:next }); setDirty(true); }}/>
                   )}
 
-                  <div style={S.floatingBarBottom}>
-                    <button style={{ ...S.floatingButton, ...S.floatingSave }} onClick={saveToList}>
-                      Save and Close
-                    </button>
-                    <button style={{ ...S.floatingButton, ...S.floatingCancel }} onClick={cancelEdit}>
-                      Cancel and Close
-                    </button>
-                  </div>
                   {dirty && <div style={{ marginTop:6, color:'#ffd166' }}>Unsaved changes…</div>}
                 </div>
               </div>
@@ -2784,11 +3479,6 @@ export default function Admin() {
       {tab==='devices' && (
         <main style={S.wrapGrid2}>
           <aside style={S.sidebarTall}>
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={{ ...S.button }} onClick={undo} disabled={!canUndo()}>↶ Undo</button>
-              <button style={{ ...S.button }} onClick={redo} disabled={!canRedo()}>↷ Redo</button>
-            </div>
-
             <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
               <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
                 <input placeholder="Search address or place…" style={S.input} value={devSearchQ} onChange={(e)=>setDevSearchQ(e.target.value)} />
@@ -2806,11 +3496,29 @@ export default function Admin() {
               </div>
             </div>
 
-            <div style={{ display:'flex', gap:8, marginBottom:8, flexWrap:'wrap' }}>
-              <button style={S.button} onClick={addDevice}>+ Add Device</button>
-              {selectedDevIdx!=null && (
-                <button style={S.button} onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}>Clear selection</button>
-              )}
+            <div style={S.sidebarBar}>
+              <div style={S.noteText}>Deploy devices and markers from this control strip.</div>
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                {selectedDevIdx!=null && (
+                  <button
+                    style={S.button}
+                    onClick={()=>{ setSelectedDevIdx(null); closeDeviceEditor(); }}
+                    title="Deselect the highlighted device"
+                  >
+                    Clear selection
+                  </button>
+                )}
+                <button
+                  style={{
+                    ...S.action3DButton,
+                    ...(addDeviceButtonFlash ? S.action3DFlash : {}),
+                  }}
+                  onClick={addDevice}
+                  title="Create a new device draft"
+                >
+                  + Add Device
+                </button>
+              </div>
             </div>
 
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -2887,35 +3595,53 @@ export default function Admin() {
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
                     <div style={S.floatingBarTop}>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingSave }}
-                        onClick={saveDraftDevice}
-                      >
-                        Save and Close
-                      </button>
-                      <div style={{ flex:1, textAlign:'center', margin:'0 16px' }}>
-                        <h4 style={{ margin:'0 0 4px 0' }}>
-                          {deviceEditorMode === 'new' ? 'New Device' : `Edit Device ${devDraft.id ? `(${devDraft.id})` : ''}`}
+                      <div style={S.overlayBarSide}>
+                        <button
+                          style={S.cancelGlowButton}
+                          onClick={cancelDeviceEditor}
+                          title="Close the device editor without saving"
+                        >
+                          Cancel & Close
+                        </button>
+                        <div style={S.noteText}>Use when you need to exit without storing updates.</div>
+                      </div>
+                      <div style={S.overlayCenter}>
+                        <div style={S.overlayIdRow}>
+                          <span style={S.overlayIdLabel}>Device ID</span>
+                          <code style={S.overlayIdValue}>{devDraft.id || '—'}</code>
+                        </div>
+                        <h4 style={{ margin:'0 0 6px 0' }}>
+                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
                         </h4>
-                        {deviceEditorMode === 'edit' && devDraft.id && (
-                          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>ID: {devDraft.id}</div>
-                        )}
-                        <div style={{ marginTop:6 }}>
+                        <div style={{ marginTop:4 }}>
                           <button
                             type="button"
                             style={S.subtleActionButton}
                             onClick={resetDeviceEditor}
+                            title="Restore the draft to its last saved state"
                           >
                             Reset draft
                           </button>
                         </div>
+                        <div style={S.noteText}>Update the title, type, or trigger settings before saving.</div>
                       </div>
-                      <button
-                        style={{ ...S.floatingButton, ...S.floatingCancel }}
-                        onClick={cancelDeviceEditor}
-                      >
-                        Cancel and Close
-                      </button>
+                      <div style={S.overlayBarSide}>
+                        <button
+                          style={{
+                            ...S.action3DButton,
+                            ...(deviceActionFlash ? S.action3DFlash : {}),
+                          }}
+                          onClick={handleDeviceSave}
+                          title={deviceEditorMode === 'new'
+                            ? 'Save the new device and close the editor'
+                            : 'Save your changes and close the editor'}
+                        >
+                          {deviceEditorMode === 'new'
+                            ? 'Save New Device and Close'
+                            : 'Save Changes and Close'}
+                        </button>
+                        <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
+                      </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
                       <div>
@@ -3109,22 +3835,6 @@ export default function Admin() {
                 readOnly={false}
                 lockToRegion={true}
               />
-              {isDeviceEditorOpen && (
-                <div style={S.deviceMapFooter}>
-                  <button
-                    style={{ ...S.floatingButton, ...S.floatingSave }}
-                    onClick={saveDraftDevice}
-                  >
-                    Save and Close
-                  </button>
-                  <button
-                    style={{ ...S.floatingButton, ...S.floatingCancel }}
-                    onClick={cancelDeviceEditor}
-                  >
-                    Cancel and Close
-                  </button>
-                </div>
-              )}
             </div>
           </section>
         </main>
@@ -3132,20 +3842,96 @@ export default function Admin() {
 
       {/* SETTINGS */}
       {tab==='settings' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={S.gameTitleRow}>
-              <div style={S.gameTitleColumn}>
-                <div style={S.fieldLabel}>Game Title</div>
-                <input
-                  style={S.input}
-                  value={config.game.title}
-                  onChange={(e)=>setConfig(prev => (prev ? { ...prev, game:{ ...(prev.game||{}), title:e.target.value } } : prev))}
-                  placeholder="Untitled Game"
-                />
+        <main style={S.wrapGrid2}>
+          <aside style={S.settingsSidebar}>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={S.settingsHeroRow}>
+                <div style={S.headerCoverFrame}>
+                  {headerCoverThumb ? (
+                    <img
+                      src={headerCoverThumb}
+                      alt="Active game cover"
+                      style={S.headerCoverThumb}
+                    />
+                  ) : (
+                    <div style={S.headerCoverPlaceholder}>No Cover</div>
+                  )}
+                </div>
+                <div style={S.settingsHeroText}>
+                  <div style={S.headerGameTitle}>{headerGameTitle}</div>
+                  <div style={S.headerSubtitle}>Admin Control Deck</div>
+                </div>
+              </div>
+              <div style={S.settingsHeroNote}>Titles are managed per game. Create a new game to set a different name.</div>
+              <div style={S.settingsSlugBlock}>
+                <div style={S.fieldLabel}>Slug</div>
+                <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
+                <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
               </div>
             </div>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={S.settingsControlSection}>
+                <div style={S.settingsControlLabel}>Saved Games</div>
+                <select
+                  style={S.input}
+                  value={activeSlug}
+                  onChange={(e)=>setActiveSlug(e.target.value)}
+                >
+                  {selectGameOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <div style={S.noteText}>
+                  Switch to another saved escape ride. The selection reloads missions, devices, and settings.
+                </div>
+              </div>
+              <div style={S.settingsActionRow}>
+                <button
+                  type="button"
+                  style={{ ...S.button, ...S.buttonSuccess, width: '100%' }}
+                  onClick={()=>setShowNewGame(true)}
+                >
+                  + New Game
+                </button>
+              </div>
+              <div style={{ ...S.noteText, marginTop:4 }}>Opens the creation window for naming, slugging, and selecting cover art.</div>
+              <div style={S.settingsControlGroup}>
+                <label style={S.settingsControlRow}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled={!gameEnabled}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ ...S.settingsControlRow, cursor: 'default' }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width: 110, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled || !gameEnabled}
+                  />
+                </label>
+                {!gameEnabled && (
+                  <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
+                    ⚠️ Game folder mirroring disabled — deploy controls are read-only.
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={{ fontWeight:700 }}>Cover status</div>
+              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                {coverStatusMessage}
+              </div>
+            </div>
+          </aside>
+          <section style={S.settingsContent}>
+            <div style={S.card}>
+              <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.coverControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
@@ -3208,25 +3994,12 @@ export default function Admin() {
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
-            <Field label="Select Game">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
-                Switch between saved games from right here in settings.
-              </div>
-            </Field>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
                 {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
               </select>
+              <div style={S.noteText}>Pick the base structure for missions and pacing.</div>
             </Field>
             <Field label="Game Tags (comma separated)">
               <input
@@ -3235,7 +4008,7 @@ export default function Admin() {
                 onChange={(e)=>updateGameTagsDraft(e.target.value)}
                 placeholder="default-game, mystery"
               />
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+              <div style={S.noteText}>
                 The current slug and <code>default-game</code> are enforced automatically.
               </div>
             </Field>
@@ -3248,7 +4021,7 @@ export default function Admin() {
                 />
                 Enable publishing to the live game build
               </label>
-              <div style={{ marginTop:6, fontSize:12, color:'#9fb0bf' }}>
+              <div style={S.noteText}>
                 When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
               </div>
             </Field>
@@ -3258,6 +4031,7 @@ export default function Admin() {
                   onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
                 Enable Splash (game code & Stripe)
               </label>
+              <div style={S.noteText}>Toggles the landing experience with access code + payment prompts.</div>
             </Field>
           </div>
 
@@ -3318,14 +4092,12 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {gameEnabled && (
-                <button
-                  style={{ ...S.button, ...S.buttonDanger }}
-                  onClick={()=> setConfirmDeleteOpen(true)}
-                >
-                  🗑 Delete Game
-                </button>
-              )}
+              <button
+                style={{ ...S.button, ...S.buttonDanger }}
+                onClick={()=> setConfirmDeleteOpen(true)}
+              >
+                🗑 Delete Game
+              </button>
               <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
             </div>
           </div>
@@ -3433,6 +4205,7 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+          </section>
         </main>
       )}
 
@@ -3544,52 +4317,254 @@ export default function Admin() {
         </main>
       )}
 
+      {protectionPrompt.open && (
+        <div style={{ ...S.modalBackdrop, zIndex: 4200 }}>
+          <div style={{ ...S.card, ...S.modalCard }}>
+            <div style={S.modalTopBar}>
+              <button style={S.cancelGlowButton} onClick={closeProtectionPrompt}>Cancel & Close</button>
+              <div style={S.modalTitle}>
+                {protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection'}
+              </div>
+              <button
+                style={S.modalCloseButton}
+                onClick={closeProtectionPrompt}
+                aria-label="Close protection dialog"
+              >
+                ×
+              </button>
+            </div>
+            <form
+              style={S.modalContent}
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitProtectionPrompt();
+              }}
+            >
+              <div style={S.noteText}>
+                {protectionPrompt.mode === 'enable'
+                  ? 'Set a password to require authentication before anyone enters the Admin Control Deck.'
+                  : 'Confirm the current password to disable the lock and return to open access.'}
+              </div>
+              <Field label="Password">
+                <input
+                  type="password"
+                  style={S.input}
+                  value={protectionPrompt.password}
+                  onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, password: e.target.value }))}
+                  placeholder="Enter password"
+                  autoFocus
+                />
+              </Field>
+              {protectionPrompt.requireConfirm && (
+                <Field label="Confirm Password">
+                  <input
+                    type="password"
+                    style={S.input}
+                    value={protectionPrompt.confirm}
+                    onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, confirm: e.target.value }))}
+                    placeholder="Re-enter password"
+                  />
+                </Field>
+              )}
+              {protectionPrompt.error && (
+                <div style={{ ...S.modalStatus, color: PROTECTION_COLOR_ALERT }}>
+                  {protectionPrompt.error}
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:12 }}>
+                <button
+                  type="submit"
+                  style={{
+                    ...S.button,
+                    ...(protectionPrompt.mode === 'enable' ? S.buttonSuccess : S.buttonDanger),
+                    minWidth: 220,
+                    opacity: protectionState.saving ? 0.7 : 1,
+                    cursor: protectionState.saving ? 'wait' : 'pointer',
+                  }}
+                  disabled={protectionState.saving}
+                >
+                  {protectionState.saving
+                    ? 'Saving…'
+                    : (protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* New Game modal */}
-      {gameEnabled && showNewGame && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'grid', placeItems:'center', zIndex:1000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Create New Game</h3>
-            <Field label="Game Title"><input style={S.input} value={newTitle} onChange={(e)=>setNewTitle(e.target.value)}/></Field>
-            <Field label="Game Type">
-              <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
-                {GAME_TYPES.map((t)=><option key={t} value={t}>{t}</option>)}
-              </select>
-            </Field>
-            <Field label="Mode">
-              <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
-                <option value="single">Single Player</option>
-                <option value="head2head">Head to Head (2)</option>
-                <option value="multi">Multiple (4)</option>
-              </select>
-            </Field>
-            <Field label="Duration (minutes — 0 = infinite; count UP)">
-              <input type="number" min={0} max={24*60} style={S.input} value={newDurationMin}
-                onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}/>
-            </Field>
-            <Field label="Alert before end (minutes)">
-              <input type="number" min={1} max={120} style={S.input} value={newAlertMin}
-                onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}/>
-            </Field>
-            <div style={{ display:'flex', gap:8, marginTop:12 }}>
-              <button style={S.button} onClick={()=>setShowNewGame(false)}>Cancel</button>
-              <button style={S.button} onClick={async ()=>{
-                if (!newTitle.trim()) return;
-                const r = await fetch('/api/games', {
-                  method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-                  body: JSON.stringify({ title:newTitle.trim(), type:newType, mode:newMode, timer:{ durationMinutes:newDurationMin, alertMinutes:newAlertMin } }),
-                });
-                const j = await r.json().catch(()=>({ ok:false }));
-                if (!j.ok) { setStatus('❌ ' + (j.error||'create failed')); return; }
-                await reloadGamesList();
-                setActiveSlug(j.slug || 'default'); setNewTitle(''); setShowNewGame(false);
-              }}>Create</button>
+      {showNewGame && (
+        <div style={S.modalBackdrop}>
+          <div style={{ ...S.card, ...S.modalCard }}>
+            <div style={S.modalTopBar}>
+              <button style={S.cancelGlowButton} onClick={handleNewGameModalClose}>Cancel & Close</button>
+              <div style={S.modalTitle}>Create New Game</div>
+              <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
+            </div>
+            <div style={S.modalContent}>
+              {!gameEnabled && (
+                <div style={{ ...S.noteText, background:'var(--admin-tab-bg)', padding:10, borderRadius:8, border:'1px solid var(--admin-border-soft)' }}>
+                  Game folder mirroring is disabled. New games will update admin data only.
+                </div>
+              )}
+
+              <Field label="Game Title">
+                <input
+                  style={S.input}
+                  value={newTitle}
+                  onChange={(e)=>setNewTitle(e.target.value)}
+                  placeholder="Starship Escape"
+                />
+                <div style={S.noteText}>This name appears wherever the game is listed.</div>
+              </Field>
+              <Field label="Slug (folder name)">
+                <input
+                  style={S.input}
+                  value={newGameSlug}
+                  onChange={(e)=>handleNewSlugInput(e.target.value)}
+                  placeholder="starship-escape"
+                />
+                <div style={S.noteText}>Stored at <code>/public/games/[slug]</code> alongside missions and config.</div>
+              </Field>
+              <Field label="Game Type">
+                <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
+                  {GAME_TYPES.map((t)=>(<option key={t} value={t}>{t}</option>))}
+                </select>
+                <div style={S.noteText}>Select a template for default mission pacing.</div>
+              </Field>
+              <Field label="Mode">
+                <select style={S.input} value={newMode} onChange={(e)=>setNewMode(e.target.value)}>
+                  <option value="single">Single Player</option>
+                  <option value="head2head">Head to Head (2)</option>
+                  <option value="multi">Multiple (4)</option>
+                </select>
+                <div style={S.noteText}>Defines how many players join each session.</div>
+              </Field>
+              <Field label="Duration (minutes — 0 = infinite)">
+                <input
+                  type="number"
+                  min={0}
+                  max={24*60}
+                  style={S.input}
+                  value={newDurationMin}
+                  onChange={(e)=>setNewDurationMin(Math.max(0, Number(e.target.value||0)))}
+                />
+                <div style={S.noteText}>Players see this countdown during the mission.</div>
+              </Field>
+              <Field label="Alert before end (minutes)">
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  style={S.input}
+                  value={newAlertMin}
+                  onChange={(e)=>setNewAlertMin(Math.max(1, Number(e.target.value||1)))}
+                />
+                <div style={S.noteText}>Send a warning before time is up.</div>
+              </Field>
+              <Field label="Short Description">
+                <textarea
+                  style={{ ...S.input, minHeight: 80 }}
+                  value={newShortDesc}
+                  onChange={(e)=>setNewShortDesc(e.target.value)}
+                  placeholder="One-sentence teaser for listings"
+                />
+                <div style={S.noteText}>Great for cards, previews, and quick share links.</div>
+              </Field>
+              <Field label="Long Description">
+                <textarea
+                  style={{ ...S.input, minHeight: 140 }}
+                  value={newLongDesc}
+                  onChange={(e)=>setNewLongDesc(e.target.value)}
+                  placeholder="Give players the full briefing for this escape ride"
+                />
+                <div style={S.noteText}>Appears on marketing pages and internal docs.</div>
+              </Field>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Cover Image</div>
+                <div
+                  onDragOver={(e)=>{ e.preventDefault(); setNewCoverDropActive(true); }}
+                  onDragLeave={(e)=>{ e.preventDefault(); setNewCoverDropActive(false); }}
+                  onDrop={(e)=>{
+                    e.preventDefault();
+                    setNewCoverDropActive(false);
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file) handleNewGameCoverFile(file);
+                  }}
+                  style={{ ...S.coverDropZone, ...(newCoverDropActive ? S.coverDropZoneActive : {}) }}
+                >
+                  {newCoverPreview ? (
+                    <img src={newCoverPreview} alt="New game cover" style={S.coverDropImage} />
+                  ) : (
+                    <div style={S.coverDropPlaceholder}>
+                      <strong>Drag & drop cover art</strong>
+                      <span>PNG or JPG · under 1 MB · shows beside the admin header</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:8 }}>
+                  <button type="button" style={S.button} onClick={()=>newGameCoverInputRef.current?.click()}>Upload cover</button>
+                  <input
+                    ref={newGameCoverInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={(e)=>{
+                      const file = e.target.files?.[0];
+                      if (file) handleNewGameCoverFile(file);
+                      if (e.target) e.target.value = '';
+                    }}
+                  />
+                  <button type="button" style={S.button} onClick={loadNewCoverOptions} disabled={newCoverLookupLoading}>
+                    {newCoverLookupLoading ? 'Loading…' : 'Import from Media Pool'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...S.buttonDanger }}
+                    onClick={clearNewGameCover}
+                    disabled={!newCoverPreview && !newCoverSelectedUrl}
+                  >
+                    Clear cover
+                  </button>
+                </div>
+                <div style={S.noteText}>Upload new artwork or reuse an existing asset.</div>
+                {newCoverOptions.length > 0 && (
+                  <div style={S.modalCoverGrid}>
+                    {newCoverOptions.map((item) => (
+                      <button
+                        key={item.url}
+                        type="button"
+                        onClick={()=>applyNewCoverFromUrl(item.url)}
+                        style={{
+                          ...S.modalCoverButton,
+                          ...(newCoverSelectedUrl === item.url ? S.modalCoverButtonActive : {}),
+                        }}
+                      >
+                        <img src={toDirectMediaURL(item.url)} alt={item.name || item.url} style={S.modalCoverThumb} />
+                        <div style={S.modalCoverLabel}>{item.name || item.url}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {newGameStatus && <div style={S.modalStatus}>{newGameStatus}</div>}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:12, flexWrap:'wrap' }}>
+                <button
+                  style={{ ...S.action3DButton, ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}) }}
+                  onClick={handleCreateNewGame}
+                  disabled={newGameBusy}
+                >
+                  {newGameBusy ? 'Creating…' : 'Save New Game'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Delete confirm modal */}
-      {gameEnabled && confirmDeleteOpen && (
+      {confirmDeleteOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
             <h3 style={{ marginTop:0 }}>Delete Game</h3>
@@ -3719,16 +4694,75 @@ const S = {
   },
   header: {
     padding: 20,
-    background: 'rgba(8, 13, 19, 0.9)',
-    backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
+    background: 'var(--admin-header-bg)',
+    backdropFilter: 'var(--admin-header-blur, blur(20px))',
+    borderBottom: 'var(--admin-header-border)',
     position: 'sticky',
     top: 0,
     zIndex: 40,
-    boxShadow: '0 28px 40px rgba(2, 6, 12, 0.45)',
+    boxShadow: 'var(--admin-header-shadow)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
-  wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  wrapGrid2: { display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  settingsSidebar: {
+    display: 'grid',
+    gap: 16,
+  },
+  settingsSidebarCard: {
+    display: 'grid',
+    gap: 12,
+  },
+  settingsHeroRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsHeroText: {
+    display: 'grid',
+    gap: 4,
+    alignItems: 'flex-start',
+  },
+  settingsHeroNote: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    marginTop: 6,
+  },
+  settingsSlugBlock: {
+    display: 'grid',
+    gap: 6,
+  },
+  settingsControlSection: {
+    display: 'grid',
+    gap: 8,
+  },
+  settingsControlLabel: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    fontWeight: 700,
+  },
+  settingsActionRow: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  settingsControlGroup: {
+    display: 'grid',
+    gap: 8,
+  },
+  settingsControlRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+    cursor: 'pointer',
+  },
+  settingsContent: {
+    display: 'grid',
+    gap: 16,
+  },
   sidebarTall: {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     border: 'var(--appearance-panel-border, var(--admin-panel-border))',
@@ -3739,6 +4773,17 @@ const S = {
     height: 'calc(100vh - 140px)',
     overflow: 'auto',
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  sidebarBar: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: '0 12px 24px rgba(8, 13, 19, 0.35)',
   },
   card: {
     position: 'relative',
@@ -3774,6 +4819,7 @@ const S = {
     borderTop: '1px solid var(--admin-border-soft)',
   },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
+  noteText: { marginTop: 6, fontSize: 12, color: 'var(--admin-muted)' },
   input: {
     width: '100%',
     padding: '10px 12px',
@@ -3832,6 +4878,35 @@ const S = {
     color: '#fff4dd',
     boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
   },
+  action3DButton: {
+    padding: '12px 20px',
+    borderRadius: 16,
+    border: '1px solid rgba(34, 197, 94, 0.85)',
+    background: 'linear-gradient(165deg, #0b4224, #22c55e)',
+    color: '#ecfdf5',
+    fontWeight: 800,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    boxShadow: '0 18px 28px rgba(12, 83, 33, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.15)',
+    cursor: 'pointer',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  },
+  action3DFlash: {
+    boxShadow: '0 0 28px rgba(34, 197, 94, 0.75), 0 22px 34px rgba(12, 83, 33, 0.55)',
+    transform: 'translateY(-2px)',
+  },
+  cancelGlowButton: {
+    padding: '10px 18px',
+    borderRadius: 999,
+    border: '1px solid rgba(248, 113, 113, 0.6)',
+    background: 'linear-gradient(140deg, #4c0519, #f87171)',
+    color: '#ffe4e6',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 22px rgba(248, 113, 113, 0.55)',
+    cursor: 'pointer',
+  },
   deviceMapFooter: {
     marginTop: 12,
     display: 'flex',
@@ -3849,10 +4924,10 @@ const S = {
     fontWeight: 700,
   },
   savePublishButton: {
-    background: 'linear-gradient(95deg, #2563eb, #38bdf8)',
-    border: '1px solid rgba(59, 130, 246, 0.6)',
+    background: 'var(--admin-save-gradient, linear-gradient(95deg, #2563eb, #38bdf8))',
+    border: 'var(--admin-save-border, 1px solid rgba(59, 130, 246, 0.6))',
     color: '#f8fafc',
-    boxShadow: '0 20px 36px rgba(37, 99, 235, 0.45)',
+    boxShadow: 'var(--admin-save-shadow, 0 20px 36px rgba(37, 99, 235, 0.45))',
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
     fontWeight: 800,
@@ -3860,15 +4935,43 @@ const S = {
   },
   headerTopRow: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
-    textAlign: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    textAlign: 'left',
+    gap: 16,
     marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  headerTitleGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+  },
+  headerCoverFrame: {
+    width: 68,
+    height: 68,
+    borderRadius: 16,
+    overflow: 'hidden',
+    border: 'var(--admin-header-frame-border, var(--admin-border-soft))',
+    background: 'var(--admin-header-frame-bg, var(--admin-tab-bg))',
+    display: 'grid',
+    placeItems: 'center',
+    boxShadow: 'var(--admin-header-frame-shadow, var(--admin-glass-sheen))',
+  },
+  headerCoverThumb: { width: '100%', height: '100%', objectFit: 'cover' },
+  headerCoverPlaceholder: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    textAlign: 'center',
+    padding: '0 6px',
   },
   headerTitleColumn: {
     display: 'grid',
-    justifyItems: 'center',
+    justifyItems: 'flex-start',
+    textAlign: 'left',
     gap: 4,
   },
   headerGameTitle: {
@@ -3885,41 +4988,38 @@ const S = {
   },
   headerNavRow: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 16,
+    flexWrap: 'wrap',
   },
   headerNavPrimary: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 10,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   headerNavSecondary: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  gameTitleRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-    alignItems: 'stretch',
-    marginBottom: 16,
-  },
-  gameTitleColumn: {
-    flex: '1 1 220px',
-    minWidth: 220,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
+    justifyContent: 'flex-end',
   },
   fieldLabel: {
     fontSize: 12,
     color: 'var(--admin-muted)',
+  },
+  readonlyCode: {
+    display: 'inline-block',
+    padding: '4px 10px',
+    borderRadius: 999,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
   },
   coverControlsRow: {
     display: 'flex',
@@ -4005,6 +5105,41 @@ const S = {
   },
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  overlayBarSide: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+    minWidth: 180,
+  },
+  overlayCenter: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    textAlign: 'center',
+  },
+  overlayIdRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  overlayIdLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  overlayIdValue: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--admin-body-color)',
+    background: 'var(--admin-tab-bg)',
+    padding: '4px 12px',
+    borderRadius: 999,
+  },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   muted: { color: 'var(--admin-muted)' },
   errorPanel: {
@@ -4029,6 +5164,98 @@ const S = {
     cursor: 'pointer',
     fontSize: 12,
     boxShadow: 'var(--admin-glass-sheen)',
+  },
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(5, 12, 20, 0.82)',
+    backdropFilter: 'blur(14px)',
+    display: 'grid',
+    placeItems: 'center',
+    padding: 24,
+    zIndex: 4000,
+  },
+  modalCard: {
+    width: 'min(720px, 96vw)',
+    maxHeight: '82vh',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  modalTopBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '16px 20px',
+    borderBottom: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    position: 'sticky',
+    top: 0,
+    zIndex: 5,
+  },
+  modalTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  modalCloseButton: {
+    border: 'none',
+    background: 'transparent',
+    color: 'var(--admin-muted)',
+    fontSize: 28,
+    lineHeight: 1,
+    cursor: 'pointer',
+    padding: 4,
+  },
+  modalContent: {
+    padding: '20px 24px 24px',
+    display: 'grid',
+    gap: 16,
+    maxHeight: 'calc(82vh - 72px)',
+    overflowY: 'auto',
+  },
+  modalCoverGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalCoverButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 14,
+    padding: 12,
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease',
+  },
+  modalCoverButtonActive: {
+    border: '1px solid rgba(59, 130, 246, 0.85)',
+    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.35)',
+  },
+  modalCoverThumb: {
+    width: '100%',
+    height: 120,
+    objectFit: 'cover',
+    borderRadius: 10,
+    background: '#0f172a',
+  },
+  modalCoverLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textAlign: 'left',
+    wordBreak: 'break-word',
+  },
+  modalStatus: {
+    fontSize: 13,
+    color: 'var(--admin-muted)',
+    minHeight: 20,
   },
 };
 

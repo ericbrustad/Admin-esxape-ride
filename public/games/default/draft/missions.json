@@ -34,10 +34,8 @@
         "screenBgColor": "#000000",
         "screenBgOpacity": 0,
         "screenBgImage": "",
-        "screenBgImageEnabled": true,
         "textAlign": "center",
-        "textVertical": "top",
-        "panelDepth": true
+        "textVertical": "top"
       },
       "correct": {
         "mode": "none"

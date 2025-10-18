@@ -1,9 +1,27 @@
-work — 2025-10-15 15:32:10Z
+work — 2025-10-17 09:46:06Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
+  - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
+  - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.
+- 2025-10-17 — Admin header theming & unique skin palettes. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `styles/globals.css`
+  - Notes: Syncs the dashboard header chrome and Save & Publish controls with each appearance preset using theme-specific CSS variables, gives every skin a bespoke palette that matches its name so presets no longer share the same look, and ships default fallbacks to keep server renders aligned. Note to review @ 2025-10-17 05:17:32Z.
+- 2025-10-16 — Hook order guard & local config fallback. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/config.js`, `.gitignore`
+  - Notes: Ensures the admin dashboard always calls its hooks in a stable order so React no longer crashes on load, adds a filesystem fallback for `/api/config` when GitHub env vars are missing so development stays functional, and reintroduces a `.gitignore` for node_modules/. Note to review @ 2025-10-16 21:15:54Z.
+- 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
+  - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
+- 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
+  - Direct links: `pages/api/admin-protection.js`
+  - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
+- 2025-10-16 — Admin protection sync & game CSS guard. Commit: 49eafe7cd5384c38bebca33b1fc201b6f7c66079
+  - Direct links: `pages/api/admin-protection.js`, `game/styles/globals.css`
+  - Notes: Keeps the admin password toggle defaulted off while syncing the game JSON copies without forcing them back to false, and restores the game Next build by shipping the missing `styles/globals.css` so Vercel no longer fails on the module lookup. Note to review @ 2025-10-16 00:41:00Z.
 - 2025-10-15 — Mission response normalization and legacy page archive. Commit: 0b52af3a53ef71c50f26765bdb681ffa9d197c21
   - Direct links: `components/InlineMissionResponses.jsx`, `docs/legacy-pages/`
   - Notes: Normalizes the mission response editor state before rendering so missing response blocks can no longer trigger the New Mission application error, and relocates historical admin page backups into `docs/legacy-pages` to prevent duplicate page routes from crashing the dashboard. Note to review @ 2025-10-15 15:32:10Z.

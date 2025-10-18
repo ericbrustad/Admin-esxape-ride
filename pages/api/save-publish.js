@@ -7,9 +7,14 @@ const {
   REPO_OWNER,
   REPO_NAME,
   GITHUB_TOKEN,
-  GITHUB_BRANCH = 'main',
+  GITHUB_BRANCH,
   GITHUB_BASE_DIR = '',
+  REPO_BRANCH,
+  VERCEL_GIT_COMMIT_REF,
+  COMMIT_REF,
 } = process.env;
+
+const TARGET_BRANCH = REPO_BRANCH || GITHUB_BRANCH || VERCEL_GIT_COMMIT_REF || COMMIT_REF || 'main';
 
 const GH_ROOT = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
 
@@ -24,7 +29,7 @@ function joinPath(p) {
 }
 
 async function getFileSha(path) {
-  const url = `${GH_ROOT}/${encodeURIComponent(path)}?ref=${encodeURIComponent(GITHUB_BRANCH)}`;
+  const url = `${GH_ROOT}/${encodeURIComponent(path)}?ref=${encodeURIComponent(TARGET_BRANCH)}`;
   const r = await fetch(url, {
     headers: {
       Authorization: `token ${GITHUB_TOKEN}`,
@@ -43,7 +48,7 @@ async function putFileWithRetry(path, contentText, message, attempts = 3) {
   const base = {
     message,
     content: Buffer.from(contentText, 'utf8').toString('base64'),
-    branch: GITHUB_BRANCH,
+    branch: TARGET_BRANCH,
   };
   for (let i = 1; i <= attempts; i++) {
     const sha = await getFileSha(path);

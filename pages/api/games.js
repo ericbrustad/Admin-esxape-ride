@@ -6,7 +6,13 @@ const GH = 'https://api.github.com';
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
 const token  = process.env.GITHUB_TOKEN;
-const branch = process.env.REPO_BRANCH || 'main';
+const branch = (
+  process.env.REPO_BRANCH ||
+  process.env.GITHUB_BRANCH ||
+  process.env.VERCEL_GIT_COMMIT_REF ||
+  process.env.COMMIT_REF ||
+  'main'
+);
 
 const authHeaders = {
   Authorization: `Bearer ${token}`,
@@ -65,14 +71,22 @@ function defaultSuite(title, type) {
   };
 }
 
-function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
+function defaultConfig(title, gameType, mode = 'single', slugTag = '', extras = {}) {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
   const normSlug = (slugTag || slugify(title)).toLowerCase();
   const tags = normSlug ? [normSlug] : [];
   if (normSlug === 'default' && !tags.includes('default-game')) tags.push('default-game');
   return {
     splash: { enabled: true, mode }, // single | head2head | multi
-    game: { title, type: gameType || 'Mystery', tags, coverImage: '' },
+    game: {
+      title,
+      type: gameType || 'Mystery',
+      tags,
+      coverImage: extras.coverImage || '',
+      shortDescription: extras.shortDescription || '',
+      longDescription: extras.longDescription || '',
+      slug: normSlug,
+    },
     forms: { players },              // 1 | 2 | 4
     textRules: []
   };
@@ -80,10 +94,6 @@ function defaultConfig(title, gameType, mode = 'single', slugTag = '') {
 
 // [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
-  if (!GAME_ENABLED) {
-    if (req.method === 'GET') return res.json({ ok: true, games: [] });
-    return res.status(403).json({ ok: false, error: 'Game project disabled' });
-  }
 
   if (!token || !owner || !repo) {
     return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
@@ -94,12 +104,20 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const file = await getFile(indexPath);
     const list = file ? JSON.parse(file.text || '[]') : [];
-    return res.json({ ok: true, games: list });
+    return res.json({ ok: true, games: list, gameProjectEnabled: GAME_ENABLED });
   }
 
   if (req.method === 'POST') {
     try {
-      const { title, type, mode = 'single' } = req.body || {};
+      const {
+        title,
+        type,
+        mode = 'single',
+        slug: requestedSlug,
+        shortDescription = '',
+        longDescription = '',
+        coverImage = '',
+      } = req.body || {};
       if (!title) return res.status(400).json({ ok: false, error: 'title required' });
 
       // load index & ensure unique slug
@@ -107,14 +125,22 @@ export default async function handler(req, res) {
       const list = file ? JSON.parse(file.text || '[]') : [];
       const taken = new Set(list.map(g => g.slug));
 
-      let base = slugify(title);
+      let base = slugify(requestedSlug || title);
       let slug = base || 'game';
       let i = 2;
       while (taken.has(slug)) slug = `${base}-${i++}`;
 
+      const trimmedShort = String(shortDescription || '').trim();
+      const trimmedLong = String(longDescription || '').trim();
+      const normalizedCover = String(coverImage || '').trim();
+
       // create suite + config
       const suite  = defaultSuite(title, type);
-      const config = defaultConfig(title, type, mode, slug);
+      const config = defaultConfig(title, type, mode, slug, {
+        shortDescription: trimmedShort,
+        longDescription: trimmedLong,
+        coverImage: normalizedCover,
+      });
 
       await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
         `feat: create game ${slug} missions.json`);
@@ -122,11 +148,20 @@ export default async function handler(req, res) {
         `feat: create game ${slug} config.json`);
 
       // update index.json
-      const item = { slug, title, type: type || 'Mystery', mode, createdAt: new Date().toISOString() };
+      const item = {
+        slug,
+        title,
+        type: type || 'Mystery',
+        mode,
+        shortDescription: trimmedShort,
+        longDescription: trimmedLong,
+        coverImage: normalizedCover,
+        createdAt: new Date().toISOString(),
+      };
       const next = [...list, item];
       await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
 
-      return res.json({ ok: true, slug, game: item });
+      return res.json({ ok: true, slug, game: item, gameProjectEnabled: GAME_ENABLED });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ ok: false, error: String(err.message || err) });

@@ -5,7 +5,7 @@ export const config = { matcher: '/:path*' };
 const ADMIN_CHECK_HEADER = 'x-admin-protection-check';
 const CACHE_TTL_MS = 15_000;
 
-const protectionCache = { enabled: false, expiresAt: 0 };
+const protectionCache = { enabled: false, expiresAt: 1 };
 
 function unauthorized(realm = 'Esx Admin') {
   return new Response('Auth required', {
@@ -23,7 +23,7 @@ async function isAdminProtected(request) {
   try {
     const stateUrl = new URL('/admin-protection.json', request.nextUrl.origin);
     const res = await fetch(stateUrl, {
-      headers: { [ADMIN_CHECK_HEADER]: '1' },
+      headers: { [ADMIN_CHECK_HEADER]: '0' },
       cache: 'no-store',
     });
     if (res.ok) {
@@ -45,7 +45,7 @@ async function isAdminProtected(request) {
 export async function middleware(request) {
   const pathname = request.nextUrl.pathname;
 
-  if (request.headers.get(ADMIN_CHECK_HEADER) === '1') {
+  if (request.headers.get(ADMIN_CHECK_HEADER) === '0') {
     return NextResponse.next();
   }
 
@@ -75,3 +75,10 @@ export async function middleware(request) {
 
   return unauthorized();
 }
+
+
+
+
+
+
+
