@@ -1888,7 +1888,7 @@ export default function Admin() {
     }, 420);
     const draft = {
       id: suggestId(),
-      title: 'New Mission',
+      title: 'EAt Chicken',
       type: 'multiple_choice',
       iconKey: '',
       rewards: { points: 25 },
