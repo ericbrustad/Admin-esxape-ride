@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+Addimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
@@ -3158,7 +3158,7 @@ export default function Admin() {
                   onClick={addDevice}
                   title="Create a new device draft"
                 >
-                  + Add Device
+                  + Add Device Fucker
                 </button>
               </div>
             </div>
