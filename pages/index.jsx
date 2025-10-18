@@ -1071,6 +1071,10 @@ export default function Admin() {
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
+  const editingIsNew = useMemo(() => {
+    if (!editing) return false;
+    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
+  }, [editing, suite]);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
@@ -1310,6 +1314,27 @@ export default function Admin() {
   const [coverUploadTarget, setCoverUploadTarget] = useState('');
   const [missionResponsesError, setMissionResponsesError] = useState(null);
   const [assignedMediaError, setAssignedMediaError] = useState(null);
+
+  const missionResponsesFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setMissionResponsesError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setMissionResponsesError]);
 
   useEffect(() => {
     return () => {
@@ -4100,6 +4125,9 @@ export default function Admin() {
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
+          assignedMediaError={assignedMediaError}
+          setAssignedMediaError={setAssignedMediaError}
+          setStatus={setStatus}
         />
       )}
 
@@ -5725,7 +5753,17 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({
+  config,
+  setConfig,
+  onReapplyDefaults,
+  inventory = [],
+  devices = [],
+  missions = [],
+  assignedMediaError = null,
+  setAssignedMediaError = () => {},
+  setStatus = () => {},
+}) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const safeConfig = config || {};
   const safeMedia = safeConfig.media || {};
@@ -5796,6 +5834,27 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
     label: d?.title || d?.name || d?.id || 'Device',
     trigger: sanitizeTriggerConfig(d?.trigger),
   }));
+
+  const assignedMediaFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Assigned Media failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the Assigned Media tab.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setAssignedMediaError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setAssignedMediaError]);
 
   const mediaPool = useMemo(() => {
     return (inventory || []).map((item, idx) => {
@@ -5907,7 +5966,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
     });
 
-    (suite?.missions || []).forEach((mission) => {
+    (missions || []).forEach((mission) => {
       if (!mission) return;
       const title = mission.title || mission.id || 'Mission';
       const iconUrls = new Set();
@@ -6029,49 +6088,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         coverImages: [],
       };
     }
-  }, [config, suite, mediaPool]);
-
-  const assignedMediaFallback = useCallback(({ error, reset }) => (
-    <div style={S.errorPanel}>
-      <div style={S.errorPanelTitle}>Assigned Media failed to load</div>
-      <div style={S.errorPanelMessage}>
-        {error?.message || 'An unexpected error occurred while rendering the Assigned Media tab.'}
-      </div>
-      <div style={S.errorPanelActions}>
-        <button
-          type="button"
-          style={S.button}
-          onClick={() => {
-            setAssignedMediaError(null);
-            reset();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  ), [setAssignedMediaError]);
-
-  const missionResponsesFallback = useCallback(({ error, reset }) => (
-    <div style={S.errorPanel}>
-      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
-      <div style={S.errorPanelMessage}>
-        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
-      </div>
-      <div style={S.errorPanelActions}>
-        <button
-          type="button"
-          style={S.button}
-          onClick={() => {
-            setMissionResponsesError(null);
-            reset();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  ), [setMissionResponsesError]);
+  }, [config, missions, mediaPool]);
 
   const arraysEqual = useCallback((a = [], b = []) => {
     if (a.length !== b.length) return false;
@@ -6098,11 +6115,6 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }, [arraysEqual, setConfig]);
 
   const triggerEnabled = !!triggerConfig.enabled;
-
-  const editingIsNew = useMemo(() => {
-    if (!editing) return false;
-    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
-  }, [editing, suite]);
 
   const handleTriggerToggle = useCallback((enabled) => {
     setMediaTriggerPicker('');
