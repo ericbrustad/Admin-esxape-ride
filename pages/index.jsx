@@ -251,7 +251,7 @@ function applyDefaultIcons(cfg) {
 /* ───────────────────────── Constants ───────────────────────── */
 const TYPE_FIELDS = {
   multiple_choice: [
-    { key:'question', label:'Question', type:'text' },
+    { key:'question', label:'question', type:'text' },
     { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   short_answer: [
