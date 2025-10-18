@@ -255,7 +255,7 @@ const TYPE_FIELDS = {
     { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   short_answer: [
-    { key:'question',   label:FUUUCK', type:'text' },
+    { key:'jdhdhdhdh',   label:question', type:'text' },
     { key:'answer',     label:'Correct Answer', type:'text' },
     { key:'acceptable', label:'Also Accept (comma-separated)', type:'text', optional: true },
     { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
