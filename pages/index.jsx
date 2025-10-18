@@ -3009,7 +3009,7 @@ export default function Admin() {
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
-                  <h3 style={{ margin:0 }}>Missions Map</h3>
+                  <h3 style={{ margin:0 }}>Missions Fucking Map line 3012 index</h3>
                   <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
