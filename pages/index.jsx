@@ -1588,7 +1588,7 @@ export default function Admin() {
     }, 420);
     const draft = {
       id: suggestId(),
-      title: 'New Mission',
+      title: 'New Fuckin Mission',
       type: 'multiple_choice',
       iconKey: '',
       rewards: { points: 25 },
