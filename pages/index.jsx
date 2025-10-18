@@ -84,6 +84,25 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
+const DEVELOPER_LOG_ROLES = ['assistant', 'user', 'system'];
+const DEFAULT_DEVELOPER_LOG = [
+  {
+    role: 'user',
+    message: 'Can we put the operator GPT log in settings all the way at the bottom and tidy the header layout?',
+  },
+  {
+    role: 'assistant',
+    message: 'Implementation tracked here. Update this log with the latest GPT ↔ operator notes as you iterate.',
+  },
+];
+
+function normalizeDeveloperLogEntry(entry) {
+  const role = typeof entry?.role === 'string' && DEVELOPER_LOG_ROLES.includes(entry.role)
+    ? entry.role
+    : 'user';
+  const message = typeof entry?.message === 'string' ? entry.message : '';
+  return { role, message };
+}
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -389,6 +408,19 @@ const BASE_UI_THEME = {
 
 function createUiTheme(overrides = {}) {
   return { ...BASE_UI_THEME, ...overrides };
+}
+
+function softenGradientAlpha(value, scale = 0.75, minAlpha = 0.25, maxAlpha = 0.9) {
+  if (typeof value !== 'string') return value;
+  return value.replace(
+    /rgba\(\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9]+)\s*,\s*([0-9.]+)\s*\)/gi,
+    (match, r, g, b, alphaStr) => {
+      const alpha = parseFloat(alphaStr);
+      if (Number.isNaN(alpha)) return match;
+      const nextAlpha = Math.max(minAlpha, Math.min(maxAlpha, alpha * scale));
+      return `rgba(${r}, ${g}, ${b}, ${nextAlpha.toFixed(2)})`;
+    },
+  );
 }
 
 const DEFAULT_UI_THEME = createUiTheme();
@@ -939,12 +971,14 @@ function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   body.style.setProperty('--admin-input-color', textColor);
   body.style.setProperty('--admin-button-color', buttonColor);
   const uiTheme = UI_THEME_MAP.get(uiKey) || DEFAULT_UI_THEME;
+  const softenedHeaderBg = softenGradientAlpha(uiTheme.headerBg, 0.65, 0.18, 0.82);
+  const softenedFrameBg = softenGradientAlpha(uiTheme.headerFrameBg, 0.7, 0.2, 0.85);
   const themeVariables = {
-    '--admin-header-bg': uiTheme.headerBg,
+    '--admin-header-bg': softenedHeaderBg || uiTheme.headerBg,
     '--admin-header-border': uiTheme.headerBorder,
     '--admin-header-shadow': uiTheme.headerShadow,
     '--admin-header-blur': uiTheme.headerBlur,
-    '--admin-header-frame-bg': uiTheme.headerFrameBg,
+    '--admin-header-frame-bg': softenedFrameBg || uiTheme.headerFrameBg,
     '--admin-header-frame-border': uiTheme.headerFrameBorder,
     '--admin-header-frame-shadow': uiTheme.headerFrameShadow,
     '--admin-tab-bg': uiTheme.tabBg,
@@ -1074,6 +1108,7 @@ function slugifyTitle(value) {
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
+  const [now, setNow] = useState(() => new Date());
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
@@ -1537,6 +1572,63 @@ export default function Admin() {
   const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
 
   useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const developerLogEntries = useMemo(() => {
+    if (!config) return [];
+    const list = Array.isArray(config.developerLog) ? config.developerLog : [];
+    return list.map(normalizeDeveloperLogEntry);
+  }, [config?.developerLog]);
+
+  const hasDeveloperLogEntries = developerLogEntries.length > 0;
+
+  function writeDeveloperLog(updater, statusMessage = '🗒 Operator GPT log updated') {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const baseList = Array.isArray(prev.developerLog)
+        ? prev.developerLog.map(normalizeDeveloperLogEntry)
+        : [];
+      const nextList = updater(baseList).map(normalizeDeveloperLogEntry);
+      return { ...prev, developerLog: nextList };
+    });
+    setDirty(true);
+    if (statusMessage) setStatus(statusMessage);
+  }
+
+  function handleDeveloperLogAdd() {
+    writeDeveloperLog((baseList) => {
+      const nextRole = baseList.length % 2 === 0 ? 'user' : 'assistant';
+      return [...baseList, { role: nextRole, message: '' }];
+    }, '🗒 Added operator GPT entry');
+  }
+
+  function handleDeveloperLogChange(index, key, value) {
+    writeDeveloperLog((baseList) => baseList.map((entry, i) => {
+      if (i !== index) return entry;
+      if (key === 'role') {
+        return {
+          ...entry,
+          role: DEVELOPER_LOG_ROLES.includes(value) ? value : entry.role,
+        };
+      }
+      if (key === 'message') {
+        return { ...entry, message: value };
+      }
+      return entry;
+    }), '');
+  }
+
+  function handleDeveloperLogRemove(index) {
+    writeDeveloperLog((baseList) => baseList.filter((_, i) => i !== index), '🗒 Removed operator GPT entry');
+  }
+
+  function handleDeveloperLogClear() {
+    writeDeveloperLog(() => [], '🗒 Cleared operator GPT log');
+  }
+
+  useEffect(() => {
     const tags = Array.isArray(config?.game?.tags) ? config.game.tags : [];
     setGameTagsDraft(tags.join(', '));
   }, [config?.game?.tags]);
@@ -1634,6 +1726,9 @@ export default function Admin() {
           map: { ...dc.map, ...(c0.map || {}) },
           geofence: { ...dc.geofence, ...(c0.geofence || {}) },
           mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG, ...(c0.mediaTriggers || {}) },
+          developerLog: Array.isArray(c0.developerLog)
+            ? c0.developerLog.map(normalizeDeveloperLogEntry)
+            : DEFAULT_DEVELOPER_LOG.map(normalizeDeveloperLogEntry),
         };
 
         const storedSkin = c0.appearanceSkin && ADMIN_SKIN_TO_UI.has(c0.appearanceSkin)
@@ -1675,6 +1770,7 @@ export default function Admin() {
       mediaTriggers: { ...DEFAULT_TRIGGER_CONFIG },
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
+      developerLog: DEFAULT_DEVELOPER_LOG,
     };
   }
   function defaultContentForType(t) {
@@ -2728,6 +2824,7 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaNowLabel = formatLocalDateTime(now);
   const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
@@ -2792,6 +2889,9 @@ export default function Admin() {
           </span>
         </div>
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
+          {metaNowLabel && (
+            <span><strong>Local:</strong> {metaNowLabel}</span>
+          )}
           {metaDeploymentLinkLabel && (
             <span>
               <strong>Preview:</strong>{' '}
@@ -2809,27 +2909,8 @@ export default function Admin() {
         </div>
       </div>
       <header style={headerStyle}>
-        <div style={S.wrap}>
-          <div style={S.headerTopRow}>
-            <div style={S.headerTitleGroup}>
-              <div style={S.headerCoverFrame}>
-                {headerCoverThumb ? (
-                  <img
-                    src={headerCoverThumb}
-                    alt="Active game cover"
-                    style={S.headerCoverThumb}
-                  />
-                ) : (
-                  <div style={S.headerCoverPlaceholder}>No Cover</div>
-                )}
-              </div>
-              <div style={S.headerTitleColumn}>
-                <div style={S.headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.headerSubtitle}>Admin Control Deck</div>
-              </div>
-            </div>
-          </div>
-          <div style={S.headerNavRow}>
+        <div style={S.headerWrap}>
+          <div style={S.headerBar}>
             <div style={S.headerNavPrimary}>
               {tabsOrder.map((t)=>{
                 const labelMap = {
@@ -2860,7 +2941,7 @@ export default function Admin() {
             </div>
             <div style={S.headerNavSecondary}>
               <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:260 }}>
                 <option value="default">(Default Game)</option>
                 {games.map(g=>(
                   <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
@@ -2873,15 +2954,15 @@ export default function Admin() {
                   onChange={(e)=>setDeployEnabled(e.target.checked)}
                   disabled={!gameEnabled}
                 />
-                Deploy game build
+                Deploy build
               </label>
               <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
+                Delay (sec):
                 <input
                   type="number" min={0} max={120}
                   value={deployDelaySec}
                   onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                  style={{ ...S.input, width:80, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
                   disabled={!deployGameEnabled || !gameEnabled}
                 />
               </label>
@@ -2932,14 +3013,6 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {tab === 'settings' && (
-                <div style={S.coverSummary}>
-                  <div style={{ fontWeight:700 }}>Cover status</div>
-                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
-                    {coverStatusMessage}
-                  </div>
-                </div>
-              )}
             </div>
           )}
           {showProtectionIndicator && protectionError && (
@@ -3843,16 +3916,48 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={S.gameTitleRow}>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Game Title</div>
-                <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+            <div style={S.settingsOverviewRow}>
+              <div style={S.settingsOverviewLeft}>
+                <div style={S.headerCoverFrame}>
+                  {headerCoverThumb ? (
+                    <img
+                      src={headerCoverThumb}
+                      alt="Active game cover"
+                      style={S.headerCoverThumb}
+                    />
+                  ) : (
+                    <div style={S.headerCoverPlaceholder}>No Cover</div>
+                  )}
+                </div>
+                <div style={S.settingsOverviewInfo}>
+                  <div style={S.headerGameTitle}>{headerGameTitle}</div>
+                  <div style={S.settingsOverviewMeta}>
+                    {isDefault && (<span style={S.chip}>Default Game</span>)}
+                    <span style={S.chip}>Admin Control Deck</span>
+                  </div>
+                  <div style={S.settingsOverviewSlug}>
+                    <span style={S.settingsOverviewLabel}>Active slug:</span>
+                    <code style={S.settingsInlineCode}>{config?.game?.slug || slugForMeta}</code>
+                  </div>
+                </div>
               </div>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Slug</div>
-                <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
-                <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
+              <div style={S.settingsOverviewRight}>
+                <div style={S.gameTitleRow}>
+                  <div style={S.readonlyField}>
+                    <div style={S.fieldLabel}>Game Title</div>
+                    <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
+                    <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+                  </div>
+                  <div style={S.readonlyField}>
+                    <div style={S.fieldLabel}>Slug</div>
+                    <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
+                    <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
+                  </div>
+                </div>
+                <div style={S.settingsOverviewStatus}>
+                  <div style={{ fontWeight:700 }}>Cover status</div>
+                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{coverStatusMessage}</div>
+                </div>
               </div>
             </div>
             <div style={S.coverControlsRow}>
@@ -4128,31 +4233,91 @@ export default function Admin() {
               <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
                 Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
               </div>
-            </div>
-            <AppearanceEditor
-              value={config.appearance||defaultAppearance()}
-              tone={interfaceTone}
-              onChange={(next)=>{
-                setConfig(prev => {
-                  const base = prev || {};
-                  const retainedSkin = base.appearanceSkin && ADMIN_SKIN_TO_UI.has(base.appearanceSkin)
-                    ? base.appearanceSkin
-                    : detectAppearanceSkin(next, base.appearanceSkin);
-                  return {
-                    ...base,
-                    appearance: next,
-                    appearanceSkin: retainedSkin,
-                  };
-                });
-                setDirty(true);
-                setStatus('🎨 Updated appearance settings');
-              }}
-            />
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
-            </div>
           </div>
-        </main>
+          <AppearanceEditor
+            value={config.appearance||defaultAppearance()}
+            tone={interfaceTone}
+            onChange={(next)=>{
+              setConfig(prev => {
+                const base = prev || {};
+                const retainedSkin = base.appearanceSkin && ADMIN_SKIN_TO_UI.has(base.appearanceSkin)
+                  ? base.appearanceSkin
+                  : detectAppearanceSkin(next, base.appearanceSkin);
+                return {
+                  ...base,
+                  appearance: next,
+                  appearanceSkin: retainedSkin,
+                };
+              });
+              setDirty(true);
+              setStatus('🎨 Updated appearance settings');
+            }}
+          />
+          <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
+            Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+          </div>
+        </div>
+
+        <div style={{ ...S.card, marginTop:16 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+            <h3 style={{ marginTop:0, marginBottom:0 }}>Operator GPT Log</h3>
+            <span style={S.developerLogBadge}>Developers</span>
+          </div>
+          <div style={S.noteText}>
+            Record the latest dialogue between operators and GPT so the next teammate can pick up the thread before deploying updates.
+          </div>
+          <div style={S.developerLogList}>
+            {hasDeveloperLogEntries ? (
+              developerLogEntries.map((entry, index) => (
+                <div key={index} style={S.developerLogEntry}>
+                  <div style={S.developerLogHeader}>
+                    <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:12, color:'var(--admin-muted)' }}>Role</span>
+                      <select
+                        value={entry.role}
+                        onChange={(e)=>handleDeveloperLogChange(index, 'role', e.target.value)}
+                        style={{ ...S.input, width:160 }}
+                      >
+                        {DEVELOPER_LOG_ROLES.map((role) => (
+                          <option key={role} value={role}>{role}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      style={{ ...S.button, ...S.buttonDanger, padding:'6px 12px' }}
+                      onClick={()=>handleDeveloperLogRemove(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <textarea
+                    value={entry.message}
+                    onChange={(e)=>handleDeveloperLogChange(index, 'message', e.target.value)}
+                    style={{ ...S.input, ...S.developerLogTextarea }}
+                    placeholder="Add notes from the GPT conversation…"
+                  />
+                </div>
+              ))
+            ) : (
+              <div style={S.developerLogEmpty}>
+                No entries yet. Log your GPT sessions here so developers can reference the conversation quickly.
+              </div>
+            )}
+          </div>
+          <div style={S.developerLogActions}>
+            <button type="button" style={S.button} onClick={handleDeveloperLogAdd}>+ Add entry</button>
+            <button
+              type="button"
+              style={{ ...S.button, ...S.buttonDanger, opacity: hasDeveloperLogEntries ? 1 : 0.45 }}
+              onClick={handleDeveloperLogClear}
+              disabled={!hasDeveloperLogEntries}
+            >
+              Clear log
+            </button>
+          </div>
+        </div>
+      </main>
       )}
 
       {/* TEXT rules */}
@@ -4639,7 +4804,7 @@ const S = {
     fontWeight: 600,
   },
   header: {
-    padding: 20,
+    padding: '12px 0',
     background: 'var(--admin-header-bg)',
     backdropFilter: 'var(--admin-header-blur, blur(20px))',
     borderBottom: 'var(--admin-header-border)',
@@ -4649,7 +4814,15 @@ const S = {
     boxShadow: 'var(--admin-header-shadow)',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
+  headerWrap: { maxWidth: 1400, margin: '0 auto', padding: '0 16px' },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
+  headerBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
   sidebarTall: {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
@@ -4821,19 +4994,6 @@ const S = {
     fontWeight: 800,
     padding: '12px 20px',
   },
-  headerTopRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    textAlign: 'center',
-    gap: 6,
-    marginBottom: 20,
-  },
-  headerTitleGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-  },
   headerCoverFrame: {
     width: 68,
     height: 68,
@@ -4854,12 +5014,6 @@ const S = {
     textAlign: 'center',
     padding: '0 6px',
   },
-  headerTitleColumn: {
-    display: 'grid',
-    justifyItems: 'flex-start',
-    textAlign: 'left',
-    gap: 4,
-  },
   headerGameTitle: {
     fontSize: 24,
     fontWeight: 700,
@@ -4872,25 +5026,19 @@ const S = {
     textTransform: 'uppercase',
     color: 'var(--admin-muted)',
   },
-  headerNavRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 16,
-  },
   headerNavPrimary: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 10,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   headerNavSecondary: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
   gameTitleRow: {
     display: 'grid',
@@ -4898,6 +5046,62 @@ const S = {
     gap: 16,
     alignItems: 'stretch',
     marginBottom: 16,
+  },
+  settingsOverviewRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 20,
+    alignItems: 'stretch',
+    marginBottom: 16,
+  },
+  settingsOverviewLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    flex: '1 1 320px',
+    minWidth: 260,
+  },
+  settingsOverviewInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  settingsOverviewMeta: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  settingsOverviewSlug: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  settingsOverviewLabel: {
+    fontWeight: 600,
+  },
+  settingsInlineCode: {
+    fontFamily: 'ui-monospace, Menlo, monospace',
+    background: 'var(--admin-input-bg)',
+    borderRadius: 8,
+    padding: '2px 6px',
+    border: '1px solid var(--admin-border-soft)',
+  },
+  settingsOverviewRight: {
+    flex: '2 1 360px',
+    minWidth: 280,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  settingsOverviewStatus: {
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
+    borderRadius: 14,
+    padding: 14,
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
   fieldLabel: {
     fontSize: 12,
@@ -4988,14 +5192,54 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  coverSummary: {
-    flex: '1 1 260px',
-    minWidth: 240,
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
+  developerLogList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    marginTop: 12,
+  },
+  developerLogEntry: {
+    border: '1px solid var(--admin-border-soft)',
     borderRadius: 14,
-    padding: 14,
+    padding: 12,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  developerLogHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  developerLogTextarea: {
+    minHeight: 120,
+    fontFamily: 'ui-monospace, Menlo, monospace',
+  },
+  developerLogActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 12,
+  },
+  developerLogEmpty: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    padding: '8px 0',
+  },
+  developerLogBadge: {
+    fontSize: 11,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    padding: '2px 8px',
+    borderRadius: 999,
+    border: 'var(--admin-chip-border)',
+    background: 'var(--admin-chip-bg)',
+    color: 'var(--admin-muted)',
   },
   tab: {
     padding: '8px 12px',
