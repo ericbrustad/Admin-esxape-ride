@@ -72,7 +72,7 @@ const EXTS = {
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
-const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
+const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
   commit: '',
@@ -541,7 +541,7 @@ function normalizeGameMetadata(cfg, slug = '') {
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
-  game.deployEnabled = game.deployEnabled === true;
+  game.deployEnabled = game.deployEnabled !== false;
   base.game = game;
   return base;
 }
@@ -650,7 +650,7 @@ export default function Admin() {
     const sizeBytes = file.size || 0;
     if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
       const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
-      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 1 MB.`);
+      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB.`);
       return;
     }
     try {
@@ -695,8 +695,7 @@ export default function Admin() {
   async function handleCreateNewGame() {
     if (newGameBusy) return;
     if (!gameEnabled) {
-      setNewGameStatus('❌ Game project is disabled. Enable game publishing to create a new title.');
-      return;
+      setNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…');
     }
     const title = newTitle.trim();
     if (!title) {
@@ -1158,8 +1157,8 @@ export default function Admin() {
 
   function defaultConfig() {
     return {
-      splash: { enabled:true, mode:'single' },
-      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
+      splash: { enabled:false, mode:'single' },
+      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'', deployEnabled:true },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1996,7 +1995,7 @@ export default function Admin() {
     const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
     const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
     if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — images over 1 MB may be slow to sync.`);
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
     } else {
       setUploadStatus(`Uploading ${safeName}…`);
     }
@@ -2113,7 +2112,7 @@ export default function Admin() {
     const sizeBytes = file.size || 0;
     if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
       const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
-      setUploadStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 1 MB (PNG or JPG work best).`);
+      setUploadStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB (PNG or JPG work best).`);
       setCoverUploadPreview('');
       setCoverUploadTarget('');
       return;
@@ -2231,7 +2230,7 @@ export default function Admin() {
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = config?.game?.deployEnabled === true;
+  const deployGameEnabled = config?.game?.deployEnabled !== false;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerCoverThumb = config?.game?.coverImage
     ? toDirectMediaURL(config.game.coverImage)
@@ -2362,6 +2361,13 @@ export default function Admin() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={()=>setShowNewGame(true)}
+                style={{ ...S.button, ...S.headerNewGameButton }}
+              >
+                + New Game
+              </button>
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -3372,7 +3378,7 @@ export default function Admin() {
                 ) : (
                   <div style={S.coverDropPlaceholder}>
                     <strong>Drag & drop cover art</strong>
-                    <span>JPG or PNG · under 1&nbsp;MB · ideal at 16:9</span>
+                    <span>JPG or PNG · under 5&nbsp;MB · ideal at 16:9</span>
                   </div>
                 )}
               </div>
@@ -3428,19 +3434,9 @@ export default function Admin() {
                 ))}
               </select>
               <div style={S.noteText}>
-                Switch to another saved escape ride. The selection reloads missions, devices, and settings.
+                Switch to another saved escape ride. Use the “+ New Game” control in the top navigation to add a title.
               </div>
             </Field>
-            <div style={S.savedGamesActions}>
-              <button
-                type="button"
-                style={{ ...S.button, ...S.buttonSuccess }}
-                onClick={()=>setShowNewGame(true)}
-              >
-                + New Game
-              </button>
-              <div style={S.noteText}>Opens the creation window for naming, slugging, and selecting cover art.</div>
-            </div>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -3949,7 +3945,7 @@ export default function Admin() {
                   ) : (
                     <div style={S.coverDropPlaceholder}>
                       <strong>Drag & drop cover art</strong>
-                      <span>PNG or JPG · under 1 MB · shows beside the admin header</span>
+                      <span>PNG or JPG · under 5 MB · shows beside the admin header</span>
                     </div>
                   )}
                 </div>
@@ -4353,6 +4349,16 @@ const S = {
     fontWeight: 800,
     padding: '12px 20px',
   },
+  headerNewGameButton: {
+    background: 'linear-gradient(100deg, #7c3aed, #a855f7)',
+    border: '1px solid rgba(168, 85, 247, 0.65)',
+    color: '#fdf4ff',
+    boxShadow: '0 18px 32px rgba(124, 58, 237, 0.35)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.1em',
+    fontWeight: 700,
+    padding: '10px 18px',
+  },
   headerTopRow: {
     display: 'flex',
     flexDirection: 'column',
@@ -4459,13 +4465,6 @@ const S = {
     background: 'var(--admin-tab-bg)',
     fontWeight: 600,
     letterSpacing: '0.08em',
-  },
-  savedGamesActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-    marginBottom: 16,
   },
   coverControlsRow: {
     display: 'flex',
