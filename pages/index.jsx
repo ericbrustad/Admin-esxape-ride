@@ -1888,7 +1888,7 @@ export default function Admin() {
     }, 420);
     const draft = {
       id: suggestId(),
-      title: 'EAt Chicken',
+      title: '',
       type: 'multiple_choice',
       iconKey: '',
       rewards: { points: 25 },
@@ -2959,7 +2959,7 @@ export default function Admin() {
           {/* Left list */}
           <aside style={S.sidebarTall}>
             <div style={S.sidebarBar}>
-              <div style={S.noteText}>Launch a brand-new mission in this timeline.</div>
+              <div style={S.noteText}>Launch a brand-new mission in this timeline Fucker.</div>
               <button
                 onClick={startNew}
                 style={{
