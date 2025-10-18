@@ -66,6 +66,7 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
+
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
   gif: /\.(gif)$/i,
@@ -161,6 +162,7 @@ function formatLocalDateTime(value) {
   }
 }
 async function deleteMediaPath(repoPath) {
+  if (!repoPath) return false; // Added check from codex branch
   const endpoints = [
     '/api/delete-media',
     '/api/delete',
@@ -177,10 +179,13 @@ async function deleteMediaPath(repoPath) {
         body: JSON.stringify({ path: repoPath })
       });
       if (r.ok) return true;
+      // Added 404 check from codex branch for compatibility
+      if (r.status === 404 && ep === '/api/media/delete') continue;
     } catch {}
   }
   return false;
 }
+
 
 async function fileToBase64(file) {
   if (!file) return '';
@@ -222,12 +227,12 @@ const DEFAULT_BUNDLES = {
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
   ],
   missions: [
-    { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
+    { key:'trivia',     name:'Trivia',     url:'/media/bundles/trivia%20icon.png' },
     { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
   ],
   rewards: [
-    { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
-    { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
+    { key:'evidence',   name:'Evidence',   url:'/media/bundles/evidence%202.png' },
+    { key:'clue',       name:'Clue',       url:'/media/bundles/CLUEgreen.png' },
     { key:'gold-coin', name:'Gold Coin', url:'/media/bundles/GOLDEN%20COIN.png' },
   ],
 };
@@ -251,11 +256,11 @@ function applyDefaultIcons(cfg) {
 /* ───────────────────────── Constants ───────────────────────── */
 const TYPE_FIELDS = {
   multiple_choice: [
-    { key:'question', label:'question', type:'text' },
+    { key:'question', label:'Question', type:'text' }, // Keep capitalized label
     { key:'mediaUrl', label:'Image or Video URL (optional)', type:'text', optional: true },
   ],
   short_answer: [
-    { key:'question',   label:'question', type:'text' },
+    { key:'question',   label:'Question', type:'text' }, // Keep capitalized label
     { key:'answer',     label:'Correct Answer', type:'text' },
     { key:'acceptable', label:'Also Accept (comma-separated)', type:'text', optional: true },
     { key:'mediaUrl',   label:'Image or Video URL (optional)', type:'text', optional: true },
@@ -360,6 +365,8 @@ function createDeviceDraft(overrides = {}) {
   merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
   return merged;
 }
+
+// Keep UI Theme definitions from Main
 const BASE_UI_THEME = {
   headerBg: 'linear-gradient(135deg, rgba(226, 234, 247, 0.92), rgba(197, 210, 232, 0.88))',
   headerBorder: '1px solid rgba(99, 127, 170, 0.38)',
@@ -393,6 +400,7 @@ function createUiTheme(overrides = {}) {
 
 const DEFAULT_UI_THEME = createUiTheme();
 
+
 const APPEARANCE_SKINS = [
   {
     key: 'default',
@@ -410,6 +418,7 @@ const APPEARANCE_SKINS = [
       screenBgImageEnabled: true,
       textAlign: 'left',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(135deg, rgba(234, 240, 251, 0.94), rgba(204, 216, 234, 0.9))',
       headerBorder: '1px solid rgba(116, 144, 186, 0.45)',
@@ -451,6 +460,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(140deg, rgba(9, 18, 32, 0.96), rgba(26, 48, 74, 0.88))',
       headerBorder: '1px solid rgba(68, 112, 178, 0.55)',
@@ -492,6 +502,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(130deg, rgba(248, 231, 196, 0.94), rgba(224, 193, 141, 0.9))',
       headerBorder: '1px solid rgba(148, 110, 68, 0.52)',
@@ -533,6 +544,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'left',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(135deg, rgba(36, 64, 46, 0.92), rgba(20, 42, 28, 0.9))',
       headerBorder: '1px solid rgba(56, 102, 74, 0.48)',
@@ -574,6 +586,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(150deg, rgba(27, 33, 68, 0.94), rgba(18, 26, 58, 0.9))',
       headerBorder: '1px solid rgba(90, 112, 198, 0.55)',
@@ -615,6 +628,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(140deg, rgba(255, 229, 255, 0.94), rgba(240, 205, 255, 0.9))',
       headerBorder: '1px solid rgba(171, 119, 206, 0.5)',
@@ -656,6 +670,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(145deg, rgba(226, 238, 255, 0.94), rgba(198, 210, 230, 0.9))',
       headerBorder: '1px solid rgba(126, 152, 190, 0.45)',
@@ -697,6 +712,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(135deg, rgba(255, 225, 196, 0.94), rgba(246, 196, 160, 0.9))',
       headerBorder: '1px solid rgba(196, 124, 92, 0.5)',
@@ -738,6 +754,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'left',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(140deg, rgba(54, 84, 44, 0.92), rgba(34, 58, 30, 0.9))',
       headerBorder: '1px solid rgba(74, 122, 64, 0.48)',
@@ -779,6 +796,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(150deg, rgba(222, 209, 255, 0.94), rgba(192, 178, 246, 0.9))',
       headerBorder: '1px solid rgba(142, 116, 208, 0.5)',
@@ -820,6 +838,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(140deg, rgba(255, 224, 244, 0.94), rgba(255, 200, 214, 0.9))',
       headerBorder: '1px solid rgba(220, 110, 150, 0.5)',
@@ -861,6 +880,7 @@ const APPEARANCE_SKINS = [
       textAlign: 'center',
       textVertical: 'top',
     },
+    // Keep UI theme from Main
     ui: createUiTheme({
       headerBg: 'linear-gradient(145deg, rgba(210, 240, 252, 0.94), rgba(178, 224, 244, 0.9))',
       headerBorder: '1px solid rgba(88, 150, 190, 0.48)',
@@ -886,6 +906,7 @@ const APPEARANCE_SKINS = [
 ];
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
+// Keep UI Theme Map from Main
 const UI_THEME_MAP = new Map(
   APPEARANCE_SKINS.map((skin) => [skin.uiKey || skin.key, skin.ui || DEFAULT_UI_THEME]),
 );
@@ -938,6 +959,7 @@ function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
   body.style.setProperty('--admin-input-border', inputBorder);
   body.style.setProperty('--admin-input-color', textColor);
   body.style.setProperty('--admin-button-color', buttonColor);
+  // Keep UI Theme variable setting from Main
   const uiTheme = UI_THEME_MAP.get(uiKey) || DEFAULT_UI_THEME;
   const themeVariables = {
     '--admin-header-bg': uiTheme.headerBg,
@@ -983,6 +1005,7 @@ function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
     root.style.setProperty('--appearance-text-bg', textBg);
   }
 }
+
 
 function isAppearanceEqual(a, b) {
   if (!a || !b) return false;
@@ -1049,17 +1072,22 @@ function normalizeGameMetadata(cfg, slug = '') {
   const normalizedCover = typeof game.coverImage === 'string' ? game.coverImage.trim() : '';
   const normalizedShort = typeof game.shortDescription === 'string' ? game.shortDescription.trim() : '';
   const normalizedLong = typeof game.longDescription === 'string' ? game.longDescription.trim() : '';
+  // Merge: Add playerCount normalization from codex branch
+  const normalizedPlayers = Number(game.playerCount || 1);
   game.tags = cleaned;
   game.title = normalizedTitle || 'Default Game';
   game.type = normalizedType || 'Mystery';
   game.coverImage = normalizedCover;
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
+  // Merge: Add playerCount normalization from codex branch
+  game.playerCount = [1, 2, 4].includes(normalizedPlayers) ? normalizedPlayers : 1;
   game.slug = normalizedSlug;
   game.deployEnabled = game.deployEnabled === true;
   base.game = game;
   return base;
 }
+
 
 function slugifyTitle(value) {
   return String(value || '')
@@ -1468,6 +1496,35 @@ export default function Admin() {
   const [missionResponsesError, setMissionResponsesError] = useState(null);
   const [assignedMediaError, setAssignedMediaError] = useState(null);
 
+  // Keep missionResponsesFallback from codex branch
+  const editingIsNew = useMemo(() => {
+    if (!editing) return false;
+    const missionList = Array.isArray(suite?.missions) ? suite.missions : [];
+    return !missionList.some((mission) => mission?.id === editing.id);
+  }, [editing, suite?.missions]);
+
+  const missionResponsesFallback = useCallback(({ error, reset }) => (
+    <div style={S.errorPanel}>
+      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
+      <div style={S.errorPanelMessage}>
+        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
+      </div>
+      <div style={S.errorPanelActions}>
+        <button
+          type="button"
+          style={S.button}
+          onClick={() => {
+            setMissionResponsesError(null);
+            reset();
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  ), [setMissionResponsesError]);
+
+
   useEffect(() => {
     return () => {
       if (
@@ -1561,7 +1618,9 @@ export default function Admin() {
   const setDevices = (list) => setConfig(prev => ({ ...(prev || {}), devices: list, powerups: list }));
 
   /* load games */
+  // Keep Main version with better error handling
   useEffect(() => {
+    if (!gameEnabled) { setGames([]); return; } // Added check from codex branch
     let cancelled = false;
     (async () => {
       try {
@@ -1585,6 +1644,7 @@ export default function Admin() {
     })();
     return () => { cancelled = true; };
   }, [gameEnabled]);
+
 
   /* load suite/config when slug changes */
   useEffect(() => {
@@ -1642,6 +1702,16 @@ export default function Admin() {
         merged.appearanceSkin = storedSkin || detectAppearanceSkin(merged.appearance, c0.appearanceSkin);
 
         merged = applyDefaultIcons(merged);
+        // Merge: Add splash mode normalization from codex branch
+        const splash = merged.splash || {};
+        const normalizedSplashMode = typeof splash.mode === 'string'
+          ? splash.mode.toLowerCase()
+          : '';
+        merged.splash = {
+          ...splash,
+          enabled: splash.enabled !== false,
+          mode: normalizedSplashMode === 'live' ? 'live' : 'test', // 'test' or 'live'
+        };
         merged = normalizeGameMetadata(merged, slugForMeta);
 
         setSuite(normalized);
@@ -1658,8 +1728,9 @@ export default function Admin() {
 
   function defaultConfig() {
     return {
-      splash: { enabled:true, mode:'single' },
-      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'' },
+      // Merge: Use 'test' splash mode and playerCount from codex
+      splash: { enabled:true, mode:'test' },
+      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'', playerCount:1 },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1677,6 +1748,7 @@ export default function Admin() {
       geofence: { mode: 'test' },
     };
   }
+
   function defaultContentForType(t) {
     const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
     switch (t) {
@@ -1732,7 +1804,7 @@ export default function Admin() {
           method:'POST',
           headers:{ 'Content-Type':'application/json' },
           credentials:'include',
-          body: JSON.stringify({ slug: 'root' }),
+          body: JSON.stringify({ slug: 'root' }), // 'root' might be legacy, adapt if needed
         });
         const txt = await res.text();
         let data = {};
@@ -1749,6 +1821,7 @@ export default function Admin() {
       }
     }
 
+    // Prefer new endpoint structure from Main
     const first = `/api/game${qs({ slug, channel })}`;
     const fallback = `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
 
@@ -1760,10 +1833,11 @@ export default function Admin() {
       const txt = await res.text();
       let data = {};
       try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) throw new Error('try fallback');
+      if (!res.ok) throw new Error('try fallback'); // Fallback logic kept
       setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
       return true;
     } catch (e) {
+      // Fallback logic
       try {
         const res2 = await fetch(fallback, {
           method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
@@ -1782,7 +1856,9 @@ export default function Admin() {
     }
   }
 
+  // Keep Main version with better error handling
   async function reloadGamesList() {
+    if (!gameEnabled) { setGames([]); return; } // Added check from codex branch
     try {
       const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
       if (!r.ok) {
@@ -1799,6 +1875,7 @@ export default function Admin() {
       setStatus(`⚠️ Unable to refresh games list (${err?.message || 'network error'})`);
     }
   }
+
 
   async function saveAndPublish() {
     if (!suite || !config) return;
@@ -1826,6 +1903,8 @@ export default function Admin() {
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
+    // Merge: Keep gameEnabled check from codex branch
+    if (!gameEnabled) { setConfirmDeleteOpen(false); return; }
     const slug = activeSlug || 'default';
     const urlTry = [
       `/api/games${qs({ slug: isDefaultSlug(slug) ? '' : slug })}`,
@@ -1844,7 +1923,8 @@ export default function Admin() {
       } catch (e) { lastErr = e?.message || String(e); }
     }
 
-    if (!ok) {
+    // Fallback clear logic kept
+    if (!ok && isDefaultSlug(slug)) { // Only clear content for default, don't rely on it for named slugs
       setSuite({ version:'0.0.0', missions:[] });
       setConfig(c => ({
         ...(c || {}),
@@ -1860,7 +1940,7 @@ export default function Admin() {
 
     if (ok) {
       await reloadGamesList();
-      setActiveSlug('default');
+      setActiveSlug('default'); // Always return to default after delete
       setStatus('✅ Game deleted');
       setPreviewNonce(n => n + 1);
     } else {
@@ -1868,6 +1948,7 @@ export default function Admin() {
     }
     setConfirmDeleteOpen(false);
   }
+
 
   /* Missions CRUD */
   function suggestId() {
@@ -1888,7 +1969,8 @@ export default function Admin() {
     }, 420);
     const draft = {
       id: suggestId(),
-      title: '',
+      // Merge: Use neutral title
+      title: 'New Mission',
       type: 'multiple_choice',
       iconKey: '',
       rewards: { points: 25 },
@@ -1904,6 +1986,7 @@ export default function Admin() {
     };
     setEditing(draft); setSelected(null); setDirty(true);
   }
+
   function editExisting(m) {
     if (!m) return;
     let e;
@@ -1993,7 +2076,7 @@ export default function Admin() {
     const list = [...(suite.missions || [])];
     const src  = list[idx]; if (!src) return;
     const cp   = JSON.parse(JSON.stringify(src));
-    cp.id      = suggestId();
+    cp.id     = suggestId();
     cp.title   = (src.title || 'Copy') + ' (copy)';
     list.splice(idx + 1, 0, cp);
     setSuite({ ...suite, missions: list });
@@ -2054,6 +2137,7 @@ export default function Admin() {
     });
     return { media: mediaOptions, devices: deviceOptions, missions: missionOptions, responses: responseOptions };
   }, [inventory, devices, suite?.missions, config?.icons?.devices, config?.icons?.missions]);
+
   function suggestDeviceId(existing = devices) {
     const ids = new Set((existing || []).map(d => String(d?.id || '').toLowerCase()));
     let i = 1;
@@ -2563,6 +2647,7 @@ export default function Admin() {
     });
   }
 
+  // Keep Main version
   function setDeployEnabled(nextEnabled) {
     const effective = gameEnabled ? nextEnabled : false;
     setConfig(prev => {
@@ -2576,6 +2661,7 @@ export default function Admin() {
         ? 'Game deployment disabled — Save & Publish updates admin data only.'
         : 'Game project mirror disabled — Save & Publish updates admin data only.'));
   }
+
 
   async function handleCoverFile(file) {
     if (!file) return;
@@ -2707,12 +2793,19 @@ export default function Admin() {
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
   const deployGameEnabled = config?.game?.deployEnabled === true;
+  // Merged: Add playerCount from config
+  const playerCount = [1, 2, 4].includes(Number(config?.game?.playerCount))
+    ? Number(config.game.playerCount)
+    : 1;
+  // Merged: Add splashMode from config (using 'test' or 'live')
+  const splashMode = config?.splash?.mode === 'live' ? 'live' : 'test';
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerCoverThumb = config?.game?.coverImage
     ? toDirectMediaURL(config.game.coverImage)
     : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
+  // Keep Main version's meta details
   const metaCommitFull = adminMeta.commit || '';
   const metaCommitShort = metaCommitFull ? String(metaCommitFull).slice(0, 7) : '';
   const metaRepoLabel = adminMeta.repo ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}` : '';
@@ -2739,6 +2832,7 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <div style={S.metaBanner}>
+        {/* Keep Main version's meta layout */}
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
           {metaRepoLabel && (
             <span>
@@ -2849,8 +2943,9 @@ export default function Admin() {
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
-                  const isDefaultNow = !activeSlug || activeSlug === 'default';
-                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
+                  // Reload logic seems redundant here, handled by saveAndPublish
+                  // const isDefaultNow = !activeSlug || activeSlug === 'default';
+                  // setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
                 disabled={savePubBusy}
                 style={{ ...S.button, ...S.savePublishButton, opacity: savePubBusy ? 0.65 : 1 }}
@@ -2858,6 +2953,7 @@ export default function Admin() {
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
+            {/* Keep Main version's condition and content for game selector/deploy controls */}
             {tab !== 'settings' && (
               <div style={S.headerNavSecondary}>
                 <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
@@ -2934,6 +3030,7 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+              {/* Keep Main version's condition for cover summary */}
               {tab !== 'settings' && (
                 <div style={S.coverSummary}>
                   <div style={{ fontWeight:700 }}>Cover status</div>
@@ -2959,7 +3056,8 @@ export default function Admin() {
           {/* Left list */}
           <aside style={S.sidebarTall}>
             <div style={S.sidebarBar}>
-              <div style={S.noteText}>Launch a brand-new mission in this timeline Fucker.</div>
+              {/* Merge: Keep neutral text */}
+              <div style={S.noteText}>Launch a brand-new mission in this timeline.</div>
               <button
                 onClick={startNew}
                 style={{
@@ -3009,7 +3107,8 @@ export default function Admin() {
             <div style={S.card}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:12, marginBottom:8, flexWrap:'wrap' }}>
                 <div>
-                  <h3 style={{ margin:0 }}>Missions Fucking Map line 3012 index</h3>
+                  {/* Merge: Keep neutral title */}
+                  <h3 style={{ margin:0 }}>Missions Map</h3>
                   <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
                     Click a <b>mission</b> pin to select. Drag the selected mission, or click the map to move it. Devices are visible here but not editable.
                   </div>
@@ -3084,6 +3183,7 @@ export default function Admin() {
                         <span style={S.overlayIdLabel}>Mission ID</span>
                         <code style={S.overlayIdValue}>{editing.id || '—'}</code>
                       </div>
+                      {/* Merge: Use "Edit Mission" for title */}
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
@@ -3105,9 +3205,10 @@ export default function Admin() {
                           ...(missionActionFlash ? S.action3DFlash : {}),
                         }}
                         onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
+                        // Merge: Use "Save & Close" for button text
+                        title={editingIsNew ? 'Save this new mission to the list' : 'Save changes and close'}
                       >
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                        {editingIsNew ? 'Save New Mission' : 'Save & Close'}
                       </button>
                       <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
                     </div>
@@ -3286,7 +3387,7 @@ export default function Admin() {
                         setEditing({ ...editing, rewards:{ ...(editing.rewards||{}), points:v } }); setDirty(true); }}/>
                   </Field>
 
-                  
+                  {/* Trigger Section */}
                   <div style={{ marginTop:16, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
                     <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
                     <label style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -3431,6 +3532,7 @@ export default function Admin() {
                     )}
                   </div>
 
+
                   {/* Mission Response (Correct/Wrong): below map, above Continue */}
                   <SafeBoundary
                     fallback={missionResponsesFallback}
@@ -3572,6 +3674,7 @@ export default function Admin() {
                 );
               })}
             </div>
+            {/* Merge: Keep neutral text */}
             {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
@@ -3610,6 +3713,7 @@ export default function Admin() {
                           <span style={S.overlayIdLabel}>Device ID</span>
                           <code style={S.overlayIdValue}>{devDraft.id || '—'}</code>
                         </div>
+                        {/* Merge: Use "Edit Device" for title */}
                         <h4 style={{ margin:'0 0 6px 0' }}>
                           {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
                         </h4>
@@ -3632,6 +3736,7 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
+                          // Merge: Use "Save Changes and Close" for button text
                           title={deviceEditorMode === 'new'
                             ? 'Save the new device and close the editor'
                             : 'Save your changes and close the editor'}
@@ -3667,6 +3772,7 @@ export default function Admin() {
                       </Field>
                     </div>
 
+                    {/* Trigger Section */}
                     <div style={{ marginTop:14, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
                       <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
                       <label style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -3808,8 +3914,8 @@ export default function Admin() {
                   />
                   <code style={{ color:'var(--admin-muted)' }}>
                     {selectedDevIdx!=null ? `D${selectedDevIdx+1} radius: ${deviceRadiusValue} m`
-                     : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
-                     : 'Select a device to adjust radius'}
+                      : isAddingDevice ? `New device radius: ${deviceRadiusValue} m`
+                      : 'Select a device to adjust radius'}
                   </code>
                 </div>
               </div>
@@ -3835,6 +3941,7 @@ export default function Admin() {
                 readOnly={false}
                 lockToRegion={true}
               />
+              {/* Merge: Remove buttons below map */}
             </div>
           </section>
         </main>
@@ -3842,6 +3949,7 @@ export default function Admin() {
 
       {/* SETTINGS */}
       {tab==='settings' && (
+        // Keep Main version's 2-column layout
         <main style={S.wrapGrid2}>
           <aside style={S.settingsSidebar}>
             <div style={{ ...S.card, ...S.settingsSidebarCard }}>
@@ -3932,282 +4040,317 @@ export default function Admin() {
           <section style={S.settingsContent}>
             <div style={S.card}>
               <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={S.coverControlsRow}>
-              <div
-                onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
-                onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
-                onDrop={(e)=>{
-                  e.preventDefault();
-                  setCoverDropActive(false);
-                  const file = e.dataTransfer?.files?.[0];
-                  if (file) handleCoverFile(file);
-                }}
-                style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
-              >
-                {coverPreviewUrl ? (
-                  <img src={coverPreviewUrl} alt="Cover preview" style={S.coverDropImage} />
-                ) : (
-                  <div style={S.coverDropPlaceholder}>
-                    <strong>Drag & drop cover art</strong>
-                    <span>JPG or PNG · under 1&nbsp;MB · ideal at 16:9</span>
-                  </div>
-                )}
-              </div>
-              <div style={S.coverActionsColumn}>
-                <div style={S.coverActionButtons}>
-                  <button
-                    style={{ ...S.button, ...S.saveCoverButton, opacity: hasCoverForSave ? 1 : 0.45 }}
-                    onClick={saveCoverImageOnly}
-                    disabled={!hasCoverForSave}
-                  >
-                    Save Cover Image
-                  </button>
-                  <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
-                  <input
-                    ref={coverFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display:'none' }}
-                    onChange={(e)=>{
-                      const file = e.target.files?.[0];
-                      if (file) handleCoverFile(file);
-                      if (e.target) e.target.value = '';
-                    }}
-                  />
-                  <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
-                    {coverPickerLoading ? 'Loading media…' : 'Media pool'}
-                  </button>
-                  <button
-                    style={{ ...S.button, ...S.buttonDanger }}
-                    onClick={clearCoverImage}
-                    disabled={!config?.game?.coverImage}
-                  >
-                    Remove
-                  </button>
-                </div>
-                {uploadStatus && (
-                  <div style={S.coverActionStatus}>{uploadStatus}</div>
-                )}
-                <div style={S.coverActionHint}>
-                  Tip: <strong>Save Cover Image</strong> stores this artwork right away and also copies it to <code>/media/covers</code> for reuse.
-                </div>
-              </div>
-            </div>
-            <div style={{ marginTop: 18 }} />
-            <Field label="Game Type">
-              <select style={S.input} value={config.game.type}
-                onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
-                {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
-              </select>
-              <div style={S.noteText}>Pick the base structure for missions and pacing.</div>
-            </Field>
-            <Field label="Game Tags (comma separated)">
-              <input
-                style={S.input}
-                value={gameTagsDraft}
-                onChange={(e)=>updateGameTagsDraft(e.target.value)}
-                placeholder="default-game, mystery"
-              />
-              <div style={S.noteText}>
-                The current slug and <code>default-game</code> are enforced automatically.
-              </div>
-            </Field>
-            <Field label="Game Deployment">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                />
-                Enable publishing to the live game build
-              </label>
-              <div style={S.noteText}>
-                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
-              </div>
-            </Field>
-            <Field label="Stripe Splash Page">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input type="checkbox" checked={config.splash.enabled}
-                  onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
-                Enable Splash (game code & Stripe)
-              </label>
-              <div style={S.noteText}>Toggles the landing experience with access code + payment prompts.</div>
-            </Field>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-              <Field label="Default Map Center — Latitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLat ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Default Map Center — Longitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLng ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Find center by address/city">
-                <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                  <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
-                  <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
-                </form>
-                <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
-                  {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
-                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+              <div style={S.coverControlsRow}>
+                <div
+                  onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
+                  onDragLeave={(e)=>{ e.preventDefault(); setCoverDropActive(false); }}
+                  onDrop={(e)=>{
+                    e.preventDefault();
+                    setCoverDropActive(false);
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file) handleCoverFile(file);
+                  }}
+                  style={{ ...S.coverDropZone, ...(coverDropActive ? S.coverDropZoneActive : {}) }}
+                >
+                  {coverPreviewUrl ? (
+                    <img src={coverPreviewUrl} alt="Cover preview" style={S.coverDropImage} />
+                  ) : (
+                    <div style={S.coverDropPlaceholder}>
+                      <strong>Drag & drop cover art</strong>
+                      <span>JPG or PNG · under 1&nbsp;MB · ideal at 16:9</span>
                     </div>
-                  ))}
+                  )}
                 </div>
+                <div style={S.coverActionsColumn}>
+                  <div style={S.coverActionButtons}>
+                    <button
+                      style={{ ...S.button, ...S.saveCoverButton, opacity: hasCoverForSave ? 1 : 0.45 }}
+                      onClick={saveCoverImageOnly}
+                      disabled={!hasCoverForSave}
+                    >
+                      Save Cover Image
+                    </button>
+                    <button style={S.button} onClick={()=>coverFileInputRef.current?.click()}>Upload image</button>
+                    <input
+                      ref={coverFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display:'none' }}
+                      onChange={(e)=>{
+                        const file = e.target.files?.[0];
+                        if (file) handleCoverFile(file);
+                        if (e.target) e.target.value = '';
+                      }}
+                    />
+                    <button style={S.button} onClick={openCoverPicker} disabled={coverPickerLoading}>
+                      {coverPickerLoading ? 'Loading media…' : 'Media pool'}
+                    </button>
+                    <button
+                      style={{ ...S.button, ...S.buttonDanger }}
+                      onClick={clearCoverImage}
+                      disabled={!config?.game?.coverImage}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {uploadStatus && (
+                    <div style={S.coverActionStatus}>{uploadStatus}</div>
+                  )}
+                  <div style={S.coverActionHint}>
+                    Tip: <strong>Save Cover Image</strong> stores this artwork right away and also copies it to <code>/media/covers</code> for reuse.
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: 18 }} />
+              <Field label="Game Type">
+                <select style={S.input} value={config.game.type}
+                  onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
+                  {GAME_TYPES.map((g)=><option key={g} value={g}>{g}</option>)}
+                </select>
+                <div style={S.noteText}>Pick the base structure for missions and pacing.</div>
               </Field>
-              <Field label="Default Zoom">
-                <input
-                  type="number" min={2} max={20} style={S.input}
-                  value={config.map?.defaultZoom ?? 13}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } })}
-                />
-              </Field>
-              <Field label="Geofence Mode">
+              {/* Merge: Add playerCount from codex branch */}
+              <Field label="Number of Players">
                 <select
                   style={S.input}
-                  value={config.geofence?.mode || 'test'}
-                  onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
+                  value={playerCount}
+                  onChange={(e)=>{
+                    const next = Number(e.target.value);
+                    setConfig({ ...config, game:{ ...config.game, playerCount: next } });
+                    setDirty(true); // Ensure dirty flag is set
+                  }}
                 >
-                  <option value="test">Test — click to enter (dev)</option>
-                  <option value="live">Live — GPS radius only</option>
+                  {[1,2,4].map((count)=>(
+                    <option key={count} value={count}>{count}</option>
+                  ))}
                 </select>
+                <div style={S.noteText}>Choose solo, duo, or four-player escape rides.</div>
+              </Field>
+              <Field label="Game Tags (comma separated)">
+                <input
+                  style={S.input}
+                  value={gameTagsDraft}
+                  onChange={(e)=>updateGameTagsDraft(e.target.value)}
+                  placeholder="default-game, mystery"
+                />
+                <div style={S.noteText}>
+                  The current slug and <code>default-game</code> are enforced automatically.
+                </div>
+              </Field>
+              {/* Deploy checkbox moved to sidebar in Main */}
+              <Field label="Stripe Splash Page">
+                <label style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <input type="checkbox" checked={config.splash.enabled !== false} // Ensure default is true
+                    onChange={(e)=>setConfig({ ...config, splash:{ ...config.splash, enabled:e.target.checked } })}/>
+                  Enable Splash (game code & Stripe)
+                </label>
+                <div style={S.noteText}>Toggles the landing experience with access code + payment prompts.</div>
+                {/* Merge: Add splashMode toggle from codex branch */}
+                <div style={S.toggleWrap}>
+                  {[
+                    { key: 'test', label: 'Test Mode' },
+                    { key: 'live', label: 'Live Mode' },
+                  ].map((option) => {
+                    const active = splashMode === option.key;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={()=>{
+                            setConfig({ ...config, splash:{ ...config.splash, mode: option.key } });
+                            setDirty(true); // Ensure dirty flag is set
+                        }}
+                        style={{
+                          ...S.toggleOption,
+                          ...(active ? S.toggleOptionActive : {}),
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={S.noteText}>
+                  Test Mode keeps Stripe in sandbox. Live Mode activates production checkout for teams.
+                </div>
               </Field>
             </div>
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
-            </div>
-          </div>
 
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Maintenance</h3>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={()=> setConfirmDeleteOpen(true)}
-              >
-                🗑 Delete Game
-              </button>
-              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
-            </div>
-          </div>
-
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
-            <div style={{ marginBottom:16 }}>
-              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                {[
-                  { key:'light', label:'☀️ Light — dark text' },
-                  { key:'dark', label:'🌙 Dark — light text' },
-                ].map((option) => {
-                  const active = interfaceTone === option.key;
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={()=>updateInterfaceTone(option.key)}
-                      style={{
-                        borderRadius:12,
-                        padding:'8px 14px',
-                        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
-                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
-                        color:'var(--admin-body-color)',
-                        cursor:'pointer',
-                        fontWeight: active ? 600 : 500,
-                        boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
-                Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
-              </div>
-            </div>
-            <div style={{ marginBottom:12 }}>
-              <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
-                {APPEARANCE_SKINS.map((skin)=>{
-                  const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
-                    ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
-                    : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
-                  return (
-                    <button
-                      key={skin.key}
-                      type="button"
-                      onClick={()=>applyAppearanceSkin(skin.key)}
-                      style={{
-                        borderRadius:12,
-                        border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
-                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
-                        padding:12,
-                        textAlign:'left',
-                        color:'var(--admin-body-color)',
-                        cursor:'pointer',
-                      }}
-                    >
-                      <div style={{ fontWeight:600 }}>{skin.label}</div>
-                      <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
-                      <div style={{
-                        border:'1px dashed var(--admin-border-soft)',
-                        borderRadius:8,
-                        padding:10,
-                        background: previewBg,
-                        color: skin.appearance.fontColor,
-                        fontFamily: skin.appearance.fontFamily,
-                        fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
-                        textAlign: skin.appearance.textAlign,
-                      }}>
-                        Preview text
+            <div style={{ ...S.card, marginTop:16 }}>
+              <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+                <Field label="Default Map Center — Latitude">
+                  <input
+                    type="number" step="0.000001" style={S.input}
+                    value={config.map?.centerLat ?? ''}
+                    onChange={(e)=>{setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } }); setDirty(true);}}
+                  />
+                </Field>
+                <Field label="Default Map Center — Longitude">
+                  <input
+                    type="number" step="0.000001" style={S.input}
+                    value={config.map?.centerLng ?? ''}
+                    onChange={(e)=>{setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } }); setDirty(true);}}
+                  />
+                </Field>
+                <Field label="Find center by address/city">
+                  <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                    <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
+                    <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
+                  </form>
+                  <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                    {mapResults.map((r,i)=>(
+                      <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
+                        <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                        <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
                       </div>
-                    </button>
-                  );
-                })}
+                    ))}
+                  </div>
+                </Field>
+                <Field label="Default Zoom">
+                  <input
+                    type="number" min={2} max={20} style={S.input}
+                    value={config.map?.defaultZoom ?? 13}
+                    onChange={(e)=>{setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } }); setDirty(true);}}
+                  />
+                </Field>
+                <Field label="Geofence Mode">
+                  <select
+                    style={S.input}
+                    value={config.geofence?.mode || 'test'}
+                    onChange={(e)=>{setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } }); setDirty(true);}}
+                  >
+                    <option value="test">Test — click to enter (dev)</option>
+                    <option value="live">Live — GPS radius only</option>
+                  </select>
+                </Field>
               </div>
-              <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
-                Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
+              <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
+                These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
               </div>
             </div>
-            <AppearanceEditor
-              value={config.appearance||defaultAppearance()}
-              tone={interfaceTone}
-              onChange={(next)=>{
-                setConfig(prev => {
-                  const base = prev || {};
-                  const retainedSkin = base.appearanceSkin && ADMIN_SKIN_TO_UI.has(base.appearanceSkin)
-                    ? base.appearanceSkin
-                    : detectAppearanceSkin(next, base.appearanceSkin);
-                  return {
-                    ...base,
-                    appearance: next,
-                    appearanceSkin: retainedSkin,
-                  };
-                });
-                setDirty(true);
-                setStatus('🎨 Updated appearance settings');
-              }}
-            />
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+
+            <div style={{ ...S.card, marginTop:16 }}>
+              <h3 style={{ marginTop:0 }}>Maintenance</h3>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                {/* Keep Main's simpler delete button (gameEnabled check done in function) */}
+                <button
+                  style={{ ...S.button, ...S.buttonDanger }}
+                  onClick={()=> setConfirmDeleteOpen(true)}
+                >
+                  🗑 Delete Game
+                </button>
+                <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
+              </div>
             </div>
-          </div>
+
+            <div style={{ ...S.card, marginTop:16 }}>
+              <h3 style={{ marginTop:0 }}>Appearance (Global)</h3>
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Interface tone</div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  {[
+                    { key:'light', label:'☀️ Light — dark text' },
+                    { key:'dark', label:'🌙 Dark — light text' },
+                  ].map((option) => {
+                    const active = interfaceTone === option.key;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={()=>updateInterfaceTone(option.key)}
+                        style={{
+                          borderRadius:12,
+                          padding:'8px 14px',
+                          border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+                          background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                          color:'var(--admin-body-color)',
+                          cursor:'pointer',
+                          fontWeight: active ? 600 : 500,
+                          boxShadow: active ? '0 0 0 1px rgba(255,255,255,0.08)' : 'none',
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ color:'var(--admin-muted)', fontSize:12, marginTop:8 }}>
+                  Switch between bright control-room surfaces or a night-mode deck. The tone applies to the admin UI and live game backgrounds.
+                </div>
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
+                  {APPEARANCE_SKINS.map((skin)=>{
+                    const active = selectedAppearanceSkin === skin.key;
+                    const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
+                      ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
+                      : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
+                    return (
+                      <button
+                        key={skin.key}
+                        type="button"
+                        onClick={()=>applyAppearanceSkin(skin.key)}
+                        style={{
+                          borderRadius:12,
+                          border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
+                          background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
+                          padding:12,
+                          textAlign:'left',
+                          color:'var(--admin-body-color)',
+                          cursor:'pointer',
+                        }}
+                      >
+                        <div style={{ fontWeight:600 }}>{skin.label}</div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
+                        <div style={{
+                          border:'1px dashed var(--admin-border-soft)',
+                          borderRadius:8,
+                          padding:10,
+                          background: previewBg,
+                          color: skin.appearance.fontColor,
+                          fontFamily: skin.appearance.fontFamily,
+                          fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
+                          textAlign: skin.appearance.textAlign,
+                        }}>
+                          Preview text
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
+                  Selected skin: <strong>{selectedAppearanceSkinLabel}</strong>
+                </div>
+              </div>
+              <AppearanceEditor
+                value={config.appearance||defaultAppearance()}
+                tone={interfaceTone}
+                onChange={(next)=>{
+                  setConfig(prev => {
+                    const base = prev || {};
+                    const retainedSkin = base.appearanceSkin && ADMIN_SKIN_TO_UI.has(base.appearanceSkin)
+                      ? base.appearanceSkin
+                      : detectAppearanceSkin(next, base.appearanceSkin);
+                    return {
+                      ...base,
+                      appearance: next,
+                      appearanceSkin: retainedSkin,
+                    };
+                  });
+                  setDirty(true);
+                  setStatus('🎨 Updated appearance settings');
+                }}
+              />
+              <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
+                Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+              </div>
+            </div>
           </section>
         </main>
       )}
+
 
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
@@ -4237,8 +4380,15 @@ export default function Admin() {
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
+          // Merge: Keep props from codex branch
+          assignedMediaError={assignedMediaError}
+          onAssignedMediaError={setAssignedMediaError}
+          onClearAssignedMediaError={() => setAssignedMediaError(null)}
+          onStatus={setStatus}
+          onUploadIcon={async (file) => uploadToRepo(file, 'icons')}
         />
       )}
+
 
       {coverPickerOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:1600, padding:16 }}>
@@ -4394,6 +4544,7 @@ export default function Admin() {
       )}
 
       {/* New Game modal */}
+      {/* Keep Main version's condition */}
       {showNewGame && (
         <div style={S.modalBackdrop}>
           <div style={{ ...S.card, ...S.modalCard }}>
@@ -4403,6 +4554,7 @@ export default function Admin() {
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
+              {/* Keep Main version's warning */}
               {!gameEnabled && (
                 <div style={{ ...S.noteText, background:'var(--admin-tab-bg)', padding:10, borderRadius:8, border:'1px solid var(--admin-border-soft)' }}>
                   Game folder mirroring is disabled. New games will update admin data only.
@@ -4563,7 +4715,9 @@ export default function Admin() {
         </div>
       )}
 
+
       {/* Delete confirm modal */}
+      {/* Keep Main version's condition */}
       {confirmDeleteOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
           <div style={{ ...S.card, width:420 }}>
@@ -4583,6 +4737,7 @@ export default function Admin() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
@@ -4625,7 +4780,7 @@ function MediaPreview({ url, kind }) {
   const u = toDirectMediaURL(String(url).trim());
   const lower = u.toLowerCase();
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
-  const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
+  const isImage = /\.(png|jpg|jpeg|gif|webp|svg)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view'); // Added SVG
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
@@ -4654,7 +4809,7 @@ const S = {
   metaBanner: {
     background: 'rgba(7, 12, 18, 0.82)',
     backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    color: 'var(--appearance-font-color, var(--admin-body-color))', // Use var
     borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
     padding: '8px 16px',
     boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
@@ -4694,6 +4849,7 @@ const S = {
   },
   header: {
     padding: 20,
+    // Keep Main version's theme variables
     background: 'var(--admin-header-bg)',
     backdropFilter: 'var(--admin-header-blur, blur(20px))',
     borderBottom: 'var(--admin-header-border)',
@@ -4704,7 +4860,9 @@ const S = {
     color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
+  // Keep Main version's 2-column grid layout
   wrapGrid2: { display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  // Keep Main version's settings sidebar styles
   settingsSidebar: {
     display: 'grid',
     gap: 16,
@@ -4769,8 +4927,8 @@ const S = {
     borderRadius: 18,
     padding: 14,
     position: 'sticky',
-    top: 20,
-    height: 'calc(100vh - 140px)',
+    top: 140, // Adjust top based on header height potentially
+    height: 'calc(100vh - 160px)', // Adjust height
     overflow: 'auto',
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
@@ -4783,7 +4941,7 @@ const S = {
     borderRadius: 14,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    boxShadow: '0 12px 24px rgba(8, 13, 19, 0.35)',
+    boxShadow: '0 12px 24px rgba(8, 13, 19, 0.35)', // Keep specific shadow if needed
   },
   card: {
     position: 'relative',
@@ -4795,7 +4953,7 @@ const S = {
   },
   floatingBarTop: {
     position: 'sticky',
-    top: 0,
+    top: -18, // Adjust based on card padding
     zIndex: 30,
     display: 'flex',
     alignItems: 'center',
@@ -4808,7 +4966,7 @@ const S = {
   },
   floatingBarBottom: {
     position: 'sticky',
-    bottom: 0,
+    bottom: -18, // Adjust based on card padding
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -4818,1627 +4976,6 @@ const S = {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     borderTop: '1px solid var(--admin-border-soft)',
   },
+  // Removed mapFooterActions from codex branch
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
-  noteText: { marginTop: 6, fontSize: 12, color: 'var(--admin-muted)' },
-  input: {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: 12,
-    border: 'var(--admin-input-border)',
-    background: 'var(--admin-input-bg)',
-    color: 'var(--admin-input-color)',
-    boxShadow: 'var(--admin-glass-sheen)',
-  },
-  button: {
-    padding: '10px 14px',
-    borderRadius: 12,
-    border: 'var(--admin-button-border)',
-    background: 'var(--admin-button-bg)',
-    color: 'var(--admin-button-color)',
-    cursor: 'pointer',
-    fontWeight: 600,
-    transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
-    boxShadow: 'var(--admin-glass-sheen)',
-  },
-  buttonDanger: {
-    border: 'var(--admin-danger-border)',
-    background: 'var(--admin-danger-bg)',
-    color: 'var(--admin-body-color)',
-  },
-  buttonSuccess: {
-    border: 'var(--admin-success-border)',
-    background: 'var(--admin-success-bg)',
-    color: 'var(--admin-body-color)',
-  },
-  floatingButton: {
-    padding: '10px 18px',
-    borderRadius: 14,
-    border: '1px solid var(--admin-button-border)',
-    background: 'var(--admin-button-bg)',
-    color: 'var(--admin-button-color)',
-    cursor: 'pointer',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 700,
-    minWidth: 160,
-    letterSpacing: 0.5,
-    boxShadow: 'var(--admin-glass-sheen)',
-    transition: 'background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease',
-  },
-  floatingSave: {
-    background: 'linear-gradient(92deg, #1f7a32, #2dd36f)',
-    border: '1px solid rgba(56, 161, 105, 0.8)',
-    color: '#e9ffe9',
-    boxShadow: '0 0 18px rgba(56, 161, 105, 0.55)',
-  },
-  floatingCancel: {
-    background: 'linear-gradient(92deg, #7a2d00, #ff8800)',
-    border: '1px solid rgba(255, 136, 0, 0.8)',
-    color: '#fff4dd',
-    boxShadow: '0 0 18px rgba(255, 136, 0, 0.55)',
-  },
-  action3DButton: {
-    padding: '12px 20px',
-    borderRadius: 16,
-    border: '1px solid rgba(34, 197, 94, 0.85)',
-    background: 'linear-gradient(165deg, #0b4224, #22c55e)',
-    color: '#ecfdf5',
-    fontWeight: 800,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    boxShadow: '0 18px 28px rgba(12, 83, 33, 0.6), inset 0 2px 0 rgba(255, 255, 255, 0.15)',
-    cursor: 'pointer',
-    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-  },
-  action3DFlash: {
-    boxShadow: '0 0 28px rgba(34, 197, 94, 0.75), 0 22px 34px rgba(12, 83, 33, 0.55)',
-    transform: 'translateY(-2px)',
-  },
-  cancelGlowButton: {
-    padding: '10px 18px',
-    borderRadius: 999,
-    border: '1px solid rgba(248, 113, 113, 0.6)',
-    background: 'linear-gradient(140deg, #4c0519, #f87171)',
-    color: '#ffe4e6',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    boxShadow: '0 0 22px rgba(248, 113, 113, 0.55)',
-    cursor: 'pointer',
-  },
-  deviceMapFooter: {
-    marginTop: 12,
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  saveCoverButton: {
-    background: 'linear-gradient(92deg, #047857, #34d399)',
-    border: '1px solid rgba(52, 211, 153, 0.6)',
-    color: '#ecfdf5',
-    boxShadow: '0 16px 28px rgba(5, 150, 105, 0.35)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    fontWeight: 700,
-  },
-  savePublishButton: {
-    background: 'var(--admin-save-gradient, linear-gradient(95deg, #2563eb, #38bdf8))',
-    border: 'var(--admin-save-border, 1px solid rgba(59, 130, 246, 0.6))',
-    color: '#f8fafc',
-    boxShadow: 'var(--admin-save-shadow, 0 20px 36px rgba(37, 99, 235, 0.45))',
-    textTransform: 'uppercase',
-    letterSpacing: '0.12em',
-    fontWeight: 800,
-    padding: '12px 20px',
-  },
-  headerTopRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    textAlign: 'left',
-    gap: 16,
-    marginBottom: 20,
-    flexWrap: 'wrap',
-  },
-  headerTitleGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-  },
-  headerCoverFrame: {
-    width: 68,
-    height: 68,
-    borderRadius: 16,
-    overflow: 'hidden',
-    border: 'var(--admin-header-frame-border, var(--admin-border-soft))',
-    background: 'var(--admin-header-frame-bg, var(--admin-tab-bg))',
-    display: 'grid',
-    placeItems: 'center',
-    boxShadow: 'var(--admin-header-frame-shadow, var(--admin-glass-sheen))',
-  },
-  headerCoverThumb: { width: '100%', height: '100%', objectFit: 'cover' },
-  headerCoverPlaceholder: {
-    fontSize: 11,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-    textAlign: 'center',
-    padding: '0 6px',
-  },
-  headerTitleColumn: {
-    display: 'grid',
-    justifyItems: 'flex-start',
-    textAlign: 'left',
-    gap: 4,
-  },
-  headerGameTitle: {
-    fontSize: 24,
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    letterSpacing: '0.3em',
-    textTransform: 'uppercase',
-    color: 'var(--admin-muted)',
-  },
-  headerNavRow: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  headerNavPrimary: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 10,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  headerNavSecondary: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  fieldLabel: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-  },
-  readonlyCode: {
-    display: 'inline-block',
-    padding: '4px 10px',
-    borderRadius: 999,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    fontWeight: 600,
-    letterSpacing: '0.08em',
-  },
-  coverControlsRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 18,
-    alignItems: 'stretch',
-  },
-  coverDropZone: {
-    flex: '1 1 380px',
-    minHeight: 280,
-    border: '1px dashed rgba(94, 234, 212, 0.35)',
-    borderRadius: 20,
-    background: 'rgba(15, 23, 42, 0.75)',
-    display: 'grid',
-    placeItems: 'center',
-    overflow: 'hidden',
-    transition: 'border 0.2s ease, box-shadow 0.2s ease, background 0.2s ease',
-  },
-  coverDropZoneActive: {
-    border: '1px dashed rgba(94, 234, 212, 0.8)',
-    boxShadow: '0 0 24px rgba(94, 234, 212, 0.35)',
-    background: 'rgba(15, 32, 27, 0.85)',
-  },
-  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  coverDropPlaceholder: {
-    color: '#9fb0bf',
-    fontSize: 13,
-    textAlign: 'center',
-    display: 'grid',
-    gap: 6,
-    padding: 16,
-    justifyItems: 'center',
-    letterSpacing: '0.05em',
-  },
-  coverActionsColumn: {
-    flex: '0 0 240px',
-    minWidth: 220,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  coverActionButtons: {
-    display: 'grid',
-    gap: 10,
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-  },
-  coverActionStatus: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-  },
-  coverActionHint: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-  },
-  coverSummary: {
-    flex: '1 1 260px',
-    minWidth: 240,
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    border: 'var(--appearance-panel-border, var(--admin-panel-border))',
-    borderRadius: 14,
-    padding: 14,
-    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
-  },
-  tab: {
-    padding: '8px 12px',
-    borderRadius: 12,
-    border: 'var(--admin-button-border)',
-    background: 'var(--admin-tab-bg)',
-    color: 'var(--admin-body-color)',
-    cursor: 'pointer',
-    transition: 'background 0.2s ease',
-  },
-  tabActive: { background: 'var(--admin-tab-active-bg)', boxShadow: '0 0 0 1px rgba(255,255,255,0.06)' },
-  search: {
-    width: '100%',
-    padding: '10px 12px',
-    borderRadius: 12,
-    border: 'var(--admin-input-border)',
-    background: 'var(--admin-input-bg)',
-    color: 'var(--admin-input-color)',
-    marginBottom: 10,
-    boxShadow: 'var(--admin-glass-sheen)',
-  },
-  hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
-  overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
-  overlayBarSide: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 6,
-    minWidth: 180,
-  },
-  overlayCenter: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    textAlign: 'center',
-  },
-  overlayIdRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  overlayIdLabel: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.08em',
-  },
-  overlayIdValue: {
-    fontSize: 14,
-    fontWeight: 700,
-    color: 'var(--admin-body-color)',
-    background: 'var(--admin-tab-bg)',
-    padding: '4px 12px',
-    borderRadius: 999,
-  },
-  chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
-  muted: { color: 'var(--admin-muted)' },
-  errorPanel: {
-    border: '1px solid var(--admin-border-soft)',
-    borderRadius: 14,
-    padding: 16,
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    display: 'grid',
-    gap: 10,
-  },
-  errorPanelTitle: { fontWeight: 700, fontSize: 16 },
-  errorPanelMessage: { fontSize: 13, color: 'var(--admin-muted)', whiteSpace: 'pre-wrap' },
-  errorPanelActions: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  subtleActionButton: {
-    padding: '4px 12px',
-    borderRadius: 999,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    color: 'var(--admin-muted)',
-    cursor: 'pointer',
-    fontSize: 12,
-    boxShadow: 'var(--admin-glass-sheen)',
-  },
-  modalBackdrop: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(5, 12, 20, 0.82)',
-    backdropFilter: 'blur(14px)',
-    display: 'grid',
-    placeItems: 'center',
-    padding: 24,
-    zIndex: 4000,
-  },
-  modalCard: {
-    width: 'min(720px, 96vw)',
-    maxHeight: '82vh',
-    padding: 0,
-    overflow: 'hidden',
-  },
-  modalTopBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: '16px 20px',
-    borderBottom: '1px solid var(--admin-border-soft)',
-    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
-    position: 'sticky',
-    top: 0,
-    zIndex: 5,
-  },
-  modalTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  modalCloseButton: {
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--admin-muted)',
-    fontSize: 28,
-    lineHeight: 1,
-    cursor: 'pointer',
-    padding: 4,
-  },
-  modalContent: {
-    padding: '20px 24px 24px',
-    display: 'grid',
-    gap: 16,
-    maxHeight: 'calc(82vh - 72px)',
-    overflowY: 'auto',
-  },
-  modalCoverGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-    gap: 12,
-    marginTop: 12,
-  },
-  modalCoverButton: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    border: '1px solid var(--admin-border-soft)',
-    borderRadius: 14,
-    padding: 12,
-    background: 'var(--admin-tab-bg)',
-    color: 'var(--admin-body-color)',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease',
-  },
-  modalCoverButtonActive: {
-    border: '1px solid rgba(59, 130, 246, 0.85)',
-    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.35)',
-  },
-  modalCoverThumb: {
-    width: '100%',
-    height: 120,
-    objectFit: 'cover',
-    borderRadius: 10,
-    background: '#0f172a',
-  },
-  modalCoverLabel: {
-    fontSize: 12,
-    color: 'var(--admin-muted)',
-    textAlign: 'left',
-    wordBreak: 'break-word',
-  },
-  modalStatus: {
-    fontSize: 13,
-    color: 'var(--admin-muted)',
-    minHeight: 20,
-  },
-};
-
-/* MapOverview — shows missions + devices */
-function MapOverview({
-  missions = [], devices = [], icons = DEFAULT_ICONS, showRings = true,
-  interactive = false, draftDevice = null,
-  selectedDevIdx = null, selectedMissionIdx = null,
-  onDraftChange = null, onMoveSelected = null, onMoveSelectedMission = null,
-  onSelectDevice = null, onSelectMission = null,
-  mapCenter = { lat:44.9778, lng:-93.2650 }, mapZoom = 13,
-  defaultIconSizePx = 24, selectedIconSizePx = 28,
-  readOnly = false,
-  lockToRegion = false,
-}) {
-  const divRef = React.useRef(null);
-  const [leafletReady, setLeafletReady] = React.useState(!!(typeof window !== 'undefined' && window.L));
-
-  function getMissionPos(m){ const c=m?.content||{}; const lat=Number(c.lat), lng=Number(c.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
-  function getDevicePos(d){ const lat=Number(d?.lat),lng=Number(d?.lng); if(!isFinite(lat)||!isFinite(lng))return null; return [lat,lng]; }
-  function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?toDirectMediaURL(it.url||''):''; }
-  function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false, size=24){
-    const s = Math.max(12, Math.min(64, Number(size)||24));
-    const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
-      : `<div style="width:${s-4}px;height:${s-4}px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
-    const font = Math.round(s*0.5);
-    return window.L.divIcon({
-      className:'num-pin',
-      html:`<div style="position:relative;display:grid;place-items:center">${img}<div style="position:absolute;bottom:-${Math.round(s*0.45)}px;left:50%;transform:translateX(-50%);font-weight:700;font-size:${font}px;color:#fff;text-shadow:0 1px 2px #000">${number}</div></div>`,
-      iconSize:[s, s+4], iconAnchor:[s/2, s/2]
-    });
-  }
-
-  useEffect(()=>{ if(typeof window==='undefined')return;
-    if(window.L){ setLeafletReady(true); return; }
-    const linkId='leaflet-css';
-    if(!document.getElementById(linkId)){
-      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    }
-    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
-  },[]);
-
-  useEffect(()=>{
-    if(!leafletReady || !divRef.current || typeof window==='undefined') return;
-    const L = window.L; if (!L) return;
-
-    const initialCenter = [mapCenter?.lat ?? 44.9778, mapCenter?.lng ?? -93.2650];
-    const initialZoom = mapZoom ?? 13;
-
-    if(!divRef.current._leaflet_map){
-      const map=L.map(divRef.current,{ center:initialCenter, zoom:initialZoom });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19, attribution:'© OpenStreetMap contributors' }).addTo(map);
-      divRef.current._leaflet_map=map;
-    }
-    const map=divRef.current._leaflet_map;
-
-    if(!map._layerGroup) map._layerGroup=L.layerGroup().addTo(map);
-    map._layerGroup.clearLayers();
-    const layer=map._layerGroup;
-    const bounds=L.latLngBounds([]);
-
-    // Missions
-    (missions||[]).forEach((m,idx)=>{
-      const pos=getMissionPos(m); if(!pos) return;
-      const url = m.iconUrl ? toDirectMediaURL(m.iconUrl) : iconUrl('missions', m.iconKey);
-      const isSel = (selectedMissionIdx===idx);
-      const size = isSel ? selectedIconSizePx : defaultIconSizePx;
-      const marker=L.marker(pos,{icon:numberedIcon(idx+1,url,'#60a5fa',isSel,size), draggable:(!readOnly && isSel)}).addTo(layer);
-      const rad=Number(m.content?.radiusMeters||0);
-      let circle=null;
-      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#60a5fa', fillOpacity:0.08 }).addTo(layer); }
-      if (onSelectMission) {
-        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectMission(idx); });
-      }
-      if(!readOnly && isSel && onMoveSelectedMission){
-        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
-        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelectedMission(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      }
-      bounds.extend(pos);
-    });
-
-    // Devices
-    (devices||[]).forEach((d,idx)=>{
-      const pos=getDevicePos(d); if(!pos) return;
-      const url=iconUrl('devices', d.iconKey);
-      const hl = (selectedDevIdx===idx);
-      const size = hl ? selectedIconSizePx : defaultIconSizePx;
-      const marker=L.marker(pos,{icon:numberedIcon(`D${idx+1}`,url,'#f59e0b',hl,size), draggable:(!readOnly && hl && !!onMoveSelected)}).addTo(layer);
-      const rad=Number(d.pickupRadius||0);
-      let circle=null;
-      if(showRings && rad>0) { circle=L.circle(pos,{ radius:rad, color:'#f59e0b', fillOpacity:0.08 }).addTo(layer); }
-      if (onSelectDevice) {
-        marker.on('click',(ev)=>{ ev.originalEvent?.preventDefault?.(); ev.originalEvent?.stopPropagation?.(); onSelectDevice(idx); });
-      }
-      if(!readOnly && hl && onMoveSelected){
-        marker.on('drag',()=>{ if(circle) circle.setLatLng(marker.getLatLng()); });
-        marker.on('dragend',()=>{ const p=marker.getLatLng(); onMoveSelected(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      }
-      bounds.extend(pos);
-    });
-
-    // Draft device (Devices tab)
-    if(!readOnly && draftDevice && typeof draftDevice.lat==='number' && typeof draftDevice.lng==='number'){
-      const pos=[draftDevice.lat, draftDevice.lng];
-      const mk=L.marker(pos,{ icon:numberedIcon('D+','', '#34d399',true,selectedIconSizePx), draggable:true }).addTo(layer);
-      if(showRings && Number(draftDevice.radius)>0){
-        const c=L.circle(pos,{ radius:Number(draftDevice.radius), color:'#34d399', fillOpacity:0.08 }).addTo(layer);
-        mk.on('drag',()=>c.setLatLng(mk.getLatLng()));
-      }
-      mk.on('dragend',()=>{ const p=mk.getLatLng(); onDraftChange && onDraftChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))); });
-      bounds.extend(pos);
-    }
-
-    // Click handler
-    if (map._clickHandler) map.off('click', map._clickHandler);
-    map._clickHandler = (e) => {
-      if (readOnly) return;
-      const lat=e.latlng.lat, lng=e.latlng.lng;
-      if (interactive && onDraftChange) { onDraftChange(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (selectedDevIdx!=null && onMoveSelected) { onMoveSelected(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-      if (selectedMissionIdx!=null && onMoveSelectedMission) { onMoveSelectedMission(Number(lat.toFixed(6)), Number(lng.toFixed(6))); return; }
-    };
-    map.on('click', map._clickHandler);
-
-    if (lockToRegion) {
-      map.setView(initialCenter, initialZoom);
-    } else if(bounds.isValid()) {
-      map.fitBounds(bounds.pad(0.2));
-    } else {
-      map.setView(initialCenter, initialZoom);
-    }
-  },[
-    leafletReady, missions, devices, icons, showRings, interactive, draftDevice,
-    selectedDevIdx, selectedMissionIdx, onDraftChange, onMoveSelected, onMoveSelectedMission,
-    onSelectDevice, onSelectMission, mapCenter, mapZoom, defaultIconSizePx, selectedIconSizePx, readOnly, lockToRegion
-  ]);
-
-  return (
-    <div>
-      {!leafletReady && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Loading map…</div>}
-      <div ref={divRef} style={{ height:560, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }}/>
-    </div>
-  );
-}
-
-/* MapPicker — geofence mini map with draggable marker + radius slider (5–500 m) */
-function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, lng:-93.2650 } }) {
-  const divRef = useRef(null);
-  const [leafletReady, setLeafletReady] = useState(!!(typeof window !== 'undefined' && window.L));
-  const [rad, setRad] = useState(clamp(Number(radius) || 25, 5, 500));
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.L) { setLeafletReady(true); return; }
-    const linkId='leaflet-css';
-    if(!document.getElementById(linkId)){
-      const link=document.createElement('link'); link.id=linkId; link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(link);
-    }
-    const s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; s.async=true; s.onload=()=>setLeafletReady(true); document.body.appendChild(s);
-  }, []);
-
-  useEffect(() => { setRad(clamp(Number(radius) || 25, 5, 500)); }, [radius]);
-
-  useEffect(() => {
-    if (!leafletReady || !divRef.current || typeof window === 'undefined') return;
-    const L = window.L; if (!L) return;
-
-    const startLat = isFinite(Number(lat)) ? Number(lat) : Number(center.lat);
-    const startLng = isFinite(Number(lng)) ? Number(lng) : Number(center.lng);
-
-    if (!divRef.current._leaflet_map) {
-      const map = L.map(divRef.current, { center: [startLat, startLng], zoom: 14 });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
-      const marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
-      const circle = L.circle([startLat, startLng], { radius: Number(rad) || 25, color: '#60a5fa', fillOpacity: 0.08 }).addTo(map);
-
-      marker.on('drag', () => circle.setLatLng(marker.getLatLng()));
-      marker.on('dragend', () => {
-        const p = marker.getLatLng();
-        onChange && onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(clamp(rad,5,500)));
-      });
-
-      map.on('click', (e) => {
-        marker.setLatLng(e.latlng);
-        circle.setLatLng(e.latlng);
-        onChange && onChange(Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6)), Number(clamp(rad,5,500)));
-      });
-
-      divRef.current._leaflet_map = map;
-      divRef.current._marker = marker;
-      divRef.current._circle = circle;
-    } else {
-      const map = divRef.current._leaflet_map;
-      const marker = divRef.current._marker;
-      const circle = divRef.current._circle;
-
-      const haveLat = isFinite(Number(lat));
-      const haveLng = isFinite(Number(lng));
-      const pos = haveLat && haveLng ? [Number(lat), Number(lng)] : [Number(center.lat), Number(center.lng)];
-      marker.setLatLng(pos);
-      circle.setLatLng(pos);
-      map.setView(pos, map.getZoom());
-      circle.setRadius(Number(clamp(rad,5,500)));
-    }
-  }, [leafletReady, lat, lng, rad, onChange, center]);
-
-  return (
-    <div>
-      <div ref={divRef} style={{ height:260, borderRadius:12, border:'1px solid var(--admin-border-soft)', background:'var(--appearance-panel-bg, var(--admin-panel-bg))' }} />
-      <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center', marginTop:8 }}>
-        <input
-          type="range" min={5} max={500} step={5}
-          value={rad}
-          onChange={(e)=>{
-            const next = clamp(Number(e.target.value)||25, 5, 500);
-            setRad(next);
-            if (divRef.current?._circle) divRef.current._circle.setRadius(Number(next));
-            if (onChange && divRef.current?._marker) {
-              const p = divRef.current._marker.getLatLng();
-              onChange(Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6)), Number(next));
-            }
-          }}
-        />
-        <code style={{ color:'var(--admin-muted)' }}>{rad} m</code>
-      </div>
-    </div>
-  );
-}
-
-/* TEXT TAB */
-function TextTab({ config, setConfig }) {
-  const [text, setText] = useState((config.textRules || []).join('\n'));
-  useEffect(()=>{ setText((config.textRules || []).join('\n')); }, [config.textRules]);
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'var(--admin-muted)', marginBottom:8, fontSize:12 }}>
-          One rule per line. This saves into <code>config.textRules</code>.
-        </div>
-        <textarea
-          style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
-          value={text}
-          onChange={(e)=>setText(e.target.value)}
-        />
-        <div style={{ display:'flex', gap:8, marginTop:8 }}>
-          <button
-            style={S.button}
-            onClick={()=>{
-              const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
-              setConfig(c=>({ ...c, textRules: lines }));
-            }}
-          >
-            Save Rules
-          </button>
-          <button
-            style={S.button}
-            onClick={()=>setText((config.textRules || []).join('\n'))}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-/* ───────────────────────── MEDIA POOL (with sub-tabs & per-file usage) ───────────────────────── */
-function MediaPoolTab({
-  suite,
-  config,
-  setConfig,
-  uploadStatus,
-  setUploadStatus,
-  uploadToRepo,
-  onInventoryRefresh,
-}) {
-  const [inv, setInv] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
-  const [addUrl, setAddUrl] = useState('');
-
-
-  
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
-  const subTabs = [
-    { key:'image', label:'Images' },
-    { key:'video', label:'Videos' },
-    { key:'audio', label:'Audio' },
-    { key:'gif',   label:'GIFs'  },
-  ];
-  const [subTab, setSubTab] = useState('image');
-
-  useEffect(() => { refreshInventory(); }, []);
-
-  async function refreshInventory() {
-    setBusy(true);
-    try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
-      setInv(items || []);
-      if (typeof onInventoryRefresh === 'function') {
-        try { await onInventoryRefresh(); } catch {}
-      }
-    } finally { setBusy(false); }
-  }
-
-  // Per-file usage counts retained for backwards compatibility
-  function usageCounts() {
-    return {
-      rewardsPool: 0,
-      penaltiesPool: 0,
-      iconMission: 0,
-      iconDevice: 0,
-      iconReward: 0,
-      outcomeCorrect: 0,
-      outcomeWrong: 0,
-      outcomeAudio: 0,
-    };
-  }
-
-  function addPoolItem(kind, url) {
-    const label = baseNameFromUrl(url);
-    setConfig(c => {
-      if (!c) return c;
-      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
-      if (kind === 'rewards') m.rewardsPool.push({ url, label });
-      if (kind === 'penalties') m.penaltiesPool.push({ url, label });
-      return { ...c, media: m };
-    });
-  }
-  function addIcon(kind, url) {
-    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
-    const name = baseNameFromUrl(url);
-    setConfig(c => {
-      if (!c) return c;
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      const list = icons[kind] || [];
-      // allow duplicates (keys must be unique)
-      let finalKey = key;
-      let suffix = 1;
-      while (list.find(i => i.key === finalKey)) {
-        suffix += 1;
-        finalKey = `${key}-${suffix}`;
-      }
-      list.push({ key: finalKey, name, url });
-      icons[kind] = list;
-      return { ...c, icons };
-    });
-  }
-
-  async function onUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = await uploadToRepo(file, folder);
-    if (url) {
-      await refreshInventory();
-      setAddUrl(url);
-    }
-  }
-
-  async function deleteOne(item) {
-    const targetUrl = typeof item === 'string' ? item : (item?.url || item?.id || '');
-    const repoPath = typeof item === 'string'
-      ? pathFromUrl(item)
-      : (item?.path || pathFromUrl(item?.url || item?.id || ''));
-    if (!repoPath) {
-      alert('This file cannot be deleted here (external or unknown path).');
-      return false;
-    }
-    if (!window.confirm(`Delete this media file?\n${targetUrl}`)) return false;
-    setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(repoPath);
-    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
-    if (ok) await refreshInventory();
-    return ok;
-  }
-
-  async function deleteAll(list) {
-    if (!list?.length) return;
-    if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
-    setUploadStatus('Deleting group…');
-    let okCount = 0;
-    for (const it of list) {
-      const path = it?.path || pathFromUrl(it?.url || it?.id || '');
-      if (!path) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const ok = await deleteMediaPath(path);
-      if (ok) okCount++;
-    }
-    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
-    await refreshInventory();
-  }
-
-  // Group by type
-  const itemsByType = (inv || []).reduce((acc, it) => {
-    const t = classifyByExt(it.url);
-    if (!acc[t]) acc[t] = [];
-    acc[t].push(it);
-    return acc;
-  }, {});
-  const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
-  ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
-
-  return (
-    <main style={S.wrap}>
-      {/* Upload */}
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Upload</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
-          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
-          </select>
-          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
-            Upload
-            <input type="file" onChange={onUpload} style={{ display:'none' }} />
-          </label>
-        </div>
-        {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
-        <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
-        </div>
-      </div>
-
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
-          {subTabs.map(st => (
-            <button
-              key={st.key}
-              onClick={()=>setSubTab(st.key)}
-              style={{ ...S.tab, ...(subTab===st.key?S.tabActive:{}) }}
-            >
-              {st.label.toUpperCase()}
-            </button>
-          ))}
-        </div>
-
-        {/* Active section */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
-          <h3 style={{ margin:0 }}>{active.title}</h3>
-          <button
-            style={{ ...S.button, ...S.buttonDanger }}
-            onClick={()=>deleteAll(active.items)}
-            disabled={!active.items.length}
-            title="Delete all files in this type"
-          >
-            Delete All
-          </button>
-        </div>
-
-        {active.items.length === 0 ? (
-          <div style={{ color:'var(--admin-muted)' }}>No files.</div>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
-            {active.items.map((it, idx)=>{
-              const url = toDirectMediaURL(it.url);
-              const name = baseNameFromUrl(url);
-              const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
-              const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
-              return (
-                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
-                  {looksImage ? (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: 160,
-                        borderRadius: 12,
-                        overflow: 'hidden',
-                        border: '1px solid var(--admin-border-soft)',
-                        background: 'var(--admin-input-bg)',
-                        display: 'grid',
-                        placeItems: 'center',
-                      }}
-                    >
-                      <img src={previewCandidate} alt={name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                    </div>
-                  ) : (
-                    <MediaPreview url={url} kind={active.key} />
-                  )}
-                  <div>
-                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
-                    <div style={{ fontSize:12, color:'var(--admin-muted)', wordBreak:'break-word' }}>{url}</div>
-                  </div>
-                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ ...S.button, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
-                    >
-                      Open
-                    </a>
-                    <button
-                      style={{ ...S.button, ...S.buttonDanger }}
-                      onClick={()=>deleteOne(it)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-/* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
-  const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
-  const safeConfig = config || {};
-  const safeMedia = safeConfig.media || {};
-  const safeIcons = safeConfig.icons || {};
-  const rewards = safeMedia.rewardsPool || [];
-  const penalties = safeMedia.penaltiesPool || [];
-  const iconsM = safeIcons.missions || [];
-  const iconsD = safeIcons.devices  || [];
-  const iconsR = safeIcons.rewards  || [];
-  const triggerConfig = mergeTriggerState(safeConfig.mediaTriggers);
-
-  function updateMediaTrigger(partial) {
-    setConfig((c) => {
-      const base = c || {};
-      return {
-        ...base,
-        mediaTriggers: mergeTriggerState(base.mediaTriggers, partial),
-      };
-    });
-  }
-
-  const iconsDevices = safeIcons.devices || [];
-  const iconsMissions = safeIcons.missions || [];
-  const mediaOptions = (inventory || []).map((it, idx) => {
-    const rawUrl = it?.url || it?.path || it;
-    const url = toDirectMediaURL(rawUrl);
-    if (!url) return null;
-    return { id: url, label: it?.label || baseNameFromUrl(url) || `Media ${idx + 1}`, thumbnail: url };
-  }).filter(Boolean);
-  const deviceOptions = (devices || []).map((d, idx) => {
-    const id = d?.id || d?.key || `device-${idx}`;
-    const label = d?.title || d?.name || id;
-    const iconKey = d?.iconKey;
-    const iconEntry = iconsDevices.find(x => (x.key||'') === iconKey);
-    const thumbnail = toDirectMediaURL(d?.iconUrl || iconEntry?.url || '');
-    return { id, label, thumbnail, meta: d };
-  });
-  const missionOptions = (missions || []).map((m, idx) => {
-    const id = m?.id || `mission-${idx}`;
-    const label = m?.title || id;
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
-    const thumbnail = toDirectMediaURL(iconEntry?.url || '');
-    return { id, label, thumbnail, meta: m };
-  });
-  const responseOptions = [];
-  (missions || []).forEach((m) => {
-    if (!m) return;
-    const baseLabel = m.title || m.id || 'Mission';
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
-    const correctThumb = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || iconEntry?.url || '');
-    responseOptions.push({ id: `${m.id || baseLabel}::correct`, label: `${baseLabel} — Correct`, thumbnail: correctThumb });
-    const wrongThumb = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || iconEntry?.url || '');
-    responseOptions.push({ id: `${m.id || baseLabel}::wrong`, label: `${baseLabel} — Wrong`, thumbnail: wrongThumb });
-  });
-  const actionOptionsByType = {
-    media: mediaOptions,
-    devices: deviceOptions,
-    missions: missionOptions,
-  };
-  const selectedActionList = actionOptionsByType[triggerConfig.actionType] || mediaOptions;
-  const selectedAction = selectedActionList.find(opt => opt.id === triggerConfig.actionTarget) || null;
-  const resolvedActionPreview = triggerConfig.actionThumbnail || selectedAction?.thumbnail || '';
-  const selectedDevice = deviceOptions.find(opt => opt.id === triggerConfig.triggerDeviceId) || null;
-  const selectedResponse = responseOptions.find(opt => opt.id === triggerConfig.triggeredResponseKey) || null;
-  const selectedMission = missionOptions.find(opt => opt.id === triggerConfig.triggeredMissionId) || null;
-  const triggeredDeviceSummaries = (devices || []).filter(d => d?.trigger?.enabled).map(d => ({
-    id: d?.id || d?.key,
-    label: d?.title || d?.name || d?.id || 'Device',
-    trigger: sanitizeTriggerConfig(d?.trigger),
-  }));
-
-  const mediaPool = useMemo(() => {
-    return (inventory || []).map((item, idx) => {
-      const rawUrl = item?.url || item?.path || item;
-      const directUrl = toDirectMediaURL(rawUrl);
-      if (!directUrl) return null;
-      const thumb = toDirectMediaURL(item?.thumbUrl || directUrl);
-      return {
-        id: directUrl,
-        name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
-        type: item?.type || item?.kind || '',
-        tags: Array.isArray(item?.tags) ? item.tags : [],
-        thumbUrl: thumb,
-        url: directUrl,
-        openUrl: rawUrl || directUrl,
-        path: item?.path || '',
-      };
-    }).filter(Boolean);
-  }, [inventory]);
-
-  const assignedState = useMemo(() => ({
-    missionIcons: (config?.icons?.missions || []).map(icon => icon.key),
-    deviceIcons: (config?.icons?.devices || []).map(icon => icon.key),
-    rewardMedia: (config?.media?.rewardsPool || []).map(item => item.url),
-    penaltyMedia: (config?.media?.penaltiesPool || []).map(item => item.url),
-    actionMedia: config?.media?.actionMedia || [],
-  }), [config]);
-
-  const mediaUsageSummary = useMemo(() => {
-    try {
-    const normalize = (value) => {
-      if (!value) return '';
-      try {
-        const direct = toDirectMediaURL(value) || String(value);
-        return String(direct).trim();
-      } catch {
-        return String(value || '').trim();
-      }
-    };
-
-    const inventoryIndex = new Map(
-      (mediaPool || [])
-        .map((item) => {
-          const key = normalize(item?.id || item?.url);
-          return key ? [key, item] : null;
-        })
-        .filter(Boolean)
-    );
-
-    const addTagValue = (set, value) => {
-      if (!set) return;
-      const normalizedTag = String(value || '').trim();
-      if (!normalizedTag) return;
-      set.add(normalizedTag);
-    };
-
-    const ensureEntry = (map, rawUrl, defaults = {}) => {
-      const key = normalize(rawUrl);
-      if (!key) return null;
-      const info = inventoryIndex.get(key);
-      let entry = map.get(key);
-      if (!entry) {
-        entry = {
-          url: key,
-          label: defaults.label || info?.name || baseNameFromUrl(key),
-          references: new Set(),
-          count: 0,
-          kind: defaults.kind || info?.type || classifyByExt(key),
-          thumbUrl: defaults.thumbUrl || info?.thumbUrl || '',
-          tags: new Set(),
-        };
-        map.set(key, entry);
-      }
-      if (!entry.label && (defaults.label || info?.name)) {
-        entry.label = defaults.label || info?.name;
-      }
-      if (!entry.kind && (defaults.kind || info?.type)) {
-        entry.kind = defaults.kind || info?.type || entry.kind;
-      }
-      if (!entry.thumbUrl && (defaults.thumbUrl || info?.thumbUrl)) {
-        entry.thumbUrl = defaults.thumbUrl || info?.thumbUrl || entry.thumbUrl;
-      }
-      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
-      (Array.isArray(defaults.tags) ? defaults.tags : []).forEach((tag) => addTagValue(entry.tags, tag));
-      return entry;
-    };
-
-    const addUsage = (map, rawUrl, referenceLabel, defaults = {}) => {
-      const entry = ensureEntry(map, rawUrl, defaults);
-      if (!entry) return;
-      entry.count += 1;
-      if (referenceLabel) entry.references.add(referenceLabel);
-    };
-
-    const missionIconMap = new Map();
-    const deviceIconMap = new Map();
-    const rewardMap = new Map();
-    const penaltyMap = new Map();
-    const actionMap = new Map();
-    const responseCorrectMap = new Map();
-    const responseWrongMap = new Map();
-    const responseAudioMap = new Map();
-    const coverMap = new Map();
-
-    const missionIconLookup = new Map();
-    (safeIcons.missions || []).forEach((icon) => {
-      const url = normalize(icon?.url);
-      if (!url) return;
-      missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
-    });
-
-    (suite?.missions || []).forEach((mission) => {
-      if (!mission) return;
-      const title = mission.title || mission.id || 'Mission';
-      const iconUrls = new Set();
-      if (mission.iconUrl) {
-        const direct = normalize(mission.iconUrl);
-        if (direct) iconUrls.add(direct);
-      }
-      if (mission.iconKey && missionIconLookup.has(mission.iconKey)) {
-        const found = missionIconLookup.get(mission.iconKey);
-        if (found?.url) iconUrls.add(found.url);
-      }
-      iconUrls.forEach((url) => addUsage(missionIconMap, url, title));
-
-      if (mission.onCorrect?.mediaUrl) addUsage(responseCorrectMap, mission.onCorrect.mediaUrl, `${title} — Correct`);
-      if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
-      if (mission.onCorrect?.audioUrl) addUsage(responseAudioMap, mission.onCorrect.audioUrl, `${title} — Correct`);
-      if (mission.onWrong?.audioUrl) addUsage(responseAudioMap, mission.onWrong.audioUrl, `${title} — Wrong`);
-    });
-
-    const deviceIconLookup = new Map();
-    (safeIcons.devices || []).forEach((icon) => {
-      const url = normalize(icon?.url);
-      if (!url) return;
-      deviceIconLookup.set(icon.key, { url, name: icon.name || icon.key });
-    });
-
-    const hasDevices = Array.isArray(safeConfig.devices) && safeConfig.devices.length;
-    const deviceList = (hasDevices ? safeConfig.devices : (safeConfig.powerups || [])) || [];
-    deviceList.forEach((device) => {
-      if (!device) return;
-      const label = device.title || device.name || device.id || 'Device';
-      const urls = new Set();
-      if (device.iconUrl) {
-        const direct = normalize(device.iconUrl);
-        if (direct) urls.add(direct);
-      }
-      if (device.iconKey && deviceIconLookup.has(device.iconKey)) {
-        const found = deviceIconLookup.get(device.iconKey);
-        if (found?.url) urls.add(found.url);
-      }
-      urls.forEach((url) => addUsage(deviceIconMap, url, label));
-    });
-
-    (safeMedia.rewardsPool || []).forEach((item) => {
-      if (!item?.url) return;
-      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
-      addUsage(rewardMap, item.url, item.label || 'Reward slot', { label: item.label || undefined, tags });
-    });
-
-    (safeMedia.penaltiesPool || []).forEach((item) => {
-      if (!item?.url) return;
-      const tags = Array.isArray(item?.tags) ? item.tags : undefined;
-      addUsage(penaltyMap, item.url, item.label || 'Penalty slot', { label: item.label || undefined, tags });
-    });
-
-    (safeMedia.actionMedia || []).forEach((url) => {
-      addUsage(actionMap, url, 'Trigger assignment');
-    });
-
-    const coverUrl = normalize(safeConfig?.game?.coverImage);
-    if (coverUrl) {
-      const entry = ensureEntry(coverMap, coverUrl, { label: 'Game cover art' });
-      if (entry) {
-        entry.count = Math.max(1, entry.count);
-        entry.references.add('Active cover image');
-      }
-    }
-
-    const finalize = (map) => Array.from(map.values()).map((entry) => {
-      const info = inventoryIndex.get(entry.url);
-      const label = entry.label || info?.name || baseNameFromUrl(entry.url);
-      const kind = entry.kind || info?.type || classifyByExt(entry.url);
-      const openUrl = info?.openUrl || entry.url;
-      const thumb = kind === 'audio'
-        ? ''
-        : (info?.thumbUrl || entry.thumbUrl || openUrl);
-      const tagSet = new Set();
-      if (entry.tags instanceof Set) {
-        entry.tags.forEach((tag) => addTagValue(tagSet, tag));
-      }
-      (Array.isArray(info?.tags) ? info.tags : []).forEach((tag) => addTagValue(tagSet, tag));
-      return {
-        url: openUrl,
-        label,
-        count: entry.count,
-        references: Array.from(entry.references || []),
-        kind,
-        thumbUrl: thumb,
-        removeKey: entry.url,
-        tags: Array.from(tagSet),
-      };
-    }).sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.label.localeCompare(b.label);
-    });
-
-    return {
-      missionIcons: finalize(missionIconMap),
-      deviceIcons: finalize(deviceIconMap),
-      rewardMedia: finalize(rewardMap),
-      penaltyMedia: finalize(penaltyMap),
-      actionMedia: finalize(actionMap),
-      responseCorrect: finalize(responseCorrectMap),
-      responseWrong: finalize(responseWrongMap),
-      responseAudio: finalize(responseAudioMap),
-      coverImages: finalize(coverMap),
-    };
-    } catch (err) {
-      console.error('Failed to compute media usage summary', err);
-      return {
-        missionIcons: [],
-        deviceIcons: [],
-        rewardMedia: [],
-        penaltyMedia: [],
-        actionMedia: [],
-        responseCorrect: [],
-        responseWrong: [],
-        responseAudio: [],
-        coverImages: [],
-      };
-    }
-  }, [config, suite, mediaPool]);
-
-  const assignedMediaFallback = useCallback(({ error, reset }) => (
-    <div style={S.errorPanel}>
-      <div style={S.errorPanelTitle}>Assigned Media failed to load</div>
-      <div style={S.errorPanelMessage}>
-        {error?.message || 'An unexpected error occurred while rendering the Assigned Media tab.'}
-      </div>
-      <div style={S.errorPanelActions}>
-        <button
-          type="button"
-          style={S.button}
-          onClick={() => {
-            setAssignedMediaError(null);
-            reset();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  ), [setAssignedMediaError]);
-
-  const missionResponsesFallback = useCallback(({ error, reset }) => (
-    <div style={S.errorPanel}>
-      <div style={S.errorPanelTitle}>Mission responses failed to load</div>
-      <div style={S.errorPanelMessage}>
-        {error?.message || 'An unexpected error occurred while rendering the mission response editor.'}
-      </div>
-      <div style={S.errorPanelActions}>
-        <button
-          type="button"
-          style={S.button}
-          onClick={() => {
-            setMissionResponsesError(null);
-            reset();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  ), [setMissionResponsesError]);
-
-  const arraysEqual = useCallback((a = [], b = []) => {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i += 1) {
-      if (a[i] !== b[i]) return false;
-    }
-    return true;
-  }, []);
-
-  const handleAssignedStateChange = useCallback((nextAssigned = {}) => {
-    const nextAction = Array.isArray(nextAssigned.actionMedia) ? nextAssigned.actionMedia : [];
-    setConfig(current => {
-      const base = current || {};
-      const prevAction = base.media?.actionMedia || [];
-      if (arraysEqual(prevAction, nextAction)) return current;
-      return {
-        ...base,
-        media: {
-          ...(base.media || {}),
-          actionMedia: [...nextAction],
-        },
-      };
-    });
-  }, [arraysEqual, setConfig]);
-
-  const triggerEnabled = !!triggerConfig.enabled;
-
-  const editingIsNew = useMemo(() => {
-    if (!editing) return false;
-    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
-  }, [editing, suite]);
-
-  const handleTriggerToggle = useCallback((enabled) => {
-    setMediaTriggerPicker('');
-    updateMediaTrigger({ enabled });
-  }, [updateMediaTrigger]);
-
-  function removePoolItem(kind, idx) {
-    if (!window.confirm('Remove this item from the assigned list?')) return;
-    setConfig(c => {
-      if (!c) return c;
-      const m = { ...(c.media||{ rewardsPool:[], penaltiesPool:[] }) };
-      if (kind === 'rewards') m.rewardsPool = m.rewardsPool.filter((_,i)=>i!==idx);
-      if (kind === 'penalties') m.penaltiesPool = m.penaltiesPool.filter((_,i)=>i!==idx);
-      return { ...c, media: m };
-    });
-  }
-  function removeIcon(kind, key) {
-    if (!window.confirm('Remove this icon from the assigned list?')) return;
-    setConfig(c => {
-      if (!c) return c;
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
-      icons[kind] = icons[kind].filter(i => i.key !== key);
-      return { ...c, icons };
-    });
-  }
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <SafeBoundary
-          fallback={assignedMediaFallback}
-          onError={(error) => {
-            console.error('Assigned Media render failure', error);
-            setAssignedMediaError(error);
-            const message = error?.message || error || 'unknown error';
-            setStatus(`❌ Assigned Media failed to load: ${message}`);
-          }}
-          onReset={() => setAssignedMediaError(null)}
-          resetKeys={[assignedMediaError, assignedState, mediaUsageSummary, inventory]}
-        >
-          <AssignedMediaTab
-            mediaPool={mediaPool}
-            assigned={assignedState}
-            onChange={handleAssignedStateChange}
-            triggerEnabled={triggerEnabled}
-            setTriggerEnabled={handleTriggerToggle}
-            usageSummary={mediaUsageSummary}
-          />
-        </SafeBoundary>
-
-        {triggerEnabled && (
-          <>
-            <div style={{ fontWeight:600, margin:'8px 0 12px', fontSize:18 }}>Automation Routing</div>
-
-            <div style={{ marginTop:12, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action type</div>
-              <select
-                style={S.input}
-                value={triggerConfig.actionType}
-                onChange={(e)=>{ setMediaTriggerPicker(''); updateMediaTrigger({ actionType:e.target.value, actionTarget:'', actionLabel:'', actionThumbnail:'' }); }}
-              >
-                <option value="media">Media</option>
-                <option value="devices">Devices</option>
-                <option value="missions">Missions</option>
-              </select>
-            </div>
-
-            <TriggerDropdown
-              label="Action target"
-              openKey={mediaTriggerPicker}
-              setOpenKey={setMediaTriggerPicker}
-              dropdownKey="media-action"
-              options={selectedActionList}
-              selected={selectedAction}
-              onSelect={(opt)=>{ updateMediaTrigger({ actionTarget: opt?.id || '', actionLabel: opt?.label || '', actionThumbnail: opt?.thumbnail || '' }); }}
-            />
-            {resolvedActionPreview && (
-              <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action preview</div>
-                <div style={{ width:80, height:60, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
-                  <img src={toDirectMediaURL(resolvedActionPreview)} alt="action preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                </div>
-              </div>
-            )}
-
-            <TriggerDropdown
-              label="Trigger Device"
-              openKey={mediaTriggerPicker}
-              setOpenKey={setMediaTriggerPicker}
-              dropdownKey="media-device"
-              options={deviceOptions}
-              selected={selectedDevice}
-              onSelect={(opt)=>{ updateMediaTrigger({ triggerDeviceId: opt?.id || '', triggerDeviceLabel: opt?.label || '' }); }}
-            />
-
-            <TriggerDropdown
-              label="Triggered Response"
-              openKey={mediaTriggerPicker}
-              setOpenKey={setMediaTriggerPicker}
-              dropdownKey="media-response"
-              options={responseOptions}
-              selected={selectedResponse}
-              onSelect={(opt)=>{ updateMediaTrigger({ triggeredResponseKey: opt?.id || '' }); }}
-            />
-
-            <TriggerDropdown
-              label="Triggered Mission"
-              openKey={mediaTriggerPicker}
-              setOpenKey={setMediaTriggerPicker}
-              dropdownKey="media-mission"
-              options={missionOptions}
-              selected={selectedMission}
-              onSelect={(opt)=>{ updateMediaTrigger({ triggeredMissionId: opt?.id || '' }); }}
-            />
-          </>
-        )}
-
-        <div style={{ marginTop:16 }}>
-          <div style={{ fontWeight:600, marginBottom:6 }}>Trigger Device Assignments</div>
-          {triggeredDeviceSummaries.length === 0 ? (
-            <div style={{ color:'var(--admin-muted)', fontSize:12 }}>No trigger-enabled devices yet.</div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:10 }}>
-              {triggeredDeviceSummaries.map((it)=>{
-                const preview = it.trigger.actionThumbnail || '';
-                return (
-                  <div key={it.id} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10, display:'grid', gap:8 }}>
-                    <div style={{ fontWeight:600 }}>{it.label}</div>
-                    <div style={{ fontSize:12, color:'var(--admin-muted)' }}>Action: {it.trigger.actionLabel || it.trigger.actionTarget || '(none)'}</div>
-                    {preview && (
-                      <div style={{ width:'100%', height:64, borderRadius:10, overflow:'hidden', border:'1px solid var(--admin-border-soft)', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
-                        <img src={toDirectMediaURL(preview)} alt="trigger preview" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Icons */}
-      <div style={S.card}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Icons</h3>
-          <button style={S.button} onClick={onReapplyDefaults}>Re-apply default icon sets</button>
-        </div>
-
-        <IconGroup
-          title={`Mission Icons (${iconsM.length})`}
-          items={iconsM}
-          onRemove={(key)=>removeIcon('missions', key)}
-        />
-        <IconGroup
-          title={`Device Icons (${iconsD.length})`}
-          items={iconsD}
-          onRemove={(key)=>removeIcon('devices', key)}
-        />
-        <IconGroup
-          title={`Reward Icons (${iconsR.length})`}
-          items={iconsR}
-          onRemove={(key)=>removeIcon('rewards', key)}
-        />
-      </div>
-
-      {/* Pools */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <h3 style={{ marginTop:0, marginBottom:8 }}>Assigned Media Pools</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-          <Pool
-            title={`Rewards Pool (${rewards.length})`}
-            items={rewards}
-            onRemove={(idx)=>removePoolItem('rewards', idx)}
-          />
-          <Pool
-            title={`Penalties Pool (${penalties.length})`}
-            items={penalties}
-            onRemove={(idx)=>removePoolItem('penalties', idx)}
-          />
-        </div>
-      </div>
-    </main>
-  );
-}
-
-/* Shared pieces for Assigned Media */
-function IconGroup({ title, items, onRemove }) {
-  return (
-    <div style={{ marginTop:8 }}>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      {items.length === 0 && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>No icons yet.</div>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:10 }}>
-        {items.map((it)=>(
-          <div key={it.key} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10, display:'grid', gap:6 }}>
-            <div style={{ display:'grid', gridTemplateColumns:'48px 1fr', gap:8, alignItems:'center' }}>
-              <img src={toDirectMediaURL(it.url)} alt="" style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-              <div>
-                <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{it.name||it.key}</div>
-                <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{it.key}</div>
-              </div>
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={()=>onRemove(it.key)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-function Pool({ title, items, onRemove }) {
-  return (
-    <div>
-      <div style={{ fontWeight:600, marginBottom:8 }}>{title}</div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px,1fr))', gap:10 }}>
-        {items.map((it, idx)=>(
-          <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:10 }}>
-            <div style={{ fontWeight:600, marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-              {it.label || baseNameFromUrl(it.url)}
-            </div>
-            <MediaPreview url={it.url} kind="pool item" />
-            <div style={{ display:'flex', gap:8, marginTop:8 }}>
-              <a href={toDirectMediaURL(it.url)} target="_blank" rel="noreferrer" style={{ ...S.button, textDecoration:'none', display:'grid', placeItems:'center' }}>Open</a>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={()=>{ if (window.confirm('Remove this item?')) onRemove(idx); }}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-        {items.length===0 && <div style={{ color:'var(--admin-muted)' }}>No items.</div>}
-      </div>
-    </div>
-  );
-}
-
-function TriggerDropdown({ label, openKey = '', setOpenKey = () => {}, dropdownKey, options = [], selected = null, onSelect = () => {} }) {
-  const isOpen = openKey === dropdownKey;
-  return (
-    <div style={{ marginTop:12 }}>
-      <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>{label}</div>
-      <div style={{ position:'relative' }}>
-        <button
-          type="button"
-          style={{ ...S.button, width:'100%', justifyContent:'space-between', display:'flex', alignItems:'center' }}
-          onClick={()=>setOpenKey(isOpen ? '' : dropdownKey)}
-        >
-          <span>{selected ? selected.label : 'Select option'}</span>
-          <span style={{ opacity:0.6 }}>▾</span>
-        </button>
-        {isOpen && (
-          <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, right:0, zIndex:40, maxHeight:240, overflowY:'auto', border:'1px solid var(--admin-border-soft)', borderRadius:10, background:'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow:'0 18px 36px rgba(0,0,0,0.45)' }}>
-            {options.length === 0 ? (
-              <div style={{ padding:12, color:'var(--admin-muted)' }}>No options available.</div>
-            ) : options.map(opt => (
-              <div
-                key={opt.id}
-                onClick={()=>{ onSelect(opt); setOpenKey(''); }}
-                style={{ display:'grid', gridTemplateColumns:'56px 1fr', gap:10, alignItems:'center', padding:'8px 12px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}
-              >
-                <div style={{ width:56, height:42, borderRadius:8, overflow:'hidden', background:'var(--admin-tab-bg)', display:'grid', placeItems:'center' }}>
-                  {opt.thumbnail ? (
-                    <img src={toDirectMediaURL(opt.thumbnail)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                  ) : (
-                    <div style={{ fontSize:12, color:'var(--admin-muted)' }}>No preview</div>
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontWeight:600 }}>{opt.label}</div>
-                  <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{opt.id}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+  noteText: { marginTop

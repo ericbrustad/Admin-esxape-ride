@@ -4,6 +4,19 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-17 — Settings stack polish, stable devices map, and icon uploads. Commit: 11f7843d468c9559bf632573a84ee719bff3e1de
+  - Direct links: `pages/index.jsx`
+  - Notes: Moves the “Select Your Game” selector above the settings card with a player-count dropdown and splash Test/Live toggle, keeps the devices map from zooming away by locking the initial fit and adds save/cancel buttons below the map, and enables drag-and-drop uploads for mission, device, and reward icons directly inside Assigned Media. Note to review @ 2025-10-17 01:50:59Z.
+- 2025-10-17 — Assigned Media props plumbing & mission launch guard. Commit: 4ff0d9196a75b9dcd275fcfa29ce2a15e04b25be
+  - Direct links: `pages/index.jsx`
+  - Notes: Exposes the parent error/status handlers to `AssignedMediaPageTab` so the tab no longer crashes when loading, restores
+    the `missionResponsesFallback` guard inside the main admin flow, recalculates the mission editor's "new" state at the page
+    level, and verified Assigned Media plus New Mission overlays render in the dev preview. Note to review @ 2025-10-17 00:26:18Z.
+- 2025-10-16 — Assigned Media mission guard & media delete API cleanup. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Stops the Assigned Media tab from referencing an undefined `suite` during render by scoping all usage to the missions
+    provided by the admin dashboard, eliminating the React ReferenceError, and trims the media deletion helper to the single
+    `/api/media/delete` endpoint so the browser no longer spams 405 errors while loading. Note to review @ 2025-10-16 21:43:50Z.
 - 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
   - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
   - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.
