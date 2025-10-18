@@ -160,6 +160,95 @@ function formatLocalDateTime(value) {
     return '';
   }
 }
+
+const CONVERSATION_LOG_STORAGE_KEY = 'gptConversationLog';
+
+function normalizeConversationEntry(entry, fallbackSeed = Date.now()) {
+  if (!entry) return null;
+  const rawSpeaker = typeof entry.speaker === 'string' && entry.speaker.trim()
+    ? entry.speaker.trim()
+    : typeof entry.role === 'string' && entry.role.trim()
+      ? entry.role.trim()
+      : '';
+  const speaker = rawSpeaker
+    ? rawSpeaker.replace(/\s+/g, ' ')
+    : entry?.role === 'assistant'
+      ? 'GPT'
+      : entry?.role === 'user'
+        ? 'You'
+        : 'System';
+  const rawMessage = typeof entry.message === 'string'
+    ? entry.message
+    : typeof entry.content === 'string'
+      ? entry.content
+      : '';
+  const message = String(rawMessage || '').trim();
+  if (!message) return null;
+  const rawTimestamp = entry.timestamp || entry.time || entry.createdAt || entry.date;
+  let timestampIso = '';
+  if (rawTimestamp) {
+    const rawDate = new Date(rawTimestamp);
+    if (!Number.isNaN(rawDate.getTime())) {
+      timestampIso = rawDate.toISOString();
+    }
+  }
+  if (!timestampIso) timestampIso = new Date().toISOString();
+  const idBase = entry.id || entry.key || `${fallbackSeed}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id: String(idBase),
+    speaker,
+    message,
+    timestamp: timestampIso,
+  };
+}
+
+function sanitizeConversationLog(entries) {
+  if (!Array.isArray(entries)) return [];
+  const seen = new Set();
+  const sanitized = [];
+  entries.forEach((entry, idx) => {
+    const normalized = normalizeConversationEntry(entry, idx + 1);
+    if (!normalized) return;
+    let finalId = normalized.id;
+    while (seen.has(finalId)) {
+      finalId = `${finalId}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    seen.add(finalId);
+    sanitized.push({ ...normalized, id: finalId });
+  });
+  return sanitized.slice(-200);
+}
+
+function readStoredConversationLog() {
+  if (typeof window === 'undefined') return [];
+  const stores = [];
+  try { stores.push(window.sessionStorage); } catch {}
+  try { stores.push(window.localStorage); } catch {}
+  for (const storage of stores) {
+    if (!storage) continue;
+    try {
+      const raw = storage.getItem(CONVERSATION_LOG_STORAGE_KEY);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const sanitized = sanitizeConversationLog(parsed);
+      if (sanitized.length || Array.isArray(parsed)) return sanitized;
+    } catch {}
+  }
+  return [];
+}
+
+function writeStoredConversationLog(entries) {
+  if (typeof window === 'undefined') return;
+  const payload = JSON.stringify(entries);
+  try { window.sessionStorage.setItem(CONVERSATION_LOG_STORAGE_KEY, payload); } catch {}
+  try { window.localStorage.setItem(CONVERSATION_LOG_STORAGE_KEY, payload); } catch {}
+}
+
+function removeStoredConversationLog() {
+  if (typeof window === 'undefined') return;
+  try { window.sessionStorage.removeItem(CONVERSATION_LOG_STORAGE_KEY); } catch {}
+  try { window.localStorage.removeItem(CONVERSATION_LOG_STORAGE_KEY); } catch {}
+}
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -757,6 +846,9 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
+  const [conversationLog, setConversationLog] = useState([]);
+  const [conversationSpeaker, setConversationSpeaker] = useState('You');
+  const [conversationDraft, setConversationDraft] = useState('');
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -1066,6 +1158,76 @@ export default function Admin() {
       clearInterval(timer);
     };
   }, []);
+
+  const appendConversationEntry = useCallback((entry) => {
+    const normalized = normalizeConversationEntry(entry, Date.now());
+    if (!normalized) return;
+    setConversationLog((prev) => {
+      const next = [...prev, normalized].slice(-200);
+      if (typeof window !== 'undefined') writeStoredConversationLog(next);
+      return next;
+    });
+  }, []);
+
+  const refreshConversationLog = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    setConversationLog(readStoredConversationLog());
+  }, []);
+
+  const handleClearConversationLog = useCallback(() => {
+    removeStoredConversationLog();
+    setConversationLog([]);
+  }, []);
+
+  const handleConversationSubmit = useCallback(() => {
+    const trimmed = conversationDraft.trim();
+    if (!trimmed) return;
+    appendConversationEntry({
+      speaker: conversationSpeaker,
+      message: trimmed,
+      timestamp: new Date().toISOString(),
+    });
+    setConversationDraft('');
+  }, [appendConversationEntry, conversationDraft, conversationSpeaker]);
+
+  const conversationLogEntries = useMemo(() => {
+    const items = Array.isArray(conversationLog) ? [...conversationLog] : [];
+    items.sort((a, b) => {
+      const aTime = Date.parse(a?.timestamp || '') || 0;
+      const bTime = Date.parse(b?.timestamp || '') || 0;
+      return aTime - bTime;
+    });
+    return items;
+  }, [conversationLog]);
+
+  const conversationLastUpdatedLabel = useMemo(() => {
+    if (!conversationLogEntries.length) return '';
+    const last = conversationLogEntries[conversationLogEntries.length - 1];
+    return formatLocalDateTime(last?.timestamp || '');
+  }, [conversationLogEntries]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const initial = readStoredConversationLog();
+    if (initial.length) setConversationLog(initial);
+    const append = (entry) => appendConversationEntry(entry);
+    window.appendGptConversation = append;
+    window.clearGptConversationLog = handleClearConversationLog;
+    window.refreshGptConversationLog = refreshConversationLog;
+    return () => {
+      delete window.appendGptConversation;
+      delete window.clearGptConversationLog;
+      delete window.refreshGptConversationLog;
+    };
+  }, [appendConversationEntry, handleClearConversationLog, refreshConversationLog]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    window.gptConversationLog = conversationLogEntries;
+    return () => {
+      delete window.gptConversationLog;
+    };
+  }, [conversationLogEntries]);
 
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
@@ -2348,10 +2510,25 @@ export default function Admin() {
     : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
+  const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
+  const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
+  const metaOwnerRepo = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
+  const metaRepoUrl = adminMeta.owner && adminMeta.repo
+    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
+    : '';
+  const metaCommitUrl = metaCommitLabel && metaRepoUrl
+    ? `${metaRepoUrl}/commit/${metaCommitLabel}`
+    : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaVercelUrl = adminMeta.vercelUrl || '';
+  const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
+  const conversationHasEntries = conversationLogEntries.length > 0;
+  const conversationEntryCount = conversationLogEntries.length;
+  const conversationDraftHasText = conversationDraft.trim().length > 0;
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2384,10 +2561,39 @@ export default function Admin() {
       <div style={S.metaBanner}>
         <div style={S.metaBannerLine}>
           <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
+          {metaCommitLabel && (
+            <span style={S.metaCommitBlock}>
+              <strong>Commit:</strong>{' '}
+              {metaCommitUrl ? (
+                <a
+                  href={metaCommitUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={S.metaCommitLink}
+                  title={`Open commit ${metaCommitLabel}`}
+                >
+                  <span style={S.metaBadge}>#{metaCommitShort || metaCommitLabel}</span>
+                </a>
+              ) : (
+                <span style={S.metaBadge} title={`Commit ${metaCommitLabel}`}>
+                  #{metaCommitShort || metaCommitLabel}
+                </span>
+              )}
+              {metaCommitLabel.length > 7 && (
+                <span style={S.metaCommitCode}>{metaCommitLabel}</span>
+              )}
+            </span>
+          )}
+          {metaOwnerRepo && (
+            <span>
+              <strong>Repo:</strong>{' '}
+              {metaRepoUrl ? (
+                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                  {metaOwnerRepo}
+                </a>
+              ) : (
+                <span style={S.metaMuted}>{metaOwnerRepo}</span>
+              )}
             </span>
           )}
           {metaDeploymentState && (
@@ -2402,8 +2608,16 @@ export default function Admin() {
               )}
             </span>
           )}
+          {metaVercelUrl && (
+            <span>
+              <strong>Vercel:</strong>{' '}
+              <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                {metaVercelLabel || metaVercelUrl}
+              </a>
+            </span>
+          )}
           {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
+            <span><strong>Updated:</strong> {metaTimestampLabel}</span>
           )}
           {adminMeta.error && (
             <span style={S.metaBannerError}>{adminMeta.error}</span>
@@ -2548,6 +2762,112 @@ export default function Admin() {
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
+
+      <section style={S.conversationWrap}>
+        <div style={{ ...S.card, ...S.conversationCard }}>
+          <div style={S.conversationHeader}>
+            <div style={S.conversationTitleBlock}>
+              <div style={S.conversationTitle}>
+                GPT Collaboration Log{conversationHasEntries ? ` (${conversationEntryCount})` : ''}
+              </div>
+              <div style={S.conversationSubtitle}>
+                Track the ongoing dialogue between you and GPT for faster debugging loops.
+              </div>
+            </div>
+            <div style={S.conversationActions}>
+              <button
+                type="button"
+                onClick={refreshConversationLog}
+                style={{ ...S.button, ...S.conversationActionButton }}
+              >
+                Reload Saved Log
+              </button>
+              <button
+                type="button"
+                onClick={handleClearConversationLog}
+                style={{
+                  ...S.button,
+                  ...S.conversationActionButton,
+                  opacity: conversationHasEntries ? 1 : 0.6,
+                }}
+                disabled={!conversationHasEntries}
+              >
+                Clear Log
+              </button>
+            </div>
+          </div>
+          {conversationLastUpdatedLabel && (
+            <div style={S.conversationHint}>Last entry: {conversationLastUpdatedLabel}</div>
+          )}
+          <div style={S.conversationBody}>
+            {conversationHasEntries ? (
+              <ol style={S.conversationList}>
+                {conversationLogEntries.map((entry) => {
+                  const timestampLabel = formatLocalDateTime(entry?.timestamp || '') || entry?.timestamp;
+                  return (
+                    <li key={entry.id} style={S.conversationItem}>
+                      <div style={S.conversationMeta}>
+                        <span style={S.conversationSpeaker}>{entry.speaker}</span>
+                        <span>{timestampLabel}</span>
+                      </div>
+                      <div style={S.conversationMessage}>{entry.message}</div>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <div style={S.conversationEmpty}>
+                No GPT conversation recorded yet. Use the composer below or call{' '}
+                <span style={S.inlineCode}>
+                  window.appendGptConversation(&#123; speaker: 'You', message: 'Hello GPT' &#125;)
+                </span>{' '}
+                in the console to capture a dialogue.
+              </div>
+            )}
+          </div>
+          <div style={S.conversationForm}>
+            <div style={S.conversationInputs}>
+              <label style={S.conversationInputLabel}>
+                Speaker
+                <select
+                  value={conversationSpeaker}
+                  onChange={(e) => setConversationSpeaker(e.target.value)}
+                  style={S.conversationSelect}
+                >
+                  <option value="You">You</option>
+                  <option value="GPT">GPT</option>
+                  <option value="System">System</option>
+                </select>
+              </label>
+            </div>
+            <textarea
+              value={conversationDraft}
+              onChange={(e) => setConversationDraft(e.target.value)}
+              placeholder="Add a quick log entry…"
+              style={S.conversationTextarea}
+            />
+            <div style={S.conversationFooterActions}>
+              <button
+                type="button"
+                onClick={handleConversationSubmit}
+                style={{
+                  ...S.button,
+                  ...S.conversationActionButton,
+                  opacity: conversationDraftHasText ? 1 : 0.6,
+                }}
+                disabled={!conversationDraftHasText}
+              >
+                Add Entry
+              </button>
+              <div style={S.conversationHelp}>
+                Tip: use{' '}
+                <span style={S.inlineCode}>window.appendGptConversation</span> or{' '}
+                <span style={S.inlineCode}>window.refreshGptConversationLog</span> in the console to automate updates.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -4204,6 +4524,27 @@ const S = {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  metaCommitBlock: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  metaCommitLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+  },
+  metaCommitCode: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    background: 'rgba(148, 163, 184, 0.12)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    padding: '2px 6px',
+    borderRadius: 6,
+    lineHeight: 1.4,
+    wordBreak: 'break-all',
+  },
   metaBadge: {
     padding: '2px 8px',
     borderRadius: 999,
@@ -4269,6 +4610,110 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  conversationWrap: { maxWidth: 1400, margin: '24px auto 0', padding: 16 },
+  conversationCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  conversationHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  conversationTitleBlock: { display: 'flex', flexDirection: 'column', gap: 4 },
+  conversationTitle: { fontSize: 18, fontWeight: 700 },
+  conversationSubtitle: { fontSize: 12, color: 'var(--admin-muted)' },
+  conversationActions: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  conversationActionButton: {
+    padding: '8px 12px',
+    borderRadius: 10,
+    border: 'var(--admin-button-border)',
+    background: 'var(--admin-button-bg)',
+    color: 'var(--admin-button-color)',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  conversationHint: { fontSize: 12, color: 'var(--admin-muted)' },
+  conversationBody: {
+    display: 'grid',
+    gap: 10,
+    maxHeight: 260,
+    overflowY: 'auto',
+    paddingRight: 4,
+  },
+  conversationList: { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 },
+  conversationItem: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    padding: 12,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+    display: 'grid',
+    gap: 8,
+  },
+  conversationMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  conversationSpeaker: {
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  conversationMessage: { whiteSpace: 'pre-wrap', lineHeight: 1.5 },
+  conversationEmpty: { fontSize: 12, color: 'var(--admin-muted)' },
+  conversationForm: { display: 'grid', gap: 10 },
+  conversationInputs: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  conversationInputLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    gap: 6,
+  },
+  conversationSelect: {
+    minWidth: 120,
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  conversationTextarea: {
+    width: '100%',
+    minHeight: 80,
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+  },
+  conversationFooterActions: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  conversationHelp: { fontSize: 12, color: 'var(--admin-muted)', maxWidth: 540 },
+  inlineCode: {
+    fontFamily: 'monospace',
+    background: 'rgba(148, 163, 184, 0.16)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    padding: '2px 6px',
+    borderRadius: 6,
   },
   floatingBarTop: {
     position: 'sticky',
