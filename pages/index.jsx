@@ -2858,39 +2858,41 @@ export default function Admin() {
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
             </div>
-            <div style={S.headerNavSecondary}>
-              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
-                {games.map(g=>(
-                  <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                ))}
-              </select>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  disabled={!gameEnabled}
-                />
-                Deploy game build
-              </label>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
-                <input
-                  type="number" min={0} max={120}
-                  value={deployDelaySec}
-                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
-                  disabled={!deployGameEnabled || !gameEnabled}
-                />
-              </label>
-              {!gameEnabled && (
-                <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
-                  ⚠️ Game folder mirroring disabled — deploy controls are read-only.
-                </span>
-              )}
-            </div>
+            {tab !== 'settings' && (
+              <div style={S.headerNavSecondary}>
+                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled={!gameEnabled}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled || !gameEnabled}
+                  />
+                </label>
+                {!gameEnabled && (
+                  <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
+                    ⚠️ Game folder mirroring disabled — deploy controls are read-only.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {(showProtectionIndicator || tab === 'settings') && (
@@ -2932,7 +2934,7 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {tab === 'settings' && (
+              {tab !== 'settings' && (
                 <div style={S.coverSummary}>
                   <div style={{ fontWeight:700 }}>Cover status</div>
                   <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
@@ -3840,21 +3842,96 @@ export default function Admin() {
 
       {/* SETTINGS */}
       {tab==='settings' && (
-        <main style={S.wrap}>
-          <div style={S.card}>
-            <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={S.gameTitleRow}>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Game Title</div>
-                <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+        <main style={S.wrapGrid2}>
+          <aside style={S.settingsSidebar}>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={S.settingsHeroRow}>
+                <div style={S.headerCoverFrame}>
+                  {headerCoverThumb ? (
+                    <img
+                      src={headerCoverThumb}
+                      alt="Active game cover"
+                      style={S.headerCoverThumb}
+                    />
+                  ) : (
+                    <div style={S.headerCoverPlaceholder}>No Cover</div>
+                  )}
+                </div>
+                <div style={S.settingsHeroText}>
+                  <div style={S.headerGameTitle}>{headerGameTitle}</div>
+                  <div style={S.headerSubtitle}>Admin Control Deck</div>
+                </div>
               </div>
-              <div style={S.readonlyField}>
+              <div style={S.settingsHeroNote}>Titles are managed per game. Create a new game to set a different name.</div>
+              <div style={S.settingsSlugBlock}>
                 <div style={S.fieldLabel}>Slug</div>
                 <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
                 <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
               </div>
             </div>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={S.settingsControlSection}>
+                <div style={S.settingsControlLabel}>Saved Games</div>
+                <select
+                  style={S.input}
+                  value={activeSlug}
+                  onChange={(e)=>setActiveSlug(e.target.value)}
+                >
+                  {selectGameOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <div style={S.noteText}>
+                  Switch to another saved escape ride. The selection reloads missions, devices, and settings.
+                </div>
+              </div>
+              <div style={S.settingsActionRow}>
+                <button
+                  type="button"
+                  style={{ ...S.button, ...S.buttonSuccess, width: '100%' }}
+                  onClick={()=>setShowNewGame(true)}
+                >
+                  + New Game
+                </button>
+              </div>
+              <div style={{ ...S.noteText, marginTop:4 }}>Opens the creation window for naming, slugging, and selecting cover art.</div>
+              <div style={S.settingsControlGroup}>
+                <label style={S.settingsControlRow}>
+                  <input
+                    type="checkbox"
+                    checked={deployGameEnabled}
+                    onChange={(e)=>setDeployEnabled(e.target.checked)}
+                    disabled={!gameEnabled}
+                  />
+                  Deploy game build
+                </label>
+                <label style={{ ...S.settingsControlRow, cursor: 'default' }}>
+                  Deploy delay (sec):
+                  <input
+                    type="number" min={0} max={120}
+                    value={deployDelaySec}
+                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                    style={{ ...S.input, width: 110, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                    disabled={!deployGameEnabled || !gameEnabled}
+                  />
+                </label>
+                {!gameEnabled && (
+                  <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
+                    ⚠️ Game folder mirroring disabled — deploy controls are read-only.
+                  </span>
+                )}
+              </div>
+            </div>
+            <div style={{ ...S.card, ...S.settingsSidebarCard }}>
+              <div style={{ fontWeight:700 }}>Cover status</div>
+              <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                {coverStatusMessage}
+              </div>
+            </div>
+          </aside>
+          <section style={S.settingsContent}>
+            <div style={S.card}>
+              <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.coverControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
@@ -3917,30 +3994,6 @@ export default function Admin() {
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
-            <Field label="Saved Games">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={S.noteText}>
-                Switch to another saved escape ride. The selection reloads missions, devices, and settings.
-              </div>
-            </Field>
-            <div style={S.savedGamesActions}>
-              <button
-                type="button"
-                style={{ ...S.button, ...S.buttonSuccess }}
-                onClick={()=>setShowNewGame(true)}
-              >
-                + New Game
-              </button>
-              <div style={S.noteText}>Opens the creation window for naming, slugging, and selecting cover art.</div>
-            </div>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -4152,6 +4205,7 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+          </section>
         </main>
       )}
 
@@ -4650,7 +4704,65 @@ const S = {
     color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
-  wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  wrapGrid2: { display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
+  settingsSidebar: {
+    display: 'grid',
+    gap: 16,
+  },
+  settingsSidebarCard: {
+    display: 'grid',
+    gap: 12,
+  },
+  settingsHeroRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsHeroText: {
+    display: 'grid',
+    gap: 4,
+    alignItems: 'flex-start',
+  },
+  settingsHeroNote: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    marginTop: 6,
+  },
+  settingsSlugBlock: {
+    display: 'grid',
+    gap: 6,
+  },
+  settingsControlSection: {
+    display: 'grid',
+    gap: 8,
+  },
+  settingsControlLabel: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    fontWeight: 700,
+  },
+  settingsActionRow: {
+    display: 'flex',
+    alignItems: 'center',
+  },
+  settingsControlGroup: {
+    display: 'grid',
+    gap: 8,
+  },
+  settingsControlRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+    cursor: 'pointer',
+  },
+  settingsContent: {
+    display: 'grid',
+    gap: 16,
+  },
   sidebarTall: {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
     border: 'var(--appearance-panel-border, var(--admin-panel-border))',
@@ -4823,11 +4935,13 @@ const S = {
   },
   headerTopRow: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
-    textAlign: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    textAlign: 'left',
+    gap: 16,
     marginBottom: 20,
+    flexWrap: 'wrap',
   },
   headerTitleGroup: {
     display: 'flex',
@@ -4874,50 +4988,29 @@ const S = {
   },
   headerNavRow: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 16,
+    flexWrap: 'wrap',
   },
   headerNavPrimary: {
     display: 'flex',
     flexWrap: 'wrap',
     gap: 10,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   headerNavSecondary: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  gameTitleRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 16,
-    alignItems: 'stretch',
-    marginBottom: 16,
+    justifyContent: 'flex-end',
   },
   fieldLabel: {
     fontSize: 12,
     color: 'var(--admin-muted)',
-  },
-  readonlyField: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
-    padding: '12px 16px',
-    borderRadius: 14,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-input-bg)',
-    boxShadow: 'var(--admin-glass-sheen)',
-  },
-  readonlyValue: {
-    fontSize: 18,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    wordBreak: 'break-word',
   },
   readonlyCode: {
     display: 'inline-block',
@@ -4927,13 +5020,6 @@ const S = {
     background: 'var(--admin-tab-bg)',
     fontWeight: 600,
     letterSpacing: '0.08em',
-  },
-  savedGamesActions: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-    marginBottom: 16,
   },
   coverControlsRow: {
     display: 'flex',
