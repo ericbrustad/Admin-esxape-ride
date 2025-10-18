@@ -593,6 +593,20 @@ export default function Admin() {
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
 
+  const logConversation = useCallback((speaker, text) => {
+    if (!text) return;
+    setStatusLog((prev) => {
+      const entry = { speaker, text, timestamp: new Date().toISOString() };
+      const next = [...prev, entry];
+      return next.slice(-20);
+    });
+  }, []);
+
+  const setStatus = useCallback((message) => {
+    setStatusInternal(message);
+    if (message) logConversation('GPT', message);
+  }, [logConversation]);
+
   const [protectionPrompt, setProtectionPrompt] = useState({
     open: false,
     mode: 'enable',
@@ -623,7 +637,13 @@ export default function Admin() {
     if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
   }
 
+  const openNewGameModal = useCallback(() => {
+    logConversation('You', 'Opened “Create New Game”');
+    setShowNewGame(true);
+  }, [logConversation]);
+
   function handleNewGameModalClose() {
+    logConversation('You', 'Closed “Create New Game” dialog');
     setShowNewGame(false);
     resetNewGameForm();
   }
@@ -694,10 +714,17 @@ export default function Admin() {
 
   async function handleCreateNewGame() {
     if (newGameBusy) return;
+    const title = newTitle.trim();
+    logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
+    if (!deployGameEnabled) {
+      setNewGameStatus('🔴 Turn on Publishing to create a game.');
+      logConversation('GPT', 'Turn on Publishing to create a game.');
+      return;
+    }
     if (!gameEnabled) {
       setNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…');
+      logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
     }
-    const title = newTitle.trim();
     if (!title) {
       setNewGameStatus('❌ Title is required.');
       return;
@@ -782,7 +809,8 @@ export default function Admin() {
 
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatusInternal] = useState('');
+  const [statusLog, setStatusLog] = useState([]);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1327,6 +1355,7 @@ export default function Admin() {
   }
 
   async function saveAndPublish() {
+    logConversation('You', 'Requested Save & Publish');
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
     const shouldPublish = gameEnabled && config?.game?.deployEnabled === true;
@@ -1352,6 +1381,7 @@ export default function Admin() {
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
+    logConversation('You', `Requested deletion for ${activeSlug || 'default'} game`);
     if (!gameEnabled) { setConfirmDeleteOpen(false); return; }
     const slug = activeSlug || 'default';
     const urlTry = [
@@ -1956,6 +1986,7 @@ export default function Admin() {
 
   // Project Health scan
   async function scanProject() {
+    logConversation('You', 'Scanning media usage for unused files');
     const inv = await listInventory(['uploads','bundles','icons']);
     const used = new Set();
 
@@ -2214,6 +2245,7 @@ export default function Admin() {
   }
 
   async function saveCoverImageOnly() {
+    logConversation('You', 'Saved cover artwork');
     const slug = activeSlug || 'default';
     setStatus('Saving cover image…');
     const saved = await saveAllWithSlug(slug);
@@ -2363,10 +2395,13 @@ export default function Admin() {
               })}
               <button
                 type="button"
-                onClick={()=>setShowNewGame(true)}
+                onClick={openNewGameModal}
                 style={{ ...S.button, ...S.headerNewGameButton }}
               >
-                + New Game
+                <span style={S.newGameLabel}>
+                  {!deployGameEnabled && <span aria-hidden="true" style={S.headerNewGameLight} />}
+                  <span>+ New Game</span>
+                </span>
               </button>
               <button
                 onClick={async ()=>{
@@ -2458,6 +2493,24 @@ export default function Admin() {
             </div>
           )}
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
+          {statusLog.length > 0 && (
+            <div style={S.conversationLog}>
+              <div style={S.conversationLogHeading}>Operator ↔ GPT Log</div>
+              <div style={S.conversationLogEntries}>
+                {statusLog.slice().reverse().map((entry, idx) => (
+                  <div key={`${entry.timestamp}-${idx}`} style={S.conversationLogRow}>
+                    <span style={{ ...S.conversationBadge, ...(entry.speaker === 'GPT' ? S.conversationBadgeGpt : S.conversationBadgeYou) }}>
+                      {entry.speaker}
+                    </span>
+                    <span style={S.conversationMessage}>{entry.text}</span>
+                    <time style={S.conversationTime} dateTime={entry.timestamp}>
+                      {formatLocalDateTime(entry.timestamp)}
+                    </time>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -3846,7 +3899,15 @@ export default function Admin() {
           <div style={{ ...S.card, ...S.modalCard }}>
             <div style={S.modalTopBar}>
               <button style={S.cancelGlowButton} onClick={handleNewGameModalClose}>Cancel & Close</button>
-              <div style={S.modalTitle}>Create New Game</div>
+              <div style={S.modalTitleStack}>
+                <div style={S.modalTitle}>Create New Game</div>
+                {!deployGameEnabled && (
+                  <div style={S.modalPublishWarning}>
+                    <span aria-hidden="true" style={S.modalPublishLight} />
+                    <span>Turn on Publishing to create a game</span>
+                  </div>
+                )}
+              </div>
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
@@ -3997,9 +4058,13 @@ export default function Admin() {
               {newGameStatus && <div style={S.modalStatus}>{newGameStatus}</div>}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:12, flexWrap:'wrap' }}>
                 <button
-                  style={{ ...S.action3DButton, ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}) }}
+                  style={{
+                    ...S.action3DButton,
+                    ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}),
+                    ...(!deployGameEnabled ? { opacity:0.55, cursor:'not-allowed' } : {}),
+                  }}
                   onClick={handleCreateNewGame}
-                  disabled={newGameBusy}
+                  disabled={newGameBusy || !deployGameEnabled}
                 >
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
@@ -4169,6 +4234,67 @@ const S = {
     zIndex: 40,
     boxShadow: '0 18px 30px rgba(15, 23, 42, 0.18)',
     color: 'var(--admin-body-color)',
+  },
+  conversationLog: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 14,
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    background: 'rgba(241, 245, 249, 0.78)',
+    boxShadow: '0 14px 28px rgba(15, 23, 42, 0.12)',
+  },
+  conversationLogHeading: {
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: '0.16em',
+    color: '#334155',
+    fontWeight: 700,
+    marginBottom: 10,
+  },
+  conversationLogEntries: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    maxHeight: 200,
+    overflowY: 'auto',
+  },
+  conversationLogRow: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr auto',
+    gap: 12,
+    alignItems: 'center',
+    padding: '6px 10px',
+    borderRadius: 10,
+    background: 'rgba(255, 255, 255, 0.72)',
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+  },
+  conversationBadge: {
+    fontSize: 11,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    padding: '3px 10px',
+    borderRadius: 999,
+    background: 'rgba(51, 65, 85, 0.08)',
+    color: '#0f172a',
+    fontWeight: 700,
+  },
+  conversationBadgeGpt: {
+    background: 'rgba(59, 130, 246, 0.16)',
+    color: '#1d4ed8',
+  },
+  conversationBadgeYou: {
+    background: 'rgba(16, 185, 129, 0.16)',
+    color: '#047857',
+  },
+  conversationMessage: {
+    color: '#1e293b',
+    fontSize: 14,
+    lineHeight: 1.4,
+  },
+  conversationTime: {
+    fontSize: 11,
+    color: '#64748b',
+    fontFamily: 'ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
@@ -4358,6 +4484,21 @@ const S = {
     letterSpacing: '0.1em',
     fontWeight: 700,
     padding: '10px 18px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  newGameLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerNewGameLight: {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    background: '#ef4444',
+    boxShadow: '0 0 12px rgba(239, 68, 68, 0.65)',
   },
   headerTopRow: {
     display: 'flex',
@@ -4519,6 +4660,48 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
+  mediaDropZone: {
+    marginTop: 12,
+    padding: '14px 18px',
+    borderRadius: 16,
+    border: '1px dashed rgba(148, 163, 184, 0.4)',
+    background: 'rgba(226, 232, 240, 0.65)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    transition: 'border 0.2s ease, background 0.2s ease, box-shadow 0.2s ease',
+  },
+  mediaDropZoneActive: {
+    border: '1px dashed rgba(59, 130, 246, 0.65)',
+    background: 'rgba(191, 219, 254, 0.72)',
+    boxShadow: '0 16px 32px rgba(59, 130, 246, 0.25)',
+  },
+  mediaDropHeadline: {
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: '#1e293b',
+    fontSize: 13,
+  },
+  mediaDropHint: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 4,
+  },
+  mediaDropBrowse: {
+    padding: '10px 16px',
+    borderRadius: 12,
+    border: '1px solid rgba(14, 165, 233, 0.6)',
+    background: 'linear-gradient(96deg, #0ea5e9, #38bdf8)',
+    color: '#f8fafc',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    boxShadow: '0 12px 24px rgba(14, 165, 233, 0.35)',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  },
   tab: {
     padding: '8px 12px',
     borderRadius: 12,
@@ -4629,13 +4812,36 @@ const S = {
     top: 0,
     zIndex: 5,
   },
-  modalTitle: {
+  modalTitleStack: {
     flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalTitle: {
     textAlign: 'center',
     fontSize: 18,
     fontWeight: 700,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
+  },
+  modalPublishWarning: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 12,
+    color: '#ef4444',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    fontWeight: 600,
+  },
+  modalPublishLight: {
+    width: 12,
+    height: 12,
+    borderRadius: '50%',
+    background: '#ef4444',
+    boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
   },
   modalCloseButton: {
     border: 'none',
@@ -4980,6 +5186,8 @@ function MediaPoolTab({
   const [busy, setBusy] = useState(false);
   const [folder, setFolder] = useState('uploads');
   const [addUrl, setAddUrl] = useState('');
+  const [dropActive, setDropActive] = useState(false);
+  const fileInputRef = useRef(null);
 
 
   
@@ -5049,14 +5257,30 @@ function MediaPoolTab({
     });
   }
 
-  async function onUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = await uploadToRepo(file, folder);
-    if (url) {
-      await refreshInventory();
-      setAddUrl(url);
+  async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    let success = 0;
+    let lastUrl = '';
+    for (const file of files) {
+      // eslint-disable-next-line no-await-in-loop
+      const uploaded = await uploadToRepo(file, folder);
+      if (uploaded) {
+        success += 1;
+        lastUrl = uploaded;
+      }
     }
+    if (lastUrl) setAddUrl(lastUrl);
+    if (success) await refreshInventory();
+    if (files.length > 1) {
+      const prefix = success === files.length ? '✅' : '⚠️';
+      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+    }
+  }
+
+  async function onUpload(e) {
+    await uploadFiles(e.target.files);
+    if (e.target) e.target.value = '';
   }
 
   async function deleteOne(item) {
@@ -5119,11 +5343,31 @@ function MediaPoolTab({
             <option value="bundles">bundles</option>
             <option value="icons">icons</option>
           </select>
-          <label style={{ ...S.button, display:'grid', placeItems:'center' }}>
+          <button
+            type="button"
+            style={{ ...S.button, display:'grid', placeItems:'center' }}
+            onClick={()=>fileInputRef.current?.click()}
+          >
             Upload
-            <input type="file" onChange={onUpload} style={{ display:'none' }} />
-          </label>
+          </button>
         </div>
+        <div
+          onDragOver={(e)=>{ e.preventDefault(); setDropActive(true); }}
+          onDragLeave={(e)=>{ e.preventDefault(); setDropActive(false); }}
+          onDrop={(e)=>{
+            e.preventDefault();
+            setDropActive(false);
+            uploadFiles(e.dataTransfer?.files);
+          }}
+          style={{ ...S.mediaDropZone, ...(dropActive ? S.mediaDropZoneActive : {}) }}
+        >
+          <div>
+            <div style={S.mediaDropHeadline}>Drag & drop media</div>
+            <div style={S.mediaDropHint}>Drop multiple files at once or click Upload to browse.</div>
+          </div>
+          <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
+        </div>
+        <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files

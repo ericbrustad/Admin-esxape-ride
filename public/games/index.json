@@ -1,65 +1,29 @@
 [
   {
-    "slug": "game-1-thriller-single-player",
-    "title": "Game 1 thriller single player",
-    "type": "Thriller",
+    "slug": "starfield-station-break",
+    "title": "Starfield Station Break",
+    "type": "Sci-Fi",
     "mode": "single",
-    "createdAt": "2025-10-02T13:40:44.216Z"
+    "coverImage": "/media/covers/starfield-station-break.svg",
+    "shortDescription": "Sneak through sunrise-lit docking bays to free the crew before lockdown.",
+    "createdAt": "2024-10-08T08:00:00.000Z"
   },
   {
-    "slug": "mike",
-    "title": "mike",
-    "type": "Chase",
+    "slug": "neon-lantern-heist",
+    "title": "Neon Lantern Heist",
+    "type": "Heist",
     "mode": "single",
-    "createdAt": "2025-10-04T13:29:34.891Z"
+    "coverImage": "/media/covers/neon-lantern-heist.svg",
+    "shortDescription": "Outrun rival crews under a canopy of neon lanterns before the loot ships out.",
+    "createdAt": "2024-10-08T08:05:00.000Z"
   },
   {
-    "slug": "slug-bug",
-    "title": "SLug BUG!",
-    "type": "Mystery",
+    "slug": "chronorift-cove",
+    "title": "Chronorift Cove",
+    "type": "Adventure",
     "mode": "single",
-    "createdAt": "2025-10-04T15:33:53.069Z"
-  },
-  {
-    "slug": "test",
-    "title": "test",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-04T15:38:53.547Z"
-  },
-  {
-    "slug": "newbie",
-    "title": "Newbie",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-04T21:32:38.062Z"
-  },
-  {
-    "slug": "secret-agent-paws",
-    "title": "Secret Agent PAWS",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-05T04:19:08.691Z"
-  },
-  {
-    "slug": "test-2",
-    "title": "test",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-05T06:38:09.535Z"
-  },
-  {
-    "slug": "new-game-5",
-    "title": "new game 5",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-06T04:45:43.938Z"
-  },
-  {
-    "slug": "best-ty",
-    "title": "best ty",
-    "type": "Mystery",
-    "mode": "single",
-    "createdAt": "2025-10-08T16:01:58.254Z"
+    "coverImage": "/media/covers/chronorift-cove.svg",
+    "shortDescription": "Stabilize shimmering tides and rescue explorers from a time-torn harbor.",
+    "createdAt": "2024-10-08T08:10:00.000Z"
   }
 ]
