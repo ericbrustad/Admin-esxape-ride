@@ -3158,7 +3158,7 @@ export default function Admin() {
                   onClick={addDevice}
                   title="Create a new device draft"
                 >
-                  + Add Device Fucker
+                  + Add Device
                 </button>
               </div>
             </div>
@@ -3214,7 +3214,7 @@ export default function Admin() {
                 );
               })}
             </div>
-            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>No devices yet. Use “Add Device” to place devices.</div>}
+            {(devices||[]).length===0 && <div style={{ color:'var(--admin-muted)' }}>My God ! No devices yet. Use “Add Device” to place devices.</div>}
           </aside>
 
           <section style={{ position:'relative' }}>
