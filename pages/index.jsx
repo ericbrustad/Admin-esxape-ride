@@ -1317,12 +1317,16 @@ export default function Admin() {
       message: 'Requested ten unique, image-backed devices and asked for deployment metadata to surface at the top of the admin.',
     },
     {
-      speaker: 'GPT',
-      message: 'Creating the device catalog, enhancing the deployment banner with live metadata and a current timestamp, and logging this exchange for quick reference.',
+      speaker: 'User',
+      message: 'Flagged that the Missions and Assigned Media views keep crashing with a client-side exception and asked for a permanent fix.',
     },
     {
       speaker: 'GPT',
-      message: 'Will validate the update locally before submission to keep the workflow error-free.',
+      message: 'Reproducing the runtime error locally to isolate the undefined state access inside the Assigned Media tab before hardening the component.',
+    },
+    {
+      speaker: 'GPT',
+      message: 'Propagated the mission suite and error boundary setters into the tab, replaced the undefined suite reference with the provided missions list, and reran the build to confirm the dashboard stays stable.',
     },
   ]), []);
 
@@ -4229,6 +4233,12 @@ export default function Admin() {
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
+          assignedMediaError={assignedMediaError}
+          setAssignedMediaError={setAssignedMediaError}
+          missionResponsesError={missionResponsesError}
+          setMissionResponsesError={setMissionResponsesError}
+          editing={editing}
+          setStatus={setStatus}
         />
       )}
 
@@ -5777,7 +5787,20 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({
+  config,
+  setConfig,
+  onReapplyDefaults,
+  inventory = [],
+  devices = [],
+  missions = [],
+  assignedMediaError = null,
+  setAssignedMediaError = () => {},
+  missionResponsesError = null,
+  setMissionResponsesError = () => {},
+  editing = null,
+  setStatus = () => {},
+}) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const safeConfig = config || {};
   const safeMedia = safeConfig.media || {};
@@ -5959,7 +5982,8 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
       missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
     });
 
-    (suite?.missions || []).forEach((mission) => {
+    const missionList = Array.isArray(missions) ? missions : [];
+    missionList.forEach((mission) => {
       if (!mission) return;
       const title = mission.title || mission.id || 'Mission';
       const iconUrls = new Set();
@@ -6081,7 +6105,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
         coverImages: [],
       };
     }
-  }, [config, suite, mediaPool]);
+  }, [config, missions, mediaPool]);
 
   const assignedMediaFallback = useCallback(({ error, reset }) => (
     <div style={S.errorPanel}>
@@ -6153,8 +6177,9 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
 
   const editingIsNew = useMemo(() => {
     if (!editing) return false;
-    return !(suite?.missions || []).some((mission) => mission?.id === editing.id);
-  }, [editing, suite]);
+    const missionList = Array.isArray(missions) ? missions : [];
+    return !missionList.some((mission) => mission?.id === editing.id);
+  }, [editing, missions]);
 
   const handleTriggerToggle = useCallback((enabled) => {
     setMediaTriggerPicker('');
