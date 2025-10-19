@@ -220,6 +220,7 @@ const DEFAULT_BUNDLES = {
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key:'text-relay', name:'Text Message Device', url:'/media/bundles/text-device.svg' },
   ],
   missions: [
     { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
@@ -297,6 +298,7 @@ const TYPE_FIELDS = {
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
+  text_message: [],
 };
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
@@ -308,6 +310,7 @@ const TYPE_LABELS = {
   ar_image:         'AR Image',
   ar_video:         'AR Video',
   stored_statement: 'Stored Statement',
+  text_message:     'Text Message Mission',
 };
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
@@ -315,6 +318,14 @@ const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'text',   label:'Text Message Device' },
+];
+const TEXT_PLAYER_TOKENS = [
+  { token:'{{FIRST_NAME}}', label:'First name' },
+  { token:'{{LAST_NAME}}', label:'Last name' },
+  { token:'{{EMAIL}}', label:'Email' },
+  { token:'{{CELL}}', label:'Cell number' },
+  { token:'{{IN_CASE_OF_EMERGENCY_NUMBER}}', label:'Emergency contact' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -1298,6 +1309,9 @@ export default function Admin() {
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
+  const editingContent = editing?.content || {};
+  const textMsgIncomingEnabled = editing?.type === 'text_message' ? !!editingContent.enableIncoming : false;
+  const textMsgOutgoingEnabled = editing?.type === 'text_message' ? !!editingContent.enableOutgoing : false;
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
@@ -1389,6 +1403,42 @@ export default function Admin() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
   const [protectionError, setProtectionError] = useState('');
+
+  function updateMissionContent(partial = {}) {
+    if (!editing) return;
+    const nextContent = { ...(editing.content || {}), ...(partial || {}) };
+    setEditing({ ...editing, content: nextContent });
+    setDirty(true);
+  }
+
+  function appendTokenToField(fieldKey, token) {
+    if (!editing || !fieldKey || !token) return;
+    const current = editing.content?.[fieldKey] || '';
+    updateMissionContent({ [fieldKey]: current ? `${current}${token}` : token });
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(token).catch(() => {});
+      }
+    } catch {}
+  }
+
+  function renderTokenButtons(fieldKey) {
+    return (
+      <div style={S.tokenHintRow}>
+        <span style={S.tokenHintLabel}>Dynamic IDs:</span>
+        {TEXT_PLAYER_TOKENS.map((t) => (
+          <button
+            key={t.token}
+            type="button"
+            style={S.tokenButton}
+            onClick={() => appendTokenToField(fieldKey, t.token)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1689,6 +1739,19 @@ export default function Admin() {
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
+      case 'text_message':    return {
+        enableIncoming:false,
+        incomingTitle:'',
+        incomingBody:'',
+        enableOutgoing:false,
+        outgoingPrompt:'',
+        outgoingPlayerMessage:'',
+        outgoingResponseNote:'',
+        targetNumberKey:'',
+        targetNumberDirect:'',
+        conversationLog:'',
+        ...base,
+      };
       default:                return { ...base };
     }
   }
@@ -1942,6 +2005,41 @@ export default function Admin() {
   function saveToList() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+
+    if (editing.type === 'text_message') {
+      const c = editing.content || {};
+      const incomingEnabled = !!c.enableIncoming;
+      const outgoingEnabled = !!c.enableOutgoing;
+      if (!incomingEnabled && !outgoingEnabled) {
+        setStatus('❌ Enable Incoming or Outgoing text message content');
+        return;
+      }
+      if (incomingEnabled) {
+        if (!String(c.incomingTitle || '').trim()) {
+          setStatus('❌ Incoming text title required');
+          return;
+        }
+        if (!String(c.incomingBody || '').trim()) {
+          setStatus('❌ Incoming message body required');
+          return;
+        }
+      }
+      if (outgoingEnabled) {
+        if (!String(c.outgoingPrompt || '').trim()) {
+          setStatus('❌ Outgoing prompt required');
+          return;
+        }
+        if (!String(c.outgoingPlayerMessage || '').trim()) {
+          setStatus('❌ Outgoing player message template required');
+          return;
+        }
+        const hasTarget = String(c.targetNumberKey || '').trim() || String(c.targetNumberDirect || '').trim();
+        if (!hasTarget) {
+          setStatus('❌ Provide a recipient number key or fallback phone number');
+          return;
+        }
+      }
+    }
 
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
@@ -3207,6 +3305,140 @@ export default function Admin() {
                     </Field>
                   )}
 
+                  {editing.type === 'text_message' && (
+                    <div style={S.textMessageBox}>
+                      <div style={S.textMessageIntro}>
+                        Configure how this mission texts the player. Use the toggles below to reveal the appropriate message flow.
+                      </div>
+
+                      <div style={S.textToggleColumn}>
+                        <label style={S.textToggleLabel}>
+                          <input
+                            type="checkbox"
+                            checked={textMsgIncomingEnabled}
+                            onChange={(e) => updateMissionContent({ enableIncoming: e.target.checked })}
+                          />
+                          <span>
+                            Incoming text message — send clues or updates straight to the player as soon as the mission is triggered.
+                          </span>
+                        </label>
+
+                        {textMsgIncomingEnabled && (
+                          <div style={S.textSectionBody}>
+                            <Field label="Incoming message title">
+                              <input
+                                style={S.input}
+                                value={editingContent.incomingTitle || ''}
+                                onChange={(e) => updateMissionContent({ incomingTitle: e.target.value })}
+                                placeholder="Example: Update from HQ"
+                              />
+                            </Field>
+                            <Field label="Message body delivered to the player">
+                              <>
+                                <textarea
+                                  style={{ ...S.input, height: 140, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={editingContent.incomingBody || ''}
+                                  onChange={(e) => updateMissionContent({ incomingBody: e.target.value })}
+                                  placeholder="Agents {{FIRST_NAME}}, your next objective…"
+                                />
+                                {renderTokenButtons('incomingBody')}
+                                <div style={S.textMessageHint}>
+                                  Text is sent through Twilio using the player's saved contact info. Tokens merge data that was captured at signup.
+                                </div>
+                              </>
+                            </Field>
+                          </div>
+                        )}
+                      </div>
+
+                      <hr style={S.subDivider} />
+
+                      <div style={S.textToggleColumn}>
+                        <label style={S.textToggleLabel}>
+                          <input
+                            type="checkbox"
+                            checked={textMsgOutgoingEnabled}
+                            onChange={(e) => updateMissionContent({ enableOutgoing: e.target.checked })}
+                          />
+                          <span>
+                            Outgoing text mission — guide the player to draft a reply that Twilio will send on their behalf.
+                          </span>
+                        </label>
+
+                        {textMsgOutgoingEnabled && (
+                          <div style={S.textSectionBody}>
+                            <Field label="Mission prompt shown in-app">
+                              <>
+                                <textarea
+                                  style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={editingContent.outgoingPrompt || ''}
+                                  onChange={(e) => updateMissionContent({ outgoingPrompt: e.target.value })}
+                                  placeholder="Text the handler with the code word you uncover…"
+                                />
+                                {renderTokenButtons('outgoingPrompt')}
+                                <div style={S.textMessageHint}>
+                                  Explain who to text, what details to include, and when the player should hit send.
+                                </div>
+                              </>
+                            </Field>
+                            <Field label="Default message template sent via Twilio">
+                              <>
+                                <textarea
+                                  style={{ ...S.input, height: 140, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={editingContent.outgoingPlayerMessage || ''}
+                                  onChange={(e) => updateMissionContent({ outgoingPlayerMessage: e.target.value })}
+                                  placeholder="Hello HQ, this is {{FIRST_NAME}} reporting from…"
+                                />
+                                {renderTokenButtons('outgoingPlayerMessage')}
+                                <div style={S.textMessageHint}>
+                                  The template becomes the SMS body that Twilio delivers once the player confirms their send.
+                                </div>
+                              </>
+                            </Field>
+                            <div style={S.textGridTwo}>
+                              <Field label="Recipient number key">
+                                <input
+                                  style={S.input}
+                                  value={editingContent.targetNumberKey || ''}
+                                  onChange={(e) => updateMissionContent({ targetNumberKey: e.target.value })}
+                                  placeholder="Example: TWILIO_CONTACT_HQ"
+                                />
+                              </Field>
+                              <Field label="Fallback phone number">
+                                <input
+                                  style={S.input}
+                                  value={editingContent.targetNumberDirect || ''}
+                                  onChange={(e) => updateMissionContent({ targetNumberDirect: e.target.value })}
+                                  placeholder="+15551234567"
+                                />
+                              </Field>
+                            </div>
+                            <Field label="Response notes / auto-replies (optional)">
+                              <textarea
+                                style={{ ...S.input, height: 100, fontFamily: 'ui-monospace, Menlo' }}
+                                value={editingContent.outgoingResponseNote || ''}
+                                onChange={(e) => updateMissionContent({ outgoingResponseNote: e.target.value })}
+                                placeholder="Document the expected reply flow or automated grading rules."
+                              />
+                            </Field>
+                            <div style={S.textMessageHint}>
+                              Pair the device triggers with geo fences, wrong answers, or timers to automate when these texts appear.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Field label="Conversation log (you ↔ GPT)">
+                        <textarea
+                          style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                          value={editingContent.conversationLog || ''}
+                          onChange={(e) => updateMissionContent({ conversationLog: e.target.value })}
+                          placeholder="Paste the planning conversation so future editors know the mission history."
+                        />
+                      </Field>
+                    </div>
+                  )}
+
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Pick location & radius</div>
@@ -3218,7 +3450,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
+                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement'||editing.type==='text_message') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
@@ -3652,6 +3884,11 @@ export default function Admin() {
                         <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
                           {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
+                        {devDraft.type === 'text' && (
+                          <div style={S.noteText}>
+                            Text Message devices are perfect for SMS-based missions. Trigger them from geo fences, incorrect responses, wrong answers, or mission timers to launch outbound texts.
+                          </div>
+                        )}
                       </Field>
                       <Field label="Icon">
                         <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
@@ -4708,6 +4945,86 @@ const S = {
   },
   missionItem: { borderBottom: '1px solid var(--admin-border-soft)', padding: '10px 4px' },
   noteText: { marginTop: 6, fontSize: 12, color: 'var(--admin-muted)' },
+  textMessageBox: {
+    marginBottom: 18,
+    padding: 16,
+    borderRadius: 16,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: '0 12px 28px rgba(6, 12, 20, 0.35)',
+    display: 'grid',
+    gap: 16,
+  },
+  textMessageIntro: {
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: 'var(--admin-body-color)',
+    background: 'rgba(37, 99, 235, 0.08)',
+    border: '1px solid rgba(37, 99, 235, 0.18)',
+    borderRadius: 12,
+    padding: '12px 14px',
+  },
+  textToggleColumn: {
+    display: 'grid',
+    gap: 12,
+    background: 'rgba(15, 23, 42, 0.18)',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  textToggleLabel: {
+    display: 'flex',
+    gap: 10,
+    alignItems: 'flex-start',
+    fontWeight: 600,
+    color: 'var(--admin-body-color)',
+  },
+  textSectionBody: {
+    display: 'grid',
+    gap: 12,
+    padding: 4,
+    background: 'rgba(15, 118, 110, 0.08)',
+    border: '1px solid rgba(45, 212, 191, 0.18)',
+    borderRadius: 10,
+  },
+  subDivider: {
+    border: 'none',
+    height: 1,
+    background: 'linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.45), transparent)',
+  },
+  textGridTwo: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+  },
+  textMessageHint: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    marginTop: 6,
+  },
+  tokenHintRow: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  tokenHintLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  tokenButton: {
+    padding: '6px 10px',
+    borderRadius: 999,
+    border: '1px solid rgba(37, 99, 235, 0.35)',
+    background: 'rgba(37, 99, 235, 0.12)',
+    color: '#bfdbfe',
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
   input: {
     width: '100%',
     padding: '10px 12px',
