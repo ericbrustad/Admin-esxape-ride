@@ -76,6 +76,7 @@ const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
   commit: '',
+  commitShort: '',
   owner: '',
   repo: '',
   vercelUrl: '',
@@ -180,6 +181,59 @@ async function deleteMediaPath(repoPath) {
     } catch {}
   }
   return false;
+}
+
+function normalizeConversationEntry(entry, index = 0) {
+  if (!entry) return null;
+  const fallbackSpeaker = index % 2 === 0 ? 'You' : 'GPT';
+
+  if (typeof entry === 'string') {
+    const message = entry.trim();
+    return message ? { speaker: fallbackSpeaker, message, timestamp: '' } : null;
+  }
+
+  if (typeof entry !== 'object') return null;
+
+  const speaker = String(entry.speaker || entry.role || entry.author || entry.from || fallbackSpeaker).trim() || fallbackSpeaker;
+  const message = String(entry.message || entry.text || entry.content || '').trim();
+  const timestampRaw = entry.timestamp || entry.time || entry.date || entry.createdAt || '';
+
+  if (!message) return null;
+
+  let timestamp = '';
+  if (timestampRaw) {
+    timestamp = formatLocalDateTime(timestampRaw) || '';
+  }
+
+  return { speaker, message, timestamp };
+}
+
+function normalizeConversationLog(raw) {
+  let source = raw;
+  if (!source) return [];
+
+  if (typeof source === 'string') {
+    try {
+      const parsed = JSON.parse(source);
+      source = parsed;
+    } catch {
+      return [];
+    }
+  }
+
+  if (typeof source === 'object' && !Array.isArray(source)) {
+    if (Array.isArray(source.entries)) source = source.entries;
+    else if (Array.isArray(source.log)) source = source.log;
+  }
+
+  if (!Array.isArray(source)) return [];
+
+  const normalized = source
+    .map((entry, idx) => normalizeConversationEntry(entry, idx))
+    .filter(Boolean);
+
+  const limit = 20;
+  return normalized.length > limit ? normalized.slice(normalized.length - limit) : normalized;
 }
 
 async function fileToBase64(file) {
@@ -742,6 +796,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
+  const [conversationLog, setConversationLog] = useState([]);
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -815,10 +870,15 @@ export default function Admin() {
 
         setAdminMeta((prev) => {
           const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
+          const commitValue = metaOk && metaJson?.commit ? metaJson.commit : base.commit;
+          const commitShortValue = metaOk && metaJson?.commitShort
+            ? metaJson.commitShort
+            : (commitValue ? String(commitValue).slice(0, 7) : base.commitShort);
           return {
             ...base,
             branch: metaOk && metaJson?.branch ? metaJson.branch : base.branch,
-            commit: metaOk && metaJson?.commit ? metaJson.commit : base.commit,
+            commit: commitValue,
+            commitShort: commitShortValue,
             owner: metaOk && metaJson?.owner ? metaJson.owner : base.owner,
             repo: metaOk && metaJson?.repo ? metaJson.repo : base.repo,
             vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : base.vercelUrl,
@@ -846,6 +906,55 @@ export default function Admin() {
     return () => {
       cancelled = true;
       clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return () => {};
+
+    let disposed = false;
+
+    const loadConversationLog = () => {
+      if (disposed) return;
+      try {
+        const fromStorage = typeof window.localStorage !== 'undefined'
+          ? window.localStorage.getItem('gptConversationLog')
+          : null;
+        const fromWindow = window.__GPT_CONVERSATION_LOG__ || window.__GPT_CONVERSATION__ || null;
+
+        const storageLog = normalizeConversationLog(fromStorage);
+        const windowLog = normalizeConversationLog(fromWindow);
+        const resolved = storageLog.length ? storageLog : windowLog;
+
+        setConversationLog(resolved);
+      } catch (err) {
+        console.warn('Failed to load GPT conversation log', err);
+        setConversationLog([]);
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event && event.key && event.key !== 'gptConversationLog') return;
+      loadConversationLog();
+    };
+
+    const handleCustomEvent = (event) => {
+      const detailLog = event?.detail ? normalizeConversationLog(event.detail) : [];
+      if (detailLog.length) {
+        setConversationLog(detailLog);
+        return;
+      }
+      loadConversationLog();
+    };
+
+    loadConversationLog();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('gpt-conversation-log', handleCustomEvent);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('gpt-conversation-log', handleCustomEvent);
     };
   }, []);
 
@@ -2073,7 +2182,11 @@ export default function Admin() {
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
+  const metaCommitShort = adminMeta.commitShort || (adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '');
+  const metaCommitFull = adminMeta.commit || '';
+  const metaRepoLabel = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
@@ -2108,15 +2221,24 @@ export default function Admin() {
     <div style={S.body}>
       <div style={S.metaBanner}>
         <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
+          {metaRepoLabel && (
+            <span style={S.metaInfoItem}>
+              <strong>Repository:</strong>{' '}
+              <span style={S.metaMutedStrong}>{metaRepoLabel}</span>
+            </span>
+          )}
+          <span style={S.metaInfoItem}>
+            <strong>Branch:</strong>{' '}
+            <span style={S.metaMutedStrong}>{metaBranchLabel}</span>
+          </span>
+          {metaCommitShort && (
+            <span style={S.metaInfoItem}>
+              <strong>Commit:</strong>{' '}
+              <span style={S.metaMono} title={metaCommitFull}>{metaCommitShort}</span>
             </span>
           )}
           {metaDeploymentState && (
-            <span>
+            <span style={S.metaInfoItem}>
               <strong>Deployment:</strong>{' '}
               {metaDeploymentUrl ? (
                 <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
@@ -2128,10 +2250,41 @@ export default function Admin() {
             </span>
           )}
           {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
+            <span style={S.metaInfoItem}><strong>Checked:</strong> {metaTimestampLabel}</span>
           )}
           {adminMeta.error && (
             <span style={S.metaBannerError}>{adminMeta.error}</span>
+          )}
+        </div>
+        <div style={S.metaLogContainer}>
+          {conversationLog.length > 0 ? (
+            <div style={S.metaLog}>
+              <div style={S.metaLogTitle}>Conversation Log</div>
+              <div style={S.metaLogList}>
+                {conversationLog.map((entry, idx) => {
+                  const speakerText = entry.speaker || '—';
+                  const messageText = entry.message || '';
+                  const speakerLower = speakerText.toLowerCase();
+                  const speakerStyle = speakerLower.includes('gpt') ? S.metaLogSpeakerGpt : S.metaLogSpeakerYou;
+                  const key = `${idx}-${entry.timestamp || speakerText}-${messageText.slice(0, 24)}`;
+                  return (
+                    <div key={key} style={S.metaLogEntry}>
+                      <span style={{ ...S.metaLogSpeaker, ...speakerStyle }}>{speakerText}</span>
+                      <span style={S.metaLogMessage}>{messageText}</span>
+                      {entry.timestamp && (
+                        <span style={S.metaLogTimestamp}>{entry.timestamp}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div style={S.metaLogPlaceholder}>
+              No GPT conversation log found. Save an array to{' '}
+              <code style={S.metaMono}>gptConversationLog</code> in localStorage or set
+              {' '}<code style={S.metaMono}>window.__GPT_CONVERSATION_LOG__</code> to surface it here.
+            </div>
           )}
         </div>
       </div>
@@ -3693,6 +3846,12 @@ const S = {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  metaInfoItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 13,
+  },
   metaBadge: {
     padding: '2px 8px',
     borderRadius: 999,
@@ -3708,6 +3867,10 @@ const S = {
     letterSpacing: '0.05em',
     textTransform: 'uppercase',
   },
+  metaMutedStrong: {
+    color: 'var(--admin-muted)',
+    fontWeight: 600,
+  },
   metaLink: {
     color: 'var(--admin-link-color, #60a5fa)',
     textDecoration: 'none',
@@ -3716,6 +3879,82 @@ const S = {
   metaBannerError: {
     color: '#f87171',
     fontWeight: 600,
+  },
+  metaMono: {
+    fontFamily: 'var(--admin-code-font, SFMono-Regular, Menlo, monospace)',
+    padding: '2px 6px',
+    borderRadius: 6,
+    background: 'rgba(15, 23, 42, 0.45)',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    fontSize: 12,
+  },
+  metaLogContainer: {
+    maxWidth: 1400,
+    margin: '8px auto 0',
+  },
+  metaLog: {
+    background: 'rgba(10, 18, 28, 0.75)',
+    border: '1px solid rgba(148, 163, 184, 0.2)',
+    borderRadius: 14,
+    padding: 12,
+    display: 'grid',
+    gap: 10,
+    boxShadow: '0 20px 30px rgba(2, 6, 12, 0.35)',
+  },
+  metaLogTitle: {
+    fontWeight: 700,
+    fontSize: 12,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: '#a5b4fc',
+  },
+  metaLogList: {
+    display: 'grid',
+    gap: 8,
+    maxHeight: 180,
+    overflowY: 'auto',
+    paddingRight: 4,
+  },
+  metaLogEntry: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+    gap: 8,
+    background: 'rgba(15, 23, 42, 0.55)',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    borderRadius: 10,
+    padding: '8px 10px',
+  },
+  metaLogSpeaker: {
+    fontWeight: 700,
+    fontSize: 11,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  metaLogSpeakerYou: {
+    color: '#34d399',
+  },
+  metaLogSpeakerGpt: {
+    color: '#60a5fa',
+  },
+  metaLogMessage: {
+    fontSize: 13,
+    lineHeight: 1.45,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
+  metaLogTimestamp: {
+    gridColumn: '1 / -1',
+    justifySelf: 'end',
+    fontSize: 10,
+    color: 'var(--admin-muted)',
+  },
+  metaLogPlaceholder: {
+    maxWidth: 1400,
+    margin: '8px auto 0',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textAlign: 'center',
   },
   header: {
     padding: 20,

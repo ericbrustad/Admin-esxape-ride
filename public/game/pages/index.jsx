@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PhotoCapture from '../components/PhotoCapture';
 import OutcomeModal from '../components/OutcomeModal';
 import BackpackButton from '../components/BackpackButton';
@@ -25,23 +25,66 @@ export default function Game() {
   const [outcome, setOutcome]   = useState(null);   // object from mission.onCorrect/onWrong
   const [backpackOpen, setBackpackOpen] = useState(false);
 
-  const { slug, channel } = useMemo(() => {
-    const u = new URL(window.location.href);
-    return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
+  const [clientContext, setClientContext] = useState({ slug: 'default', channel: 'published', ready: false });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setClientContext((prev) => ({ ...prev, ready: true }));
+      return;
+    }
+    try {
+      const current = new URL(window.location.href);
+      const slugParam = current.searchParams.get('slug') || 'default';
+      const channelParam = current.searchParams.get('channel') || 'published';
+      setClientContext({ slug: slugParam, channel: channelParam, ready: true });
+    } catch (err) {
+      console.warn('Failed to read game params', err);
+      setClientContext((prev) => ({ ...prev, ready: true }));
+    }
   }, []);
 
-  useEffect(() => { initBackpack(slug); }, [slug]);
+  const slug = clientContext.slug || 'default';
+  const channel = clientContext.channel || 'published';
+  const ready = clientContext.ready;
 
-  useEffect(() => { (async () => {
-    try {
-      const base = channel === 'published' ? 'published' : 'draft';
-      const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
-      const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
-      setSuite(ms); setConfig(cfg); setStatus('');
-    } catch (e) {
-      setStatus('Failed to load game.');
+  useEffect(() => {
+    if (!ready) return;
+    initBackpack(slug);
+  }, [ready, slug]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!slug) {
+      setStatus('Missing game slug.');
+      return;
     }
-  })(); }, [slug, channel]);
+    (async () => {
+      try {
+        setStatus('Loading…');
+        const base = channel === 'published' ? 'published' : 'draft';
+        const missionsUrl = `/games/${encodeURIComponent(slug)}/${base}/missions.json`;
+        const configUrl = `/games/${encodeURIComponent(slug)}/${base}/config.json`;
+        const ms = await fetch(missionsUrl, { cache:'no-store' }).then(r=>r.json());
+        const cfg = await fetch(configUrl,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
+        setSuite(ms);
+        setConfig(cfg);
+        setStatus('');
+      } catch (e) {
+        console.error('Failed to load game suite', e);
+        setStatus('Failed to load game.');
+        setSuite(null);
+        setConfig(null);
+      }
+    })();
+  }, [ready, slug, channel]);
+
+  useEffect(() => {
+    if (!suite || !Array.isArray(suite.missions)) return;
+    setIdx((prev) => {
+      const maxIndex = Math.max(suite.missions.length - 1, 0);
+      return Math.min(Math.max(prev, 0), maxIndex);
+    });
+  }, [suite]);
 
   if (!suite || !config) {
     return <main style={outer}><div style={card}>{status}</div></main>;

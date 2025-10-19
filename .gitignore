@@ -1,0 +1,5 @@
+node_modules/
+.next/
+game/node_modules/
+public/game/node_modules/
+.DS_Store
