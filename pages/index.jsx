@@ -218,8 +218,16 @@ async function fileToBase64(file) {
 /* ───────────────────────── Defaults ───────────────────────── */
 const DEFAULT_BUNDLES = {
   devices: [
-    { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
-    { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key:'aurora-signal-bloom', name:'Aurora Signal Bloom', url:'https://images.unsplash.com/photo-1526498460520-4c246339dccb?auto=format&fit=crop&w=512&q=80' },
+    { key:'cyclone-decoy-drone', name:'Cyclone Decoy Drone', url:'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=512&q=80' },
+    { key:'horizon-phase-gate', name:'Horizon Phase Gate', url:'https://images.unsplash.com/photo-1523966211575-eb4a75ec3f2e?auto=format&fit=crop&w=512&q=80' },
+    { key:'luminous-net-sphere', name:'Luminous Net Sphere', url:'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=512&q=80' },
+    { key:'quantum-resonance-node', name:'Quantum Resonance Node', url:'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?auto=format&fit=crop&w=512&q=80' },
+    { key:'skyline-specter-kite', name:'Skyline Specter Kite', url:'https://images.unsplash.com/photo-1504383309838-3c5e758e3dab?auto=format&fit=crop&w=512&q=80' },
+    { key:'tempest-shield-array', name:'Tempest Shield Array', url:'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=512&q=80' },
+    { key:'nebula-scout-lantern', name:'Nebula Scout Lantern', url:'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=512&q=80' },
+    { key:'ion-surge-beacon', name:'Ion Surge Beacon', url:'https://images.unsplash.com/photo-1527430253228-e93688616381?auto=format&fit=crop&w=512&q=80' },
+    { key:'chrono-anchor-relay', name:'Chrono Anchor Relay', url:'https://images.unsplash.com/photo-1504386106331-3e4e71712b38?auto=format&fit=crop&w=512&q=80' },
   ],
   missions: [
     { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
@@ -1295,6 +1303,28 @@ export default function Admin() {
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('');
+  const [nowIso, setNowIso] = useState(() => new Date().toISOString());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowIso(new Date().toISOString());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const currentTimeLabel = useMemo(() => formatLocalDateTime(nowIso), [nowIso]);
+  const conversationLog = useMemo(() => ([
+    {
+      speaker: 'User',
+      message: 'Requested ten unique, image-backed devices and asked for deployment metadata to surface at the top of the admin.',
+    },
+    {
+      speaker: 'GPT',
+      message: 'Creating the device catalog, enhancing the deployment banner with live metadata and a current timestamp, and logging this exchange for quick reference.',
+    },
+    {
+      speaker: 'GPT',
+      message: 'Will validate the update locally before submission to keep the workflow error-free.',
+    },
+  ]), []);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -2740,6 +2770,10 @@ export default function Admin() {
     <div style={S.body}>
       <div style={S.metaBanner}>
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
+          <span>
+            <strong>Now:</strong>{' '}
+            {currentTimeLabel || '—'}
+          </span>
           {metaRepoLabel && (
             <span>
               <strong>Repo:</strong>{' '}
@@ -2808,6 +2842,18 @@ export default function Admin() {
           )}
         </div>
       </div>
+      <div style={S.conversationPanel}>
+        <div style={S.conversationInner}>
+          <div style={S.conversationHeader}>Conversation Log</div>
+          {conversationLog.map((entry, index) => (
+            <div key={`${entry.speaker}-${index}`} style={S.conversationItem}>
+              <div style={S.conversationSpeaker}>{entry.speaker}</div>
+              <div style={S.conversationMessage}>{entry.message}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -4604,6 +4650,47 @@ const S = {
     borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
     padding: '8px 16px',
     boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
+  },
+  conversationPanel: {
+    background: 'rgba(10, 15, 24, 0.78)',
+    backdropFilter: 'blur(14px)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.16)',
+    padding: '12px 16px',
+    boxShadow: '0 14px 28px rgba(2, 8, 23, 0.4)',
+  },
+  conversationInner: {
+    maxWidth: 1200,
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  conversationHeader: {
+    fontSize: 12,
+    letterSpacing: '0.18em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  conversationItem: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'flex-start',
+    padding: '8px 12px',
+    borderRadius: 12,
+    background: 'rgba(148, 163, 184, 0.08)',
+    border: '1px solid rgba(148, 163, 184, 0.16)',
+  },
+  conversationSpeaker: {
+    fontWeight: 700,
+    minWidth: 64,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: '#93c5fd',
+  },
+  conversationMessage: {
+    flex: 1,
+    lineHeight: 1.5,
   },
   metaBannerLine: {
     maxWidth: 1400,
