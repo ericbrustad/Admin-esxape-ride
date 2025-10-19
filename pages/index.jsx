@@ -2062,8 +2062,8 @@ export default function Admin() {
     }
   }
 
-  // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
+  // Tabs: missions / devices / settings / media-pool / assigned
+  const tabsOrder = ['settings','missions','devices','assigned','media-pool'];
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
@@ -2150,7 +2150,6 @@ export default function Admin() {
                   'missions':'MISSIONS',
                   'devices':'DEVICES',
                   'settings':'SETTINGS',
-                  'text':'TEXT',
                   'media-pool':'MEDIA POOL',
                   'assigned':'ASSIGNED MEDIA',
                 };
@@ -3436,9 +3435,6 @@ export default function Admin() {
         </main>
       )}
 
-      {/* TEXT rules */}
-      {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
-
       {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
       {tab==='media-pool' && (
         <MediaPoolTab
@@ -4256,45 +4252,6 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
         <code style={{ color:'var(--admin-muted)' }}>{rad} m</code>
       </div>
     </div>
-  );
-}
-
-/* TEXT TAB */
-function TextTab({ config, setConfig }) {
-  const [text, setText] = useState((config.textRules || []).join('\n'));
-  useEffect(()=>{ setText((config.textRules || []).join('\n')); }, [config.textRules]);
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'var(--admin-muted)', marginBottom:8, fontSize:12 }}>
-          One rule per line. This saves into <code>config.textRules</code>.
-        </div>
-        <textarea
-          style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
-          value={text}
-          onChange={(e)=>setText(e.target.value)}
-        />
-        <div style={{ display:'flex', gap:8, marginTop:8 }}>
-          <button
-            style={S.button}
-            onClick={()=>{
-              const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
-              setConfig(c=>({ ...c, textRules: lines }));
-            }}
-          >
-            Save Rules
-          </button>
-          <button
-            style={S.button}
-            onClick={()=>setText((config.textRules || []).join('\n'))}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </main>
   );
 }
 
