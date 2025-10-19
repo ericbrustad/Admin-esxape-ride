@@ -160,6 +160,45 @@ function formatLocalDateTime(value) {
     return '';
   }
 }
+
+function isDisplayableColor(value) {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'none') return false;
+  if (lowered.includes('gradient') || lowered.includes('url(') || lowered.startsWith('var(')) return false;
+  if (/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(trimmed)) return true;
+  if (/^rgba?\(/i.test(trimmed)) return true;
+  if (/^hsla?\(/i.test(trimmed)) return true;
+  if (/^(oklch|oklab|lab|lch)\(/i.test(trimmed)) return true;
+  if (/^[a-z]+$/i.test(trimmed)) return true;
+  return false;
+}
+
+function extractSkinPalette(skin) {
+  if (!skin) return [];
+  const palette = [];
+  const pushColor = (color) => {
+    if (!isDisplayableColor(color)) return;
+    const normalized = color.trim();
+    if (!palette.includes(normalized)) palette.push(normalized);
+  };
+  pushColor(skin.ui?.accent);
+  pushColor(skin.ui?.linkColor);
+  pushColor(skin.appearance?.fontColor);
+  pushColor(skin.appearance?.textBgColor);
+  pushColor(skin.appearance?.screenBgColor);
+  pushColor(skin.appearance?.panelBgColor);
+  pushColor(skin.appearance?.panelBorderColor);
+  return palette.slice(0, 5);
+}
+
+function describeFontFamily(fontFamily) {
+  if (!fontFamily) return 'Default system';
+  const primary = String(fontFamily).split(',')[0] || '';
+  return primary.replace(/['"]/g, '').trim() || 'Custom font';
+}
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -4086,42 +4125,16 @@ export default function Admin() {
             </div>
             <div style={{ marginBottom:12 }}>
               <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:8 }}>Theme skins</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:8 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
                 {APPEARANCE_SKINS.map((skin)=>{
                   const active = selectedAppearanceSkin === skin.key;
-                  const previewBg = skin.appearance.screenBgImage && skin.appearance.screenBgImageEnabled !== false
-                    ? `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
-                    : `linear-gradient(rgba(0,0,0,${skin.appearance.screenBgOpacity}), rgba(0,0,0,${skin.appearance.screenBgOpacity})), ${skin.appearance.screenBgColor}`;
                   return (
-                    <button
+                    <ThemeSkinButton
                       key={skin.key}
-                      type="button"
-                      onClick={()=>applyAppearanceSkin(skin.key)}
-                      style={{
-                        borderRadius:12,
-                        border:`1px solid ${active ? 'var(--admin-accent)' : 'var(--admin-border-soft)'}`,
-                        background: active ? 'var(--admin-tab-active-bg)' : 'var(--admin-tab-bg)',
-                        padding:12,
-                        textAlign:'left',
-                        color:'var(--admin-body-color)',
-                        cursor:'pointer',
-                      }}
-                    >
-                      <div style={{ fontWeight:600 }}>{skin.label}</div>
-                      <div style={{ fontSize:12, color:'var(--admin-muted)', margin:'4px 0 8px 0' }}>{skin.description}</div>
-                      <div style={{
-                        border:'1px dashed var(--admin-border-soft)',
-                        borderRadius:8,
-                        padding:10,
-                        background: previewBg,
-                        color: skin.appearance.fontColor,
-                        fontFamily: skin.appearance.fontFamily,
-                        fontSize: Math.max(14, Math.min(20, skin.appearance.fontSizePx * 0.7)),
-                        textAlign: skin.appearance.textAlign,
-                      }}>
-                        Preview text
-                      </div>
-                    </button>
+                      skin={skin}
+                      active={active}
+                      onSelect={()=>applyAppearanceSkin(skin.key)}
+                    />
                   );
                 })}
               </div>
@@ -4566,6 +4579,127 @@ function MultipleChoiceEditor({ value, correctIndex, onChange }) {
     </div>
   );
 }
+function ThemeSkinButton({ skin, active, onSelect }) {
+  if (!skin) return null;
+  const palette = extractSkinPalette(skin);
+  const fontLabel = describeFontFamily(skin.appearance?.fontFamily);
+  const accentLabel = palette[0] || '';
+  const screenBgOpacity = typeof skin.appearance?.screenBgOpacity === 'number'
+    ? skin.appearance.screenBgOpacity
+    : 0.35;
+  const previewBg = skin.appearance?.screenBgImage && skin.appearance?.screenBgImageEnabled !== false
+    ? `linear-gradient(rgba(0,0,0,${screenBgOpacity}), rgba(0,0,0,${screenBgOpacity})), url(${toDirectMediaURL(skin.appearance.screenBgImage)}) center/cover no-repeat`
+    : `linear-gradient(rgba(0,0,0,${screenBgOpacity}), rgba(0,0,0,${screenBgOpacity})), ${skin.appearance?.screenBgColor || 'var(--admin-panel-bg)'}`;
+  const baseFontSize = typeof skin.appearance?.fontSizePx === 'number' && !Number.isNaN(skin.appearance.fontSizePx)
+    ? skin.appearance.fontSizePx
+    : 24;
+
+  const previewTextStyle = {
+    color: skin.appearance?.fontColor || 'var(--admin-body-color)',
+    fontFamily: skin.appearance?.fontFamily || 'var(--appearance-font-family, var(--admin-font-family))',
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      data-active={active ? 'true' : 'false'}
+      style={{
+        borderRadius: 14,
+        border: active ? '1px solid var(--admin-accent)' : '1px solid var(--admin-border-soft)',
+        background: active
+          ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(14,165,233,0.08))'
+          : 'var(--admin-tab-bg)',
+        padding: 16,
+        textAlign: 'left',
+        color: 'var(--admin-body-color)',
+        cursor: 'pointer',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: active
+          ? '0 18px 36px rgba(15, 23, 42, 0.28)'
+          : '0 10px 24px rgba(15, 23, 42, 0.22)',
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease, background 0.2s ease',
+        transform: active ? 'translateY(-1px)' : 'translateY(0)',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>{skin.label}</div>
+        {active && (
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: 'rgba(59,130,246,0.2)',
+              color: '#93c5fd',
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Active
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--admin-muted)', margin: '6px 0 10px 0', lineHeight: 1.4 }}>
+        {skin.description}
+      </div>
+      <div
+        style={{
+          border: '1px solid rgba(148, 163, 184, 0.35)',
+          borderRadius: 12,
+          padding: 12,
+          background: previewBg,
+          backdropFilter: 'blur(2px)',
+          display: 'grid',
+          gap: 8,
+          minHeight: 96,
+        }}
+      >
+        <div style={{ ...previewTextStyle, fontWeight: 700, fontSize: 15, textAlign: skin.appearance?.textAlign || 'left' }}>
+          Mission Console Ready
+        </div>
+        <div
+          style={{
+            ...previewTextStyle,
+            fontSize: Math.max(13, Math.min(18, baseFontSize * 0.55)),
+            opacity: 0.92,
+          }}
+        >
+          Status lights synchronized. Operators are clear for launch.
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {palette.map((color) => (
+            <span
+              key={`${skin.key}-${color}`}
+              title={`Palette swatch ${color}`}
+              aria-label={`Palette swatch ${color}`}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                border: '1px solid rgba(15,23,42,0.35)',
+                background: color,
+                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 11, color: 'var(--admin-muted)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span>Font: <strong style={{ color: 'var(--admin-body-color)' }}>{fontLabel}</strong></span>
+        {accentLabel && (
+          <span>
+            Accent: <strong style={{ color: 'var(--admin-body-color)' }}>{accentLabel}</strong>
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
 function MediaPreview({ url, kind }) {
   if (!url) return null;
   const u = toDirectMediaURL(String(url).trim());
