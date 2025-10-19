@@ -1,7 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { commitJsonWithMerge } from '../../lib/secureStore.js';
 
 const ADMIN_PROTECTION_PATH = path.join(process.cwd(), 'public', 'admin-protection.json');
 const GAME_PROTECTION_PATHS = [
@@ -18,27 +17,6 @@ const hasGitHub = Boolean(
 async function ensureDir(filePath) {
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
-}
-
-function isReadonlyError(err) {
-  if (!err || typeof err !== 'object') return false;
-  return ['EROFS', 'EACCES', 'EPERM'].includes(err.code);
-}
-
-async function writeViaGitHub(relPath, state) {
-  if (!hasGitHub || !relPath) {
-    const missing = !hasGitHub ? 'GitHub credentials missing' : 'relative path unavailable';
-    const error = new Error(`Read-only filesystem and ${missing}`);
-    error.code = 'READONLY_NO_GH';
-    throw error;
-  }
-
-  const message = state?.protected
-    ? 'admin-protection: enable password'
-    : 'admin-protection: disable password';
-
-  await commitJsonWithMerge(relPath, state, message);
-  return { method: 'github' };
 }
 
 function normalizeProtectedFlag(value, fallback = false) {
@@ -91,26 +69,8 @@ async function readGameProtection() {
 }
 
 async function writeProtection(filePath, state) {
-  const relPath = path.relative(process.cwd(), filePath).split(path.sep).join('/');
-
-  try {
-    await ensureDir(filePath);
-  } catch (err) {
-    if (isReadonlyError(err)) {
-      return writeViaGitHub(relPath, state);
-    }
-    throw err;
-  }
-
-  try {
-    await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf8');
-    return { method: 'fs' };
-  } catch (err) {
-    if (isReadonlyError(err)) {
-      return writeViaGitHub(relPath, state);
-    }
-    throw err;
-  }
+  await ensureDir(filePath);
+  await fs.writeFile(filePath, JSON.stringify(state, null, 2), 'utf8');
 }
 
 async function syncGameProtection(targetState, nowIso) {
@@ -183,14 +143,8 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    let body;
     try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    } catch (err) {
-      return res.status(400).json({ error: 'Invalid request body' });
-    }
-
-    try {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       const target = normalizeProtectedFlag(body.protected, false);
       const password = typeof body.password === 'string' ? body.password : '';
       const confirmPassword = typeof body.confirmPassword === 'string' ? body.confirmPassword : '';
@@ -235,13 +189,7 @@ export default async function handler(req, res) {
         passwordSet: true,
       });
     } catch (err) {
-      if (err?.code === 'READONLY_NO_GH') {
-        return res.status(500).json({ error: 'Read-only filesystem detected. Configure GitHub credentials to allow saving.' });
-      }
-      if (isReadonlyError(err)) {
-        return res.status(500).json({ error: 'Read-only filesystem prevented saving admin-protection.json' });
-      }
-      return res.status(500).json({ error: err?.message || 'Unable to update protection' });
+      return res.status(400).json({ error: err?.message || 'Invalid request body' });
     }
   }
 

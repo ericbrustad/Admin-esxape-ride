@@ -161,7 +161,7 @@ export default async function handler(req, res) {
       const next = [...list, item];
       await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
 
-      return res.json({ ok: true, slug, game: item, gameProjectEnabled: GAME_ENABLED });
+      return res.json({ ok: true, slug, game: item });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ ok: false, error: String(err.message || err) });
