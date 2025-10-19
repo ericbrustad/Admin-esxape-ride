@@ -1,0 +1,21 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Alien Surge",
+    "type": "Thriller",
+    "tags": [
+      "alien-surge"
+    ],
+    "coverImage": "/media/covers/1760916753546-361908030_MONSTER_SHRUGGING_400px.gif",
+    "shortDescription": "They didnt come to eat dinner with you",
+    "longDescription": "A Surge of Aliens becomes to be more than was expected after you invited them to come and live in your city.",
+    "slug": "alien-surge"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
