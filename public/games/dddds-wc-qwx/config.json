@@ -1,0 +1,21 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "dddds  wc qwx",
+    "type": "Thriller",
+    "tags": [
+      "dddds-wc-qwx"
+    ],
+    "coverImage": "/media/covers/1760917344366-20face2eye03.png",
+    "shortDescription": "gngngn",
+    "longDescription": "gngg g g dhrdhrdff srr r  r",
+    "slug": "dddds-wc-qwx"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
