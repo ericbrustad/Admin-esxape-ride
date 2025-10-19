@@ -61,5 +61,15 @@
     "type": "Mystery",
     "mode": "single",
     "createdAt": "2025-10-08T16:01:58.254Z"
+  },
+  {
+    "slug": "alien-surge",
+    "title": "Alien Surge",
+    "type": "Thriller",
+    "mode": "single",
+    "shortDescription": "They didnt come to eat dinner with you",
+    "longDescription": "A Surge of Aliens becomes to be more than was expected after you invited them to come and live in your city.",
+    "coverImage": "/media/covers/1760916753546-361908030_MONSTER_SHRUGGING_400px.gif",
+    "createdAt": "2025-10-19T23:32:36.092Z"
   }
 ]
