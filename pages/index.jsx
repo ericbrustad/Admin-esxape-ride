@@ -4,6 +4,8 @@ import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
+import TextDeviceDetails from '../components/TextDeviceDetails';
+import TextMessageMissionEditor from '../components/TextMessageMissionEditor';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -12,6 +14,11 @@ import {
   surfaceStylesFromAppearance,
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
+import {
+  TEXT_PLAYER_TOKENS,
+  createTextMessageContent,
+  validateTextMessageContent,
+} from '../lib/text-messages';
 import { GAME_ENABLED } from '../lib/game-switch';
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -220,6 +227,7 @@ const DEFAULT_BUNDLES = {
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key:'text-relay', name:'Text Message Device', url:'/media/bundles/text-device.svg' },
   ],
   missions: [
     { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
@@ -297,6 +305,7 @@ const TYPE_FIELDS = {
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
+  text_message: [],
 };
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
@@ -308,6 +317,7 @@ const TYPE_LABELS = {
   ar_image:         'AR Image',
   ar_video:         'AR Video',
   stored_statement: 'Stored Statement',
+  text_message:     'Text Message Mission',
 };
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
@@ -315,6 +325,7 @@ const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'text',   label:'Text Message Device' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -1298,6 +1309,13 @@ export default function Admin() {
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
+  const editingContent = useMemo(() => {
+    if (!editing) return {};
+    if (editing.type === 'text_message') {
+      return createTextMessageContent(editing.content);
+    }
+    return editing.content || {};
+  }, [editing]);
   // media inventory for editors
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
@@ -1389,6 +1407,27 @@ export default function Admin() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
   const [protectionError, setProtectionError] = useState('');
+
+  function updateMissionContent(partial = {}) {
+    if (!editing) return;
+    const merged = { ...(editing.content || {}), ...(partial || {}) };
+    const nextContent = editing.type === 'text_message'
+      ? createTextMessageContent(merged)
+      : merged;
+    setEditing({ ...editing, content: nextContent });
+    setDirty(true);
+  }
+
+  function appendTokenToField(fieldKey, token) {
+    if (!editing || !fieldKey || !token) return;
+    const current = editing.content?.[fieldKey] || '';
+    updateMissionContent({ [fieldKey]: current ? `${current}${token}` : token });
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(token).catch(() => {});
+      }
+    } catch {}
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1689,6 +1728,7 @@ export default function Admin() {
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
+      case 'text_message':    return createTextMessageContent();
       default:                return { ...base };
     }
   }
@@ -1921,6 +1961,9 @@ export default function Admin() {
     if (!e.onWrong)   e.onWrong   = { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false };
     if (e.showContinue === undefined) e.showContinue = true;
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
+    if (e.type === 'text_message') {
+      e.content = createTextMessageContent(e.content);
+    }
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() {
@@ -1943,6 +1986,17 @@ export default function Admin() {
     if (!editing || !suite) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
+    let validatedTextMessage = null;
+    if (editing.type === 'text_message') {
+      const { ok, errors, content: normalizedContent } = validateTextMessageContent(editing.content);
+      if (!ok) {
+        setStatus(`❌ ${errors[0]}`);
+        return;
+      }
+      setEditing(prev => (prev ? { ...prev, content: normalizedContent } : prev));
+      validatedTextMessage = normalizedContent;
+    }
+
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
       if (f.type === 'number' || f.optional) continue;
@@ -1955,6 +2009,14 @@ export default function Admin() {
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
+    if (obj.type === 'text_message') {
+      if (validatedTextMessage) {
+        obj.content = validatedTextMessage;
+      } else {
+        const { content: normalizedContent } = validateTextMessageContent(obj.content);
+        obj.content = normalizedContent;
+      }
+    }
     obj.trigger = sanitizeTriggerConfig(editing.trigger);
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
 
@@ -2127,6 +2189,16 @@ export default function Admin() {
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
       trigger: sanitizeTriggerConfig(devDraft.trigger),
     };
+    if (normalized.type === 'text') {
+      if (!normalized.trigger.enabled) {
+        setStatus('❌ Enable the trigger so Text Message devices know when to fire');
+        return;
+      }
+      if (!normalized.trigger.actionTarget) {
+        setStatus('❌ Select an action target for the Text Message device');
+        return;
+      }
+    }
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
         setStatus('❌ Click the map or search an address to set device location');
@@ -3207,6 +3279,17 @@ export default function Admin() {
                     </Field>
                   )}
 
+                  {editing.type === 'text_message' && (
+                    <TextMessageMissionEditor
+                      content={editingContent}
+                      onChange={updateMissionContent}
+                      onAppendToken={appendTokenToField}
+                      playerTokens={TEXT_PLAYER_TOKENS}
+                      inputStyle={S.input}
+                      textareaStyle={{ ...S.input, minHeight: 140, fontFamily: 'ui-monospace, Menlo, Monaco, Consolas' }}
+                    />
+                  )}
+
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Pick location & radius</div>
@@ -3218,7 +3301,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
+                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement'||editing.type==='text_message') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
@@ -3652,6 +3735,7 @@ export default function Admin() {
                         <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
                           {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
+                        {devDraft.type === 'text' && <TextDeviceDetails trigger={trigger} />}
                       </Field>
                       <Field label="Icon">
                         <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
