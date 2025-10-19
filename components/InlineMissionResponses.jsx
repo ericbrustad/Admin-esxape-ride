@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { ADMIN_THEME } from '../lib/admin-shared';
 
 const DEFAULT_SIDE_STATE = {
   statement: "",
@@ -70,6 +71,8 @@ function fallbackLabelFromUrl(u) {
     return cleaned || leaf;
   }
 }
+
+const theme = ADMIN_THEME;
 
 export default function InlineMissionResponses({ editing, setEditing, inventory = [] }) {
   const safeEditing = useMemo(() => normalizeMission(editing), [editing]);
@@ -272,7 +275,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     useEffect(() => { currentSideRef.current = sideKey; }, [sideKey]);
 
     return (
-      <div style={{ border:'1px solid #1f2b2f', borderRadius:10, padding:12, marginBottom:12, background:'#071014' }}>
+      <div style={{ border:theme.panelBorder, borderRadius:16, padding:16, marginBottom:12, background:theme.surfaceRaised, boxShadow:theme.panelShadow, color:theme.textPrimary }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
           <div style={{ fontWeight:700 }}>{title}</div>
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -284,7 +287,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
         {/* status ticker */}
         <div style={{ marginTop:8, marginBottom:8 }}>
-          <div style={{ padding:8, borderRadius:8, border:'1px solid #132122', background: enabled ? 'rgba(34,197,94,0.06)' : 'transparent', color: enabled ? '#a7f3d0' : '#9fb0bf' }}>
+        <div style={{ padding:8, borderRadius:12, border:theme.borderSoft, background: enabled ? theme.successSurface : theme.surfaceGlass, color: enabled ? theme.successText : theme.textMuted }}>
             {enabled ? (deviceId ? "Response Device Enabled!" : "Response Enabled — No Devices Selected") : "No Devices Enabled"}
           </div>
         </div>
@@ -292,8 +295,8 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         {/* Device selector */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 160px', gap:8, alignItems:'center' }}>
           <div>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Trigger Device</div>
-            {loadingDevices ? <div style={{ color:'#9fb0bf' }}>Loading devices…</div> : (
+            <div style={{ fontSize:12, color:theme.textMuted, marginBottom:6 }}>Trigger Device</div>
+            {loadingDevices ? <div style={{ color:theme.textMuted }}>Loading devices…</div> : (
               hasDevices ? (
                 <div style={{ display:'grid', gap:6 }}>
                   <select style={styles.select} value={deviceId || ""} onChange={(e)=>chooseDeviceForSide(sideKey, e.target.value)}>
@@ -310,10 +313,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                     if (!d) return null;
                     return (
                       <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <div style={{ width:48, height:48, border:'1px solid #263236', borderRadius:8, overflow:'hidden', display:'grid', placeItems:'center' }}>
-                          {d && d.iconKey ? <img src={d.iconUrl || d.icon || ''} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ color:'#9fb0bf' }}>{d.title?.charAt(0) || 'D'}</div>}
+                        <div style={{ width:48, height:48, border:theme.borderSoft, borderRadius:10, overflow:'hidden', display:'grid', placeItems:'center' }}>
+                          {d && d.iconKey ? <img src={d.iconUrl || d.icon || ''} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} /> : <div style={{ color:theme.textMuted }}>{d.title?.charAt(0) || 'D'}</div>}
                         </div>
-                        <div style={{ color:'#9fb0bf' }}>{d.title || d.name || d.key}</div>
+                        <div style={{ color:theme.textMuted }}>{d.title || d.name || d.key}</div>
                         <div style={{ marginLeft:'auto' }}>
                           <button style={styles.smallButton} onClick={()=>removeDeviceForSide(sideKey)}>Clear</button>
                         </div>
@@ -322,26 +325,26 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                   })()}
                 </div>
               ) : (
-                <div style={{ color:'#9fb0bf' }}>No devices available. Create a device in the Devices tab first.</div>
+                <div style={{ color:theme.textMuted }}>No devices available. Create a device in the Devices tab first.</div>
               )
             )}
           </div>
 
           {/* arrows and ordering hint (non-destructive — this component doesn't reorder devices list - that is managed on the Devices tab) */}
           <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Device list actions</div>
+            <div style={{ fontSize:12, color:theme.textMuted, marginBottom:6 }}>Device list actions</div>
             <div style={{ display:'flex', gap:6, justifyContent:'flex-end' }}>
               <button style={styles.smallButton} title="Move selected device up">▲</button>
               <button style={styles.smallButton} title="Move selected device down">▼</button>
             </div>
-            <div style={{ fontSize:11, color:'#9fb0bf', marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
+            <div style={{ fontSize:11, color:theme.textMuted, marginTop:8 }}>Note: Use the Devices tab to permanently reorder devices.</div>
           </div>
         </div>
 
-        <hr style={{ border:'1px solid #0f2527', margin:'12px 0' }} />
+        <hr style={{ border:theme.borderSoft, margin:'12px 0' }} />
 
         {/* Media selector area */}
-        <div ref={dropRef} style={{ border:'1px dashed #123033', borderRadius:8, padding:10, background:'#061015' }}>
+        <div ref={dropRef} style={{ border:`1px dashed ${theme.borderSoftColor}`, borderRadius:12, padding:12, background:theme.surfaceGlass }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
             <div style={{ fontWeight:600 }}>{title} — Media</div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -371,18 +374,18 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               const kind = entry.kind;
               const isSelected = (url === (mediaUrl || audioUrl));
               return (
-                <div key={idx} style={{ border: isSelected ? '2px solid #1aa654' : '1px solid #153033', borderRadius:8, padding:6, background: isSelected ? 'rgba(34,197,94,0.04)' : 'transparent' }}>
+                <div key={idx} style={{ border: isSelected ? `2px solid ${theme.accent}` : theme.borderSoft, borderRadius:12, padding:8, background: isSelected ? theme.successSurface : theme.surfaceGlass }}>
                   <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                    <div style={{ width:56, height:44, borderRadius:6, overflow:'hidden', background:'#071018', display:'grid', placeItems:'center' }}>
+                    <div style={{ width:56, height:44, borderRadius:10, overflow:'hidden', background:theme.surfaceSunken, display:'grid', placeItems:'center' }}>
                       {(kind === 'image' || kind === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         : (kind === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
-                        : (kind === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
-                        : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(entry.label || 'file').slice(0,8)}</div>
+                        : (kind === 'audio') ? <div style={{ fontSize:12, color:theme.textMuted }}>Audio</div>
+                        : <div style={{ fontSize:12, color:theme.textMuted }}>{(entry.label || 'file').slice(0,8)}</div>
                       }
                     </div>
                     <div style={{ flex:1, overflow:'hidden' }}>
                       <div style={{ fontWeight:600, fontSize:13, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{entry.label}</div>
-                      <div style={{ fontSize:12, color:'#9fb0bf' }}>{kind}</div>
+                      <div style={{ fontSize:12, color:theme.textMuted }}>{kind}</div>
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:8 }}>
@@ -396,7 +399,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
           {/* selected preview */}
           {selectedPreviewUrl && (
             <div style={{ marginTop:10 }}>
-              <div style={{ fontSize:12, color:'#9fb0bf', marginBottom:6 }}>Preview</div>
+              <div style={{ fontSize:12, color:theme.textMuted, marginBottom:6 }}>Preview</div>
               {classifyByExt(selectedPreviewUrl) === 'image' || classifyByExt(selectedPreviewUrl) === 'gif' ? (
                 <img src={selectedPreviewUrl} alt="preview" style={{ width:'100%', maxHeight:220, objectFit:'contain', borderRadius:8 }} />
               ) : classifyByExt(selectedPreviewUrl) === 'video' ? (
@@ -404,7 +407,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
                 <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
               ) : (
-                <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
+                <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:theme.textMuted }}>{selectedPreviewUrl}</a>
               )}
             </div>
           )}
@@ -422,7 +425,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               }} />
             </label>
 
-            <div style={{ color:'#9fb0bf', fontSize:12 }}>
+            <div style={{ color:theme.textMuted, fontSize:12 }}>
               Or drag & drop a file onto this box to upload and assign.
             </div>
           </div>
@@ -433,7 +436,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 
   if (!editing) {
     return (
-      <div style={{ marginTop: 12, color: '#9fb0bf', fontSize: 12 }}>
+      <div style={{ marginTop: 12, color: theme.textMuted, fontSize: 12 }}>
         Select a mission to configure response media.
       </div>
     );
@@ -448,9 +451,45 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
 }
 
 const styles = {
-  select: { width: "100%", padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  selectSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2" },
-  inputSmall: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#061217", color: "#e9eef2", width:240 },
-  smallButton: { padding: "6px 8px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" },
-  button: { padding: "8px 10px", borderRadius:8, border: "1px solid #233236", background: "#0d1a1b", color: "#e9eef2", cursor: "pointer" }
+  select: {
+    width: "100%",
+    padding: "8px 10px",
+    borderRadius:12,
+    border: theme.inputBorder,
+    background: theme.inputBg,
+    color: theme.inputColor,
+  },
+  selectSmall: {
+    padding: "6px 8px",
+    borderRadius:10,
+    border: theme.inputBorder,
+    background: theme.inputBg,
+    color: theme.inputColor,
+  },
+  inputSmall: {
+    padding: "6px 8px",
+    borderRadius:10,
+    border: theme.inputBorder,
+    background: theme.inputBg,
+    color: theme.inputColor,
+    width:240,
+  },
+  smallButton: {
+    padding: "6px 8px",
+    borderRadius:10,
+    border: theme.borderSoft,
+    background: theme.surfaceGlass,
+    color: theme.textPrimary,
+    cursor: "pointer",
+    boxShadow: theme.glassSheen,
+  },
+  button: {
+    padding: "8px 12px",
+    borderRadius:12,
+    border: theme.borderSoft,
+    background: theme.surfaceRaised,
+    color: theme.textPrimary,
+    cursor: "pointer",
+    boxShadow: theme.glassSheen,
+  }
 };

@@ -2,14 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import {
   clamp, hexToRgb, toDirectMediaURL,
-  FONT_FAMILIES, defaultAppearance
+  FONT_FAMILIES, defaultAppearance, ADMIN_THEME
 } from '../lib/admin-shared';
+
+const theme = ADMIN_THEME;
 
 /* -------- Field wrappers -------- */
 export function Field({ label, children }) {
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 12, color: '#9fb0bf', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 6 }}>{label}</div>
       {children}
     </div>
   );
@@ -28,14 +30,33 @@ export function ColorField({ label, value, onChange }) {
 /* -------- Appearance Editor -------- */
 export function AppearanceEditor({ value, onChange }) {
   const a = value || defaultAppearance();
+  const dashedBorder = `1px dashed ${theme.borderSoftColor}`;
   return (
-    <div style={{ border:'1px solid #22303c', borderRadius:10, padding:12 }}>
+    <div
+      style={{
+        border: theme.panelBorder,
+        borderRadius: 14,
+        padding: 16,
+        background: theme.surfaceRaised,
+        boxShadow: theme.panelShadow,
+      }}
+    >
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
         <Field label="Font family">
           <select style={styles.input} value={a.fontFamily} onChange={(e)=>onChange({ ...a, fontFamily:e.target.value })}>
             {FONT_FAMILIES.map(f=><option key={f.v} value={f.v}>{f.label}</option>)}
           </select>
-          <div style={{ marginTop:6, padding:'6px 10px', border:'1px dashed #2a323b', borderRadius:8, fontFamily:a.fontFamily }}>
+          <div
+            style={{
+              marginTop:6,
+              padding:'6px 10px',
+              border: dashedBorder,
+              borderRadius:10,
+              fontFamily:a.fontFamily,
+              background: theme.surfaceSunken,
+              color: theme.textPrimary,
+            }}
+          >
             Aa — preview text with this font
           </div>
         </Field>
@@ -48,19 +69,30 @@ export function AppearanceEditor({ value, onChange }) {
         <Field label="Text background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.textBgOpacity}
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:theme.textMuted, fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
         <Field label="Screen background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
             onChange={(e)=>onChange({ ...a, screenBgOpacity:Number(e.target.value) })}/>
-          <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
+          <div style={{ color:theme.textMuted, fontSize:12, marginTop:4 }}>{(a.screenBgOpacity*100).toFixed(0)}%</div>
         </Field>
         <Field label="Screen background image (URL)">
           <input style={styles.input} value={a.screenBgImage || ''} onChange={(e)=>onChange({ ...a, screenBgImage:e.target.value })}/>
           {a.screenBgImage && (
-            <img src={toDirectMediaURL(a.screenBgImage)} alt="bg"
-                 style={{ marginTop:6, width:'100%', maxHeight:120, objectFit:'cover', border:'1px solid #2a323b', borderRadius:8 }}/>
+            <img
+              src={toDirectMediaURL(a.screenBgImage)}
+              alt="bg"
+              style={{
+                marginTop:6,
+                width:'100%',
+                maxHeight:120,
+                objectFit:'cover',
+                border:theme.borderSoft,
+                borderRadius:12,
+                background:theme.surfaceSunken,
+              }}
+            />
           )}
         </Field>
         <Field label="Text alignment (horizontal)">
@@ -76,7 +108,10 @@ export function AppearanceEditor({ value, onChange }) {
       </div>
 
       <div style={{
-        marginTop:12, border:'1px dashed #2a323b', borderRadius:10, overflow:'hidden',
+        marginTop:12,
+        border: dashedBorder,
+        borderRadius:14,
+        overflow:'hidden',
         background:a.screenBgImage
           ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), url(${toDirectMediaURL(a.screenBgImage)}) center/cover no-repeat`
           : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity}), rgba(0,0,0,${a.screenBgOpacity})), ${a.screenBgColor}`,
@@ -85,7 +120,7 @@ export function AppearanceEditor({ value, onChange }) {
         <div style={{
           maxWidth:'100%',
           background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
-          padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
+          padding:'6px 10px', borderRadius:10, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
           textAlign:a.textAlign, width:'fit-content',
           justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
         }}>
@@ -95,7 +130,6 @@ export function AppearanceEditor({ value, onChange }) {
     </div>
   );
 }
-
 /* -------- MCQ Editor -------- */
 export function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   const [local, setLocal] = useState(Array.isArray(value) ? value.slice(0, 5) : []);
@@ -111,7 +145,7 @@ export function MultipleChoiceEditor({ value, correctIndex, onChange }) {
   }
 
   return (
-    <div style={{ border:'1px solid #2a323b', borderRadius:10, padding:12 }}>
+    <div style={{ border:theme.panelBorder, borderRadius:14, padding:16, background:theme.surfaceRaised, boxShadow:theme.panelShadow }}>
       <div style={{ fontWeight:600, marginBottom:8 }}>Choices (A–E)</div>
       {[0,1,2,3,4].map(i=>(
         <div key={i} style={{ display:'grid', gridTemplateColumns:'24px 1fr', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -120,7 +154,7 @@ export function MultipleChoiceEditor({ value, correctIndex, onChange }) {
             onChange={(e)=>{ const next=[...local]; next[i]=e.target.value; setLocal(next); sync(next, correct); }}/>
         </div>
       ))}
-      <div style={{ color:'#9fb0bf', fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
+      <div style={{ color:theme.textMuted, fontSize:12 }}>Leave blanks for unused options. Exactly one radio can be marked correct.</div>
     </div>
   );
 }
@@ -135,13 +169,21 @@ export function MediaPreview({ url, kind }) {
 
   return (
     <div style={{ marginTop:8 }}>
-      <div style={{ color:'#9fb0bf', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
+      <div style={{ color:theme.textMuted, fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
       {isVideo ? (
-        <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid #2a323b' }}/>
+        <video
+          src={u}
+          controls
+          style={{ width:'100%', maxHeight:260, borderRadius:12, border:theme.borderSoft, background:theme.surfaceSunken }}
+        />
       ) : isImage ? (
-        <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid #2a323b' }}/>
+        <img
+          src={u}
+          alt="preview"
+          style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:12, border:theme.borderSoft, background:theme.surfaceSunken }}
+        />
       ) : (
-        <a href={u} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf', textDecoration:'underline' }}>Open media</a>
+        <a href={u} target="_blank" rel="noreferrer" style={{ color:theme.accent, textDecoration:'underline' }}>Open media</a>
       )}
     </div>
   );
@@ -149,5 +191,13 @@ export function MediaPreview({ url, kind }) {
 
 /* -------- shared styles for inputs -------- */
 export const styles = {
-  input:{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2' }
+  input:{
+    width:'100%',
+    padding:'10px 12px',
+    borderRadius:12,
+    border:theme.inputBorder,
+    background:theme.inputBg,
+    color:theme.inputColor,
+    boxShadow:'0 0 0 1px transparent',
+  }
 };
