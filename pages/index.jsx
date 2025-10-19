@@ -297,6 +297,7 @@ const TYPE_FIELDS = {
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
+  text_message: [],
 };
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
@@ -308,13 +309,15 @@ const TYPE_LABELS = {
   ar_image:         'AR Image',
   ar_video:         'AR Video',
   stored_statement: 'Stored Statement',
+  text_message:     'Text Message Mission',
 };
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const DEVICE_TYPES = [
-  { value:'smoke',  label:'Smoke (hide on GPS)' },
-  { value:'clone',  label:'Clone (decoy location)' },
-  { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'smoke',         label:'Smoke (hide on GPS)' },
+  { value:'clone',         label:'Clone (decoy location)' },
+  { value:'jammer',        label:'Signal Jammer (blackout radius)' },
+  { value:'text_message',  label:'Text Message Device' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -355,9 +358,32 @@ function createDeviceDraft(overrides = {}) {
     lat: null,
     lng: null,
     trigger: { ...DEFAULT_TRIGGER_CONFIG },
+    textMessaging: {
+      prompt: '',
+      outgoingTemplate: '',
+      targetNumberKey: '',
+      notes: '',
+      delaySeconds: 0,
+      triggers: {
+        geofence: false,
+        incorrectResponse: false,
+        wrongResponse: false,
+        timeWindow: false,
+      },
+    },
   };
   const merged = { ...base, ...overrides };
   merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
+  merged.textMessaging = {
+    ...base.textMessaging,
+    ...(merged.textMessaging || {}),
+    ...(overrides.textMessaging || {}),
+    triggers: {
+      ...base.textMessaging.triggers,
+      ...((merged.textMessaging && merged.textMessaging.triggers) || {}),
+      ...((overrides.textMessaging && overrides.textMessaging.triggers) || {}),
+    },
+  };
   return merged;
 }
 const BASE_UI_THEME = {
@@ -1107,6 +1133,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
+  const pageLoadedAtRef = useRef(new Date().toISOString());
 
   const [protectionPrompt, setProtectionPrompt] = useState({
     open: false,
@@ -1288,6 +1315,22 @@ export default function Admin() {
     }
     return undefined;
   }, [newCoverPreview]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof console === 'undefined') return;
+    const opener = console.groupCollapsed || console.group;
+    if (typeof opener === 'function') {
+      try { opener.call(console, 'GPT Collaboration Log'); } catch {}
+    }
+    try {
+      console.info('Operator → Requested header consolidation plus text messaging mission/device support.');
+      console.info('Assistant → Implemented layout merge, messaging flows, and deployment banner updates.');
+    } finally {
+      if (typeof console.groupEnd === 'function') {
+        try { console.groupEnd(); } catch {}
+      }
+    }
+  }, []);
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
@@ -1689,6 +1732,38 @@ export default function Admin() {
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
+      case 'text_message':    return {
+        ...base,
+        incoming: {
+          enabled: false,
+          title: '',
+          message: '',
+          includeFirstName: true,
+          includeLastName: false,
+          includeEmail: false,
+          includeCell: false,
+          includeEmergency: false,
+        },
+        outgoing: {
+          enabled: false,
+          prompt: '',
+          playerMessage: '',
+          targetNumberKey: '',
+          responseNotes: '',
+        },
+        automation: {
+          enabled: false,
+          modes: {
+            geofence: true,
+            incorrectResponse: false,
+            wrongResponse: false,
+            timeWindow: false,
+          },
+          delaySeconds: 0,
+          followUpMessage: '',
+          notes: '',
+        },
+      };
       default:                return { ...base };
     }
   }
@@ -1952,6 +2027,24 @@ export default function Admin() {
         return setStatus('❌ Missing: ' + f.label);
       }
     }
+    if (editing.type === 'text_message') {
+      const textContent = editing.content || {};
+      const incoming = textContent.incoming || {};
+      const outgoing = textContent.outgoing || {};
+      const automation = textContent.automation || {};
+      if (!incoming.enabled && !outgoing.enabled && !automation.enabled) {
+        return setStatus('❌ Enable at least one text messaging section.');
+      }
+      if (incoming.enabled && !(incoming.message || '').trim()) {
+        return setStatus('❌ Incoming text message body is required.');
+      }
+      if (outgoing.enabled && !(outgoing.playerMessage || '').trim()) {
+        return setStatus('❌ Provide the player message template for outgoing texts.');
+      }
+      if (automation.enabled && !((automation.followUpMessage || '').trim())) {
+        return setStatus('❌ Add a follow-up message template for the automation trigger.');
+      }
+    }
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
@@ -2126,6 +2219,19 @@ export default function Admin() {
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
       trigger: sanitizeTriggerConfig(devDraft.trigger),
+      textMessaging: {
+        prompt: devDraft.textMessaging?.prompt || '',
+        outgoingTemplate: devDraft.textMessaging?.outgoingTemplate || '',
+        targetNumberKey: devDraft.textMessaging?.targetNumberKey || '',
+        notes: devDraft.textMessaging?.notes || '',
+        delaySeconds: clamp(Number(devDraft.textMessaging?.delaySeconds || 0), 0, 3600),
+        triggers: {
+          geofence: !!devDraft.textMessaging?.triggers?.geofence,
+          incorrectResponse: !!devDraft.textMessaging?.triggers?.incorrectResponse,
+          wrongResponse: !!devDraft.textMessaging?.triggers?.wrongResponse,
+          timeWindow: !!devDraft.textMessaging?.triggers?.timeWindow,
+        },
+      },
     };
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
@@ -2700,7 +2806,7 @@ export default function Admin() {
   }
 
   // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
+  const tabsOrder = ['settings','missions','devices','assigned','media-pool'];
 
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
@@ -2728,6 +2834,7 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaPageLoadedLabel = formatLocalDateTime(pageLoadedAtRef.current);
   const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
@@ -2803,6 +2910,9 @@ export default function Admin() {
           {metaTimestampLabel && (
             <span><strong>Checked:</strong> {metaTimestampLabel}</span>
           )}
+          {metaPageLoadedLabel && (
+            <span><strong>Page Loaded:</strong> {metaPageLoadedLabel}</span>
+          )}
           {adminMeta.error && (
             <span style={S.metaBannerError}>{adminMeta.error}</span>
           )}
@@ -2810,42 +2920,29 @@ export default function Admin() {
       </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
-          <div style={S.headerTopRow}>
-            <div style={S.headerTitleGroup}>
-              <div style={S.headerCoverFrame}>
-                {headerCoverThumb ? (
-                  <img
-                    src={headerCoverThumb}
-                    alt="Active game cover"
-                    style={S.headerCoverThumb}
-                  />
-                ) : (
-                  <div style={S.headerCoverPlaceholder}>No Cover</div>
-                )}
+          <div style={S.headerBar}>
+            <div style={S.headerIdentity}>
+              <div style={S.headerCoverStack}>
+                <div style={S.headerMiniLabel}>Cover Image</div>
+                <div style={S.headerCoverFrame}>
+                  {headerCoverThumb ? (
+                    <img
+                      src={headerCoverThumb}
+                      alt="Active game cover"
+                      style={S.headerCoverThumb}
+                    />
+                  ) : (
+                    <div style={S.headerCoverPlaceholder}>No Cover</div>
+                  )}
+                </div>
               </div>
               <div style={S.headerTitleColumn}>
+                <div style={S.headerMiniLabel}>Current Title</div>
                 <div style={S.headerGameTitle}>{headerGameTitle}</div>
                 <div style={S.headerSubtitle}>Admin Control Deck</div>
               </div>
             </div>
-          </div>
-          <div style={S.headerNavRow}>
-            <div style={S.headerNavPrimary}>
-              {tabsOrder.map((t)=>{
-                const labelMap = {
-                  'missions':'MISSIONS',
-                  'devices':'DEVICES',
-                  'settings':'SETTINGS',
-                  'text':'TEXT',
-                  'media-pool':'MEDIA POOL',
-                  'assigned':'ASSIGNED MEDIA',
-                };
-                return (
-                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                    {labelMap[t] || t.toUpperCase()}
-                  </button>
-                );
-              })}
+            <div style={S.headerActions}>
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -2857,39 +2954,22 @@ export default function Admin() {
               >
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
-            </div>
-            <div style={S.headerNavSecondary}>
-              <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-              <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                <option value="default">(Default Game)</option>
-                {games.map(g=>(
-                  <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
-                ))}
-              </select>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  disabled={!gameEnabled}
-                />
-                Deploy game build
-              </label>
-              <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                Deploy delay (sec):
-                <input
-                  type="number" min={0} max={120}
-                  value={deployDelaySec}
-                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                  style={{ ...S.input, width:90, opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
-                  disabled={!deployGameEnabled || !gameEnabled}
-                />
-              </label>
-              {!gameEnabled && (
-                <span style={{ ...S.metaMuted, display:'flex', alignItems:'center', gap:6 }}>
-                  ⚠️ Game folder mirroring disabled — deploy controls are read-only.
-                </span>
-              )}
+              <div style={S.headerTabsRow}>
+                {tabsOrder.map((t)=>{
+                  const labelMap = {
+                    'missions':'MISSIONS',
+                    'devices':'DEVICES',
+                    'settings':'SETTINGS',
+                    'media-pool':'MEDIA POOL',
+                    'assigned':'ASSIGNED MEDIA',
+                  };
+                  return (
+                    <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                      {labelMap[t] || t.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -3206,6 +3286,278 @@ export default function Admin() {
                       />
                     </Field>
                   )}
+
+                  {editing.type === 'text_message' && (() => {
+                    const content = editing.content || {};
+                    const incoming = { ...(content.incoming || {}) };
+                    const outgoing = { ...(content.outgoing || {}) };
+                    const automation = { ...(content.automation || {}) };
+                    const modes = { ...(automation.modes || {}) };
+                    const tokenList = ['{{FIRST_NAME}}','{{LAST_NAME}}','{{EMAIL}}','{{CELL}}','{{IN_CASE_OF_EMERGENCY_NUMBER}}'];
+
+                    const applyContentUpdate = (nextContent) => {
+                      setEditing({ ...editing, content: nextContent });
+                      setDirty(true);
+                    };
+                    const updateIncoming = (partial) => {
+                      applyContentUpdate({
+                        ...content,
+                        incoming: { ...incoming, ...partial },
+                      });
+                    };
+                    const updateOutgoing = (partial) => {
+                      applyContentUpdate({
+                        ...content,
+                        outgoing: { ...outgoing, ...partial },
+                      });
+                    };
+                    const updateAutomation = (partial) => {
+                      applyContentUpdate({
+                        ...content,
+                        automation: { ...automation, ...partial },
+                      });
+                    };
+                    const updateAutomationModes = (partialModes) => {
+                      updateAutomation({ modes: { ...modes, ...partialModes } });
+                    };
+                    const appendToken = (section, key, token) => {
+                      const normalized = String(token || '').trim();
+                      if (!normalized) return;
+                      const appendValue = (current) => {
+                        const base = current || '';
+                        const joiner = base === '' || base.endsWith(' ') ? '' : ' ';
+                        return `${base}${joiner}${normalized}`;
+                      };
+                      if (section === 'incoming') {
+                        updateIncoming({ [key]: appendValue(incoming[key]) });
+                      } else if (section === 'outgoing') {
+                        updateOutgoing({ [key]: appendValue(outgoing[key]) });
+                      } else if (section === 'automation') {
+                        updateAutomation({ [key]: appendValue(automation[key]) });
+                      }
+                    };
+
+                    return (
+                      <div style={S.textMessagePanel}>
+                        <div>
+                          <h4 style={S.textMessageHeading}>Text Message Mission Flow</h4>
+                          <div style={S.noteText}>
+                            Configure how players receive and respond to Twilio-powered messages. Toggle each channel to reveal
+                            its fields — nothing is sent until the section is enabled.
+                          </div>
+                          <div style={S.tokenRow}>
+                            <span style={S.headerMiniLabel}>Tokens:</span>
+                            {tokenList.map((token) => (
+                              <button
+                                key={token}
+                                type="button"
+                                style={S.tokenButton}
+                                onClick={()=>appendToken('incoming','message',token)}
+                                title="Insert into the incoming message body"
+                              >
+                                {token}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={S.textSectionBlock}>
+                          <label style={S.textSectionToggle}>
+                            <input
+                              type="checkbox"
+                              checked={!!incoming.enabled}
+                              onChange={(e)=>updateIncoming({ enabled: e.target.checked })}
+                            />
+                            Incoming text message (Twilio → player)
+                          </label>
+                          {incoming.enabled && (
+                            <div style={S.textSectionBody}>
+                              <Field label="Incoming Message Title">
+                                <input
+                                  style={S.input}
+                                  value={incoming.title || ''}
+                                  onChange={(e)=>updateIncoming({ title: e.target.value })}
+                                  placeholder="Mission kickoff"
+                                />
+                              </Field>
+                              <Field label="Message sent to the player">
+                                <textarea
+                                  style={{ ...S.input, height: 140, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={incoming.message || ''}
+                                  onChange={(e)=>updateIncoming({ message: e.target.value })}
+                                  placeholder="Welcome {{FIRST_NAME}}! Text HQ when you reach the lobby."
+                                />
+                              </Field>
+                              <div style={S.noteText}>
+                                Click a token above to insert player details. The Twilio number uses the signup record stored in
+                                the database.
+                              </div>
+                              <div style={S.textTokenActions}>
+                                {tokenList.map((token) => (
+                                  <button
+                                    key={`incoming-${token}`}
+                                    type="button"
+                                    style={S.tokenButton}
+                                    onClick={()=>appendToken('incoming','message',token)}
+                                  >
+                                    {token}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={S.textSectionBlock}>
+                          <label style={S.textSectionToggle}>
+                            <input
+                              type="checkbox"
+                              checked={!!outgoing.enabled}
+                              onChange={(e)=>updateOutgoing({ enabled: e.target.checked })}
+                            />
+                            Outgoing text message (player → game)
+                          </label>
+                          {outgoing.enabled && (
+                            <div style={S.textSectionBody}>
+                              <Field label="Prompt shown inside the app">
+                                <input
+                                  style={S.input}
+                                  value={outgoing.prompt || ''}
+                                  onChange={(e)=>updateOutgoing({ prompt: e.target.value })}
+                                  placeholder="Ask dispatch for the access code."
+                                />
+                              </Field>
+                              <Field label="Player message template">
+                                <textarea
+                                  style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={outgoing.playerMessage || ''}
+                                  onChange={(e)=>updateOutgoing({ playerMessage: e.target.value })}
+                                  placeholder="This is {{FIRST_NAME}} from team Shadow. What's the entry code?"
+                                />
+                              </Field>
+                              <div style={S.textTokenActions}>
+                                {tokenList.map((token) => (
+                                  <button
+                                    key={`outgoing-${token}`}
+                                    type="button"
+                                    style={S.tokenButton}
+                                    onClick={()=>appendToken('outgoing','playerMessage',token)}
+                                  >
+                                    {token}
+                                  </button>
+                                ))}
+                              </div>
+                              <Field label="Target number key">
+                                <input
+                                  style={S.input}
+                                  value={outgoing.targetNumberKey || ''}
+                                  onChange={(e)=>updateOutgoing({ targetNumberKey: e.target.value })}
+                                  placeholder="TWILIO_MAIN"
+                                />
+                              </Field>
+                              <Field label="Response & gameplay notes">
+                                <textarea
+                                  style={{ ...S.input, height: 100 }}
+                                  value={outgoing.responseNotes || ''}
+                                  onChange={(e)=>updateOutgoing({ responseNotes: e.target.value })}
+                                  placeholder="Log expected replies, clue variations, or escalation steps."
+                                />
+                              </Field>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={S.textSectionBlock}>
+                          <label style={S.textSectionToggle}>
+                            <input
+                              type="checkbox"
+                              checked={!!automation.enabled}
+                              onChange={(e)=>updateAutomation({ enabled: e.target.checked })}
+                            />
+                            Automation triggers &amp; follow-ups
+                          </label>
+                          {automation.enabled && (
+                            <div style={S.textSectionBody}>
+                              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                                <label style={S.textTriggerToggle}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!modes.geofence}
+                                    onChange={(e)=>updateAutomationModes({ geofence: e.target.checked })}
+                                  />
+                                  Trigger on geo fence entry
+                                </label>
+                                <label style={S.textTriggerToggle}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!modes.incorrectResponse}
+                                    onChange={(e)=>updateAutomationModes({ incorrectResponse: e.target.checked })}
+                                  />
+                                  Trigger on incorrect mission response
+                                </label>
+                                <label style={S.textTriggerToggle}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!modes.wrongResponse}
+                                    onChange={(e)=>updateAutomationModes({ wrongResponse: e.target.checked })}
+                                  />
+                                  Trigger on wrong keyword reply
+                                </label>
+                                <label style={S.textTriggerToggle}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!modes.timeWindow}
+                                    onChange={(e)=>updateAutomationModes({ timeWindow: e.target.checked })}
+                                  />
+                                  Trigger after time duration
+                                </label>
+                              </div>
+                              {modes.timeWindow && (
+                                <Field label="Time delay (seconds)">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={3600}
+                                    style={S.input}
+                                    value={Number.isFinite(Number(automation.delaySeconds)) ? automation.delaySeconds : 0}
+                                    onChange={(e)=>updateAutomation({ delaySeconds: Math.max(0, Number(e.target.value || 0)) })}
+                                  />
+                                </Field>
+                              )}
+                              <Field label="Follow-up message template">
+                                <textarea
+                                  style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                                  value={automation.followUpMessage || ''}
+                                  onChange={(e)=>updateAutomation({ followUpMessage: e.target.value })}
+                                  placeholder="HQ: {{FIRST_NAME}}, the window is closing. Report in with the cipher."
+                                />
+                              </Field>
+                              <div style={S.textTokenActions}>
+                                {tokenList.map((token) => (
+                                  <button
+                                    key={`automation-${token}`}
+                                    type="button"
+                                    style={S.tokenButton}
+                                    onClick={()=>appendToken('automation','followUpMessage',token)}
+                                  >
+                                    {token}
+                                  </button>
+                                ))}
+                              </div>
+                              <Field label="Control room notes">
+                                <textarea
+                                  style={{ ...S.input, height: 100 }}
+                                  value={automation.notes || ''}
+                                  onChange={(e)=>updateAutomation({ notes: e.target.value })}
+                                  placeholder="Document who reviews replies, escalation scripts, or override steps."
+                                />
+                              </Field>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
@@ -3665,6 +4017,147 @@ export default function Admin() {
                       </Field>
                     </div>
 
+                    {devDraft.type === 'text_message' && (() => {
+                      const msg = devDraft.textMessaging || {};
+                      const triggers = { ...(msg.triggers || {}) };
+                      const tokenList = ['{{FIRST_NAME}}','{{LAST_NAME}}','{{EMAIL}}','{{CELL}}','{{IN_CASE_OF_EMERGENCY_NUMBER}}'];
+
+                      const updateTextMessaging = (partial) => {
+                        setDevDraft((draft) => {
+                          const base = draft.textMessaging || {};
+                          const next = { ...base, ...partial };
+                          if (partial && typeof partial.triggers === 'object') {
+                            next.triggers = { ...(base.triggers || {}), ...partial.triggers };
+                          } else {
+                            next.triggers = { ...(base.triggers || {}) };
+                          }
+                          return { ...draft, textMessaging: next };
+                        });
+                      };
+                      const updateTriggerModes = (partial) => {
+                        updateTextMessaging({ triggers: partial });
+                      };
+                      const appendToken = (key, token) => {
+                        const normalized = String(token || '').trim();
+                        if (!normalized) return;
+                        setDevDraft((draft) => {
+                          const base = draft.textMessaging || {};
+                          const current = base[key] || '';
+                          const joiner = current === '' || current.endsWith(' ') ? '' : ' ';
+                          return {
+                            ...draft,
+                            textMessaging: {
+                              ...base,
+                              [key]: `${current}${joiner}${normalized}`,
+                              triggers: { ...(base.triggers || {}) },
+                            },
+                          };
+                        });
+                      };
+
+                      return (
+                        <div style={S.textDevicePanel}>
+                          <h4 style={{ margin:'0 0 8px 0' }}>Text Device Messaging</h4>
+                          <div style={S.noteText}>
+                            Define how this device dispatches or requests texts. Triggers below determine when the message is fired.
+                          </div>
+                          <Field label="Control room prompt">
+                            <input
+                              style={S.input}
+                              value={msg.prompt || ''}
+                              onChange={(e)=>updateTextMessaging({ prompt: e.target.value })}
+                              placeholder="Announce device deployment instructions."
+                            />
+                          </Field>
+                          <Field label="Outgoing template to players">
+                            <textarea
+                              style={{ ...S.input, height: 120, fontFamily: 'ui-monospace, Menlo' }}
+                              value={msg.outgoingTemplate || ''}
+                              onChange={(e)=>updateTextMessaging({ outgoingTemplate: e.target.value })}
+                              placeholder="Device deployed — respond with the clue you discover."
+                            />
+                          </Field>
+                          <div style={S.textTokenActions}>
+                            {tokenList.map((token) => (
+                              <button
+                                key={`device-${token}`}
+                                type="button"
+                                style={S.tokenButton}
+                                onClick={()=>appendToken('outgoingTemplate', token)}
+                              >
+                                {token}
+                              </button>
+                            ))}
+                          </div>
+                          <Field label="Target number key">
+                            <input
+                              style={S.input}
+                              value={msg.targetNumberKey || ''}
+                              onChange={(e)=>updateTextMessaging({ targetNumberKey: e.target.value })}
+                              placeholder="TWILIO_DEVICE"
+                            />
+                          </Field>
+                          <Field label="Operational notes">
+                            <textarea
+                              style={{ ...S.input, height: 100 }}
+                              value={msg.notes || ''}
+                              onChange={(e)=>updateTextMessaging({ notes: e.target.value })}
+                              placeholder="Escalate to HQ if no reply within 5 minutes."
+                            />
+                          </Field>
+                          <div style={{ marginTop:12 }}>
+                            <div style={{ fontWeight:600, marginBottom:8 }}>Trigger modes</div>
+                            <div style={{ display:'grid', gap:8 }}>
+                              <label style={S.textTriggerToggle}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!triggers.geofence}
+                                  onChange={(e)=>updateTriggerModes({ geofence: e.target.checked })}
+                                />
+                                Geo fence breach
+                              </label>
+                              <label style={S.textTriggerToggle}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!triggers.incorrectResponse}
+                                  onChange={(e)=>updateTriggerModes({ incorrectResponse: e.target.checked })}
+                                />
+                                Incorrect mission response
+                              </label>
+                              <label style={S.textTriggerToggle}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!triggers.wrongResponse}
+                                  onChange={(e)=>updateTriggerModes({ wrongResponse: e.target.checked })}
+                                />
+                                Wrong keyword reply
+                              </label>
+                              <label style={S.textTriggerToggle}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!triggers.timeWindow}
+                                  onChange={(e)=>updateTriggerModes({ timeWindow: e.target.checked })}
+                                />
+                                Time duration reached
+                              </label>
+                            </div>
+                          </div>
+                          {triggers.timeWindow && (
+                            <Field label="Time delay (seconds)">
+                              <input
+                                type="number"
+                                min={0}
+                                max={3600}
+                                style={S.input}
+                                value={Number.isFinite(Number(msg.delaySeconds)) ? msg.delaySeconds : 0}
+                                onChange={(e)=>updateTextMessaging({ delaySeconds: Math.max(0, Number(e.target.value || 0)) })}
+                              />
+                            </Field>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <div style={{ marginTop:14, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
                       <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
                       <label style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -3917,30 +4410,6 @@ export default function Admin() {
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
-            <Field label="Saved Games">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={S.noteText}>
-                Switch to another saved escape ride. The selection reloads missions, devices, and settings.
-              </div>
-            </Field>
-            <div style={S.savedGamesActions}>
-              <button
-                type="button"
-                style={{ ...S.button, ...S.buttonSuccess }}
-                onClick={()=>setShowNewGame(true)}
-              >
-                + New Game
-              </button>
-              <div style={S.noteText}>Opens the creation window for naming, slugging, and selecting cover art.</div>
-            </div>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -3957,19 +4426,6 @@ export default function Admin() {
               />
               <div style={S.noteText}>
                 The current slug and <code>default-game</code> are enforced automatically.
-              </div>
-            </Field>
-            <Field label="Game Deployment">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                />
-                Enable publishing to the live game build
-              </label>
-              <div style={S.noteText}>
-                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
               </div>
             </Field>
             <Field label="Stripe Splash Page">
@@ -4152,11 +4608,69 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Game Activation &amp; Publishing</h3>
+            <Field label="Active Game">
+              <select
+                style={S.input}
+                value={activeSlug}
+                onChange={(e)=>setActiveSlug(e.target.value)}
+              >
+                {selectGameOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <div style={S.noteText}>
+                Choose which saved escape ride is loaded across missions, devices, and media.
+              </div>
+            </Field>
+            <div style={S.savedGamesActions}>
+              <button
+                type="button"
+                style={{ ...S.button, ...S.buttonSuccess }}
+                onClick={()=>setShowNewGame(true)}
+              >
+                + New Game
+              </button>
+              <div style={S.noteText}>Launches the creation window for a fresh title, slug, and cover art.</div>
+            </div>
+            <Field label="Deployment Controls">
+              <label style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <input
+                  type="checkbox"
+                  checked={deployGameEnabled}
+                  onChange={(e)=>setDeployEnabled(e.target.checked)}
+                  disabled={!gameEnabled}
+                />
+                Enable publishing to the live game build
+              </label>
+              <div style={S.noteText}>
+                When disabled, Save &amp; Publish only updates the admin data and skips deploying a game bundle.
+              </div>
+            </Field>
+            <Field label="Deploy Delay (seconds)">
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={deployDelaySec}
+                onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                style={{ ...S.input, width:160, maxWidth:'100%', opacity: deployGameEnabled && gameEnabled ? 1 : 0.45 }}
+                disabled={!deployGameEnabled || !gameEnabled}
+              />
+              <div style={S.noteText}>
+                Adds a pause after saving before the publish webhook fires. Helpful when coordinating Twilio or map assets.
+              </div>
+            </Field>
+            {!gameEnabled && (
+              <div style={{ ...S.metaMuted, marginTop:12 }}>
+                ⚠️ Game folder mirroring is disabled — deployment controls are read-only in this environment.
+              </div>
+            )}
+          </div>
         </main>
       )}
-
-      {/* TEXT rules */}
-      {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
 
       {/* MEDIA POOL — with sub-tabs and per-file usage counts */}
       {tab==='media-pool' && (
@@ -4812,27 +5326,32 @@ const S = {
     fontWeight: 700,
   },
   savePublishButton: {
-    background: 'var(--admin-save-gradient, linear-gradient(95deg, #2563eb, #38bdf8))',
-    border: 'var(--admin-save-border, 1px solid rgba(59, 130, 246, 0.6))',
-    color: '#f8fafc',
-    boxShadow: 'var(--admin-save-shadow, 0 20px 36px rgba(37, 99, 235, 0.45))',
+    background: 'linear-gradient(96deg, #047857, #22c55e)',
+    border: '1px solid rgba(34, 197, 94, 0.75)',
+    color: '#ecfdf5',
+    boxShadow: '0 20px 36px rgba(16, 185, 129, 0.45)',
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
     fontWeight: 800,
     padding: '12px 20px',
   },
-  headerTopRow: {
+  headerBar: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
-    textAlign: 'center',
-    gap: 6,
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    gap: 20,
+    flexWrap: 'wrap',
   },
-  headerTitleGroup: {
+  headerIdentity: {
     display: 'flex',
     alignItems: 'center',
-    gap: 16,
+    gap: 18,
+    flexWrap: 'wrap',
+  },
+  headerCoverStack: {
+    display: 'grid',
+    gap: 8,
+    justifyItems: 'center',
   },
   headerCoverFrame: {
     width: 68,
@@ -4858,7 +5377,13 @@ const S = {
     display: 'grid',
     justifyItems: 'flex-start',
     textAlign: 'left',
-    gap: 4,
+    gap: 6,
+  },
+  headerMiniLabel: {
+    fontSize: 11,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
   },
   headerGameTitle: {
     fontSize: 24,
@@ -4872,25 +5397,18 @@ const S = {
     textTransform: 'uppercase',
     color: 'var(--admin-muted)',
   },
-  headerNavRow: {
+  headerActions: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     gap: 16,
-  },
-  headerNavPrimary: {
-    display: 'flex',
     flexWrap: 'wrap',
-    gap: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
   },
-  headerNavSecondary: {
+  headerTabsRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
-    justifyContent: 'center',
   },
   gameTitleRow: {
     display: 'grid',
@@ -4934,6 +5452,77 @@ const S = {
     gap: 12,
     flexWrap: 'wrap',
     marginBottom: 16,
+  },
+  textMessagePanel: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 18,
+    padding: 18,
+    display: 'grid',
+    gap: 20,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  textMessageHeading: {
+    margin: 0,
+    fontSize: 18,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  tokenRow: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  tokenButton: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 999,
+    padding: '4px 12px',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-body-color)',
+    fontSize: 12,
+    cursor: 'pointer',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  textSectionBlock: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 14,
+    padding: 14,
+    display: 'grid',
+    gap: 12,
+    background: 'var(--admin-input-bg)',
+  },
+  textDevicePanel: {
+    marginTop: 16,
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 16,
+    padding: 16,
+    display: 'grid',
+    gap: 12,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  textSectionToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  textSectionBody: {
+    display: 'grid',
+    gap: 12,
+  },
+  textTokenActions: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  textTriggerToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
   },
   coverControlsRow: {
     display: 'flex',
@@ -5397,45 +5986,6 @@ function MapPicker({ lat, lng, radius = 25, onChange, center = { lat:44.9778, ln
         <code style={{ color:'var(--admin-muted)' }}>{rad} m</code>
       </div>
     </div>
-  );
-}
-
-/* TEXT TAB */
-function TextTab({ config, setConfig }) {
-  const [text, setText] = useState((config.textRules || []).join('\n'));
-  useEffect(()=>{ setText((config.textRules || []).join('\n')); }, [config.textRules]);
-
-  return (
-    <main style={S.wrap}>
-      <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Text Rules / Instructions</h3>
-        <div style={{ color:'var(--admin-muted)', marginBottom:8, fontSize:12 }}>
-          One rule per line. This saves into <code>config.textRules</code>.
-        </div>
-        <textarea
-          style={{ ...S.input, height:220, fontFamily:'ui-monospace, Menlo' }}
-          value={text}
-          onChange={(e)=>setText(e.target.value)}
-        />
-        <div style={{ display:'flex', gap:8, marginTop:8 }}>
-          <button
-            style={S.button}
-            onClick={()=>{
-              const lines = text.split('\n').map(s=>s.trim()).filter(Boolean);
-              setConfig(c=>({ ...c, textRules: lines }));
-            }}
-          >
-            Save Rules
-          </button>
-          <button
-            style={S.button}
-            onClick={()=>setText((config.textRules || []).join('\n'))}
-          >
-            Reset
-          </button>
-        </div>
-      </div>
-    </main>
   );
 }
 
