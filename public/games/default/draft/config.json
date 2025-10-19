@@ -4,14 +4,17 @@
     "mode": "single"
   },
   "game": {
-    "title": "Untitled Game",
+    "title": "DEFAULT",
     "type": "Mystery",
     "tags": [
       "default",
       "default-game"
     ],
-    "coverImage": "/media/covers/1760532373127-casper.jpg",
-    "deployEnabled": false
+    "coverImage": "",
+    "deployEnabled": true,
+    "shortDescription": "",
+    "longDescription": "",
+    "slug": "default"
   },
   "forms": {
     "players": 1
@@ -25,7 +28,12 @@
   "powerups": [],
   "media": {
     "rewardsPool": [],
-    "penaltiesPool": []
+    "penaltiesPool": [],
+    "actionMedia": [
+      "/media/uploads/1760531435763-black_magic_book_-_Copy.jpg",
+      "/media/mediapool/1759645884960-SMOKE_BOMB.png",
+      "/media/uploads/1759945867484-panda_cute.jpg"
+    ]
   },
   "icons": {
     "missions": [
@@ -70,7 +78,7 @@
       }
     ]
   },
-  "appearanceSkin": "starfield-dawn",
+  "appearanceSkin": "default",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -86,7 +94,7 @@
   },
   "appearanceTone": "light",
   "mediaTriggers": {
-    "enabled": false,
+    "enabled": true,
     "actionType": "media",
     "actionTarget": "",
     "actionLabel": "",
@@ -103,5 +111,26 @@
   },
   "geofence": {
     "mode": "test"
-  }
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#f1f5f9",
+      "align": "left",
+      "backgroundColor": "#0f172a",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#f8fafc",
+      "align": "center",
+      "backgroundColor": "#111827",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
 }
