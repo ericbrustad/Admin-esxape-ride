@@ -312,6 +312,7 @@ const TYPE_LABELS = {
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
 const DEVICE_TYPES = [
+  { value:'roaming-robot', label:'Roaming Robot (autonomous patrol)' },
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
@@ -345,21 +346,69 @@ function sanitizeTriggerConfig(input = {}) {
 function mergeTriggerState(current, partial = {}) {
   return { ...DEFAULT_TRIGGER_CONFIG, ...(current || {}), ...(partial || {}) };
 }
+const DEFAULT_DEVICE_TYPE = 'roaming-robot';
+const DEFAULT_DEVICE_ICON = 'roaming-robot';
+const DEFAULT_ROAMING_CONFIG = {
+  enabled: true,
+  behavior: 'random',
+  speed: 0.6,
+  areaMeters: 180,
+  durationSeconds: 180,
+};
+const ROAMING_SPEED_RANGE = { min: 0.2, max: 3, step: 0.1 };
+const ROAMING_AREA_RANGE = { min: 10, max: 800, step: 10 };
+const ROAMING_DURATION_RANGE = { min: 30, max: 900, step: 15 };
+function describeRoamingSpeed(value) {
+  if (!Number.isFinite(value)) return 'Slow';
+  const clamped = clamp(value, ROAMING_SPEED_RANGE.min, ROAMING_SPEED_RANGE.max);
+  const ratio = (clamped - ROAMING_SPEED_RANGE.min) / (ROAMING_SPEED_RANGE.max - ROAMING_SPEED_RANGE.min);
+  if (ratio <= 0.33) return 'Slow';
+  if (ratio <= 0.66) return 'Cruise';
+  return 'Fast';
+}
 function createDeviceDraft(overrides = {}) {
+  const baseType = overrides.type || DEFAULT_DEVICE_TYPE;
   const base = {
     title: '',
-    type: 'smoke',
-    iconKey: '',
+    type: baseType,
+    iconKey: baseType === 'roaming-robot' ? DEFAULT_DEVICE_ICON : '',
     pickupRadius: 100,
     effectSeconds: 120,
     lat: null,
     lng: null,
     trigger: { ...DEFAULT_TRIGGER_CONFIG },
+    roaming: { ...DEFAULT_ROAMING_CONFIG },
   };
   const merged = { ...base, ...overrides };
-  merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
+  const defaultTrigger = baseType === 'roaming-robot'
+    ? { ...DEFAULT_TRIGGER_CONFIG, enabled: true }
+    : { ...DEFAULT_TRIGGER_CONFIG };
+  merged.trigger = { ...defaultTrigger, ...(overrides.trigger || merged.trigger || {}) };
+  merged.roaming = { ...DEFAULT_ROAMING_CONFIG, ...(merged.roaming || {}), ...(overrides.roaming || {}) };
+  if (merged.type === 'roaming-robot') {
+    merged.iconKey = merged.iconKey || DEFAULT_DEVICE_ICON;
+    merged.roaming = {
+      ...DEFAULT_ROAMING_CONFIG,
+      ...(merged.roaming || {}),
+      enabled: true,
+      behavior: 'random',
+    };
+    merged.trigger = { ...merged.trigger, enabled: true };
+  } else {
+    merged.roaming = { ...merged.roaming, enabled: false };
+  }
   return merged;
 }
+const DEV_CONVERSATION_LOG = [
+  {
+    speaker: 'User',
+    message: 'I need the roaming robot to be saved as a default and it is a triggered device. I need him to wander around the map in a random fashion. please insert a speed slider that can be adjusted from slow to fast and a roaming robot area space slider 10 meters to 800 meters with a duration slider for whenever the roaming robot is selected.',
+  },
+  {
+    speaker: 'GPT',
+    message: 'Understood. Updating the admin tools to default to the roaming robot with adjustable roaming behavior controls.',
+  },
+];
 const BASE_UI_THEME = {
   headerBg: 'linear-gradient(135deg, rgba(226, 234, 247, 0.92), rgba(197, 210, 232, 0.88))',
   headerBorder: '1px solid rgba(99, 127, 170, 0.38)',
@@ -1076,6 +1125,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
+  const [currentTimestamp, setCurrentTimestamp] = useState(() => new Date());
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -1262,6 +1312,11 @@ export default function Admin() {
     if (newSlugTouched) return;
     setNewGameSlug(slugifyTitle(newTitle));
   }, [newTitle, newSlugTouched]);
+
+  useEffect(() => {
+    const tick = setInterval(() => setCurrentTimestamp(new Date()), 1000);
+    return () => clearInterval(tick);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -2119,14 +2174,30 @@ export default function Admin() {
     }
   }
   function saveDraftDevice() {
+    const draftType = devDraft.type || DEFAULT_DEVICE_TYPE;
     const normalized = {
-      title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
-      type: devDraft.type || 'smoke',
-      iconKey: devDraft.iconKey || '',
+      title: devDraft.title?.trim() || (draftType.charAt(0).toUpperCase() + draftType.slice(1)),
+      type: draftType,
+      iconKey: devDraft.iconKey || (draftType === 'roaming-robot' ? DEFAULT_DEVICE_ICON : ''),
       pickupRadius: clamp(Number(devDraft.pickupRadius || 0), 1, 2000),
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
       trigger: sanitizeTriggerConfig(devDraft.trigger),
     };
+    if (normalized.type === 'roaming-robot') {
+      const roamSource = devDraft.roaming || {};
+      normalized.roaming = {
+        enabled: true,
+        behavior: 'random',
+        speed: Number.isFinite(roamSource.speed)
+          ? Number(clamp(roamSource.speed, ROAMING_SPEED_RANGE.min, ROAMING_SPEED_RANGE.max).toFixed(2))
+          : DEFAULT_ROAMING_CONFIG.speed,
+        areaMeters: Math.round(clamp(Number(roamSource.areaMeters || DEFAULT_ROAMING_CONFIG.areaMeters), ROAMING_AREA_RANGE.min, ROAMING_AREA_RANGE.max)),
+        durationSeconds: Math.round(clamp(Number(roamSource.durationSeconds || DEFAULT_ROAMING_CONFIG.durationSeconds), ROAMING_DURATION_RANGE.min, ROAMING_DURATION_RANGE.max)),
+      };
+      normalized.trigger = { ...normalized.trigger, enabled: true };
+    } else if ('roaming' in normalized) {
+      delete normalized.roaming;
+    }
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
         setStatus('❌ Click the map or search an address to set device location');
@@ -2729,6 +2800,7 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaDeploymentLinkLabel = metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : '';
+  const metaNowLabel = formatLocalDateTime(currentTimestamp);
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2772,6 +2844,12 @@ export default function Admin() {
               ) : (
                 metaCommitShort || metaCommitFull.slice(0, 7)
               )}
+            </span>
+          )}
+          {metaNowLabel && (
+            <span>
+              <strong>Local Time:</strong>{' '}
+              {metaNowLabel}
             </span>
           )}
           {metaDeploymentState && (
@@ -2950,6 +3028,20 @@ export default function Admin() {
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
+
+      <div style={S.wrap}>
+        <section style={S.devLogCard}>
+          <div style={{ fontWeight:700, marginBottom:8 }}>Dev Conversation Log</div>
+          <div style={{ display:'grid', gap:8 }}>
+            {DEV_CONVERSATION_LOG.map((entry, idx) => (
+              <div key={idx} style={S.devLogEntry}>
+                <div style={S.devLogSpeaker}>{entry.speaker}</div>
+                <div style={S.devLogMessage}>{entry.message}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -3554,6 +3646,13 @@ export default function Admin() {
                         <span style={S.chip}>{x.type}</span>
                         <span style={S.chip}>Radius {x.pickupRadius} m</span>
                         <span style={S.chip}>Effect {x.effectSeconds}s</span>
+                        {x.type === 'roaming-robot' && (
+                          <>
+                            <span style={S.chip}>Roam {Math.round(Number(x?.roaming?.areaMeters ?? DEFAULT_ROAMING_CONFIG.areaMeters))} m</span>
+                            <span style={S.chip}>Speed {Number(x?.roaming?.speed ?? DEFAULT_ROAMING_CONFIG.speed).toFixed(2)}×</span>
+                            <span style={S.chip}>Duration {Math.round(Number(x?.roaming?.durationSeconds ?? DEFAULT_ROAMING_CONFIG.durationSeconds))}s</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div onClick={(e)=>e.stopPropagation()} style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -3590,6 +3689,17 @@ export default function Admin() {
                 const selectedAction = actionOptions.find(opt => opt.id === trigger.actionTarget) || null;
                 const previewThumb = trigger.actionThumbnail || selectedAction?.thumbnail || '';
                 const resolvedPreview = previewThumb ? toDirectMediaURL(previewThumb) : '';
+                const isRoamingRobot = devDraft.type === 'roaming-robot';
+                const roamDraft = devDraft.roaming || DEFAULT_ROAMING_CONFIG;
+                const roamSpeedValue = Number.isFinite(roamDraft.speed)
+                  ? clamp(roamDraft.speed, ROAMING_SPEED_RANGE.min, ROAMING_SPEED_RANGE.max)
+                  : DEFAULT_ROAMING_CONFIG.speed;
+                const roamAreaValue = Math.round(clamp(Number(roamDraft.areaMeters || DEFAULT_ROAMING_CONFIG.areaMeters), ROAMING_AREA_RANGE.min, ROAMING_AREA_RANGE.max));
+                const roamDurationValue = Math.round(clamp(Number(roamDraft.durationSeconds || DEFAULT_ROAMING_CONFIG.durationSeconds), ROAMING_DURATION_RANGE.min, ROAMING_DURATION_RANGE.max));
+                const roamSpeedLabel = describeRoamingSpeed(roamSpeedValue);
+                if (isRoamingRobot && !trigger.enabled) {
+                  trigger.enabled = true;
+                }
                 return (
                   <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, marginBottom:12 }}>
                     <div style={S.floatingBarTop}>
@@ -3649,7 +3759,33 @@ export default function Admin() {
                       </div>
                       <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                       <Field label="Type">
-                        <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                        <select
+                          style={S.input}
+                          value={devDraft.type}
+                          onChange={(e)=>{
+                            const nextType = e.target.value;
+                            setDevDraft((draft)=>{
+                              const next = { ...draft, type: nextType };
+                              if (nextType === 'roaming-robot') {
+                                next.iconKey = draft.iconKey || DEFAULT_DEVICE_ICON;
+                                next.trigger = mergeTriggerState(draft.trigger, { enabled: true });
+                                next.roaming = {
+                                  ...DEFAULT_ROAMING_CONFIG,
+                                  ...(draft.roaming || {}),
+                                  enabled: true,
+                                  behavior: 'random',
+                                };
+                              } else {
+                                next.roaming = {
+                                  ...DEFAULT_ROAMING_CONFIG,
+                                  ...(draft.roaming || {}),
+                                  enabled: false,
+                                };
+                              }
+                              return next;
+                            });
+                          }}
+                        >
                           {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                       </Field>
@@ -3665,13 +3801,101 @@ export default function Admin() {
                       </Field>
                     </div>
 
+                    {devDraft.type === 'roaming-robot' && (
+                      <div style={S.roamingCard}>
+                        <div style={{ fontWeight:700, marginBottom:10 }}>Roaming Pattern</div>
+                        <div style={S.roamingGrid}>
+                          <div>
+                            <div style={S.roamingLabel}>Speed — {roamSpeedLabel}</div>
+                            <input
+                              type="range"
+                              min={ROAMING_SPEED_RANGE.min}
+                              max={ROAMING_SPEED_RANGE.max}
+                              step={ROAMING_SPEED_RANGE.step}
+                              value={Number(roamSpeedValue.toFixed(2))}
+                              onChange={(e)=>{
+                                const value = Number(e.target.value);
+                                setDevDraft((draft)=>({
+                                  ...draft,
+                                  roaming: {
+                                    ...DEFAULT_ROAMING_CONFIG,
+                                    ...(draft.roaming || {}),
+                                    enabled: true,
+                                    behavior: 'random',
+                                    speed: value,
+                                  },
+                                }));
+                              }}
+                              style={S.rangeInput}
+                            />
+                            <div style={S.roamingValue}>{roamSpeedValue.toFixed(2)}×</div>
+                          </div>
+                          <div>
+                            <div style={S.roamingLabel}>Roaming Area — {roamAreaValue} m</div>
+                            <input
+                              type="range"
+                              min={ROAMING_AREA_RANGE.min}
+                              max={ROAMING_AREA_RANGE.max}
+                              step={ROAMING_AREA_RANGE.step}
+                              value={roamAreaValue}
+                              onChange={(e)=>{
+                                const value = Number(e.target.value);
+                                setDevDraft((draft)=>({
+                                  ...draft,
+                                  roaming: {
+                                    ...DEFAULT_ROAMING_CONFIG,
+                                    ...(draft.roaming || {}),
+                                    enabled: true,
+                                    behavior: 'random',
+                                    areaMeters: value,
+                                  },
+                                }));
+                              }}
+                              style={S.rangeInput}
+                            />
+                            <div style={S.roamingValue}>{roamAreaValue} meters</div>
+                          </div>
+                          <div>
+                            <div style={S.roamingLabel}>Patrol Duration — {roamDurationValue} sec</div>
+                            <input
+                              type="range"
+                              min={ROAMING_DURATION_RANGE.min}
+                              max={ROAMING_DURATION_RANGE.max}
+                              step={ROAMING_DURATION_RANGE.step}
+                              value={roamDurationValue}
+                              onChange={(e)=>{
+                                const value = Number(e.target.value);
+                                setDevDraft((draft)=>({
+                                  ...draft,
+                                  roaming: {
+                                    ...DEFAULT_ROAMING_CONFIG,
+                                    ...(draft.roaming || {}),
+                                    enabled: true,
+                                    behavior: 'random',
+                                    durationSeconds: value,
+                                  },
+                                }));
+                              }}
+                              style={S.rangeInput}
+                            />
+                            <div style={S.roamingValue}>{Math.round(roamDurationValue)} seconds</div>
+                          </div>
+                        </div>
+                        <div style={S.noteText}>
+                          The roaming robot will wander randomly within the configured radius when triggered.
+                        </div>
+                      </div>
+                    )}
+
                     <div style={{ marginTop:14, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
                       <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
                       <label style={{ display:'flex', alignItems:'center', gap:8 }}>
                         <input
                           type="checkbox"
-                          checked={trigger.enabled}
+                          checked={isRoamingRobot ? true : trigger.enabled}
+                          disabled={isRoamingRobot}
                           onChange={(e)=>{
+                            if (isRoamingRobot) return;
                             const checked = e.target.checked;
                             setDeviceTriggerPicker('');
                             setDevDraft(d=>({ ...d, trigger: mergeTriggerState(d.trigger, { enabled: checked }) }));
@@ -4680,6 +4904,63 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  roamingCard: {
+    marginTop: 16,
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    padding: 16,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--admin-panel-shadow)',
+  },
+  roamingGrid: {
+    display: 'grid',
+    gap: 16,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    marginBottom: 12,
+  },
+  roamingLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  roamingValue: {
+    marginTop: 8,
+    fontWeight: 600,
+    fontSize: 13,
+    letterSpacing: '0.06em',
+  },
+  rangeInput: {
+    width: '100%',
+  },
+  devLogCard: {
+    marginTop: 24,
+    marginBottom: 24,
+    padding: 18,
+    borderRadius: 16,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  devLogEntry: {
+    display: 'grid',
+    gap: 6,
+    padding: '10px 12px',
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+  },
+  devLogSpeaker: {
+    fontSize: 12,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  devLogMessage: {
+    fontSize: 14,
+    lineHeight: 1.5,
   },
   floatingBarTop: {
     position: 'sticky',
