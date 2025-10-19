@@ -84,6 +84,17 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
+const FULLSCREEN_TAB_KEYS = ['missions', 'devices', 'settings', 'assigned', 'media-pool'];
+const FULLSCREEN_TABS = new Set(FULLSCREEN_TAB_KEYS);
+const TAB_LABELS = {
+  missions: 'MISSIONS',
+  devices: 'DEVICES',
+  settings: 'SETTINGS',
+  text: 'TEXT',
+  'media-pool': 'MEDIA POOL',
+  assigned: 'ASSIGNED MEDIA',
+  test: 'TEST',
+};
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -1074,6 +1085,38 @@ function slugifyTitle(value) {
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
+  const [fullScreenTab, setFullScreenTab] = useState(null);
+
+  const conversationLog = useMemo(() => ([
+    {
+      speaker: 'User',
+      message: 'keep style the same but hide everything in the header when settings, missions, devices, assigned media, and media pool is selected.',
+    },
+    {
+      speaker: 'User',
+      message: 'make the chosen option full screen and have a back button to go back to original mode.',
+    },
+    {
+      speaker: 'User',
+      message: 'bring in all the original theme skin choices in settings also.',
+    },
+    {
+      speaker: 'Assistant',
+      message: 'Implementing full-screen dashboard tabs, restoring header on demand, and ensuring theme skin presets appear in settings.',
+    },
+  ]), []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.groupCollapsed('GPT Conversation Log');
+      conversationLog.forEach((entry, index) => {
+        console.log(`${index + 1}. ${entry.speaker}: ${entry.message}`);
+      });
+      console.groupEnd();
+    }
+  }, [conversationLog]);
+
+  const isFullScreen = fullScreenTab != null;
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
@@ -2702,6 +2745,30 @@ export default function Admin() {
   // Tabs: missions / devices / settings / text / media-pool / assigned
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
+  const handleTabSelect = (nextTab) => {
+    setTab(nextTab);
+    if (FULLSCREEN_TABS.has(nextTab)) {
+      setFullScreenTab(nextTab);
+    } else {
+      setFullScreenTab(null);
+    }
+  };
+
+  const exitFullScreen = () => {
+    setFullScreenTab(null);
+  };
+
+  const activeFullScreenLabel = fullScreenTab
+    ? (TAB_LABELS[fullScreenTab] || fullScreenTab.toUpperCase())
+    : '';
+
+  const getSectionStyle = (baseStyle, key) => {
+    if (isFullScreen && fullScreenTab === key) {
+      return { ...baseStyle, ...S.fullScreenSection };
+    }
+    return baseStyle;
+  };
+
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
@@ -2737,7 +2804,7 @@ export default function Admin() {
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   return (
-    <div style={S.body}>
+    <div style={isFullScreen ? { ...S.body, ...S.bodyFullScreen } : S.body}>
       <div style={S.metaBanner}>
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
           {metaRepoLabel && (
@@ -2803,13 +2870,39 @@ export default function Admin() {
           {metaTimestampLabel && (
             <span><strong>Checked:</strong> {metaTimestampLabel}</span>
           )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
+        {adminMeta.error && (
+          <span style={S.metaBannerError}>{adminMeta.error}</span>
+        )}
       </div>
-      <header style={headerStyle}>
-        <div style={S.wrap}>
+      <div style={{ ...S.metaBannerLine, justifyContent:'center' }}>
+        <details style={S.convoDetails}>
+          <summary style={S.convoSummary}>Conversation Log</summary>
+          <div style={S.convoList}>
+            {conversationLog.map((entry, index) => (
+              <div key={`${entry.speaker}-${index}`} style={S.convoLine}>
+                <strong>{entry.speaker}:</strong>
+                <span>{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+      </div>
+      {isFullScreen && (
+        <div style={S.fullScreenBar}>
+          <button
+            type="button"
+            style={{ ...S.button, ...S.fullScreenBackButton }}
+            onClick={exitFullScreen}
+          >
+            ← Back to dashboard
+          </button>
+          <div style={S.fullScreenTitle}>{activeFullScreenLabel}</div>
+        </div>
+      )}
+      {!isFullScreen && (
+        <header style={headerStyle}>
+          <div style={S.wrap}>
           <div style={S.headerTopRow}>
             <div style={S.headerTitleGroup}>
               <div style={S.headerCoverFrame}>
@@ -2831,21 +2924,11 @@ export default function Admin() {
           </div>
           <div style={S.headerNavRow}>
             <div style={S.headerNavPrimary}>
-              {tabsOrder.map((t)=>{
-                const labelMap = {
-                  'missions':'MISSIONS',
-                  'devices':'DEVICES',
-                  'settings':'SETTINGS',
-                  'text':'TEXT',
-                  'media-pool':'MEDIA POOL',
-                  'assigned':'ASSIGNED MEDIA',
-                };
-                return (
-                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                    {labelMap[t] || t.toUpperCase()}
-                  </button>
-                );
-              })}
+              {tabsOrder.map((t)=>(
+                <button key={t} onClick={()=>handleTabSelect(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                  {TAB_LABELS[t] || t.toUpperCase()}
+                </button>
+              ))}
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -2950,10 +3033,11 @@ export default function Admin() {
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
+      )}
 
       {/* MISSIONS */}
       {tab==='missions' && (
-        <main style={S.wrapGrid2}>
+        <main style={getSectionStyle(S.wrapGrid2, 'missions')}>
           {/* Left list */}
           <aside style={S.sidebarTall}>
             <div style={S.sidebarBar}>
@@ -3475,7 +3559,7 @@ export default function Admin() {
 
       {/* DEVICES */}
       {tab==='devices' && (
-        <main style={S.wrapGrid2}>
+        <main style={getSectionStyle(S.wrapGrid2, 'devices')}>
           <aside style={S.sidebarTall}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:8, marginBottom:8 }}>
               <form onSubmit={devSearch} style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8 }}>
@@ -3840,7 +3924,7 @@ export default function Admin() {
 
       {/* SETTINGS */}
       {tab==='settings' && (
-        <main style={S.wrap}>
+        <main style={getSectionStyle(S.wrap, 'settings')}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
@@ -4171,6 +4255,7 @@ export default function Admin() {
             return url;
           }}
           onInventoryRefresh={syncInventory}
+          fullScreen={isFullScreen && fullScreenTab === 'media-pool'}
         />
       )}
 
@@ -4183,6 +4268,7 @@ export default function Admin() {
           inventory={inventory}
           devices={devices}
           missions={suite?.missions || []}
+          fullScreen={isFullScreen && fullScreenTab === 'assigned'}
         />
       )}
 
@@ -4597,6 +4683,10 @@ const S = {
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
+  bodyFullScreen: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
   metaBanner: {
     background: 'rgba(7, 12, 18, 0.82)',
     backdropFilter: 'blur(14px)',
@@ -4604,6 +4694,69 @@ const S = {
     borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
     padding: '8px 16px',
     boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
+  },
+  fullScreenBar: {
+    background: 'var(--admin-header-bg)',
+    borderBottom: 'var(--admin-header-border)',
+    boxShadow: 'var(--admin-header-shadow)',
+    backdropFilter: 'var(--admin-header-blur, blur(18px))',
+    padding: '12px 20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    position: 'sticky',
+    top: 0,
+    zIndex: 60,
+  },
+  fullScreenBackButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 14,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  fullScreenTitle: {
+    fontSize: 12,
+    letterSpacing: '0.2em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  fullScreenSection: {
+    maxWidth: '100%',
+    width: '100%',
+    padding: '24px 32px',
+    minHeight: 'calc(100vh - 200px)',
+    overflowY: 'auto',
+    flex: '1 1 auto',
+    boxSizing: 'border-box',
+  },
+  convoDetails: {
+    background: 'rgba(15, 23, 42, 0.45)',
+    borderRadius: 12,
+    padding: '8px 16px',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    border: '1px solid rgba(148, 163, 184, 0.3)',
+  },
+  convoSummary: {
+    cursor: 'pointer',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  convoList: {
+    marginTop: 8,
+    display: 'grid',
+    gap: 6,
+  },
+  convoLine: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+    gap: 8,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   metaBannerLine: {
     maxWidth: 1400,
@@ -5448,6 +5601,7 @@ function MediaPoolTab({
   setUploadStatus,
   uploadToRepo,
   onInventoryRefresh,
+  fullScreen = false,
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -5581,7 +5735,7 @@ function MediaPoolTab({
   const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
 
   return (
-    <main style={S.wrap}>
+    <main style={fullScreen ? { ...S.wrap, ...S.fullScreenSection } : S.wrap}>
       {/* Upload */}
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Upload</h3>
@@ -5690,7 +5844,7 @@ function MediaPoolTab({
 }
 
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
-function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [] }) {
+function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory = [], devices = [], missions = [], fullScreen = false }) {
   const [mediaTriggerPicker, setMediaTriggerPicker] = useState('');
   const safeConfig = config || {};
   const safeMedia = safeConfig.media || {};
@@ -6095,7 +6249,7 @@ function AssignedMediaPageTab({ config, setConfig, onReapplyDefaults, inventory 
   }
 
   return (
-    <main style={S.wrap}>
+    <main style={fullScreen ? { ...S.wrap, ...S.fullScreenSection } : S.wrap}>
       <div style={S.card}>
         <SafeBoundary
           fallback={assignedMediaFallback}
