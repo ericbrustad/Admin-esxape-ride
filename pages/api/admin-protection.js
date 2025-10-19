@@ -8,6 +8,12 @@ const GAME_PROTECTION_PATHS = [
   path.join(process.cwd(), 'game', 'public', 'admin-protection.json'),
 ];
 
+const hasGitHub = Boolean(
+  process.env.GITHUB_TOKEN &&
+  process.env.REPO_OWNER &&
+  process.env.REPO_NAME
+);
+
 async function ensureDir(filePath) {
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
