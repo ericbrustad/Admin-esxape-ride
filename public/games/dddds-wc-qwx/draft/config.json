@@ -23,8 +23,52 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "fffb",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 1745,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "actionLabel": "1759945844073 Diamond complete2",
+        "actionThumbnail": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "fffb",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 1745,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "actionLabel": "1759945844073 Diamond complete2",
+        "actionThumbnail": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
