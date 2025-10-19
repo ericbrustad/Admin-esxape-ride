@@ -220,6 +220,7 @@ const DEFAULT_BUNDLES = {
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key:'text-device',   name:'Text Message Device', url:'/media/bundles/text-message-device.svg' },
   ],
   missions: [
     { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
@@ -297,6 +298,7 @@ const TYPE_FIELDS = {
   stored_statement: [
     { key:'template', label:'Template Text (use #mXX# to insert answers)', type:'multiline' },
   ],
+  text_message: [],
 };
 const TYPE_LABELS = {
   multiple_choice:  'Multiple Choice',
@@ -308,6 +310,7 @@ const TYPE_LABELS = {
   ar_image:         'AR Image',
   ar_video:         'AR Video',
   stored_statement: 'Stored Statement',
+  text_message:     'Text Message Mission',
 };
 
 const GAME_TYPES = ['Mystery','Chase','Race','Thriller','Hunt'];
@@ -315,6 +318,7 @@ const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'text_message', label:'Text Message Device (Twilio)' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -345,6 +349,102 @@ function sanitizeTriggerConfig(input = {}) {
 function mergeTriggerState(current, partial = {}) {
   return { ...DEFAULT_TRIGGER_CONFIG, ...(current || {}), ...(partial || {}) };
 }
+const TEXT_MESSAGE_PLACEHOLDERS = [
+  { token: '{{FIRST_NAME}}', description: 'Player first name' },
+  { token: '{{LAST_NAME}}', description: 'Player last name' },
+  { token: '{{EMAIL}}', description: 'Player email address' },
+  { token: '{{CELL}}', description: 'Player mobile number' },
+  { token: '{{EMERGENCY_CONTACT}}', description: 'In-case-of-emergency contact number' },
+];
+const DEFAULT_TEXT_MESSAGE_MISSION = {
+  incomingEnabled: false,
+  incomingTitle: '',
+  incomingBody: '',
+  outgoingEnabled: false,
+  outgoingPrompt: '',
+  outgoingTemplate: '',
+  outgoingDestinationKey: '',
+};
+const DEFAULT_TEXT_MESSAGE_DEVICE_CONFIG = {
+  incomingEnabled: false,
+  incomingTitle: '',
+  incomingBody: '',
+  outgoingEnabled: false,
+  outgoingPrompt: '',
+  outgoingTemplate: '',
+  outgoingDestinationKey: '',
+  activationModes: {
+    geofence: false,
+    incorrect: false,
+    wrong: false,
+    timer: false,
+  },
+};
+function normalizeTextMessageMission(input = {}) {
+  const src = input || {};
+  const normalized = {
+    incomingEnabled: !!src.incomingEnabled,
+    incomingTitle: (src.incomingTitle || '').trim(),
+    incomingBody: typeof src.incomingBody === 'string' ? src.incomingBody : (src.incomingBody ? String(src.incomingBody) : ''),
+    outgoingEnabled: !!src.outgoingEnabled,
+    outgoingPrompt: typeof src.outgoingPrompt === 'string' ? src.outgoingPrompt : (src.outgoingPrompt ? String(src.outgoingPrompt) : ''),
+    outgoingTemplate: typeof src.outgoingTemplate === 'string' ? src.outgoingTemplate : (src.outgoingTemplate ? String(src.outgoingTemplate) : ''),
+    outgoingDestinationKey: (src.outgoingDestinationKey || '').trim(),
+  };
+  if (!normalized.incomingEnabled) {
+    normalized.incomingTitle = '';
+    normalized.incomingBody = '';
+  }
+  if (!normalized.outgoingEnabled) {
+    normalized.outgoingPrompt = '';
+    normalized.outgoingTemplate = '';
+    normalized.outgoingDestinationKey = '';
+  }
+  return normalized;
+}
+function mergeTextMessageMissionContent(content = {}) {
+  const base = { ...DEFAULT_TEXT_MESSAGE_MISSION };
+  const geo = {
+    geofenceEnabled: !!content.geofenceEnabled,
+    lat: content.lat ?? '',
+    lng: content.lng ?? '',
+    radiusMeters: content.radiusMeters ?? 25,
+    cooldownSeconds: content.cooldownSeconds ?? 30,
+  };
+  const normalized = normalizeTextMessageMission(content);
+  return { ...geo, ...base, ...normalized };
+}
+function normalizeTextMessageDevice(input = {}) {
+  const src = input || {};
+  const normalized = {
+    incomingEnabled: !!src.incomingEnabled,
+    incomingTitle: (src.incomingTitle || '').trim(),
+    incomingBody: typeof src.incomingBody === 'string' ? src.incomingBody : (src.incomingBody ? String(src.incomingBody) : ''),
+    outgoingEnabled: !!src.outgoingEnabled,
+    outgoingPrompt: typeof src.outgoingPrompt === 'string' ? src.outgoingPrompt : (src.outgoingPrompt ? String(src.outgoingPrompt) : ''),
+    outgoingTemplate: typeof src.outgoingTemplate === 'string' ? src.outgoingTemplate : (src.outgoingTemplate ? String(src.outgoingTemplate) : ''),
+    outgoingDestinationKey: (src.outgoingDestinationKey || '').trim(),
+    activationModes: {
+      ...DEFAULT_TEXT_MESSAGE_DEVICE_CONFIG.activationModes,
+      ...(typeof src.activationModes === 'object' && src.activationModes ? src.activationModes : {}),
+    },
+  };
+  if (!normalized.incomingEnabled) {
+    normalized.incomingTitle = '';
+    normalized.incomingBody = '';
+  }
+  if (!normalized.outgoingEnabled) {
+    normalized.outgoingPrompt = '';
+    normalized.outgoingTemplate = '';
+    normalized.outgoingDestinationKey = '';
+  }
+  const modes = { ...DEFAULT_TEXT_MESSAGE_DEVICE_CONFIG.activationModes };
+  Object.keys(modes).forEach((key) => {
+    modes[key] = !!normalized.activationModes[key];
+  });
+  normalized.activationModes = modes;
+  return normalized;
+}
 function createDeviceDraft(overrides = {}) {
   const base = {
     title: '',
@@ -355,9 +455,11 @@ function createDeviceDraft(overrides = {}) {
     lat: null,
     lng: null,
     trigger: { ...DEFAULT_TRIGGER_CONFIG },
+    textConfig: normalizeTextMessageDevice(),
   };
   const merged = { ...base, ...overrides };
   merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
+  merged.textConfig = normalizeTextMessageDevice(overrides.textConfig || merged.textConfig || {});
   return merged;
 }
 const APPEARANCE_SKINS = [
@@ -1176,6 +1278,7 @@ export default function Admin() {
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
+      case 'text_message':    return { ...base, ...DEFAULT_TEXT_MESSAGE_MISSION };
       default:                return { ...base };
     }
   }
@@ -1391,6 +1494,9 @@ export default function Admin() {
     if (!e.onWrong)   e.onWrong   = { statement:'', mediaUrl:'', audioUrl:'', durationSeconds:0, buttonText:'OK', enabled:false };
     if (e.showContinue === undefined) e.showContinue = true;
     e.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(e.trigger || {}) };
+    if (e.type === 'text_message') {
+      e.content = mergeTextMessageMissionContent(e.content || {});
+    }
     setEditing(e); setSelected(m.id); setDirty(false);
   }
   function cancelEdit() { setEditing(null); setSelected(null); setDirty(false); }
@@ -1415,9 +1521,32 @@ export default function Admin() {
         return setStatus('❌ Missing: ' + f.label);
       }
     }
+    let preparedContent = editing.content || {};
+    if (editing.type === 'text_message') {
+      const normalizedText = mergeTextMessageMissionContent(preparedContent);
+      if (normalizedText.incomingEnabled && !normalizedText.incomingBody.trim()) {
+        return setStatus('❌ Provide the incoming text message body');
+      }
+      if (normalizedText.incomingEnabled && !normalizedText.incomingTitle.trim()) {
+        return setStatus('❌ Provide an incoming message title');
+      }
+      if (normalizedText.outgoingEnabled) {
+        if (!normalizedText.outgoingPrompt.trim()) {
+          return setStatus('❌ Provide player instructions for the outgoing text');
+        }
+        if (!normalizedText.outgoingTemplate.trim()) {
+          return setStatus('❌ Provide the outgoing text template');
+        }
+        if (!normalizedText.outgoingDestinationKey.trim()) {
+          return setStatus('❌ Provide the destination contact key for the outgoing text');
+        }
+      }
+      preparedContent = normalizedText;
+    }
     const missions = [...(suite.missions || [])];
     const i = missions.findIndex(m => m.id === editing.id);
     const obj = { ...editing };
+    obj.content = preparedContent;
     obj.trigger = sanitizeTriggerConfig(editing.trigger);
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
 
@@ -1556,6 +1685,33 @@ export default function Admin() {
     setStatus('🚫 Device edit cancelled');
   }
   function saveDraftDevice() {
+    const textConfigNormalized = normalizeTextMessageDevice(devDraft.textConfig);
+    if (devDraft.type === 'text_message') {
+      if (textConfigNormalized.incomingEnabled) {
+        if (!textConfigNormalized.incomingTitle.trim()) {
+          setStatus('❌ Provide a title for the automatic text');
+          return;
+        }
+        if (!textConfigNormalized.incomingBody.trim()) {
+          setStatus('❌ Provide the automatic text body');
+          return;
+        }
+      }
+      if (textConfigNormalized.outgoingEnabled) {
+        if (!textConfigNormalized.outgoingPrompt.trim()) {
+          setStatus('❌ Provide in-app instructions for the reply');
+          return;
+        }
+        if (!textConfigNormalized.outgoingTemplate.trim()) {
+          setStatus('❌ Provide the reply template that Twilio will send');
+          return;
+        }
+        if (!textConfigNormalized.outgoingDestinationKey.trim()) {
+          setStatus('❌ Provide the destination contact key for the reply');
+          return;
+        }
+      }
+    }
     const normalized = {
       title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
       type: devDraft.type || 'smoke',
@@ -1564,6 +1720,9 @@ export default function Admin() {
       effectSeconds: clamp(Number(devDraft.effectSeconds || 0), 5, 3600),
       trigger: sanitizeTriggerConfig(devDraft.trigger),
     };
+    if (devDraft.type === 'text_message') {
+      normalized.textConfig = textConfigNormalized;
+    }
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
         setStatus('❌ Click the map or search an address to set device location');
@@ -1590,7 +1749,11 @@ export default function Admin() {
       const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
       const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
       pushHistory();
-      list[index] = { ...existing, ...normalized, lat, lng };
+      const updated = { ...existing, ...normalized, lat, lng };
+      if (devDraft.type !== 'text_message') {
+        delete updated.textConfig;
+      }
+      list[index] = updated;
       setDevices(list);
       setStatus('✅ Device updated');
       closeDeviceEditor();
@@ -2506,6 +2669,113 @@ export default function Admin() {
                     </Field>
                   )}
 
+                  {editing.type === 'text_message' && (() => {
+                    const textContent = mergeTextMessageMissionContent(editing.content || {});
+                    const updateTextContent = (partial) => {
+                      const combined = { ...(editing.content || {}), ...partial };
+                      const next = mergeTextMessageMissionContent(combined);
+                      setEditing({ ...editing, content: next });
+                      setDirty(true);
+                    };
+                    return (
+                      <div style={{ display:'grid', gap:12 }}>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                          Configure Twilio-powered text exchanges for this mission. Use the merge tags below to personalize
+                          each message with player registration details.
+                        </div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                          {TEXT_MESSAGE_PLACEHOLDERS.map((p)=>(
+                            <span key={p.token} style={S.chip} title={p.description}>{p.token}</span>
+                          ))}
+                        </div>
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                          Example: <code style={{ background:'var(--admin-tab-bg)', padding:'2px 6px', borderRadius:6 }}>{'Hello {{FIRST_NAME}}!'}</code>
+                        </div>
+
+                        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <input
+                            type="checkbox"
+                            checked={textContent.incomingEnabled}
+                            onChange={(e)=>{
+                              const enabled = e.target.checked;
+                              updateTextContent({ incomingEnabled: enabled, ...(enabled ? {} : { incomingTitle:'', incomingBody:'' }) });
+                            }}
+                          />
+                          <span>Incoming text message (sent automatically to the player)</span>
+                        </label>
+                        {textContent.incomingEnabled && (
+                          <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
+                            <Field label="Incoming message title">
+                              <input
+                                style={S.input}
+                                value={textContent.incomingTitle}
+                                onChange={(e)=>updateTextContent({ incomingTitle: e.target.value })}
+                                placeholder="e.g., Mission Brief"
+                              />
+                            </Field>
+                            <Field label="Message body">
+                              <textarea
+                                style={{ ...S.input, height:140, fontFamily:'ui-monospace, Menlo' }}
+                                value={textContent.incomingBody}
+                                onChange={(e)=>updateTextContent({ incomingBody: e.target.value })}
+                                placeholder="This text is delivered to the player's phone when triggered."
+                              />
+                              <div style={{ fontSize:12, color:'var(--admin-muted)', marginTop:6 }}>
+                                Delivered directly via Twilio using the player's signup number.
+                              </div>
+                            </Field>
+                          </div>
+                        )}
+
+                        <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <input
+                            type="checkbox"
+                            checked={textContent.outgoingEnabled}
+                            onChange={(e)=>{
+                              const enabled = e.target.checked;
+                              updateTextContent({
+                                outgoingEnabled: enabled,
+                                ...(enabled ? {} : { outgoingPrompt:'', outgoingTemplate:'', outgoingDestinationKey:'' }),
+                              });
+                            }}
+                          />
+                          <span>Outgoing text mission (player composes and sends a reply)</span>
+                        </label>
+                        {textContent.outgoingEnabled && (
+                          <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
+                            <Field label="Instruction shown to the player">
+                              <textarea
+                                style={{ ...S.input, height:110 }}
+                                value={textContent.outgoingPrompt}
+                                onChange={(e)=>updateTextContent({ outgoingPrompt: e.target.value })}
+                                placeholder="Let the player know what to text and why."
+                              />
+                            </Field>
+                            <Field label="Suggested message template">
+                              <textarea
+                                style={{ ...S.input, height:110, fontFamily:'ui-monospace, Menlo' }}
+                                value={textContent.outgoingTemplate}
+                                onChange={(e)=>updateTextContent({ outgoingTemplate: e.target.value })}
+                                placeholder="Message drafted inside the app before Twilio sends it."
+                              />
+                            </Field>
+                            <Field label="Destination contact key">
+                              <input
+                                style={S.input}
+                                value={textContent.outgoingDestinationKey}
+                                onChange={(e)=>updateTextContent({ outgoingDestinationKey: e.target.value })}
+                                placeholder="e.g., FIELD_AGENT or HQ_NUMBER"
+                              />
+                              <div style={{ fontSize:12, color:'var(--admin-muted)', marginTop:6 }}>
+                                This should match an environment variable or saved contact so the game can look up the phone number to text.
+                              </div>
+                            </Field>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {(editing.type==='geofence_image'||editing.type==='geofence_video') && (
                     <div style={{ marginBottom:12 }}>
                       <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>Pick location & radius</div>
@@ -2517,7 +2787,7 @@ export default function Admin() {
                     </div>
                   )}
 
-                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement') && (
+                  {(editing.type==='multiple_choice'||editing.type==='short_answer'||editing.type==='statement'||editing.type==='video'||editing.type==='stored_statement'||editing.type==='text_message') && (
                     <div style={{ marginBottom:12 }}>
                       <label style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
                         <input type="checkbox" checked={!!editing.content?.geofenceEnabled}
@@ -2925,7 +3195,20 @@ export default function Admin() {
                       </div>
                       <Field label="Title"><input style={S.input} value={devDraft.title} onChange={(e)=>setDevDraft(d=>({ ...d, title:e.target.value }))}/></Field>
                       <Field label="Type">
-                        <select style={S.input} value={devDraft.type} onChange={(e)=>setDevDraft(d=>({ ...d, type:e.target.value }))}>
+                        <select
+                          style={S.input}
+                          value={devDraft.type}
+                          onChange={(e)=>{
+                            const nextType = e.target.value;
+                            setDevDraft(d => {
+                              const next = { ...d, type: nextType };
+                              if (nextType === 'text_message') {
+                                next.textConfig = normalizeTextMessageDevice(d.textConfig);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
                           {DEVICE_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                       </Field>
@@ -2940,6 +3223,139 @@ export default function Admin() {
                           onChange={(e)=>setDevDraft(d=>({ ...d, effectSeconds: clamp(Number(e.target.value||0),5,3600) }))}/>
                       </Field>
                     </div>
+
+                    {devDraft.type === 'text_message' && (() => {
+                      const textConfig = normalizeTextMessageDevice(devDraft.textConfig);
+                      const updateTextConfig = (partial) => {
+                        setDevDraft(d => ({
+                          ...d,
+                          textConfig: normalizeTextMessageDevice({ ...(d.textConfig || {}), ...partial }),
+                        }));
+                      };
+                      const updateActivationMode = (modeKey, value) => {
+                        const nextModes = { ...textConfig.activationModes, [modeKey]: value };
+                        updateTextConfig({ activationModes: nextModes });
+                      };
+                      return (
+                        <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, marginTop:12, display:'grid', gap:12 }}>
+                          <div style={{ fontWeight:700 }}>Text message payload</div>
+                          <div style={{ fontSize:12, color:'var(--admin-muted)' }}>
+                            Personalize device-triggered texts with the same merge tags available to missions.
+                          </div>
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                            {TEXT_MESSAGE_PLACEHOLDERS.map((p)=>(
+                              <span key={p.token} style={S.chip} title={p.description}>{p.token}</span>
+                            ))}
+                          </div>
+
+                          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={textConfig.incomingEnabled}
+                              onChange={(e)=>{
+                                const enabled = e.target.checked;
+                                updateTextConfig({
+                                  incomingEnabled: enabled,
+                                  ...(enabled ? {} : { incomingTitle:'', incomingBody:'' }),
+                                });
+                              }}
+                            />
+                            <span>Send an automatic text when this device is triggered</span>
+                          </label>
+                          {textConfig.incomingEnabled && (
+                            <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, display:'grid', gap:10 }}>
+                              <Field label="Message title">
+                                <input
+                                  style={S.input}
+                                  value={textConfig.incomingTitle}
+                                  onChange={(e)=>updateTextConfig({ incomingTitle: e.target.value })}
+                                  placeholder="e.g., Device breach alert"
+                                />
+                              </Field>
+                              <Field label="Message body">
+                                <textarea
+                                  style={{ ...S.input, height:120, fontFamily:'ui-monospace, Menlo' }}
+                                  value={textConfig.incomingBody}
+                                  onChange={(e)=>updateTextConfig({ incomingBody: e.target.value })}
+                                  placeholder="Message sent to the player's phone when the device activates."
+                                />
+                              </Field>
+                            </div>
+                          )}
+
+                          <label style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <input
+                              type="checkbox"
+                              checked={textConfig.outgoingEnabled}
+                              onChange={(e)=>{
+                                const enabled = e.target.checked;
+                                updateTextConfig({
+                                  outgoingEnabled: enabled,
+                                  ...(enabled ? {} : { outgoingPrompt:'', outgoingTemplate:'', outgoingDestinationKey:'' }),
+                                });
+                              }}
+                            />
+                            <span>Allow the player to compose a reply from this device event</span>
+                          </label>
+                          {textConfig.outgoingEnabled && (
+                            <div style={{ border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12, display:'grid', gap:10 }}>
+                              <Field label="Instruction to display in-app">
+                                <textarea
+                                  style={{ ...S.input, height:110 }}
+                                  value={textConfig.outgoingPrompt}
+                                  onChange={(e)=>updateTextConfig({ outgoingPrompt: e.target.value })}
+                                  placeholder="Explain how the player should respond to this text event."
+                                />
+                              </Field>
+                              <Field label="Reply template">
+                                <textarea
+                                  style={{ ...S.input, height:110, fontFamily:'ui-monospace, Menlo' }}
+                                  value={textConfig.outgoingTemplate}
+                                  onChange={(e)=>updateTextConfig({ outgoingTemplate: e.target.value })}
+                                  placeholder="Drafted message forwarded to Twilio."
+                                />
+                              </Field>
+                              <Field label="Destination contact key">
+                                <input
+                                  style={S.input}
+                                  value={textConfig.outgoingDestinationKey}
+                                  onChange={(e)=>updateTextConfig({ outgoingDestinationKey: e.target.value })}
+                                  placeholder="e.g., OPS_CENTER"
+                                />
+                                <div style={{ fontSize:12, color:'var(--admin-muted)', marginTop:6 }}>
+                                  Matches an environment variable or saved contact entry that stores the receiving phone number.
+                                </div>
+                              </Field>
+                            </div>
+                          )}
+
+                          <div>
+                            <div style={{ fontWeight:600, marginBottom:6 }}>Activation windows</div>
+                            <div style={{ fontSize:12, color:'var(--admin-muted)', marginBottom:6 }}>
+                              Select which events should trigger the text device automation.
+                            </div>
+                            <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
+                              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <input type="checkbox" checked={textConfig.activationModes.geofence} onChange={(e)=>updateActivationMode('geofence', e.target.checked)} />
+                                Geo fence breach
+                              </label>
+                              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <input type="checkbox" checked={textConfig.activationModes.incorrect} onChange={(e)=>updateActivationMode('incorrect', e.target.checked)} />
+                                Incorrect response
+                              </label>
+                              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <input type="checkbox" checked={textConfig.activationModes.wrong} onChange={(e)=>updateActivationMode('wrong', e.target.checked)} />
+                                Wrong mission choice
+                              </label>
+                              <label style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                <input type="checkbox" checked={textConfig.activationModes.timer} onChange={(e)=>updateActivationMode('timer', e.target.checked)} />
+                                Time duration reached
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div style={{ marginTop:14, border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:12 }}>
                       <div style={{ fontWeight:700, marginBottom:8 }}>Trigger</div>
