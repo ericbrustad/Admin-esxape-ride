@@ -13,6 +13,13 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
+import {
+  classifyMediaType,
+  resolveMediaSubfolder,
+  expandMediaDirectories,
+  DEFAULT_MEDIA_INVENTORY_DIRS,
+  MEDIA_EXTENSION_PATTERNS,
+} from '../lib/media-types';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -66,12 +73,6 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
-const EXTS = {
-  image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
-  gif: /\.(gif)$/i,
-  video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
-};
 const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
@@ -84,21 +85,17 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
-function classifyByExt(u) {
-  if (!u) return 'other';
-  const s = String(u).toLowerCase();
-  if (EXTS.gif.test(s)) return 'gif';
-  if (EXTS.image.test(s)) return 'image';
-  if (EXTS.video.test(s)) return 'video';
-  if (EXTS.audio.test(s)) return 'audio';
-  return 'other';
+const AR_MODEL_EXTENSION_PATTERN = /\.(glb|gltf|usdz|usd|fbx|obj|dae|3ds|ply|stl)$/i;
+function classifyByExt(u, mime) {
+  return classifyMediaType(u, mime);
 }
 
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
+async function listInventory(dirs = DEFAULT_MEDIA_INVENTORY_DIRS) {
   const seen = new Set();
   const out = [];
-  await Promise.all(dirs.map(async (dir) => {
+  const targets = expandMediaDirectories(dirs);
+  await Promise.all(targets.map(async (dir) => {
     try {
       const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
       const j = await r.json();
@@ -218,15 +215,25 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const DEFAULT_MISSION_ICONS = [
+  { key:'aurora-beacon',  name:'Aurora Beacon',  url:'/media/icons/aurora-beacon.svg' },
+  { key:'briefing-star',  name:'Briefing Star',  url:'/media/icons/aurora-beacon.svg' },
+  { key:'decoy-glow',     name:'Decoy Glow',     url:'/media/icons/lumen-halo.svg' },
+  { key:'lantern-clue',   name:'Lantern Clue',   url:'/media/icons/lumen-halo.svg' },
+  { key:'helm-brief',     name:'Helm Brief',     url:'/media/icons/voyager-dial.svg' },
+  { key:'voyager-dial',   name:'Voyager Dial',   url:'/media/icons/voyager-dial.svg' },
+  { key:'quantum-anchor', name:'Quantum Anchor', url:'/media/icons/quantum-anchor.svg' },
+  { key:'missions-1',     name:'Smoke Bomb',     url:'/media/bundles/SMOKE%20BOMB.png' },
+  { key:'trivia',         name:'Trivia',         url:'/media/bundles/trivia%20icon.png' },
+  { key:'trivia-2',       name:'Trivia 2',       url:'/media/bundles/trivia%20yellow.png' },
+];
+
 const DEFAULT_BUNDLES = {
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
   ],
-  missions: [
-    { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
-    { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
-  ],
+  missions: DEFAULT_MISSION_ICONS,
   rewards: [
     { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
     { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
@@ -248,6 +255,29 @@ function applyDefaultIcons(cfg) {
   ensure('devices',  DEFAULT_BUNDLES.devices);
   ensure('rewards',  DEFAULT_BUNDLES.rewards);
   return next;
+}
+
+function buildMissionIconLookup(cfg) {
+  const map = new Map();
+  const icons = (cfg && cfg.icons) || {};
+  const add = (icon, { override = false } = {}) => {
+    if (!icon) return;
+    const rawKey = (icon.key ?? '').toString().trim();
+    const rawUrl = (icon.url ?? '').toString().trim();
+    if (!rawKey || !rawUrl) return;
+    const key = rawKey.toLowerCase();
+    if (!override && map.has(key)) return;
+    map.set(key, {
+      key: rawKey,
+      name: icon.name || rawKey,
+      url: rawUrl,
+    });
+  };
+
+  (Array.isArray(icons.missions) ? icons.missions : []).forEach((icon) => add(icon, { override: true }));
+  (Array.isArray(icons.devices) ? icons.devices : []).forEach((icon) => add(icon));
+  DEFAULT_MISSION_ICONS.forEach((icon) => add(icon));
+  return map;
 }
 
 /* ───────────────────────── Constants ───────────────────────── */
@@ -317,6 +347,7 @@ const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'ar_image', label:'AR Image' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -662,7 +693,7 @@ export default function Admin() {
   async function handleNewGameCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || MEDIA_EXTENSION_PATTERNS.image.test(file.name || '');
     if (!looksLikeImage) {
       setNewGameStatus(`❌ ${safeName} must be an image file.`);
       return;
@@ -689,7 +720,7 @@ export default function Admin() {
   async function loadNewCoverOptions() {
     setNewCoverLookupLoading(true);
     try {
-      const items = await listInventory(['covers','mediapool','uploads']);
+      const items = await listInventory(['covers','mediapool','uploads','missions','devices','assigned']);
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
@@ -739,7 +770,7 @@ export default function Admin() {
     let coverPath = newCoverSelectedUrl;
     try {
       if (!coverPath && newCoverFile) {
-        coverPath = await uploadToRepo(newCoverFile, 'covers');
+        coverPath = await uploadToRepo(newCoverFile, { context: 'settings' });
         if (!coverPath) throw new Error('Cover upload failed');
       }
       const res = await fetch('/api/games', {
@@ -822,7 +853,7 @@ export default function Admin() {
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+      const items = await listInventory(['uploads','bundles','icons','mediapool','covers','missions','devices','assigned']);
       return Array.isArray(items) ? items : [];
     } catch {
       return [];
@@ -1087,7 +1118,7 @@ export default function Admin() {
       const savedDelay = localStorage.getItem('deployDelaySec');
       if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
       const savedSel = localStorage.getItem('selectedPinSize');
-      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
+      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 16, 120));
     } catch {}
   }, []);
   useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
@@ -1205,14 +1236,20 @@ export default function Admin() {
     };
   }
   function defaultContentForType(t) {
-    const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+    const rawLat = Number(config?.map?.centerLat);
+    const rawLng = Number(config?.map?.centerLng);
+    const fallbackLat = 44.9778;
+    const fallbackLng = -93.2650;
+    const baseLat = Number.isFinite(rawLat) ? Number(rawLat.toFixed(6)) : fallbackLat;
+    const baseLng = Number.isFinite(rawLng) ? Number(rawLng.toFixed(6)) : fallbackLng;
+    const base = { geofenceEnabled:false, lat:baseLat, lng:baseLng, radiusMeters:25, cooldownSeconds:30 };
     switch (t) {
       case 'multiple_choice': return { question:'', choices:[], correctIndex:undefined, mediaUrl:'', ...base };
       case 'short_answer':    return { question:'', answer:'', acceptable:'', mediaUrl:'', ...base };
       case 'statement':       return { text:'', mediaUrl:'', ...base };
       case 'video':           return { videoUrl:'', overlayText:'', ...base };
-      case 'geofence_image':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
-      case 'geofence_video':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
+      case 'geofence_image':  return { ...base, imageUrl:'', overlayText:'' };
+      case 'geofence_video':  return { ...base, videoUrl:'', overlayText:'' };
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
@@ -1496,9 +1533,13 @@ export default function Admin() {
     p[2] += 1;
     return p.join('.');
   }
-  function saveToList() {
-    if (!editing || !suite) return;
-    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+  function saveToList(options = {}) {
+    const { close = true } = options;
+    if (!editing || !suite) return { success: false, mode: null };
+    if (!editing.id || !editing.title || !editing.type) {
+      setStatus('❌ Fill id, title, type');
+      return { success: false, mode: null };
+    }
 
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
@@ -1515,12 +1556,23 @@ export default function Admin() {
     obj.trigger = sanitizeTriggerConfig(editing.trigger);
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
 
-    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
+    const list = (i >= 0 ? (missions[i] = obj, missions) : [...missions, obj]);
     setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ Mission saved');
+    setSelected(editing.id);
+    if (close) {
+      setEditing(null);
+    }
+    setDirty(false);
+    const mode = i >= 0 ? 'update' : 'create';
+    const defaultStatus = close
+      ? '✅ Mission saved'
+      : mode === 'update'
+        ? '✅ Mission updated'
+        : '✅ Mission added';
+    setStatus(defaultStatus);
+    return { success: true, mode };
   }
-  function handleMissionSave() {
+  function handleMissionSave({ close = true } = {}) {
     if (missionFlashTimeout.current) {
       clearTimeout(missionFlashTimeout.current);
       missionFlashTimeout.current = null;
@@ -1530,7 +1582,18 @@ export default function Admin() {
       setMissionActionFlash(false);
       missionFlashTimeout.current = null;
     }, 420);
-    saveToList();
+    const result = saveToList({ close });
+    if (!result.success) {
+      if (missionFlashTimeout.current) {
+        clearTimeout(missionFlashTimeout.current);
+        missionFlashTimeout.current = null;
+      }
+      setMissionActionFlash(false);
+    }
+    return result;
+  }
+  function handleMissionApply() {
+    return handleMissionSave({ close: false });
   }
   function removeMission(id) {
     if (!suite) return;
@@ -1560,6 +1623,14 @@ export default function Admin() {
 
   /* Devices (Devices tab only) */
   const devices = getDevices();
+  const missionIconLookup = useMemo(
+    () => buildMissionIconLookup(config),
+    [config?.icons?.missions, config?.icons?.devices]
+  );
+  const missionIconOptions = useMemo(() => {
+    const options = Array.from(missionIconLookup.values());
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [missionIconLookup]);
   function deviceIconUrlFromKey(key) {
     if (!key) return '';
     const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
@@ -1567,8 +1638,12 @@ export default function Admin() {
   }
   function missionIconUrlFromKey(key) {
     if (!key) return '';
-    const it = (config?.icons?.missions || []).find(x => (x.key||'') === key);
-    return it?.url || '';
+    const entry = missionIconLookup.get(key.toLowerCase());
+    return entry?.url || '';
+  }
+  function missionIconEntryFromKey(key) {
+    if (!key) return null;
+    return missionIconLookup.get(key.toLowerCase()) || null;
   }
   const triggerOptionSets = useMemo(() => {
     const mediaOptions = (inventory || []).map((it, idx) => {
@@ -1587,21 +1662,24 @@ export default function Admin() {
     const missionOptions = ((suite?.missions) || []).map((m, idx) => {
       const id = m?.id || `mission-${idx}`;
       const label = m?.title || id;
-      const thumbnail = toDirectMediaURL(missionIconUrlFromKey(m?.iconKey) || '');
+      const iconEntry = missionIconEntryFromKey(m?.iconKey);
+      const thumbnail = toDirectMediaURL(iconEntry?.url || '');
       return { id, label, thumbnail, meta: m };
     });
     const responseOptions = [];
     ((suite?.missions) || []).forEach((m) => {
       if (!m) return;
       const baseLabel = m.title || m.id || 'Mission';
-      const correctUrl = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      const iconEntry = missionIconEntryFromKey(m?.iconKey);
+      const fallbackUrl = iconEntry?.url || '';
+      const correctUrl = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || fallbackUrl);
       responseOptions.push({
         id: `${m.id || baseLabel}::correct`,
         label: `${baseLabel} — Correct`,
         thumbnail: correctUrl,
         meta: { mission: m, side: 'correct', url: correctUrl },
       });
-      const wrongUrl = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      const wrongUrl = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || fallbackUrl);
       responseOptions.push({
         id: `${m.id || baseLabel}::wrong`,
         label: `${baseLabel} — Wrong`,
@@ -1675,7 +1753,8 @@ export default function Admin() {
       deviceFlashTimeout.current = null;
     }
   }
-  function saveDraftDevice() {
+  function saveDraftDevice(options = {}) {
+    const { close = true } = options;
     const normalized = {
       title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
       type: devDraft.type || 'smoke',
@@ -1687,7 +1766,7 @@ export default function Admin() {
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
         setStatus('❌ Click the map or search an address to set device location');
-        return;
+        return { success: false, mode: null };
       }
       const lat = Number(Number(devDraft.lat).toFixed(6));
       const lng = Number(Number(devDraft.lng).toFixed(6));
@@ -1698,25 +1777,45 @@ export default function Admin() {
       setSelectedDevIdx(next.length - 1);
       setSelectedMissionIdx(null);
       setDirty(true);
+      setDeviceTriggerPicker('');
       setStatus('✅ Device added');
-      closeDeviceEditor();
-      return;
+      if (close) {
+        closeDeviceEditor();
+      } else {
+        const draft = createDeviceDraft({ ...item });
+        setDeviceEditorMode('edit');
+        setIsDeviceEditorOpen(true);
+        setDevDraft(draft);
+        setDevDraftBaseline(createDeviceDraft({ ...item }));
+      }
+      return { success: true, mode: 'create' };
     }
     if (deviceEditorMode === 'edit' && selectedDevIdx != null) {
       const index = selectedDevIdx;
       const list = [...(devices || [])];
       const existing = list[index];
-      if (!existing) return;
+      if (!existing) return { success: false, mode: null };
       const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
       const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
       list[index] = { ...existing, ...normalized, lat, lng };
       setDevices(list);
       setDirty(true);
-      setStatus('✅ Device updated');
-      closeDeviceEditor();
+      setDeviceTriggerPicker('');
+      setStatus(close ? '✅ Device saved' : '✅ Device updated');
+      if (close) {
+        closeDeviceEditor();
+      } else {
+        const updated = createDeviceDraft({ ...list[index] });
+        setDevDraft(updated);
+        setDevDraftBaseline(createDeviceDraft({ ...list[index] }));
+        setDeviceEditorMode('edit');
+        setIsDeviceEditorOpen(true);
+      }
+      return { success: true, mode: 'update' };
     }
+    return { success: false, mode: null };
   }
-  function handleDeviceSave() {
+  function handleDeviceSave({ close = true } = {}) {
     if (deviceFlashTimeout.current) {
       clearTimeout(deviceFlashTimeout.current);
       deviceFlashTimeout.current = null;
@@ -1726,7 +1825,18 @@ export default function Admin() {
       setDeviceActionFlash(false);
       deviceFlashTimeout.current = null;
     }, 420);
-    saveDraftDevice();
+    const result = saveDraftDevice({ close });
+    if (!result.success) {
+      if (deviceFlashTimeout.current) {
+        clearTimeout(deviceFlashTimeout.current);
+        deviceFlashTimeout.current = null;
+      }
+      setDeviceActionFlash(false);
+    }
+    return result;
+  }
+  function handleDeviceApply() {
+    return handleDeviceSave({ close: false });
   }
   function duplicateDevice(idx) {
     const list = [...(devices || [])];
@@ -1987,7 +2097,7 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     logConversation('You', 'Scanning media usage for unused files');
-    const inv = await listInventory(['uploads','bundles','icons']);
+    const inv = await listInventory(['uploads','bundles','icons','mediapool','covers','missions','devices','assigned']);
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -2019,16 +2129,24 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='uploads') {
+  async function uploadToRepo(file, target = 'uploads') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    const detectedType = classifyMediaType(file.name, file.type);
+    const request = typeof target === 'string' ? { subfolder: target } : (target || {});
+    const context = request.context || undefined;
+    const explicitFolder = request.subfolder || request.folder || undefined;
+    const effectiveType = request.type || detectedType;
+    const folder = (explicitFolder && explicitFolder.replace(/^\/+|\/+$/g, ''))
+      || resolveMediaSubfolder(effectiveType, context);
+    const path = `public/media/${folder}/${Date.now()}-${safeName}`;
     const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
-    if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+    const isVisual = effectiveType === 'image' || effectiveType === 'gif';
+    const targetLabel = `/media/${folder}`;
+    if (isVisual && file.size > 1024 * 1024) {
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — uploading to ${targetLabel} may take longer.`);
     } else {
-      setUploadStatus(`Uploading ${safeName}…`);
+      setUploadStatus(`Uploading ${safeName} to ${targetLabel}…`);
     }
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
@@ -2036,7 +2154,7 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${targetLabel}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -2135,7 +2253,7 @@ export default function Admin() {
   async function handleCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || MEDIA_EXTENSION_PATTERNS.image.test(file.name || '');
     if (!looksLikeImage) {
       setUploadStatus(`❌ ${safeName} is not an image file.`);
       return;
@@ -2158,7 +2276,7 @@ export default function Admin() {
     setCoverUploadTarget('');
     setUploadStatus(`Preparing ${safeName}…`);
     try {
-      const url = await uploadToRepo(file, 'covers');
+      const url = await uploadToRepo(file, { context: 'settings' });
       if (!url) {
         setUploadStatus(`❌ Upload failed for ${safeName}`);
         setCoverUploadPreview('');
@@ -2210,7 +2328,7 @@ export default function Admin() {
     setCoverPickerLoading(true);
     setCoverPickerItems([]);
     try {
-      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const items = await listInventory(['covers','mediapool','uploads','bundles','icons','missions','devices','assigned']);
       const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
       setCoverPickerItems(filtered);
     } catch {
@@ -2268,6 +2386,22 @@ export default function Admin() {
     ? toDirectMediaURL(config.game.coverImage)
     : '';
   const headerStyle = S.header;
+  const editingTitleLabel = (editing?.title || '').trim();
+  const missionSaveButtonLabel = `Save and Close ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const missionApplyButtonLabel = editingIsNew
+    ? `Add ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`
+    : `Update ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const missionApplyTooltip = editingIsNew
+    ? 'Add this mission to the list and keep editing'
+    : 'Update the mission details without closing the editor';
+  const deviceTitleLabel = (devDraft?.title || '').trim();
+  const deviceSaveButtonLabel = `Save and Close ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
+  const deviceApplyButtonLabel = deviceEditorMode === 'new'
+    ? `Add ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`
+    : `Update ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
+  const deviceApplyTooltip = deviceEditorMode === 'new'
+    ? 'Add this device to the list and continue editing'
+    : 'Update the device details without closing the editor';
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
@@ -2562,7 +2696,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -2629,8 +2763,50 @@ export default function Admin() {
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
+                    </div>
+                    <div style={S.overlayBarSide}>
+                      <div style={S.overlayActionStack}>
+                        <button
+                          style={S.overlayUpdateButton}
+                          onClick={handleMissionApply}
+                          title={missionApplyTooltip}
+                        >
+                          {missionApplyButtonLabel}
+                        </button>
+                        <button
+                          style={{
+                            ...S.action3DButton,
+                            ...(missionActionFlash ? S.action3DFlash : {}),
+                            width: '100%',
+                          }}
+                          onClick={() => handleMissionSave({ close: true })}
+                          title={`Save and close ${editingTitleLabel ? `${editingTitleLabel} mission` : 'this mission'}`}
+                        >
+                          {missionSaveButtonLabel}
+                        </button>
+                      </div>
+                      <div style={S.noteText}>Use Update to keep working or Save &amp; Close when you are finished.</div>
+                    </div>
+                  </div>
+
+                  <div style={S.missionQuickRow}>
+                    <div style={S.missionIconPreview}>
+                      {(() => {
+                        const sel = missionIconEntryFromKey(editing.iconKey);
+                        return sel?.url ? (
+                          <img
+                            alt="mission icon"
+                            src={toDirectMediaURL(sel.url)}
+                            style={{ width: 48, height: 48, objectFit: 'contain' }}
+                          />
+                        ) : (
+                          <div style={S.missionIconPlaceholder}>icon</div>
+                        );
+                      })()}
+                    </div>
+                    <Field label="Title">
                       <input
-                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
+                        style={S.input}
                         value={editing.title || ''}
                         onChange={(e) => {
                           setEditing({ ...editing, title: e.target.value });
@@ -2638,55 +2814,43 @@ export default function Admin() {
                         }}
                         placeholder="Mission title"
                       />
-                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
-                    </div>
-                    <div style={S.overlayBarSide}>
-                      <button
-                        style={{
-                          ...S.action3DButton,
-                          ...(missionActionFlash ? S.action3DFlash : {}),
+                    </Field>
+                    <Field label="Type">
+                      <select
+                        style={S.input}
+                        value={editing.type}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setEditing({ ...editing, type: t, content: defaultContentForType(t) });
+                          setDirty(true);
                         }}
-                        onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
                       >
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
-                      </button>
-                      <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
-                    </div>
-                  </div>
-
-                  <Field label="Type">
-                    <select style={S.input} value={editing.type}
-                      onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map((k)=>(
-                        <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  {/* Icon select with thumbnail (inventory-only) */}
-                  <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                        {Object.keys(TYPE_FIELDS).map((k) => (
+                          <option key={k} value={k}>
+                            {TYPE_LABELS[k] || k}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
                       <select
                         style={S.input}
                         value={editing.iconKey || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                        onChange={(e) => {
+                          setEditing({ ...editing, iconKey: e.target.value });
+                          setDirty(true);
+                        }}
                       >
                         <option value="">(default)</option>
-                        {(config?.icons?.missions||[]).map((it)=>(
-                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        {missionIconOptions.map((it) => (
+                          <option key={it.key} value={it.key}>
+                            {it.name || it.key}
+                          </option>
                         ))}
                       </select>
-                      <div>
-                        {(() => {
-                          const sel = (config?.icons?.missions||[]).find(it => it.key === editing.iconKey);
-                          return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
-                        })()}
-                      </div>
-                    </div>
-                  </Field>
+                    </Field>
+                  </div>
+                  <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
 
                   <hr style={S.hr}/>
 
@@ -3168,17 +3332,27 @@ export default function Admin() {
                         <div style={S.noteText}>Update the title, type, or trigger settings before saving.</div>
                       </div>
                       <div style={S.overlayBarSide}>
-                        <button
-                          style={{
-                            ...S.action3DButton,
-                            ...(deviceActionFlash ? S.action3DFlash : {}),
-                          }}
-                          onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Commit device updates'}
-                        >
-                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
-                        </button>
-                        <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
+                        <div style={S.overlayActionStack}>
+                          <button
+                            style={S.overlayUpdateButton}
+                            onClick={handleDeviceApply}
+                            title={deviceApplyTooltip}
+                          >
+                            {deviceApplyButtonLabel}
+                          </button>
+                          <button
+                            style={{
+                              ...S.action3DButton,
+                              ...(deviceActionFlash ? S.action3DFlash : {}),
+                              width: '100%',
+                            }}
+                            onClick={() => handleDeviceSave({ close: true })}
+                            title={`Save and close ${deviceTitleLabel ? `${deviceTitleLabel} device` : 'this device'}`}
+                          >
+                            {deviceSaveButtonLabel}
+                          </button>
+                        </div>
+                        <div style={S.noteText}>Tap Update to keep the editor open or Save &amp; Close to finish.</div>
                       </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
@@ -3326,7 +3500,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -3735,6 +3909,33 @@ export default function Admin() {
               Snapshot taken at {metaTimestampLabel || formatLocalDateTime(new Date())}.
             </div>
           </div>
+          <footer style={S.settingsMetaFooter}>
+            <div style={S.settingsMetaFooterRow}>
+              <span><strong>Repo:</strong> {metaOwnerRepo || 'unknown'}</span>
+              <span><strong>Branch:</strong> {metaBranchLabel}</span>
+              <span>
+                <strong>Commit:</strong>{' '}
+                {metaCommitUrl ? (
+                  <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.settingsMetaFooterLink}>
+                    {metaCommitShort || metaCommitLabel || '—'}
+                  </a>
+                ) : (
+                  metaCommitShort || metaCommitLabel || '—'
+                )}
+              </span>
+              <span>
+                <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.settingsMetaFooterLink}>
+                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  metaDeploymentState || '—'
+                )}
+              </span>
+              <span><strong>Snapshot:</strong> {metaTimestampLabel || formatLocalDateTime(new Date())}</span>
+            </div>
+          </footer>
       </main>
     )}
 
@@ -3749,8 +3950,8 @@ export default function Admin() {
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          uploadToRepo={async (file, folder)=> {
-            const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
+          uploadToRepo={async (file, options)=> {
+            const url = await (async ()=>{ try { return await uploadToRepo(file, options); } catch { return ''; }})();
             return url;
           }}
           onInventoryRefresh={syncInventory}
@@ -4360,6 +4561,27 @@ const S = {
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
   },
+  settingsMetaFooter: {
+    marginTop: 16,
+    padding: '14px 18px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  settingsMetaFooterRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'center',
+  },
+  settingsMetaFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+  },
   inlineCode: {
     fontFamily: 'monospace',
     background: 'rgba(148, 163, 184, 0.16)',
@@ -4480,6 +4702,19 @@ const S = {
     textTransform: 'uppercase',
     boxShadow: '0 0 22px rgba(248, 113, 113, 0.55)',
     cursor: 'pointer',
+  },
+  overlayUpdateButton: {
+    padding: '10px 18px',
+    borderRadius: 999,
+    border: '1px solid rgba(59, 130, 246, 0.6)',
+    background: 'linear-gradient(135deg, #1d4ed8, #38bdf8)',
+    color: '#e0f2fe',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 20px rgba(59, 130, 246, 0.45)',
+    cursor: 'pointer',
+    width: '100%',
   },
   deviceMapFooter: {
     marginTop: 12,
@@ -4661,7 +4896,7 @@ const S = {
     boxShadow: '0 0 24px rgba(94, 234, 212, 0.35)',
     background: 'rgba(15, 32, 27, 0.85)',
   },
-  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverDropImage: { width: '50%', height: '50%', objectFit: 'cover', borderRadius: 16, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.35)' },
   coverDropPlaceholder: {
     color: '#9fb0bf',
     fontSize: 13,
@@ -4763,6 +4998,13 @@ const S = {
     gap: 6,
     minWidth: 180,
   },
+  overlayActionStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
+    width: '100%',
+  },
   overlayCenter: {
     display: 'flex',
     flexDirection: 'column',
@@ -4790,6 +5032,33 @@ const S = {
     background: 'var(--admin-tab-bg)',
     padding: '4px 12px',
     borderRadius: 999,
+  },
+  missionQuickRow: {
+    display: 'grid',
+    gridTemplateColumns: '64px 1fr 1fr 1fr',
+    gap: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  missionIconPreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+  },
+  missionIconPlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   muted: { color: 'var(--admin-muted)' },
@@ -5216,7 +5485,7 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const [uploadContext, setUploadContext] = useState('media-pool');
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -5232,18 +5501,29 @@ function MediaPoolTab({
   ];
   const [subTab, setSubTab] = useState('image');
 
+  const uploadContexts = [
+    { value: 'media-pool', label: 'Media Pool' },
+    { value: 'missions', label: 'Missions' },
+    { value: 'devices', label: 'Devices' },
+    { value: 'assigned', label: 'Assigned Media' },
+    { value: 'settings', label: 'Settings (Cover Art)' },
+    { value: 'uploads', label: 'General Uploads' },
+  ];
+
   useEffect(() => { refreshInventory(); }, []);
 
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
+      const items = await listInventory(['uploads','bundles','icons','covers','missions','devices','assigned','mediapool']);
       setInv(items || []);
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
       }
     } finally { setBusy(false); }
   }
+
+  const currentTargetPath = resolveMediaSubfolder(subTab, uploadContext);
 
   // Per-file usage counts retained for backwards compatibility
   function usageCounts() {
@@ -5294,19 +5574,32 @@ function MediaPoolTab({
     if (!files.length) return;
     let success = 0;
     let lastUrl = '';
+    const failures = [];
     for (const file of files) {
+      const type = classifyMediaType(file?.name, file?.type);
+      if (uploadContext === 'settings' && !(type === 'image' || type === 'gif')) {
+        const blockedName = file?.name || 'file';
+        failures.push(blockedName);
+        setUploadStatus(`❌ ${blockedName} is ${type || 'unsupported'} — Settings uploads accept images or GIFs.`);
+        continue;
+      }
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, { context: uploadContext, type });
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+      } else {
+        failures.push(file?.name || 'file');
       }
     }
     if (lastUrl) setAddUrl(lastUrl);
     if (success) await refreshInventory();
+    const contextLabel = uploadContexts.find((ctx) => ctx.value === uploadContext)?.label || uploadContext;
     if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+      const prefix = success === files.length ? '✅' : (success > 0 ? '⚠️' : '❌');
+      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files to ${contextLabel}`);
+    } else if (!success && failures.length) {
+      setUploadStatus(`❌ Upload blocked for ${failures.join(', ')}`);
     }
   }
 
@@ -5350,18 +5643,18 @@ function MediaPoolTab({
 
   // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
-    const t = classifyByExt(it.url);
+    const t = classifyMediaType(it.url, it.type);
     if (!acc[t]) acc[t] = [];
     acc[t].push(it);
     return acc;
   }, {});
   const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
+    { key:'image', title:'Images (png/jpg/svg)', items: itemsByType.image || [] },
+    { key:'video', title:'Video (mp4/mov)',       items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/aiff)',  items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',                  items: itemsByType.gif   || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+  const active = sections.find(s => s.key === subTab) || sections[0];
 
   return (
     <main style={S.wrap}>
@@ -5370,10 +5663,10 @@ function MediaPoolTab({
         <h3 style={{ marginTop:0 }}>Upload</h3>
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+          <select style={S.input} value={uploadContext} onChange={(e)=>setUploadContext(e.target.value)}>
+            {uploadContexts.map((ctx) => (
+              <option key={ctx.value} value={ctx.value}>{ctx.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -5395,12 +5688,17 @@ function MediaPoolTab({
         >
           <div>
             <div style={S.mediaDropHeadline}>Drag & drop media</div>
-            <div style={S.mediaDropHint}>Drop multiple files at once or click Upload to browse.</div>
+            <div style={S.mediaDropHint}>
+              Drop multiple files at once or click Upload to browse. Files save to <code>/media/{currentTargetPath}</code>.
+            </div>
           </div>
           <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
         </div>
         <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
+        <div style={{ marginTop:4, color:'var(--admin-muted)', fontSize:12 }}>
+          Target directory: <code>/media/{currentTargetPath}</code>
+        </div>
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
@@ -5441,7 +5739,8 @@ function MediaPoolTab({
               const url = toDirectMediaURL(it.url);
               const name = baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
-              const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
+              const previewKind = classifyMediaType(previewCandidate, it.type);
+              const looksImage = previewKind === 'image' || previewKind === 'gif';
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
@@ -5513,6 +5812,10 @@ function AssignedMediaPageTab({
   const iconsM = safeIcons.missions || [];
   const iconsD = safeIcons.devices  || [];
   const iconsR = safeIcons.rewards  || [];
+  const missionIconLookup = useMemo(
+    () => buildMissionIconLookup(config),
+    [config?.icons?.missions, config?.icons?.devices]
+  );
   const triggerConfig = mergeTriggerState(safeConfig.mediaTriggers);
 
   function updateMediaTrigger(partial) {
@@ -5526,7 +5829,6 @@ function AssignedMediaPageTab({
   }
 
   const iconsDevices = safeIcons.devices || [];
-  const iconsMissions = safeIcons.missions || [];
   const mediaOptions = (inventory || []).map((it, idx) => {
     const rawUrl = it?.url || it?.path || it;
     const url = toDirectMediaURL(rawUrl);
@@ -5544,7 +5846,7 @@ function AssignedMediaPageTab({
   const missionOptions = (missions || []).map((m, idx) => {
     const id = m?.id || `mission-${idx}`;
     const label = m?.title || id;
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const iconEntry = missionIconLookup.get((m?.iconKey || '').toLowerCase());
     const thumbnail = toDirectMediaURL(iconEntry?.url || '');
     return { id, label, thumbnail, meta: m };
   });
@@ -5552,7 +5854,7 @@ function AssignedMediaPageTab({
   (missions || []).forEach((m) => {
     if (!m) return;
     const baseLabel = m.title || m.id || 'Mission';
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const iconEntry = missionIconLookup.get((m?.iconKey || '').toLowerCase());
     const correctThumb = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || iconEntry?.url || '');
     responseOptions.push({ id: `${m.id || baseLabel}::correct`, label: `${baseLabel} — Correct`, thumbnail: correctThumb });
     const wrongThumb = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || iconEntry?.url || '');
@@ -5616,12 +5918,12 @@ function AssignedMediaPageTab({
   }, [inventory]);
 
   const assignedState = useMemo(() => ({
-    missionIcons: (config?.icons?.missions || []).map(icon => icon.key),
+    missionIcons: Array.from(missionIconLookup.values()).map(icon => icon.key),
     deviceIcons: (config?.icons?.devices || []).map(icon => icon.key),
     rewardMedia: (config?.media?.rewardsPool || []).map(item => item.url),
     penaltyMedia: (config?.media?.penaltiesPool || []).map(item => item.url),
     actionMedia: config?.media?.actionMedia || [],
-  }), [config]);
+  }), [config, missionIconLookup]);
 
   const mediaUsageSummary = useMemo(() => {
     try {
@@ -5697,14 +5999,12 @@ function AssignedMediaPageTab({
     const responseCorrectMap = new Map();
     const responseWrongMap = new Map();
     const responseAudioMap = new Map();
+    const arMarkerMap = new Map();
+    const arOverlayImageMap = new Map();
+    const arOverlayVideoMap = new Map();
     const coverMap = new Map();
 
-    const missionIconLookup = new Map();
-    (safeIcons.missions || []).forEach((icon) => {
-      const url = normalize(icon?.url);
-      if (!url) return;
-      missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
-    });
+    const missionIconLookup = buildMissionIconLookup(safeConfig);
 
     (missions || []).forEach((mission) => {
       if (!mission) return;
@@ -5714,11 +6014,48 @@ function AssignedMediaPageTab({
         const direct = normalize(mission.iconUrl);
         if (direct) iconUrls.add(direct);
       }
-      if (mission.iconKey && missionIconLookup.has(mission.iconKey)) {
-        const found = missionIconLookup.get(mission.iconKey);
+      if (mission.iconKey) {
+        const found = missionIconLookup.get(String(mission.iconKey).toLowerCase());
         if (found?.url) iconUrls.add(found.url);
       }
       iconUrls.forEach((url) => addUsage(missionIconMap, url, title));
+
+      const missionContent = mission.content || {};
+      const missionType = mission.type || missionContent.type;
+      if (missionType === 'ar_image' || missionType === 'ar_video') {
+        if (missionContent.markerUrl) {
+          addUsage(arMarkerMap, missionContent.markerUrl, `${title} — AR Marker`, {
+            label: undefined,
+            kind: 'image',
+            tags: ['AR Marker'],
+          });
+        }
+        if (missionContent.assetUrl) {
+          const rawAssetUrl = missionContent.assetUrl;
+          const detectedKind = classifyByExt(rawAssetUrl);
+          const isModel = AR_MODEL_EXTENSION_PATTERN.test(String(rawAssetUrl || ''));
+          const overlayDefaults = {
+            label: undefined,
+            kind: isModel ? '3d' : detectedKind,
+            tags: ['AR Overlay'],
+          };
+          if (isModel) {
+            overlayDefaults.tags = [...overlayDefaults.tags, '3D'];
+          } else if (detectedKind === 'video') {
+            overlayDefaults.tags = [...overlayDefaults.tags, 'Video'];
+          } else {
+            overlayDefaults.tags = [...overlayDefaults.tags, 'Image'];
+          }
+          const overlayLabel = missionType === 'ar_video'
+            ? `${title} — AR Overlay Video`
+            : `${title} — AR Overlay`;
+          if (missionType === 'ar_video') {
+            addUsage(arOverlayVideoMap, rawAssetUrl, overlayLabel, overlayDefaults);
+          } else {
+            addUsage(arOverlayImageMap, rawAssetUrl, overlayLabel, overlayDefaults);
+          }
+        }
+      }
 
       if (mission.onCorrect?.mediaUrl) addUsage(responseCorrectMap, mission.onCorrect.mediaUrl, `${title} — Correct`);
       if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
@@ -5780,7 +6117,7 @@ function AssignedMediaPageTab({
       const label = entry.label || info?.name || baseNameFromUrl(entry.url);
       const kind = entry.kind || info?.type || classifyByExt(entry.url);
       const openUrl = info?.openUrl || entry.url;
-      const thumb = kind === 'audio'
+      const thumb = (kind === 'audio' || kind === '3d')
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
       const tagSet = new Set();
@@ -5812,6 +6149,9 @@ function AssignedMediaPageTab({
       responseCorrect: finalize(responseCorrectMap),
       responseWrong: finalize(responseWrongMap),
       responseAudio: finalize(responseAudioMap),
+      arMarkers: finalize(arMarkerMap),
+      arOverlayImages: finalize(arOverlayImageMap),
+      arOverlayVideos: finalize(arOverlayVideoMap),
       coverImages: finalize(coverMap),
     };
     } catch (err) {
@@ -5825,6 +6165,9 @@ function AssignedMediaPageTab({
         responseCorrect: [],
         responseWrong: [],
         responseAudio: [],
+        arMarkers: [],
+        arOverlayImages: [],
+        arOverlayVideos: [],
         coverImages: [],
       };
     }

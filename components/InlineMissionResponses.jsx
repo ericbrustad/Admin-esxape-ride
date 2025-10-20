@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import { classifyMediaType, resolveMediaSubfolder } from "../lib/media-types";
 
 const DEFAULT_SIDE_STATE = {
   statement: "",
@@ -46,14 +47,8 @@ function toDirectMediaURL(u) {
     return u;
   }
 }
-function classifyByExt(u) {
-  if (!u) return "other";
-  const s = String(u).toLowerCase();
-  if (/\.(png|jpg|jpeg|webp)$/i.test(s)) return "image";
-  if (/\.(gif)$/i.test(s)) return "gif";
-  if (/\.(mp4|webm|mov)$/i.test(s)) return "video";
-  if (/\.(mp3|wav|ogg|m4a|aiff|aif)$/i.test(s)) return "audio";
-  return "other";
+function classifyByExt(u, mime) {
+  return classifyMediaType(u, mime);
 }
 
 function fallbackLabelFromUrl(u) {
@@ -75,7 +70,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   const safeEditing = useMemo(() => normalizeMission(editing), [editing]);
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
+  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / 3d / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
 
@@ -96,7 +91,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
           original: item,
           url: directUrl,
           label: label || fallbackLabelFromUrl(directUrl) || `Media ${idx + 1}`,
-          kind: classifyByExt(directUrl),
+          kind: classifyMediaType(directUrl, item?.type),
         };
       })
       .filter(Boolean);
@@ -173,13 +168,15 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     });
   }
 
-  async function uploadFileAsMedia(file, subfolder="uploads") {
+  async function uploadFileAsMedia(file, context = "missions") {
     if (!file) return "";
     try {
       const base64 = await readFileAsBase64(file);
       const safeName = (file.name || "upload").replace(/[^\w.\-]+/g, "_");
       const timestamp = Date.now();
-      const path = `public/media/${subfolder}/${timestamp}-${safeName}`;
+      const mediaType = classifyMediaType(file?.name, file?.type);
+      const folder = resolveMediaSubfolder(mediaType, context);
+      const path = `public/media/${folder}/${timestamp}-${safeName}`;
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,7 +204,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
       const f = e.dataTransfer?.files?.[0];
       if (f) {
         (async () => {
-          const url = await uploadFileAsMedia(f, "uploads");
+          const url = await uploadFileAsMedia(f, 'missions');
           if (url) {
             // add to inventory locally and to selected side
             // default: attach to onCorrect if it's present in editing, otherwise onWrong
@@ -351,6 +348,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <option value="video">Videos</option>
                 <option value="audio">Audio</option>
                 <option value="gif">GIFs</option>
+                <option value="3d">3D Models</option>
                 <option value="other">Other</option>
               </select>
               <input placeholder="Paste URL to assign…" style={styles.inputSmall} onKeyDown={async (e)=>{
@@ -377,6 +375,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                       {(kind === 'image' || kind === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         : (kind === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
                         : (kind === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
+                        : (kind === '3d') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>3D</div>
                         : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(entry.label || 'file').slice(0,8)}</div>
                       }
                     </div>
@@ -414,7 +413,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               Choose file
               <input type="file" style={{ display:'none' }} onChange={async (e)=>{
                 const f = e.target.files?.[0]; if (!f) return;
-                const url = await uploadFileAsMedia(f, 'uploads');
+                const url = await uploadFileAsMedia(f, 'missions');
                 if (url) {
                   // add new inventory item locally (won't reload global pool automatically)
                   chooseMediaForSide(sideKey, url);
