@@ -1529,9 +1529,13 @@ export default function Admin() {
     p[2] += 1;
     return p.join('.');
   }
-  function saveToList() {
-    if (!editing || !suite) return;
-    if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
+  function saveToList(options = {}) {
+    const { close = true } = options;
+    if (!editing || !suite) return { success: false, mode: null };
+    if (!editing.id || !editing.title || !editing.type) {
+      setStatus('❌ Fill id, title, type');
+      return { success: false, mode: null };
+    }
 
     const fields = TYPE_FIELDS[editing.type] || [];
     for (const f of fields) {
@@ -1548,12 +1552,23 @@ export default function Admin() {
     obj.trigger = sanitizeTriggerConfig(editing.trigger);
     if (!obj.appearanceOverrideEnabled) delete obj.appearance;
 
-    const list = (i >= 0 ? (missions[i]=obj, missions) : [...missions, obj]);
+    const list = (i >= 0 ? (missions[i] = obj, missions) : [...missions, obj]);
     setSuite({ ...suite, missions: list, version: bumpVersion(suite.version || '0.0.0') });
-    setSelected(editing.id); setEditing(null); setDirty(false);
-    setStatus('✅ Mission saved');
+    setSelected(editing.id);
+    if (close) {
+      setEditing(null);
+    }
+    setDirty(false);
+    const mode = i >= 0 ? 'update' : 'create';
+    const defaultStatus = close
+      ? '✅ Mission saved'
+      : mode === 'update'
+        ? '✅ Mission updated'
+        : '✅ Mission added';
+    setStatus(defaultStatus);
+    return { success: true, mode };
   }
-  function handleMissionSave() {
+  function handleMissionSave({ close = true } = {}) {
     if (missionFlashTimeout.current) {
       clearTimeout(missionFlashTimeout.current);
       missionFlashTimeout.current = null;
@@ -1563,7 +1578,18 @@ export default function Admin() {
       setMissionActionFlash(false);
       missionFlashTimeout.current = null;
     }, 420);
-    saveToList();
+    const result = saveToList({ close });
+    if (!result.success) {
+      if (missionFlashTimeout.current) {
+        clearTimeout(missionFlashTimeout.current);
+        missionFlashTimeout.current = null;
+      }
+      setMissionActionFlash(false);
+    }
+    return result;
+  }
+  function handleMissionApply() {
+    return handleMissionSave({ close: false });
   }
   function removeMission(id) {
     if (!suite) return;
@@ -1723,7 +1749,8 @@ export default function Admin() {
       deviceFlashTimeout.current = null;
     }
   }
-  function saveDraftDevice() {
+  function saveDraftDevice(options = {}) {
+    const { close = true } = options;
     const normalized = {
       title: devDraft.title?.trim() || (devDraft.type.charAt(0).toUpperCase() + devDraft.type.slice(1)),
       type: devDraft.type || 'smoke',
@@ -1735,7 +1762,7 @@ export default function Admin() {
     if (deviceEditorMode === 'new') {
       if (devDraft.lat == null || devDraft.lng == null) {
         setStatus('❌ Click the map or search an address to set device location');
-        return;
+        return { success: false, mode: null };
       }
       const lat = Number(Number(devDraft.lat).toFixed(6));
       const lng = Number(Number(devDraft.lng).toFixed(6));
@@ -1746,25 +1773,45 @@ export default function Admin() {
       setSelectedDevIdx(next.length - 1);
       setSelectedMissionIdx(null);
       setDirty(true);
+      setDeviceTriggerPicker('');
       setStatus('✅ Device added');
-      closeDeviceEditor();
-      return;
+      if (close) {
+        closeDeviceEditor();
+      } else {
+        const draft = createDeviceDraft({ ...item });
+        setDeviceEditorMode('edit');
+        setIsDeviceEditorOpen(true);
+        setDevDraft(draft);
+        setDevDraftBaseline(createDeviceDraft({ ...item }));
+      }
+      return { success: true, mode: 'create' };
     }
     if (deviceEditorMode === 'edit' && selectedDevIdx != null) {
       const index = selectedDevIdx;
       const list = [...(devices || [])];
       const existing = list[index];
-      if (!existing) return;
+      if (!existing) return { success: false, mode: null };
       const lat = devDraft.lat == null ? existing.lat : Number(Number(devDraft.lat).toFixed(6));
       const lng = devDraft.lng == null ? existing.lng : Number(Number(devDraft.lng).toFixed(6));
       list[index] = { ...existing, ...normalized, lat, lng };
       setDevices(list);
       setDirty(true);
-      setStatus('✅ Device updated');
-      closeDeviceEditor();
+      setDeviceTriggerPicker('');
+      setStatus(close ? '✅ Device saved' : '✅ Device updated');
+      if (close) {
+        closeDeviceEditor();
+      } else {
+        const updated = createDeviceDraft({ ...list[index] });
+        setDevDraft(updated);
+        setDevDraftBaseline(createDeviceDraft({ ...list[index] }));
+        setDeviceEditorMode('edit');
+        setIsDeviceEditorOpen(true);
+      }
+      return { success: true, mode: 'update' };
     }
+    return { success: false, mode: null };
   }
-  function handleDeviceSave() {
+  function handleDeviceSave({ close = true } = {}) {
     if (deviceFlashTimeout.current) {
       clearTimeout(deviceFlashTimeout.current);
       deviceFlashTimeout.current = null;
@@ -1774,7 +1821,18 @@ export default function Admin() {
       setDeviceActionFlash(false);
       deviceFlashTimeout.current = null;
     }, 420);
-    saveDraftDevice();
+    const result = saveDraftDevice({ close });
+    if (!result.success) {
+      if (deviceFlashTimeout.current) {
+        clearTimeout(deviceFlashTimeout.current);
+        deviceFlashTimeout.current = null;
+      }
+      setDeviceActionFlash(false);
+    }
+    return result;
+  }
+  function handleDeviceApply() {
+    return handleDeviceSave({ close: false });
   }
   function duplicateDevice(idx) {
     const list = [...(devices || [])];
@@ -2318,8 +2376,20 @@ export default function Admin() {
   const headerStyle = S.header;
   const editingTitleLabel = (editing?.title || '').trim();
   const missionSaveButtonLabel = `Save and Close ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const missionApplyButtonLabel = editingIsNew
+    ? `Add ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`
+    : `Update ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const missionApplyTooltip = editingIsNew
+    ? 'Add this mission to the list and keep editing'
+    : 'Update the mission details without closing the editor';
   const deviceTitleLabel = (devDraft?.title || '').trim();
   const deviceSaveButtonLabel = `Save and Close ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
+  const deviceApplyButtonLabel = deviceEditorMode === 'new'
+    ? `Add ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`
+    : `Update ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
+  const deviceApplyTooltip = deviceEditorMode === 'new'
+    ? 'Add this device to the list and continue editing'
+    : 'Update the device details without closing the editor';
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
@@ -2683,17 +2753,27 @@ export default function Admin() {
                       </h3>
                     </div>
                     <div style={S.overlayBarSide}>
-                      <button
-                        style={{
-                          ...S.action3DButton,
-                          ...(missionActionFlash ? S.action3DFlash : {}),
-                        }}
-                        onClick={handleMissionSave}
-                        title={`Save and close ${editingTitleLabel ? `${editingTitleLabel} mission` : 'this mission'}`}
-                      >
-                        {missionSaveButtonLabel}
-                      </button>
-                      <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
+                      <div style={S.overlayActionStack}>
+                        <button
+                          style={S.overlayUpdateButton}
+                          onClick={handleMissionApply}
+                          title={missionApplyTooltip}
+                        >
+                          {missionApplyButtonLabel}
+                        </button>
+                        <button
+                          style={{
+                            ...S.action3DButton,
+                            ...(missionActionFlash ? S.action3DFlash : {}),
+                            width: '100%',
+                          }}
+                          onClick={() => handleMissionSave({ close: true })}
+                          title={`Save and close ${editingTitleLabel ? `${editingTitleLabel} mission` : 'this mission'}`}
+                        >
+                          {missionSaveButtonLabel}
+                        </button>
+                      </div>
+                      <div style={S.noteText}>Use Update to keep working or Save &amp; Close when you are finished.</div>
                     </div>
                   </div>
 
@@ -3240,17 +3320,27 @@ export default function Admin() {
                         <div style={S.noteText}>Update the title, type, or trigger settings before saving.</div>
                       </div>
                       <div style={S.overlayBarSide}>
-                        <button
-                          style={{
-                            ...S.action3DButton,
-                            ...(deviceActionFlash ? S.action3DFlash : {}),
-                          }}
-                          onClick={handleDeviceSave}
-                          title={`Save and close ${deviceTitleLabel ? `${deviceTitleLabel} device` : 'this device'}`}
-                        >
-                          {deviceSaveButtonLabel}
-                        </button>
-                        <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
+                        <div style={S.overlayActionStack}>
+                          <button
+                            style={S.overlayUpdateButton}
+                            onClick={handleDeviceApply}
+                            title={deviceApplyTooltip}
+                          >
+                            {deviceApplyButtonLabel}
+                          </button>
+                          <button
+                            style={{
+                              ...S.action3DButton,
+                              ...(deviceActionFlash ? S.action3DFlash : {}),
+                              width: '100%',
+                            }}
+                            onClick={() => handleDeviceSave({ close: true })}
+                            title={`Save and close ${deviceTitleLabel ? `${deviceTitleLabel} device` : 'this device'}`}
+                          >
+                            {deviceSaveButtonLabel}
+                          </button>
+                        </div>
+                        <div style={S.noteText}>Tap Update to keep the editor open or Save &amp; Close to finish.</div>
                       </div>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr 1fr 1fr', gap:8, alignItems:'center' }}>
@@ -4601,6 +4691,19 @@ const S = {
     boxShadow: '0 0 22px rgba(248, 113, 113, 0.55)',
     cursor: 'pointer',
   },
+  overlayUpdateButton: {
+    padding: '10px 18px',
+    borderRadius: 999,
+    border: '1px solid rgba(59, 130, 246, 0.6)',
+    background: 'linear-gradient(135deg, #1d4ed8, #38bdf8)',
+    color: '#e0f2fe',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    boxShadow: '0 0 20px rgba(59, 130, 246, 0.45)',
+    cursor: 'pointer',
+    width: '100%',
+  },
   deviceMapFooter: {
     marginTop: 12,
     display: 'flex',
@@ -4882,6 +4985,13 @@ const S = {
     alignItems: 'flex-start',
     gap: 6,
     minWidth: 180,
+  },
+  overlayActionStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 8,
+    width: '100%',
   },
   overlayCenter: {
     display: 'flex',
