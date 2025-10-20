@@ -70,7 +70,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   const safeEditing = useMemo(() => normalizeMission(editing), [editing]);
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
+  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / 3d / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
 
@@ -348,6 +348,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <option value="video">Videos</option>
                 <option value="audio">Audio</option>
                 <option value="gif">GIFs</option>
+                <option value="3d">3D Models</option>
                 <option value="other">Other</option>
               </select>
               <input placeholder="Paste URL to assign…" style={styles.inputSmall} onKeyDown={async (e)=>{
@@ -374,6 +375,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                       {(kind === 'image' || kind === 'gif') ? <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                         : (kind === 'video') ? <video src={url} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted playsInline />
                         : (kind === 'audio') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>Audio</div>
+                        : (kind === '3d') ? <div style={{ fontSize:12, color:'#9fb0bf' }}>3D</div>
                         : <div style={{ fontSize:12, color:'#9fb0bf' }}>{(entry.label || 'file').slice(0,8)}</div>
                       }
                     </div>

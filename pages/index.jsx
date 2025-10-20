@@ -85,6 +85,7 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
+const AR_MODEL_EXTENSION_PATTERN = /\.(glb|gltf|usdz|usd|fbx|obj|dae|3ds|ply|stl)$/i;
 function classifyByExt(u, mime) {
   return classifyMediaType(u, mime);
 }
@@ -346,6 +347,7 @@ const DEVICE_TYPES = [
   { value:'smoke',  label:'Smoke (hide on GPS)' },
   { value:'clone',  label:'Clone (decoy location)' },
   { value:'jammer', label:'Signal Jammer (blackout radius)' },
+  { value:'ar_image', label:'AR Image' },
 ];
 const DEFAULT_TRIGGER_CONFIG = {
   enabled: false,
@@ -5997,6 +5999,9 @@ function AssignedMediaPageTab({
     const responseCorrectMap = new Map();
     const responseWrongMap = new Map();
     const responseAudioMap = new Map();
+    const arMarkerMap = new Map();
+    const arOverlayImageMap = new Map();
+    const arOverlayVideoMap = new Map();
     const coverMap = new Map();
 
     const missionIconLookup = buildMissionIconLookup(safeConfig);
@@ -6014,6 +6019,43 @@ function AssignedMediaPageTab({
         if (found?.url) iconUrls.add(found.url);
       }
       iconUrls.forEach((url) => addUsage(missionIconMap, url, title));
+
+      const missionContent = mission.content || {};
+      const missionType = mission.type || missionContent.type;
+      if (missionType === 'ar_image' || missionType === 'ar_video') {
+        if (missionContent.markerUrl) {
+          addUsage(arMarkerMap, missionContent.markerUrl, `${title} — AR Marker`, {
+            label: undefined,
+            kind: 'image',
+            tags: ['AR Marker'],
+          });
+        }
+        if (missionContent.assetUrl) {
+          const rawAssetUrl = missionContent.assetUrl;
+          const detectedKind = classifyByExt(rawAssetUrl);
+          const isModel = AR_MODEL_EXTENSION_PATTERN.test(String(rawAssetUrl || ''));
+          const overlayDefaults = {
+            label: undefined,
+            kind: isModel ? '3d' : detectedKind,
+            tags: ['AR Overlay'],
+          };
+          if (isModel) {
+            overlayDefaults.tags = [...overlayDefaults.tags, '3D'];
+          } else if (detectedKind === 'video') {
+            overlayDefaults.tags = [...overlayDefaults.tags, 'Video'];
+          } else {
+            overlayDefaults.tags = [...overlayDefaults.tags, 'Image'];
+          }
+          const overlayLabel = missionType === 'ar_video'
+            ? `${title} — AR Overlay Video`
+            : `${title} — AR Overlay`;
+          if (missionType === 'ar_video') {
+            addUsage(arOverlayVideoMap, rawAssetUrl, overlayLabel, overlayDefaults);
+          } else {
+            addUsage(arOverlayImageMap, rawAssetUrl, overlayLabel, overlayDefaults);
+          }
+        }
+      }
 
       if (mission.onCorrect?.mediaUrl) addUsage(responseCorrectMap, mission.onCorrect.mediaUrl, `${title} — Correct`);
       if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
@@ -6075,7 +6117,7 @@ function AssignedMediaPageTab({
       const label = entry.label || info?.name || baseNameFromUrl(entry.url);
       const kind = entry.kind || info?.type || classifyByExt(entry.url);
       const openUrl = info?.openUrl || entry.url;
-      const thumb = kind === 'audio'
+      const thumb = (kind === 'audio' || kind === '3d')
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
       const tagSet = new Set();
@@ -6107,6 +6149,9 @@ function AssignedMediaPageTab({
       responseCorrect: finalize(responseCorrectMap),
       responseWrong: finalize(responseWrongMap),
       responseAudio: finalize(responseAudioMap),
+      arMarkers: finalize(arMarkerMap),
+      arOverlayImages: finalize(arOverlayImageMap),
+      arOverlayVideos: finalize(arOverlayVideoMap),
       coverImages: finalize(coverMap),
     };
     } catch (err) {
@@ -6120,6 +6165,9 @@ function AssignedMediaPageTab({
         responseCorrect: [],
         responseWrong: [],
         responseAudio: [],
+        arMarkers: [],
+        arOverlayImages: [],
+        arOverlayVideos: [],
         coverImages: [],
       };
     }

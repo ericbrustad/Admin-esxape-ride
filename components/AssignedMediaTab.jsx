@@ -27,6 +27,9 @@ import React, { useMemo } from 'react';
  *     responseWrong?: Array<UsageRow>
  *     responseAudio?: Array<UsageRow>
  *     actionMedia?: Array<UsageRow>
+ *     arMarkers?: Array<UsageRow>
+ *     arOverlayImages?: Array<UsageRow>
+ *     arOverlayVideos?: Array<UsageRow>
  *   }
  *
  *   type UsageRow = {
@@ -140,6 +143,9 @@ export default function AssignedMediaTab({
     responseWrong: responseWrongUsage = [],
     responseAudio: responseAudioUsage = [],
     actionMedia: actionUsage = [],
+    arMarkers: arMarkerUsage = [],
+    arOverlayImages: arOverlayImageUsage = [],
+    arOverlayVideos: arOverlayVideoUsage = [],
   } = usageSummary || {};
 
   const pluralize = (word, count) => (count === 1 ? word : `${word}s`);
@@ -226,6 +232,9 @@ export default function AssignedMediaTab({
       ...(responseWrongUsage || []),
       ...(responseAudioUsage || []),
       ...(actionOverview || []),
+      ...(arMarkerUsage || []),
+      ...(arOverlayImageUsage || []),
+      ...(arOverlayVideoUsage || []),
     ];
 
     const responseTrigger = new Set();
@@ -256,6 +265,9 @@ export default function AssignedMediaTab({
     responseWrongUsage,
     responseAudioUsage,
     actionOverview,
+    arMarkerUsage,
+    arOverlayImageUsage,
+    arOverlayVideoUsage,
   ]);
 
   function renderUsageSection(title, items, {
@@ -322,6 +334,8 @@ export default function AssignedMediaTab({
                           <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : item.kind === 'audio' ? (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
+                        ) : item.kind === '3d' ? (
+                          <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>3D</span>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>No preview</span>
                         )}
@@ -465,6 +479,21 @@ export default function AssignedMediaTab({
         {renderUsageSection('Penalties Pool Media', penaltyUsage, {
           emptyLabel: 'Penalties pool is empty.',
           noun: 'penalty slot',
+          showTags: true,
+        })}
+        {renderUsageSection('AR Marker Images', arMarkerUsage, {
+          emptyLabel: 'No AR markers detected.',
+          noun: 'mission',
+          showTags: true,
+        })}
+        {renderUsageSection('AR Overlay Images', arOverlayImageUsage, {
+          emptyLabel: 'No AR overlay images detected.',
+          noun: 'mission',
+          showTags: true,
+        })}
+        {renderUsageSection('AR Overlay Video', arOverlayVideoUsage, {
+          emptyLabel: 'No AR overlay video detected.',
+          noun: 'mission',
           showTags: true,
         })}
         {renderUsageSection('Response Media — Correct', responseCorrectUsage, {
