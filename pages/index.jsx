@@ -744,6 +744,26 @@ export default function Admin() {
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
+  const selectGameOptions = useMemo(() => {
+    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
+    const extra = Array.isArray(games)
+      ? games
+          .filter((g) => g && g.slug && g.slug !== 'default')
+          .map((g) => ({
+            value: g.slug,
+            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
+          }))
+      : [];
+    const seen = new Set();
+    const combined = [];
+    [...baseOptions, ...extra].forEach((option) => {
+      if (!option || !option.value) return;
+      if (seen.has(option.value)) return;
+      seen.add(option.value);
+      combined.push(option);
+    });
+    return combined;
+  }, [games]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -2077,32 +2097,21 @@ export default function Admin() {
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaRepositoryLabel = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
+  const metaRepositoryUrl = adminMeta.owner && adminMeta.repo
+    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
+    : '';
+  const metaCommitFull = adminMeta.commit || '';
+  const metaDeploymentLink = metaDeploymentUrl || adminMeta.vercelUrl || '';
+  const metaCheckedLabel = metaTimestampLabel || formatLocalDateTime(new Date());
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
       ? 'Cover preview loaded — Save Cover Image or Save & Publish to keep this artwork.'
       : 'No cover selected yet — add artwork in the settings panel.';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
-  const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Default Game (root)' }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
-    });
-    return combined;
-  }, [games]);
 
   return (
     <div style={S.body}>
@@ -3433,6 +3442,66 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Deployment Snapshot</h3>
+            <div style={S.devMetaGrid}>
+              <div>
+                <span style={S.devMetaLabel}>Repository:</span>
+                {metaRepositoryLabel ? (
+                  metaRepositoryUrl ? (
+                    <a href={metaRepositoryUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                      {metaRepositoryLabel}
+                    </a>
+                  ) : (
+                    metaRepositoryLabel
+                  )
+                ) : (
+                  <span style={{ color: 'var(--admin-muted)' }}>Not available</span>
+                )}
+              </div>
+              <div>
+                <span style={S.devMetaLabel}>Branch:</span>
+                {metaBranchLabel || 'unknown'}
+              </div>
+              <div>
+                <span style={S.devMetaLabel}>Commit:</span>
+                {metaCommitFull ? (
+                  metaRepositoryUrl ? (
+                    <a
+                      href={`${metaRepositoryUrl}/commit/${metaCommitFull}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={S.metaLink}
+                    >
+                      {metaCommitFull}
+                    </a>
+                  ) : (
+                    <code>{metaCommitFull}</code>
+                  )
+                ) : (
+                  'Not reported'
+                )}
+              </div>
+              <div>
+                <span style={S.devMetaLabel}>Vercel Deployment:</span>
+                {metaDeploymentLink ? (
+                  <a href={metaDeploymentLink} target="_blank" rel="noreferrer" style={S.metaLink}>
+                    {metaDeploymentState || 'Ready'}
+                  </a>
+                ) : (
+                  metaDeploymentState || 'Not connected'
+                )}
+              </div>
+              <div>
+                <span style={S.devMetaLabel}>Checked:</span>
+                {metaCheckedLabel || '—'}
+              </div>
+              {adminMeta.error && (
+                <div style={{ color: '#f87171' }}>{adminMeta.error}</div>
+              )}
+            </div>
+          </div>
         </main>
       )}
 
@@ -3716,6 +3785,17 @@ const S = {
   metaBannerError: {
     color: '#f87171',
     fontWeight: 600,
+  },
+  devMetaGrid: {
+    display: 'grid',
+    gap: 6,
+    fontSize: 13,
+    color: 'var(--admin-muted)',
+  },
+  devMetaLabel: {
+    fontWeight: 600,
+    color: 'var(--admin-body-color)',
+    marginRight: 6,
   },
   header: {
     padding: 20,
