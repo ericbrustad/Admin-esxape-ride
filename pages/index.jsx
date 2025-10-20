@@ -218,15 +218,25 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const DEFAULT_MISSION_ICONS = [
+  { key:'aurora-beacon',  name:'Aurora Beacon',  url:'/media/icons/aurora-beacon.svg' },
+  { key:'briefing-star',  name:'Briefing Star',  url:'/media/icons/aurora-beacon.svg' },
+  { key:'decoy-glow',     name:'Decoy Glow',     url:'/media/icons/lumen-halo.svg' },
+  { key:'lantern-clue',   name:'Lantern Clue',   url:'/media/icons/lumen-halo.svg' },
+  { key:'helm-brief',     name:'Helm Brief',     url:'/media/icons/voyager-dial.svg' },
+  { key:'voyager-dial',   name:'Voyager Dial',   url:'/media/icons/voyager-dial.svg' },
+  { key:'quantum-anchor', name:'Quantum Anchor', url:'/media/icons/quantum-anchor.svg' },
+  { key:'missions-1',     name:'Smoke Bomb',     url:'/media/bundles/SMOKE%20BOMB.png' },
+  { key:'trivia',         name:'Trivia',         url:'/media/bundles/trivia%20icon.png' },
+  { key:'trivia-2',       name:'Trivia 2',       url:'/media/bundles/trivia%20yellow.png' },
+];
+
 const DEFAULT_BUNDLES = {
   devices: [
     { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
     { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
   ],
-  missions: [
-    { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
-    { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
-  ],
+  missions: DEFAULT_MISSION_ICONS,
   rewards: [
     { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
     { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
@@ -248,6 +258,29 @@ function applyDefaultIcons(cfg) {
   ensure('devices',  DEFAULT_BUNDLES.devices);
   ensure('rewards',  DEFAULT_BUNDLES.rewards);
   return next;
+}
+
+function buildMissionIconLookup(cfg) {
+  const map = new Map();
+  const icons = (cfg && cfg.icons) || {};
+  const add = (icon, { override = false } = {}) => {
+    if (!icon) return;
+    const rawKey = (icon.key ?? '').toString().trim();
+    const rawUrl = (icon.url ?? '').toString().trim();
+    if (!rawKey || !rawUrl) return;
+    const key = rawKey.toLowerCase();
+    if (!override && map.has(key)) return;
+    map.set(key, {
+      key: rawKey,
+      name: icon.name || rawKey,
+      url: rawUrl,
+    });
+  };
+
+  (Array.isArray(icons.missions) ? icons.missions : []).forEach((icon) => add(icon, { override: true }));
+  (Array.isArray(icons.devices) ? icons.devices : []).forEach((icon) => add(icon));
+  DEFAULT_MISSION_ICONS.forEach((icon) => add(icon));
+  return map;
 }
 
 /* ───────────────────────── Constants ───────────────────────── */
@@ -1560,6 +1593,14 @@ export default function Admin() {
 
   /* Devices (Devices tab only) */
   const devices = getDevices();
+  const missionIconLookup = useMemo(
+    () => buildMissionIconLookup(config),
+    [config?.icons?.missions, config?.icons?.devices]
+  );
+  const missionIconOptions = useMemo(() => {
+    const options = Array.from(missionIconLookup.values());
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [missionIconLookup]);
   function deviceIconUrlFromKey(key) {
     if (!key) return '';
     const it = (config?.icons?.devices || []).find(x => (x.key||'') === key);
@@ -1567,8 +1608,12 @@ export default function Admin() {
   }
   function missionIconUrlFromKey(key) {
     if (!key) return '';
-    const it = (config?.icons?.missions || []).find(x => (x.key||'') === key);
-    return it?.url || '';
+    const entry = missionIconLookup.get(key.toLowerCase());
+    return entry?.url || '';
+  }
+  function missionIconEntryFromKey(key) {
+    if (!key) return null;
+    return missionIconLookup.get(key.toLowerCase()) || null;
   }
   const triggerOptionSets = useMemo(() => {
     const mediaOptions = (inventory || []).map((it, idx) => {
@@ -1587,21 +1632,24 @@ export default function Admin() {
     const missionOptions = ((suite?.missions) || []).map((m, idx) => {
       const id = m?.id || `mission-${idx}`;
       const label = m?.title || id;
-      const thumbnail = toDirectMediaURL(missionIconUrlFromKey(m?.iconKey) || '');
+      const iconEntry = missionIconEntryFromKey(m?.iconKey);
+      const thumbnail = toDirectMediaURL(iconEntry?.url || '');
       return { id, label, thumbnail, meta: m };
     });
     const responseOptions = [];
     ((suite?.missions) || []).forEach((m) => {
       if (!m) return;
       const baseLabel = m.title || m.id || 'Mission';
-      const correctUrl = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      const iconEntry = missionIconEntryFromKey(m?.iconKey);
+      const fallbackUrl = iconEntry?.url || '';
+      const correctUrl = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || fallbackUrl);
       responseOptions.push({
         id: `${m.id || baseLabel}::correct`,
         label: `${baseLabel} — Correct`,
         thumbnail: correctUrl,
         meta: { mission: m, side: 'correct', url: correctUrl },
       });
-      const wrongUrl = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || missionIconUrlFromKey(m?.iconKey) || '');
+      const wrongUrl = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || fallbackUrl);
       responseOptions.push({
         id: `${m.id || baseLabel}::wrong`,
         label: `${baseLabel} — Wrong`,
@@ -2652,7 +2700,7 @@ export default function Admin() {
                   <div style={S.missionQuickRow}>
                     <div style={S.missionIconPreview}>
                       {(() => {
-                        const sel = (config?.icons?.missions || []).find((it) => it.key === editing.iconKey);
+                        const sel = missionIconEntryFromKey(editing.iconKey);
                         return sel?.url ? (
                           <img
                             alt="mission icon"
@@ -2702,7 +2750,7 @@ export default function Admin() {
                         }}
                       >
                         <option value="">(default)</option>
-                        {(config?.icons?.missions || []).map((it) => (
+                        {missionIconOptions.map((it) => (
                           <option key={it.key} value={it.key}>
                             {it.name || it.key}
                           </option>
@@ -5612,6 +5660,10 @@ function AssignedMediaPageTab({
   const iconsM = safeIcons.missions || [];
   const iconsD = safeIcons.devices  || [];
   const iconsR = safeIcons.rewards  || [];
+  const missionIconLookup = useMemo(
+    () => buildMissionIconLookup(config),
+    [config?.icons?.missions, config?.icons?.devices]
+  );
   const triggerConfig = mergeTriggerState(safeConfig.mediaTriggers);
 
   function updateMediaTrigger(partial) {
@@ -5625,7 +5677,6 @@ function AssignedMediaPageTab({
   }
 
   const iconsDevices = safeIcons.devices || [];
-  const iconsMissions = safeIcons.missions || [];
   const mediaOptions = (inventory || []).map((it, idx) => {
     const rawUrl = it?.url || it?.path || it;
     const url = toDirectMediaURL(rawUrl);
@@ -5643,7 +5694,7 @@ function AssignedMediaPageTab({
   const missionOptions = (missions || []).map((m, idx) => {
     const id = m?.id || `mission-${idx}`;
     const label = m?.title || id;
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const iconEntry = missionIconLookup.get((m?.iconKey || '').toLowerCase());
     const thumbnail = toDirectMediaURL(iconEntry?.url || '');
     return { id, label, thumbnail, meta: m };
   });
@@ -5651,7 +5702,7 @@ function AssignedMediaPageTab({
   (missions || []).forEach((m) => {
     if (!m) return;
     const baseLabel = m.title || m.id || 'Mission';
-    const iconEntry = iconsMissions.find(x => (x.key||'') === m?.iconKey);
+    const iconEntry = missionIconLookup.get((m?.iconKey || '').toLowerCase());
     const correctThumb = toDirectMediaURL(m?.correct?.mediaUrl || m?.correct?.audioUrl || iconEntry?.url || '');
     responseOptions.push({ id: `${m.id || baseLabel}::correct`, label: `${baseLabel} — Correct`, thumbnail: correctThumb });
     const wrongThumb = toDirectMediaURL(m?.wrong?.mediaUrl || m?.wrong?.audioUrl || iconEntry?.url || '');
@@ -5715,12 +5766,12 @@ function AssignedMediaPageTab({
   }, [inventory]);
 
   const assignedState = useMemo(() => ({
-    missionIcons: (config?.icons?.missions || []).map(icon => icon.key),
+    missionIcons: Array.from(missionIconLookup.values()).map(icon => icon.key),
     deviceIcons: (config?.icons?.devices || []).map(icon => icon.key),
     rewardMedia: (config?.media?.rewardsPool || []).map(item => item.url),
     penaltyMedia: (config?.media?.penaltiesPool || []).map(item => item.url),
     actionMedia: config?.media?.actionMedia || [],
-  }), [config]);
+  }), [config, missionIconLookup]);
 
   const mediaUsageSummary = useMemo(() => {
     try {
@@ -5798,12 +5849,7 @@ function AssignedMediaPageTab({
     const responseAudioMap = new Map();
     const coverMap = new Map();
 
-    const missionIconLookup = new Map();
-    (safeIcons.missions || []).forEach((icon) => {
-      const url = normalize(icon?.url);
-      if (!url) return;
-      missionIconLookup.set(icon.key, { url, name: icon.name || icon.key });
-    });
+    const missionIconLookup = buildMissionIconLookup(safeConfig);
 
     (missions || []).forEach((mission) => {
       if (!mission) return;
@@ -5813,8 +5859,8 @@ function AssignedMediaPageTab({
         const direct = normalize(mission.iconUrl);
         if (direct) iconUrls.add(direct);
       }
-      if (mission.iconKey && missionIconLookup.has(mission.iconKey)) {
-        const found = missionIconLookup.get(mission.iconKey);
+      if (mission.iconKey) {
+        const found = missionIconLookup.get(String(mission.iconKey).toLowerCase());
         if (found?.url) iconUrls.add(found.url);
       }
       iconUrls.forEach((url) => addUsage(missionIconMap, url, title));

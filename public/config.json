@@ -146,8 +146,16 @@
   },
   "icons": {
     "missions": [
+      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/icons/aurora-beacon.svg" },
       { "key": "briefing-star", "name": "Briefing Star", "url": "/media/icons/aurora-beacon.svg" },
-      { "key": "decoy-glow", "name": "Decoy Glow", "url": "/media/icons/lumen-halo.svg" }
+      { "key": "decoy-glow", "name": "Decoy Glow", "url": "/media/icons/lumen-halo.svg" },
+      { "key": "helm-brief", "name": "Helm Brief", "url": "/media/icons/voyager-dial.svg" },
+      { "key": "lantern-clue", "name": "Lantern Clue", "url": "/media/icons/lumen-halo.svg" },
+      { "key": "missions-1", "name": "Smoke Bomb", "url": "/media/bundles/SMOKE%20BOMB.png" },
+      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/icons/quantum-anchor.svg" },
+      { "key": "trivia", "name": "Trivia", "url": "/media/bundles/trivia%20icon.png" },
+      { "key": "trivia-2", "name": "Trivia 2", "url": "/media/bundles/trivia%20yellow.png" },
+      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/icons/voyager-dial.svg" }
     ],
     "devices": [
       { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/icons/aurora-beacon.svg" },
