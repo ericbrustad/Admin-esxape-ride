@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-20 — Settings log relocation & repository snapshot panel. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Moved the Operator ↔ GPT conversation history into the Settings tab with status copy, removed it from the global header, and added a repository snapshot card that surfaces the repo, branch, commit, Vercel target, and timestamp for quick QA reference.
 - 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
   - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
