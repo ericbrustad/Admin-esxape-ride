@@ -1087,7 +1087,7 @@ export default function Admin() {
       const savedDelay = localStorage.getItem('deployDelaySec');
       if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
       const savedSel = localStorage.getItem('selectedPinSize');
-      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
+      if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 16, 120));
     } catch {}
   }, []);
   useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
@@ -2566,7 +2566,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -3350,7 +3350,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
