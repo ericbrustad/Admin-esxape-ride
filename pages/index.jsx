@@ -3743,6 +3743,33 @@ export default function Admin() {
               Snapshot taken at {metaTimestampLabel || formatLocalDateTime(new Date())}.
             </div>
           </div>
+          <footer style={S.settingsMetaFooter}>
+            <div style={S.settingsMetaFooterRow}>
+              <span><strong>Repo:</strong> {metaOwnerRepo || 'unknown'}</span>
+              <span><strong>Branch:</strong> {metaBranchLabel}</span>
+              <span>
+                <strong>Commit:</strong>{' '}
+                {metaCommitUrl ? (
+                  <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.settingsMetaFooterLink}>
+                    {metaCommitShort || metaCommitLabel || '—'}
+                  </a>
+                ) : (
+                  metaCommitShort || metaCommitLabel || '—'
+                )}
+              </span>
+              <span>
+                <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.settingsMetaFooterLink}>
+                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  metaDeploymentState || '—'
+                )}
+              </span>
+              <span><strong>Snapshot:</strong> {metaTimestampLabel || formatLocalDateTime(new Date())}</span>
+            </div>
+          </footer>
       </main>
     )}
 
@@ -4367,6 +4394,27 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  settingsMetaFooter: {
+    marginTop: 16,
+    padding: '14px 18px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  settingsMetaFooterRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 16,
+    alignItems: 'center',
+  },
+  settingsMetaFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
   },
   inlineCode: {
     fontFamily: 'monospace',
