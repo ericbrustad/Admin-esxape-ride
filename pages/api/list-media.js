@@ -6,21 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
-
-const EXTS = {
-  image: /\.(png|jpg|jpeg|webp)$/i,
-  gif: /\.(gif)$/i,
-  video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
-};
-
-function classify(name) {
-  if (EXTS.gif.test(name)) return 'gif';
-  if (EXTS.image.test(name)) return 'image';
-  if (EXTS.video.test(name)) return 'video';
-  if (EXTS.audio.test(name)) return 'audio';
-  return 'other';
-}
+import { classifyMediaType } from '../../lib/media-types.js';
 
 function listFiles(absDir) {
   try {
@@ -51,7 +37,7 @@ export default async function handler(req, res) {
 
     // 1) Admin (canonical)
     for (const name of adminNames) {
-      const type = classify(name);
+      const type = classifyMediaType(name);
       if (type === 'other') continue;
       const key = name.toLowerCase();
       if (seenByName.has(key)) continue;
@@ -69,7 +55,7 @@ export default async function handler(req, res) {
     // 2) Game (fallback only for names not present in Admin)
     if (GAME_ENABLED && gameOrigin) {
       for (const name of gameNames) {
-        const type = classify(name);
+        const type = classifyMediaType(name);
         if (type === 'other') continue;
         const key = name.toLowerCase();
         if (seenByName.has(key)) continue; // Admin has it → skip Game

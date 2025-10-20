@@ -13,6 +13,13 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
+import {
+  classifyMediaType,
+  resolveMediaSubfolder,
+  expandMediaDirectories,
+  DEFAULT_MEDIA_INVENTORY_DIRS,
+  MEDIA_EXTENSION_PATTERNS,
+} from '../lib/media-types';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -66,12 +73,6 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
-const EXTS = {
-  image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
-  gif: /\.(gif)$/i,
-  video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
-};
 const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
@@ -84,21 +85,16 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
-function classifyByExt(u) {
-  if (!u) return 'other';
-  const s = String(u).toLowerCase();
-  if (EXTS.gif.test(s)) return 'gif';
-  if (EXTS.image.test(s)) return 'image';
-  if (EXTS.video.test(s)) return 'video';
-  if (EXTS.audio.test(s)) return 'audio';
-  return 'other';
+function classifyByExt(u, mime) {
+  return classifyMediaType(u, mime);
 }
 
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
+async function listInventory(dirs = DEFAULT_MEDIA_INVENTORY_DIRS) {
   const seen = new Set();
   const out = [];
-  await Promise.all(dirs.map(async (dir) => {
+  const targets = expandMediaDirectories(dirs);
+  await Promise.all(targets.map(async (dir) => {
     try {
       const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
       const j = await r.json();
@@ -695,7 +691,7 @@ export default function Admin() {
   async function handleNewGameCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || MEDIA_EXTENSION_PATTERNS.image.test(file.name || '');
     if (!looksLikeImage) {
       setNewGameStatus(`❌ ${safeName} must be an image file.`);
       return;
@@ -722,7 +718,7 @@ export default function Admin() {
   async function loadNewCoverOptions() {
     setNewCoverLookupLoading(true);
     try {
-      const items = await listInventory(['covers','mediapool','uploads']);
+      const items = await listInventory(['covers','mediapool','uploads','missions','devices','assigned']);
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
@@ -772,7 +768,7 @@ export default function Admin() {
     let coverPath = newCoverSelectedUrl;
     try {
       if (!coverPath && newCoverFile) {
-        coverPath = await uploadToRepo(newCoverFile, 'covers');
+        coverPath = await uploadToRepo(newCoverFile, { context: 'settings' });
         if (!coverPath) throw new Error('Cover upload failed');
       }
       const res = await fetch('/api/games', {
@@ -855,7 +851,7 @@ export default function Admin() {
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+      const items = await listInventory(['uploads','bundles','icons','mediapool','covers','missions','devices','assigned']);
       return Array.isArray(items) ? items : [];
     } catch {
       return [];
@@ -1238,14 +1234,20 @@ export default function Admin() {
     };
   }
   function defaultContentForType(t) {
-    const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+    const rawLat = Number(config?.map?.centerLat);
+    const rawLng = Number(config?.map?.centerLng);
+    const fallbackLat = 44.9778;
+    const fallbackLng = -93.2650;
+    const baseLat = Number.isFinite(rawLat) ? Number(rawLat.toFixed(6)) : fallbackLat;
+    const baseLng = Number.isFinite(rawLng) ? Number(rawLng.toFixed(6)) : fallbackLng;
+    const base = { geofenceEnabled:false, lat:baseLat, lng:baseLng, radiusMeters:25, cooldownSeconds:30 };
     switch (t) {
       case 'multiple_choice': return { question:'', choices:[], correctIndex:undefined, mediaUrl:'', ...base };
       case 'short_answer':    return { question:'', answer:'', acceptable:'', mediaUrl:'', ...base };
       case 'statement':       return { text:'', mediaUrl:'', ...base };
       case 'video':           return { videoUrl:'', overlayText:'', ...base };
-      case 'geofence_image':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
-      case 'geofence_video':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
+      case 'geofence_image':  return { ...base, imageUrl:'', overlayText:'' };
+      case 'geofence_video':  return { ...base, videoUrl:'', overlayText:'' };
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
@@ -2093,7 +2095,7 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     logConversation('You', 'Scanning media usage for unused files');
-    const inv = await listInventory(['uploads','bundles','icons']);
+    const inv = await listInventory(['uploads','bundles','icons','mediapool','covers','missions','devices','assigned']);
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -2125,16 +2127,24 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='uploads') {
+  async function uploadToRepo(file, target = 'uploads') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    const detectedType = classifyMediaType(file.name, file.type);
+    const request = typeof target === 'string' ? { subfolder: target } : (target || {});
+    const context = request.context || undefined;
+    const explicitFolder = request.subfolder || request.folder || undefined;
+    const effectiveType = request.type || detectedType;
+    const folder = (explicitFolder && explicitFolder.replace(/^\/+|\/+$/g, ''))
+      || resolveMediaSubfolder(effectiveType, context);
+    const path = `public/media/${folder}/${Date.now()}-${safeName}`;
     const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
-    if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+    const isVisual = effectiveType === 'image' || effectiveType === 'gif';
+    const targetLabel = `/media/${folder}`;
+    if (isVisual && file.size > 1024 * 1024) {
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — uploading to ${targetLabel} may take longer.`);
     } else {
-      setUploadStatus(`Uploading ${safeName}…`);
+      setUploadStatus(`Uploading ${safeName} to ${targetLabel}…`);
     }
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
@@ -2142,7 +2152,7 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${targetLabel}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -2241,7 +2251,7 @@ export default function Admin() {
   async function handleCoverFile(file) {
     if (!file) return;
     const safeName = file.name || 'cover';
-    const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
+    const looksLikeImage = (file.type && file.type.startsWith('image/')) || MEDIA_EXTENSION_PATTERNS.image.test(file.name || '');
     if (!looksLikeImage) {
       setUploadStatus(`❌ ${safeName} is not an image file.`);
       return;
@@ -2264,7 +2274,7 @@ export default function Admin() {
     setCoverUploadTarget('');
     setUploadStatus(`Preparing ${safeName}…`);
     try {
-      const url = await uploadToRepo(file, 'covers');
+      const url = await uploadToRepo(file, { context: 'settings' });
       if (!url) {
         setUploadStatus(`❌ Upload failed for ${safeName}`);
         setCoverUploadPreview('');
@@ -2316,7 +2326,7 @@ export default function Admin() {
     setCoverPickerLoading(true);
     setCoverPickerItems([]);
     try {
-      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const items = await listInventory(['covers','mediapool','uploads','bundles','icons','missions','devices','assigned']);
       const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
       setCoverPickerItems(filtered);
     } catch {
@@ -3938,8 +3948,8 @@ export default function Admin() {
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          uploadToRepo={async (file, folder)=> {
-            const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
+          uploadToRepo={async (file, options)=> {
+            const url = await (async ()=>{ try { return await uploadToRepo(file, options); } catch { return ''; }})();
             return url;
           }}
           onInventoryRefresh={syncInventory}
@@ -5473,7 +5483,7 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const [uploadContext, setUploadContext] = useState('media-pool');
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -5489,18 +5499,29 @@ function MediaPoolTab({
   ];
   const [subTab, setSubTab] = useState('image');
 
+  const uploadContexts = [
+    { value: 'media-pool', label: 'Media Pool' },
+    { value: 'missions', label: 'Missions' },
+    { value: 'devices', label: 'Devices' },
+    { value: 'assigned', label: 'Assigned Media' },
+    { value: 'settings', label: 'Settings (Cover Art)' },
+    { value: 'uploads', label: 'General Uploads' },
+  ];
+
   useEffect(() => { refreshInventory(); }, []);
 
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
+      const items = await listInventory(['uploads','bundles','icons','covers','missions','devices','assigned','mediapool']);
       setInv(items || []);
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
       }
     } finally { setBusy(false); }
   }
+
+  const currentTargetPath = resolveMediaSubfolder(subTab, uploadContext);
 
   // Per-file usage counts retained for backwards compatibility
   function usageCounts() {
@@ -5551,19 +5572,32 @@ function MediaPoolTab({
     if (!files.length) return;
     let success = 0;
     let lastUrl = '';
+    const failures = [];
     for (const file of files) {
+      const type = classifyMediaType(file?.name, file?.type);
+      if (uploadContext === 'settings' && !(type === 'image' || type === 'gif')) {
+        const blockedName = file?.name || 'file';
+        failures.push(blockedName);
+        setUploadStatus(`❌ ${blockedName} is ${type || 'unsupported'} — Settings uploads accept images or GIFs.`);
+        continue;
+      }
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, { context: uploadContext, type });
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+      } else {
+        failures.push(file?.name || 'file');
       }
     }
     if (lastUrl) setAddUrl(lastUrl);
     if (success) await refreshInventory();
+    const contextLabel = uploadContexts.find((ctx) => ctx.value === uploadContext)?.label || uploadContext;
     if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+      const prefix = success === files.length ? '✅' : (success > 0 ? '⚠️' : '❌');
+      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files to ${contextLabel}`);
+    } else if (!success && failures.length) {
+      setUploadStatus(`❌ Upload blocked for ${failures.join(', ')}`);
     }
   }
 
@@ -5607,18 +5641,18 @@ function MediaPoolTab({
 
   // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
-    const t = classifyByExt(it.url);
+    const t = classifyMediaType(it.url, it.type);
     if (!acc[t]) acc[t] = [];
     acc[t].push(it);
     return acc;
   }, {});
   const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
+    { key:'image', title:'Images (png/jpg/svg)', items: itemsByType.image || [] },
+    { key:'video', title:'Video (mp4/mov)',       items: itemsByType.video || [] },
+    { key:'audio', title:'Audio (mp3/wav/aiff)',  items: itemsByType.audio || [] },
+    { key:'gif',   title:'GIF',                  items: itemsByType.gif   || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+  const active = sections.find(s => s.key === subTab) || sections[0];
 
   return (
     <main style={S.wrap}>
@@ -5627,10 +5661,10 @@ function MediaPoolTab({
         <h3 style={{ marginTop:0 }}>Upload</h3>
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+          <select style={S.input} value={uploadContext} onChange={(e)=>setUploadContext(e.target.value)}>
+            {uploadContexts.map((ctx) => (
+              <option key={ctx.value} value={ctx.value}>{ctx.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -5652,12 +5686,17 @@ function MediaPoolTab({
         >
           <div>
             <div style={S.mediaDropHeadline}>Drag & drop media</div>
-            <div style={S.mediaDropHint}>Drop multiple files at once or click Upload to browse.</div>
+            <div style={S.mediaDropHint}>
+              Drop multiple files at once or click Upload to browse. Files save to <code>/media/{currentTargetPath}</code>.
+            </div>
           </div>
           <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
         </div>
         <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
+        <div style={{ marginTop:4, color:'var(--admin-muted)', fontSize:12 }}>
+          Target directory: <code>/media/{currentTargetPath}</code>
+        </div>
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
@@ -5698,7 +5737,8 @@ function MediaPoolTab({
               const url = toDirectMediaURL(it.url);
               const name = baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
-              const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
+              const previewKind = classifyMediaType(previewCandidate, it.type);
+              const looksImage = previewKind === 'image' || previewKind === 'gif';
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
