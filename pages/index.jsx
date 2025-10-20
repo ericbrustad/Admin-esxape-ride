@@ -2269,13 +2269,9 @@ export default function Admin() {
     : '';
   const headerStyle = S.header;
   const editingTitleLabel = (editing?.title || '').trim();
-  const missionSaveButtonLabel = editingIsNew
-    ? 'New Mission'
-    : `Save and Close ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const missionSaveButtonLabel = `Save and Close ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
   const deviceTitleLabel = (devDraft?.title || '').trim();
-  const deviceSaveButtonLabel = deviceEditorMode === 'new'
-    ? 'New Device'
-    : `Save and Close ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
+  const deviceSaveButtonLabel = `Save and Close ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
@@ -2637,16 +2633,6 @@ export default function Admin() {
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
-                      <input
-                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
-                        value={editing.title || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, title: e.target.value });
-                          setDirty(true);
-                        }}
-                        placeholder="Mission title"
-                      />
-                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
                     </div>
                     <div style={S.overlayBarSide}>
                       <button
@@ -2655,7 +2641,7 @@ export default function Admin() {
                           ...(missionActionFlash ? S.action3DFlash : {}),
                         }}
                         onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : `Commit updates for ${editingTitleLabel || 'this'} mission and close`}
+                        title={`Save and close ${editingTitleLabel ? `${editingTitleLabel} mission` : 'this mission'}`}
                       >
                         {missionSaveButtonLabel}
                       </button>
@@ -2663,38 +2649,68 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <Field label="Type">
-                    <select style={S.input} value={editing.type}
-                      onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map((k)=>(
-                        <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  {/* Icon select with thumbnail (inventory-only) */}
-                  <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <div style={S.missionQuickRow}>
+                    <div style={S.missionIconPreview}>
+                      {(() => {
+                        const sel = (config?.icons?.missions || []).find((it) => it.key === editing.iconKey);
+                        return sel?.url ? (
+                          <img
+                            alt="mission icon"
+                            src={toDirectMediaURL(sel.url)}
+                            style={{ width: 48, height: 48, objectFit: 'contain' }}
+                          />
+                        ) : (
+                          <div style={S.missionIconPlaceholder}>icon</div>
+                        );
+                      })()}
+                    </div>
+                    <Field label="Title">
+                      <input
+                        style={S.input}
+                        value={editing.title || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, title: e.target.value });
+                          setDirty(true);
+                        }}
+                        placeholder="Mission title"
+                      />
+                    </Field>
+                    <Field label="Type">
+                      <select
+                        style={S.input}
+                        value={editing.type}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setEditing({ ...editing, type: t, content: defaultContentForType(t) });
+                          setDirty(true);
+                        }}
+                      >
+                        {Object.keys(TYPE_FIELDS).map((k) => (
+                          <option key={k} value={k}>
+                            {TYPE_LABELS[k] || k}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
                       <select
                         style={S.input}
                         value={editing.iconKey || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                        onChange={(e) => {
+                          setEditing({ ...editing, iconKey: e.target.value });
+                          setDirty(true);
+                        }}
                       >
                         <option value="">(default)</option>
-                        {(config?.icons?.missions||[]).map((it)=>(
-                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        {(config?.icons?.missions || []).map((it) => (
+                          <option key={it.key} value={it.key}>
+                            {it.name || it.key}
+                          </option>
                         ))}
                       </select>
-                      <div>
-                        {(() => {
-                          const sel = (config?.icons?.missions||[]).find(it => it.key === editing.iconKey);
-                          return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
-                        })()}
-                      </div>
-                    </div>
-                  </Field>
+                    </Field>
+                  </div>
+                  <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
 
                   <hr style={S.hr}/>
 
@@ -3182,7 +3198,7 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new' ? 'Save this new device' : `Commit updates for ${deviceTitleLabel || 'this'} device and close`}
+                          title={`Save and close ${deviceTitleLabel ? `${deviceTitleLabel} device` : 'this device'}`}
                         >
                           {deviceSaveButtonLabel}
                         </button>
@@ -4846,6 +4862,33 @@ const S = {
     background: 'var(--admin-tab-bg)',
     padding: '4px 12px',
     borderRadius: 999,
+  },
+  missionQuickRow: {
+    display: 'grid',
+    gridTemplateColumns: '64px 1fr 1fr 1fr',
+    gap: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  missionIconPreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+  },
+  missionIconPlaceholder: {
+    width: '100%',
+    height: '100%',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   chip: { fontSize: 11, color: 'var(--admin-muted)', border: 'var(--admin-chip-border)', padding: '2px 6px', borderRadius: 999, background: 'var(--admin-chip-bg)' },
   muted: { color: 'var(--admin-muted)' },
