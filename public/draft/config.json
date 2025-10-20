@@ -10,7 +10,7 @@
       "default",
       "default-game"
     ],
-    "coverImage": "",
+    "coverImage": "/media/covers/starfield-station-break.svg",
     "deployEnabled": true,
     "shortDescription": "",
     "longDescription": "",
@@ -28,15 +28,50 @@
   "powerups": [],
   "media": {
     "rewardsPool": [],
-    "penaltiesPool": [],
-    "actionMedia": [
-      "/media/uploads/1760531435763-black_magic_book_-_Copy.jpg",
-      "/media/mediapool/1759645884960-SMOKE_BOMB.png",
-      "/media/uploads/1759945867484-panda_cute.jpg"
-    ]
+    "penaltiesPool": []
   },
   "icons": {
     "missions": [
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "briefing-star",
+        "name": "Briefing Star",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "decoy-glow",
+        "name": "Decoy Glow",
+        "url": "/media/icons/lumen-halo.svg"
+      },
+      {
+        "key": "lantern-clue",
+        "name": "Lantern Clue",
+        "url": "/media/icons/lumen-halo.svg"
+      },
+      {
+        "key": "helm-brief",
+        "name": "Helm Brief",
+        "url": "/media/icons/voyager-dial.svg"
+      },
+      {
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/icons/voyager-dial.svg"
+      },
+      {
+        "key": "quantum-anchor",
+        "name": "Quantum Anchor",
+        "url": "/media/icons/quantum-anchor.svg"
+      },
+      {
+        "key": "missions-1",
+        "name": "Smoke Bomb",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
+      },
       {
         "key": "trivia",
         "name": "Trivia",
@@ -94,7 +129,7 @@
   },
   "appearanceTone": "light",
   "mediaTriggers": {
-    "enabled": true,
+    "enabled": false,
     "actionType": "media",
     "actionTarget": "",
     "actionLabel": "",
