@@ -2073,10 +2073,18 @@ export default function Admin() {
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
+  const metaCommitFull = adminMeta.commit ? String(adminMeta.commit) : '';
+  const metaCommitShort = metaCommitFull ? metaCommitFull.slice(0, 7) : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
+  const metaDeploymentLabel = metaDeploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '—');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
+  const metaRepoLabel = adminMeta.repo
+    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
+    : '';
+  const metaCommitUrl = adminMeta.owner && adminMeta.repo && metaCommitFull
+    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}/commit/${metaCommitFull}`
+    : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -3429,12 +3437,59 @@ export default function Admin() {
                 setStatus('🎨 Updated appearance settings');
               }}
             />
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+          <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
+            Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
+          </div>
+        </div>
+        <div style={{ ...S.card, marginTop:16 }}>
+          <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
+          <div style={S.metaInfoGrid}>
+            <div style={S.metaInfoRow}>
+              <span style={S.metaInfoLabel}>Repository</span>
+              <span style={S.metaInfoValue}>{metaRepoLabel || '—'}</span>
+            </div>
+            <div style={S.metaInfoRow}>
+              <span style={S.metaInfoLabel}>Branch</span>
+              <span style={S.metaInfoValue}>{metaBranchLabel}</span>
+            </div>
+            <div style={S.metaInfoRow}>
+              <span style={S.metaInfoLabel}>Commit</span>
+              <span style={S.metaInfoValue}>
+                {metaCommitFull ? (
+                  metaCommitUrl ? (
+                    <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaInfoLink}>
+                      #{metaCommitShort}
+                      <span style={S.metaInfoCommitFull}>({metaCommitFull})</span>
+                    </a>
+                  ) : (
+                    <>
+                      #{metaCommitShort}
+                      <span style={S.metaInfoCommitFull}>({metaCommitFull})</span>
+                    </>
+                  )
+                ) : '—'}
+              </span>
+            </div>
+            <div style={S.metaInfoRow}>
+              <span style={S.metaInfoLabel}>Vercel Deployment</span>
+              <span style={S.metaInfoValue}>
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaInfoLink}>
+                    {metaDeploymentLabel}
+                  </a>
+                ) : (
+                  metaDeploymentLabel
+                )}
+              </span>
+            </div>
+            <div style={S.metaInfoRow}>
+              <span style={S.metaInfoLabel}>Last Checked</span>
+              <span style={S.metaInfoValue}>{metaTimestampLabel || '—'}</span>
             </div>
           </div>
-        </main>
-      )}
+        </div>
+      </main>
+    )}
 
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
@@ -3747,6 +3802,48 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  metaInfoGrid: {
+    display: 'grid',
+    gap: 12,
+    marginTop: 12,
+  },
+  metaInfoRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: '8px 12px',
+    borderRadius: 12,
+    background: 'rgba(15, 23, 42, 0.32)',
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+  },
+  metaInfoLabel: {
+    fontSize: 12,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+    fontWeight: 600,
+  },
+  metaInfoValue: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    wordBreak: 'break-word',
+  },
+  metaInfoLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 700,
+  },
+  metaInfoCommitFull: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    marginLeft: 6,
+    letterSpacing: '0.02em',
   },
   floatingBarTop: {
     position: 'sticky',
