@@ -2492,25 +2492,6 @@ export default function Admin() {
               {protectionError}
             </div>
           )}
-          <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
-          {statusLog.length > 0 && (
-            <div style={S.conversationLog}>
-              <div style={S.conversationLogHeading}>Operator ↔ GPT Log</div>
-              <div style={S.conversationLogEntries}>
-                {statusLog.slice().reverse().map((entry, idx) => (
-                  <div key={`${entry.timestamp}-${idx}`} style={S.conversationLogRow}>
-                    <span style={{ ...S.conversationBadge, ...(entry.speaker === 'GPT' ? S.conversationBadgeGpt : S.conversationBadgeYou) }}>
-                      {entry.speaker}
-                    </span>
-                    <span style={S.conversationMessage}>{entry.text}</span>
-                    <time style={S.conversationTime} dateTime={entry.timestamp}>
-                      {formatLocalDateTime(entry.timestamp)}
-                    </time>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
@@ -3703,8 +3684,59 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
-        </main>
-      )}
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Operator ↔ GPT Log</h3>
+            {status && (
+              <div style={{ color:'var(--admin-muted)', marginBottom:12, whiteSpace:'pre-wrap' }}>{status}</div>
+            )}
+            <div style={S.conversationLog}>
+              {statusLog.length === 0 ? (
+                <div style={{ color:'var(--admin-muted)', fontSize:12 }}>No exchanges recorded yet.</div>
+              ) : (
+                <div style={S.conversationLogEntries}>
+                  {statusLog.slice().reverse().map((entry, idx) => (
+                    <div key={`${entry.timestamp}-${idx}`} style={S.conversationLogRow}>
+                      <span style={{ ...S.conversationBadge, ...(entry.speaker === 'GPT' ? S.conversationBadgeGpt : S.conversationBadgeYou) }}>
+                        {entry.speaker}
+                      </span>
+                      <span style={S.conversationMessage}>{entry.text}</span>
+                      <time style={S.conversationTime} dateTime={entry.timestamp}>
+                        {formatLocalDateTime(entry.timestamp)}
+                      </time>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+              <div>
+                <div style={S.fieldLabel}>Repository</div>
+                <div style={S.readonlyValue}>{metaOwnerRepo || 'unknown'}</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Branch</div>
+                <div style={S.readonlyValue}>{metaBranchLabel}</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Commit</div>
+                <div style={S.readonlyValue}>{metaCommitLabel || '—'}</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Vercel Deployment</div>
+                <div style={S.readonlyValue}>{metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : (metaDeploymentState || '—')}</div>
+              </div>
+            </div>
+            <div style={{ color:'var(--admin-muted)', marginTop:12, fontSize:12 }}>
+              Snapshot taken at {metaTimestampLabel || formatLocalDateTime(new Date())}.
+            </div>
+          </div>
+      </main>
+    )}
 
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
