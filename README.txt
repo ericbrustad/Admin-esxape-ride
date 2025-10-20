@@ -3,6 +3,14 @@ BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
+## Operator GPT Meta Snapshot (Archived)
+- Repository: Admin-esxape-ride
+- Branch: work
+- Commit: efaab26a347f4d1a3222476f9ed0da09a5e2b8a4
+- Recorded: 2025-10-20T01:41:55Z
+- Vercel Deployment: refer to the Vercel dashboard or `VERCEL_URL`
+- Notes: Repository metadata previously shown in the admin UI banner/card is now documented here to avoid the operator GPT polling loop.
+
 ## Update Log
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`

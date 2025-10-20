@@ -73,17 +73,6 @@ const EXTS = {
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
-const ADMIN_META_INITIAL_STATE = {
-  branch: '',
-  commit: '',
-  owner: '',
-  repo: '',
-  vercelUrl: '',
-  deploymentUrl: '',
-  deploymentState: '',
-  fetchedAt: '',
-  error: '',
-};
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -143,23 +132,6 @@ function pathFromUrl(u) {
   return ''; // external or unknown
 }
 
-function formatLocalDateTime(value) {
-  if (!value) return '';
-  try {
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return '';
-  }
-}
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -741,7 +713,6 @@ export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
 
-  const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -785,69 +756,6 @@ export default function Admin() {
     return ()=> { mounted = false; };
   },[fetchInventory]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadMeta() {
-      const nowIso = new Date().toISOString();
-      try {
-        const [metaRes, vercelRes] = await Promise.all([
-          fetch('/api/admin-meta', { cache: 'no-store', credentials: 'include' }).catch(() => null),
-          fetch('/api/vercel-status?project=game', { cache: 'no-store', credentials: 'include' }).catch(() => null),
-        ]);
-
-        const metaJson = metaRes ? await metaRes.json().catch(() => ({})) : {};
-        const vercelJson = vercelRes ? await vercelRes.json().catch(() => ({})) : {};
-
-        if (cancelled) return;
-
-        const metaOk = metaJson?.ok !== false;
-        const vercelOk = vercelJson?.ok !== false;
-
-        const deploymentUrlRaw = vercelJson?.url || '';
-        const deploymentUrl = typeof deploymentUrlRaw === 'string' && deploymentUrlRaw
-          ? (deploymentUrlRaw.startsWith('http') ? deploymentUrlRaw : `https://${deploymentUrlRaw}`)
-          : '';
-        const deploymentState = vercelJson?.state || (vercelJson?.disabled ? 'DISABLED' : '');
-        const combinedError = (!metaOk && metaJson?.error)
-          || (!vercelOk && (vercelJson?.error || vercelJson?.reason))
-          || '';
-
-        setAdminMeta((prev) => {
-          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
-          return {
-            ...base,
-            branch: metaOk && metaJson?.branch ? metaJson.branch : base.branch,
-            commit: metaOk && metaJson?.commit ? metaJson.commit : base.commit,
-            owner: metaOk && metaJson?.owner ? metaJson.owner : base.owner,
-            repo: metaOk && metaJson?.repo ? metaJson.repo : base.repo,
-            vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : base.vercelUrl,
-            deploymentUrl: deploymentUrl || base.deploymentUrl,
-            deploymentState: deploymentState ? String(deploymentState).toUpperCase() : base.deploymentState,
-            fetchedAt: nowIso,
-            error: combinedError || '',
-          };
-        });
-      } catch (err) {
-        if (cancelled) return;
-        setAdminMeta((prev) => {
-          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
-          return {
-            ...base,
-            fetchedAt: new Date().toISOString(),
-            error: 'Unable to load deployment status',
-          };
-        });
-      }
-    }
-
-    loadMeta();
-    const timer = setInterval(loadMeta, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
@@ -2072,19 +1980,6 @@ export default function Admin() {
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
-  const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitFull = adminMeta.commit ? String(adminMeta.commit) : '';
-  const metaCommitShort = metaCommitFull ? metaCommitFull.slice(0, 7) : '';
-  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
-  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
-  const metaDeploymentLabel = metaDeploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '—');
-  const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
-  const metaRepoLabel = adminMeta.repo
-    ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
-    : '';
-  const metaCommitUrl = adminMeta.owner && adminMeta.repo && metaCommitFull
-    ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}/commit/${metaCommitFull}`
-    : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2114,35 +2009,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
-            </span>
-          )}
-          {metaDeploymentState && (
-            <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
-            </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
-          )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
-      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -3437,57 +3303,10 @@ export default function Admin() {
                 setStatus('🎨 Updated appearance settings');
               }}
             />
-          <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-            Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
-          </div>
-        </div>
-        <div style={{ ...S.card, marginTop:16 }}>
-          <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
-          <div style={S.metaInfoGrid}>
-            <div style={S.metaInfoRow}>
-              <span style={S.metaInfoLabel}>Repository</span>
-              <span style={S.metaInfoValue}>{metaRepoLabel || '—'}</span>
-            </div>
-            <div style={S.metaInfoRow}>
-              <span style={S.metaInfoLabel}>Branch</span>
-              <span style={S.metaInfoValue}>{metaBranchLabel}</span>
-            </div>
-            <div style={S.metaInfoRow}>
-              <span style={S.metaInfoLabel}>Commit</span>
-              <span style={S.metaInfoValue}>
-                {metaCommitFull ? (
-                  metaCommitUrl ? (
-                    <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaInfoLink}>
-                      #{metaCommitShort}
-                      <span style={S.metaInfoCommitFull}>({metaCommitFull})</span>
-                    </a>
-                  ) : (
-                    <>
-                      #{metaCommitShort}
-                      <span style={S.metaInfoCommitFull}>({metaCommitFull})</span>
-                    </>
-                  )
-                ) : '—'}
-              </span>
-            </div>
-            <div style={S.metaInfoRow}>
-              <span style={S.metaInfoLabel}>Vercel Deployment</span>
-              <span style={S.metaInfoValue}>
-                {metaDeploymentUrl ? (
-                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaInfoLink}>
-                    {metaDeploymentLabel}
-                  </a>
-                ) : (
-                  metaDeploymentLabel
-                )}
-              </span>
-            </div>
-            <div style={S.metaInfoRow}>
-              <span style={S.metaInfoLabel}>Last Checked</span>
-              <span style={S.metaInfoValue}>{metaTimestampLabel || '—'}</span>
+            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
+              Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
-        </div>
       </main>
     )}
 
@@ -3731,47 +3550,6 @@ const S = {
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
-  metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
-    backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
-  },
-  metaBannerLine: {
-    maxWidth: 1400,
-    margin: '0 auto',
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaBadge: {
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: 'rgba(59, 130, 246, 0.16)',
-    color: '#9cc0ff',
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  metaMuted: {
-    color: 'var(--admin-muted)',
-    fontSize: 12,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-  },
-  metaLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
-  metaBannerError: {
-    color: '#f87171',
-    fontWeight: 600,
-  },
   header: {
     padding: 20,
     background: 'rgba(8, 13, 19, 0.9)',
@@ -3802,48 +3580,6 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
-  },
-  metaInfoGrid: {
-    display: 'grid',
-    gap: 12,
-    marginTop: 12,
-  },
-  metaInfoRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: '8px 12px',
-    borderRadius: 12,
-    background: 'rgba(15, 23, 42, 0.32)',
-    border: '1px solid rgba(148, 163, 184, 0.18)',
-  },
-  metaInfoLabel: {
-    fontSize: 12,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    color: 'var(--admin-muted)',
-    fontWeight: 600,
-  },
-  metaInfoValue: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    wordBreak: 'break-word',
-  },
-  metaInfoLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 700,
-  },
-  metaInfoCommitFull: {
-    fontSize: 11,
-    color: 'var(--admin-muted)',
-    marginLeft: 6,
-    letterSpacing: '0.02em',
   },
   floatingBarTop: {
     position: 'sticky',
