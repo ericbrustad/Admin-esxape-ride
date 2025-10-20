@@ -2268,6 +2268,14 @@ export default function Admin() {
     ? toDirectMediaURL(config.game.coverImage)
     : '';
   const headerStyle = S.header;
+  const editingTitleLabel = (editing?.title || '').trim();
+  const missionSaveButtonLabel = editingIsNew
+    ? 'New Mission'
+    : `Save and Close ${editingTitleLabel ? `"${editingTitleLabel}" ` : ''}Mission`;
+  const deviceTitleLabel = (devDraft?.title || '').trim();
+  const deviceSaveButtonLabel = deviceEditorMode === 'new'
+    ? 'New Device'
+    : `Save and Close ${deviceTitleLabel ? `"${deviceTitleLabel}" ` : ''}Device`;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
@@ -2647,9 +2655,9 @@ export default function Admin() {
                           ...(missionActionFlash ? S.action3DFlash : {}),
                         }}
                         onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
+                        title={editingIsNew ? 'Save this new mission to the list' : `Commit updates for ${editingTitleLabel || 'this'} mission and close`}
                       >
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                        {missionSaveButtonLabel}
                       </button>
                       <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
                     </div>
@@ -3174,9 +3182,9 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Commit device updates'}
+                          title={deviceEditorMode === 'new' ? 'Save this new device' : `Commit updates for ${deviceTitleLabel || 'this'} device and close`}
                         >
-                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
+                          {deviceSaveButtonLabel}
                         </button>
                         <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
                       </div>
@@ -4661,7 +4669,7 @@ const S = {
     boxShadow: '0 0 24px rgba(94, 234, 212, 0.35)',
     background: 'rgba(15, 32, 27, 0.85)',
   },
-  coverDropImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverDropImage: { width: '50%', height: '50%', objectFit: 'cover', borderRadius: 16, boxShadow: '0 12px 32px rgba(15, 23, 42, 0.35)' },
   coverDropPlaceholder: {
     color: '#9fb0bf',
     fontSize: 13,
