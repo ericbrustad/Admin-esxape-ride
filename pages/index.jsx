@@ -73,6 +73,7 @@ const EXTS = {
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
+const MEDIA_POOL_WARN_BYTES = 5 * 1024 * 1024; // warn when queued uploads exceed 5 MB
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
   commit: '',
@@ -119,6 +120,19 @@ function baseNameFromUrl(url) {
     const file = (String(url).split('/').pop() || '').replace(/\.[^.]+$/, '');
     return file.replace(/[-_]+/g, ' ').trim();
   }
+}
+function formatFileSize(bytes) {
+  const size = Number(bytes);
+  if (!Number.isFinite(size) || size <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = size;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const formatted = value >= 10 || unitIndex === 0 ? Math.round(value) : Number(value.toFixed(1));
+  return `${formatted} ${units[unitIndex]}`;
 }
 function qs(obj) {
   const p = new URLSearchParams();
@@ -2047,10 +2061,11 @@ export default function Admin() {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
     const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
-    const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
-    if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+    const sizeBytes = Number(file.size) || 0;
+    const sizeMb = sizeBytes / (1024 * 1024);
+    if (sizeBytes > MEDIA_POOL_WARN_BYTES) {
+      const formattedMb = sizeMb >= 10 ? Math.round(sizeMb) : Math.max(1, Number(sizeMb.toFixed(1)));
+      setUploadStatus(`⚠️ ${safeName} is ${formattedMb} MB — uploads over 5 MB may take longer.`);
     } else {
       setUploadStatus(`Uploading ${safeName}…`);
     }
@@ -5450,6 +5465,9 @@ function MediaPoolTab({
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [savingPending, setSavingPending] = useState(false);
+  const pendingFilesRef = useRef(pendingFiles);
 
 
   
@@ -5463,6 +5481,111 @@ function MediaPoolTab({
   const [subTab, setSubTab] = useState('image');
 
   useEffect(() => { refreshInventory(); }, []);
+  useEffect(() => { pendingFilesRef.current = pendingFiles; }, [pendingFiles]);
+  useEffect(() => () => {
+    (pendingFilesRef.current || []).forEach((item) => {
+      if (item?.preview) {
+        try { URL.revokeObjectURL(item.preview); } catch {}
+      }
+    });
+  }, []);
+
+  const updatePendingFiles = useCallback((updater) => {
+    setPendingFiles((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      const nextArray = Array.isArray(next) ? next.filter(Boolean) : [];
+      const nextIds = new Set(nextArray.map((item) => item?.id));
+      prev.forEach((item) => {
+        if (!item) return;
+        if (!nextIds.has(item.id) && item.preview) {
+          try { URL.revokeObjectURL(item.preview); } catch {}
+        }
+      });
+      return nextArray;
+    });
+  }, []);
+
+  function buttonStateStyle(disabled) {
+    return disabled ? { opacity: 0.55, cursor: 'not-allowed' } : {};
+  }
+
+  const queuePendingFiles = useCallback((fileList) => {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    const nextEntries = files.map((file) => {
+      const id = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const type = String(file?.type || '').toLowerCase();
+      const name = file?.name || 'Untitled file';
+      const size = Number(file?.size) || 0;
+      const looksImage = type.startsWith('image/') || EXTS.image.test(name) || EXTS.gif.test(name);
+      return {
+        id,
+        file,
+        name,
+        size,
+        type,
+        preview: looksImage ? URL.createObjectURL(file) : '',
+        overLimit: size > MEDIA_POOL_WARN_BYTES,
+      };
+    });
+    updatePendingFiles((prev) => [...prev, ...nextEntries]);
+    const overs = nextEntries.filter((entry) => entry.overLimit);
+    if (overs.length) {
+      const label = overs.length === 1 ? overs[0].name : `${overs.length} files`;
+      setUploadStatus(`⚠️ ${label} exceed${overs.length === 1 ? 's' : ''} 5 MB. They'll still upload but may take longer. Click “Save to Media Pool” to continue.`);
+    } else {
+      const total = (pendingFilesRef.current?.length || 0) + nextEntries.length;
+      setUploadStatus(`Ready to upload ${total} file${total === 1 ? '' : 's'}. Click “Save to Media Pool” to continue.`);
+    }
+  }, [setUploadStatus, updatePendingFiles]);
+
+  const removePendingFile = useCallback((id) => {
+    updatePendingFiles((prev) => prev.filter((item) => item?.id !== id));
+    setUploadStatus('Removed pending upload.');
+  }, [setUploadStatus, updatePendingFiles]);
+
+  const clearPendingFiles = useCallback(() => {
+    if (!(pendingFilesRef.current || []).length) return;
+    updatePendingFiles([]);
+    setUploadStatus('Cleared pending uploads.');
+  }, [setUploadStatus, updatePendingFiles]);
+
+  const savePendingFiles = useCallback(async () => {
+    if (savingPending) return;
+    const current = pendingFilesRef.current || [];
+    if (!current.length) {
+      setUploadStatus('No pending files to upload.');
+      return;
+    }
+    setSavingPending(true);
+    setUploadStatus(`Uploading ${current.length} file${current.length === 1 ? '' : 's'}…`);
+    let success = 0;
+    let lastUrl = '';
+    const failed = [];
+    try {
+      for (const item of current) {
+        if (!item?.file) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const uploaded = await uploadToRepo(item.file, folder);
+        if (uploaded) {
+          success += 1;
+          lastUrl = uploaded;
+        } else {
+          failed.push(item);
+        }
+      }
+      if (lastUrl) setAddUrl(lastUrl);
+      if (success) await refreshInventory();
+      const prefix = success === current.length ? '✅' : success > 0 ? '⚠️' : '❌';
+      setUploadStatus(`${prefix} Uploaded ${success}/${current.length} files`);
+      updatePendingFiles(() => failed);
+    } catch (error) {
+      console.error('Media upload failed', error);
+      setUploadStatus('❌ Upload failed. Please try again.');
+    } finally {
+      setSavingPending(false);
+    }
+  }, [folder, refreshInventory, savingPending, setAddUrl, setUploadStatus, updatePendingFiles, uploadToRepo]);
 
   async function refreshInventory() {
     setBusy(true);
@@ -5519,29 +5642,8 @@ function MediaPoolTab({
     });
   }
 
-  async function uploadFiles(fileList) {
-    const files = Array.from(fileList || []).filter(Boolean);
-    if (!files.length) return;
-    let success = 0;
-    let lastUrl = '';
-    for (const file of files) {
-      // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
-      if (uploaded) {
-        success += 1;
-        lastUrl = uploaded;
-      }
-    }
-    if (lastUrl) setAddUrl(lastUrl);
-    if (success) await refreshInventory();
-    if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
-    }
-  }
-
-  async function onUpload(e) {
-    await uploadFiles(e.target.files);
+  function onUpload(e) {
+    queuePendingFiles(e.target?.files);
     if (e.target) e.target.value = '';
   }
 
@@ -5619,17 +5721,96 @@ function MediaPoolTab({
           onDrop={(e)=>{
             e.preventDefault();
             setDropActive(false);
-            uploadFiles(e.dataTransfer?.files);
+            queuePendingFiles(e.dataTransfer?.files);
           }}
           style={{ ...S.mediaDropZone, ...(dropActive ? S.mediaDropZoneActive : {}) }}
         >
           <div>
             <div style={S.mediaDropHeadline}>Drag & drop media</div>
-            <div style={S.mediaDropHint}>Drop multiple files at once or click Upload to browse.</div>
+            <div style={S.mediaDropHint}>Drop files to stage them, then click Save to Media Pool to finish uploading.</div>
           </div>
           <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
         </div>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+          <button
+            type="button"
+            onClick={savePendingFiles}
+            disabled={!pendingFiles.length || savingPending}
+            style={{
+              ...S.button,
+              ...S.buttonSuccess,
+              ...buttonStateStyle(!pendingFiles.length || savingPending),
+            }}
+          >
+            {savingPending ? 'Saving…' : 'Save to Media Pool'}
+          </button>
+          <button
+            type="button"
+            onClick={clearPendingFiles}
+            disabled={!pendingFiles.length || savingPending}
+            style={{
+              ...S.button,
+              ...buttonStateStyle(!pendingFiles.length || savingPending),
+            }}
+          >
+            Clear Pending
+          </button>
+        </div>
         <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
+        {pendingFiles.length > 0 && (
+          <div style={{ marginTop:16 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexWrap:'wrap', gap:8 }}>
+              <div style={{ fontWeight:600 }}>Pending Uploads ({pendingFiles.length})</div>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px,1fr))', gap:12 }}>
+              {pendingFiles.map((item) => {
+                const fallbackLabel = item?.type || (item?.name || '').split('.').pop() || 'file';
+                return (
+                  <div key={item.id} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
+                    <div
+                      style={{
+                        width: '100%',
+                        height: 140,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        border: '1px solid var(--admin-border-soft)',
+                        background: 'var(--admin-input-bg)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      {item.preview ? (
+                        <img src={item.preview} alt={item.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      ) : (
+                        <div style={{ color:'var(--admin-muted)', fontSize:12, letterSpacing:'0.08em', textTransform:'uppercase', textAlign:'center', padding:'0 8px' }}>
+                          {fallbackLabel}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display:'grid', gap:4 }}>
+                      <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.name}</div>
+                      {item.size ? (
+                        <div style={{ fontSize:12, color:'var(--admin-muted)' }}>{formatFileSize(item.size)}</div>
+                      ) : null}
+                      {item.overLimit && (
+                        <div style={{ fontSize:12, color:'#f97316', fontWeight:600 }}>
+                          ⚠️ Over 5 MB — will upload but may take longer.
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={()=>removePendingFile(item.id)}
+                      style={{ ...S.button, ...S.buttonDanger, padding:'8px 10px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
