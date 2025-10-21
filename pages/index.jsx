@@ -2344,6 +2344,7 @@ export default function Admin() {
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
   const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
+  const metaRenderIso = useMemo(() => new Date().toISOString(), [adminMeta.fetchedAt]);
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
@@ -3858,6 +3859,101 @@ export default function Admin() {
               Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
             </div>
           </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Developer Build Snapshot</h3>
+            <dl style={S.devSnapshotList}>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Repository</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaRepoUrl ? (
+                    <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                      {metaOwnerRepo || 'unknown'}
+                    </a>
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>{metaOwnerRepo || 'unknown'}</span>
+                  )}
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Branch</dt>
+                <dd style={S.devSnapshotValue}>
+                  <span style={S.devSnapshotCode}>{metaBranchLabel || 'unknown'}</span>
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Commit</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaCommitLabel ? (
+                    metaCommitUrl ? (
+                      <a
+                        href={metaCommitUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={S.metaFooterLink}
+                        title={`Open commit ${metaCommitLabel}`}
+                      >
+                        <code style={S.devSnapshotCode}>{metaCommitLabel}</code>
+                      </a>
+                    ) : (
+                      <code style={S.devSnapshotCode}>{metaCommitLabel}</code>
+                    )
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>—</span>
+                  )}
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Vercel Deployment</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaDeploymentUrl ? (
+                    <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                      {metaDeploymentState ? `${metaDeploymentState} · ${metaDeploymentUrl.replace(/^https?:\/\//, '')}` : metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                    </a>
+                  ) : metaDeploymentState ? (
+                    <span style={S.devSnapshotCode}>{metaDeploymentState}</span>
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>—</span>
+                  )}
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Vercel Project</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaVercelUrl ? (
+                    <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                      {metaVercelLabel || metaVercelUrl.replace(/^https?:\/\//, '')}
+                    </a>
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>—</span>
+                  )}
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Rendered</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaNowLabel ? (
+                    <time style={S.devSnapshotCode} dateTime={metaRenderIso}>{metaNowLabel}</time>
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>—</span>
+                  )}
+                </dd>
+              </div>
+              <div style={S.devSnapshotItem}>
+                <dt style={S.devSnapshotLabel}>Fetched</dt>
+                <dd style={S.devSnapshotValue}>
+                  {metaTimestampLabel ? (
+                    <time style={S.devSnapshotCode} dateTime={adminMeta.fetchedAt || undefined}>{metaTimestampLabel}</time>
+                  ) : (
+                    <span style={S.devSnapshotValueMuted}>—</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <div style={S.devSnapshotFootnote}>
+              Snapshot updates each minute. Capture this line in QA screenshots to log repo, branch, commit, and deployment at a glance.
+            </div>
+          </div>
       </main>
     )}
 
@@ -4414,6 +4510,51 @@ const S = {
     color: 'var(--admin-muted)',
     marginTop: 12,
     fontSize: 12,
+  },
+  devSnapshotList: {
+    display: 'grid',
+    gap: 10,
+  },
+  devSnapshotItem: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(140px, 200px) 1fr',
+    gap: 12,
+    alignItems: 'baseline',
+  },
+  devSnapshotLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  devSnapshotValue: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    wordBreak: 'break-word',
+  },
+  devSnapshotValueMuted: {
+    color: 'var(--admin-muted)',
+    fontSize: 14,
+    fontWeight: 500,
+  },
+  devSnapshotCode: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 10px',
+    borderRadius: 999,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    fontFamily: 'ui-monospace, Menlo, SFMono-Regular, Consolas',
+    fontSize: 13,
+    letterSpacing: '0.05em',
+    lineHeight: 1.4,
+  },
+  devSnapshotFootnote: {
+    marginTop: 12,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    lineHeight: 1.5,
   },
   header: {
     padding: 20,
