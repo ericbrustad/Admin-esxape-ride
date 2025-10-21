@@ -60,3 +60,11 @@
 **You:** All image previews disappeared after the zero-binary update. Bring back the new placeholders alongside the legacy images, keep using the latest Supabase configuration, and make sure settings, missions, and devices still sync into their directories.
 
 **GPT:** Added a reusable SVG placeholder library, updated the media manifest to pair each Supabase object with a local thumbnail plus metadata, taught `/api/list-media` to emit placeholder-aware previews, refreshed the storage guide, and revalidated the Supabase sync directories for settings, missions, and devices.
+
+---
+
+**Timestamp:** 2025-10-21T19:20:00Z
+
+**You:** Uploading new media still fails with `ENOENT: no such file or directory, mkdir '/var/task/next/cache/admin-media'`. Keep the Supabase workflow, but make sure manifest updates land somewhere writable so cards appear again.
+
+**GPT:** Pointed the manifest fallback to the runtime temp directory (`/tmp/admin-media/manifest.json`) so serverless environments can persist updates, and extended the binary asset guide with the new troubleshooting step while re-running the build.
