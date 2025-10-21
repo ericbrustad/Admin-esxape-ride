@@ -165,8 +165,8 @@ function listFiles(absDir, prefix = '') {
         files.push(...listFiles(path.join(absDir, entry.name), nextPrefix));
       } else if (entry.isFile()) {
         const baseName = entry.name.toLowerCase();
-        if (baseName === '.gitkeep' || baseName === 'index.json' || baseName === '.ds_store') {
-          // Skip placeholder/metadata files so the Media Pool only surfaces real assets.
+        if (baseName === 'index.json' || baseName === '.ds_store') {
+          // Skip metadata files so the Media Pool only surfaces real assets.
           // eslint-disable-next-line no-continue
           continue;
         }
@@ -496,30 +496,51 @@ export default async function handler(req, res) {
       const publicUrl = buildUrlFromPath(repoPath);
       if (publicUrl) seenKeys.add(publicUrl.toLowerCase());
       const meta = enrichMeta(path.posix.join(folder, name));
-      const type = (meta.type || classify(name)).toLowerCase();
-      const slug = buildMediaSlug({ folder, type, name });
+      const isPlaceholderFile = name.toLowerCase() === '.gitkeep';
+      const normalizedMeta = isPlaceholderFile
+        ? {
+            category: 'placeholder',
+            categoryLabel: 'Placeholder',
+            type: 'placeholder',
+            tags: ['placeholder'],
+          }
+        : meta;
+      const type = (normalizedMeta.type || classify(name)).toLowerCase();
+      const slug = isPlaceholderFile
+        ? ['placeholder', slugify(folder) || 'mediapool'].filter(Boolean).join('-')
+        : buildMediaSlug({ folder, type, name });
       const tags = new Set([
-        ...(meta.tags || []),
-        type,
+        ...(normalizedMeta.tags || []),
         `folder:${slugify(folder)}`,
       ]);
+      if (!isPlaceholderFile) tags.add(type);
+      if (isPlaceholderFile) {
+        tags.add('gitkeep');
+        tags.add('keepalive');
+      }
       if (slug) tags.add(`slug:${slug}`);
+      const placeholderInfo = isPlaceholderFile ? resolvePlaceholder(folder, type) : null;
+      const placeholderUrl = placeholderInfo?.url || '';
       out.push({
         id: key,
-        name,
+        name: isPlaceholderFile ? 'Placeholder (.gitkeep)' : name,
         fileName: name,
         url: publicUrl,
         path: repoPath,
         folder,
         type,
         source: 'filesystem',
-        category: meta.category,
-        categoryLabel: meta.categoryLabel,
+        category: normalizedMeta.category,
+        categoryLabel: normalizedMeta.categoryLabel,
         tags: Array.from(tags),
-        kind: meta.type,
-        status: 'available',
-        notes: '',
+        kind: normalizedMeta.type,
+        status: isPlaceholderFile ? 'placeholder' : 'available',
+        notes: isPlaceholderFile
+          ? 'Git placeholder file — keeps this folder tracked without storing media.'
+          : '',
         existsOnDisk: true,
+        thumbUrl: placeholderUrl,
+        placeholder: placeholderInfo,
         slug,
       });
     }

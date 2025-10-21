@@ -89,6 +89,7 @@ const ADMIN_META_INITIAL_STATE = {
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
+  if (/\.gitkeep(\?|#|$)/.test(s)) return 'placeholder';
   if (EXTS.gif.test(s)) return 'gif';
   if (EXTS.image.test(s)) return 'image';
   if (EXTS.video.test(s)) return 'video';
@@ -104,6 +105,7 @@ const MEDIA_TYPE_DEFS = [
   { key: 'gif', label: 'GIF', title: 'GIF' },
   { key: 'ar-target', label: 'AR Targets', title: 'AR Targets (markers)' },
   { key: 'ar-overlay', label: 'AR Overlays', title: 'AR Overlays (assets)' },
+  { key: 'placeholder', label: 'Placeholders', title: 'Placeholder keep-alive markers (.gitkeep)' },
   { key: 'other', label: 'Other', title: 'Other (unclassified)' },
 ];
 
@@ -113,6 +115,7 @@ const MEDIA_CLASS_TO_TYPE = {
   image: 'image',
   gif: 'gif',
   ar: 'ar-target',
+  placeholder: 'placeholder',
   other: 'other',
 };
 
@@ -301,31 +304,37 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const PLACEHOLDER_MEDIA = {
+  cover: '/media/placeholders/cover.svg',
+  icon: '/media/placeholders/icon.svg',
+  bundle: '/media/placeholders/bundle.svg',
+};
+
 const STARFIELD_DEFAULTS = {
   title: 'Starfield Station Break',
   type: 'Sci-Fi',
   slug: 'starfield-station-break',
-  coverImage: '/media/mediapool/Images/covers/starfield-station-break.svg',
+  coverImage: PLACEHOLDER_MEDIA.cover,
   tags: ['starfield-station-break', 'default-game'],
 };
 
 const DEFAULT_BUNDLES = {
   devices: [
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
-    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/mediapool/Images/icons/quantum-anchor.svg' },
-    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/mediapool/Images/icons/chrono-switch.svg' },
-    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/mediapool/Images/icons/voyager-dial.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'lumen-halo', name: 'Lumen Halo', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'quantum-anchor', name: 'Quantum Anchor', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'chrono-switch', name: 'Chrono Switch', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'voyager-dial', name: 'Voyager Dial', url: PLACEHOLDER_MEDIA.icon },
   ],
   missions: [
-    { key: 'briefing-star', name: 'Briefing Star', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
+    { key: 'briefing-star', name: 'Briefing Star', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'decoy-glow', name: 'Decoy Glow', url: PLACEHOLDER_MEDIA.icon },
   ],
   rewards: [
-    { key: 'evidence', name: 'Evidence', url: '/media/mediapool/Images/bundles/evidence%202.png' },
-    { key: 'clue', name: 'Clue', url: '/media/mediapool/Images/bundles/CLUEgreen.png' },
-    { key: 'gold-coin', name: 'Gold Coin', url: '/media/mediapool/Images/bundles/GOLDEN%20COIN.png' },
+    { key: 'evidence', name: 'Evidence', url: PLACEHOLDER_MEDIA.bundle },
+    { key: 'clue', name: 'Clue', url: PLACEHOLDER_MEDIA.bundle },
+    { key: 'gold-coin', name: 'Gold Coin', url: PLACEHOLDER_MEDIA.bundle },
   ],
 };
 
@@ -5338,7 +5347,7 @@ function MediaPoolTab({
       if (!raw) return false;
       const withoutQuery = raw.split('?')[0];
       const base = withoutQuery.split('/').pop()?.toLowerCase() || '';
-      if (base === '.gitkeep' || base === 'index.json' || base === '.ds_store') return false;
+      if (base === 'index.json' || base === '.ds_store') return false;
       return true;
     });
   }, [inv]);
@@ -5620,6 +5629,13 @@ function MediaPoolTab({
     const repoPath = typeof item === 'string'
       ? pathFromUrl(item)
       : (item?.path || pathFromUrl(item?.url || item?.id || ''));
+    const type = String((item && (item.type || item.kind)) || '').toLowerCase();
+    const nameLower = String(item?.name || '').toLowerCase();
+    const fileNameLower = String(item?.fileName || '').toLowerCase();
+    if (type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep') {
+      alert('Placeholder keep-alive files cannot be deleted from the dashboard.');
+      return false;
+    }
     if (!repoPath && !(item?.supabase?.path)) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
@@ -5633,18 +5649,27 @@ function MediaPoolTab({
   }
 
   async function deleteAll(list) {
-    if (!list?.length) return;
-    if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
+    const actionable = (list || []).filter((it) => {
+      const type = String((it && (it.type || it.kind)) || '').toLowerCase();
+      const nameLower = String(it?.name || '').toLowerCase();
+      const fileNameLower = String(it?.fileName || '').toLowerCase();
+      return !(type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep');
+    });
+    if (!actionable.length) {
+      alert('No deletable files in this group. Placeholder keep-alive files are protected.');
+      return;
+    }
+    if (!window.confirm(`Delete ALL ${actionable.length} files in this group? This cannot be undone.`)) return;
     setUploadStatus('Deleting group…');
     let okCount = 0;
-    for (const it of list) {
+    for (const it of actionable) {
       const path = it?.path || pathFromUrl(it?.url || it?.id || '');
       if (!path && !(it?.supabase?.path)) continue;
       // eslint-disable-next-line no-await-in-loop
       const ok = await deleteMediaEntry({ ...it, path });
       if (ok) okCount++;
     }
-    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    setUploadStatus(`✅ Deleted ${okCount}/${actionable.length}`);
     await refreshInventory();
   }
 
@@ -5655,6 +5680,12 @@ function MediaPoolTab({
     items: itemsByType[key] || [],
   }));
   const active = sections.find((s) => s.key === subTab) || sections[0];
+  const canDeleteActive = active.items.some((item) => {
+    const type = String((item && (item.type || item.kind)) || '').toLowerCase();
+    const nameLower = String(item?.name || '').toLowerCase();
+    const fileNameLower = String(item?.fileName || '').toLowerCase();
+    return !(type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep');
+  });
   const availableTabKeys = baseTabs.map((tab) => tab.key);
   useEffect(() => {
     if (!availableTabKeys.includes(subTab) && availableTabKeys.length) {
@@ -5793,10 +5824,10 @@ function MediaPoolTab({
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
           <button
-            style={{ ...S.button, ...S.buttonDanger }}
+            style={{ ...S.button, ...S.buttonDanger, ...(!canDeleteActive ? S.buttonDisabled : {}) }}
             onClick={()=>deleteAll(active.items)}
-            disabled={!active.items.length}
-            title="Delete all files in this type"
+            disabled={!canDeleteActive}
+            title={canDeleteActive ? 'Delete all files in this type' : 'No deletable files in this type'}
           >
             Delete All
           </button>
@@ -5808,13 +5839,23 @@ function MediaPoolTab({
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
-              const name = baseNameFromUrl(url);
+              const name = it.name || baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
               const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
-              const status = String(it.status || (url ? 'external' : 'pending')).replace(/[-_]+/g, ' ');
-              const statusColor = it.existsOnDisk
-                ? 'var(--admin-success)'
-                : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
+              const typeLower = String((it && (it.type || it.kind || active.key)) || '').toLowerCase();
+              const fileNameLower = String(it?.fileName || '').toLowerCase();
+              const isPlaceholderItem = typeLower === 'placeholder'
+                || String(it?.name || '').toLowerCase() === '.gitkeep'
+                || fileNameLower === '.gitkeep';
+              const statusRaw = String(it.status || (url ? 'external' : 'pending'));
+              const status = isPlaceholderItem ? 'placeholder' : statusRaw.replace(/[-_]+/g, ' ');
+              const statusColor = isPlaceholderItem
+                ? 'var(--admin-info)'
+                : it.existsOnDisk
+                  ? 'var(--admin-success)'
+                  : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
+              const canDelete = !isPlaceholderItem;
+              const canOpen = Boolean(url) && !isPlaceholderItem;
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
@@ -5854,18 +5895,21 @@ function MediaPoolTab({
                         display:'inline-flex',
                         alignItems:'center',
                         justifyContent:'center',
-                        pointerEvents: url ? 'auto' : 'none',
-                        opacity: url ? 1 : 0.5,
+                        pointerEvents: canOpen ? 'auto' : 'none',
+                        opacity: canOpen ? 1 : 0.5,
                       }}
-                      aria-disabled={url ? undefined : true}
+                      aria-disabled={canOpen ? undefined : true}
+                      title={canOpen ? 'Open media in new tab' : 'No preview available for placeholders'}
                     >
                       Open
                     </a>
                     <button
-                      style={{ ...S.button, ...S.buttonDanger }}
-                      onClick={()=>deleteOne(it)}
+                      style={{ ...S.button, ...S.buttonDanger, ...(canDelete ? {} : S.buttonDisabled) }}
+                      onClick={()=>{ if (canDelete) deleteOne(it); }}
+                      disabled={!canDelete}
+                      title={canDelete ? 'Delete this file' : 'Placeholder keep-alive files cannot be deleted'}
                     >
-                      Delete
+                      {canDelete ? 'Delete' : 'Protected'}
                     </button>
                   </div>
                 </div>
