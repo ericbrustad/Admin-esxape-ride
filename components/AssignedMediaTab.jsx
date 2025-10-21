@@ -140,7 +140,8 @@ export default function AssignedMediaTab({
     responseWrong: responseWrongUsage = [],
     responseAudio: responseAudioUsage = [],
     actionMedia: actionUsage = [],
-    arMedia: arUsage = [],
+    arTargets: arTargetUsage = [],
+    arOverlays: arOverlayUsage = [],
   } = usageSummary || {};
 
   const pluralize = (word, count) => (count === 1 ? word : `${word}s`);
@@ -227,7 +228,8 @@ export default function AssignedMediaTab({
       ...(responseWrongUsage || []),
       ...(responseAudioUsage || []),
       ...(actionOverview || []),
-      ...(arUsage || []),
+      ...(arTargetUsage || []),
+      ...(arOverlayUsage || []),
     ];
 
     const responseTrigger = new Set();
@@ -258,6 +260,8 @@ export default function AssignedMediaTab({
     responseWrongUsage,
     responseAudioUsage,
     actionOverview,
+    arTargetUsage,
+    arOverlayUsage,
   ]);
 
   function renderUsageSection(title, items, {
@@ -489,9 +493,13 @@ export default function AssignedMediaTab({
           allowRemove: true,
           onRemove: removeActionMedia,
         })}
-        {renderUsageSection('AR Media', arUsage, {
-          emptyLabel: 'No AR media assigned yet.',
-          noun: 'AR reference',
+        {renderUsageSection('AR Targets', arTargetUsage, {
+          emptyLabel: 'No AR targets assigned yet.',
+          noun: 'AR marker',
+        })}
+        {renderUsageSection('AR Overlays', arOverlayUsage, {
+          emptyLabel: 'No AR overlays assigned yet.',
+          noun: 'AR overlay',
         })}
       </Section>
     </div>

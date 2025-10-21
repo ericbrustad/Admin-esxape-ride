@@ -4,7 +4,7 @@
     "title": "Chronorift Cove",
     "type": "Adventure",
     "tags": [ "chronorift-cove" ],
-    "coverImage": "/media/covers/chronorift-cove.svg",
+    "coverImage": "/media/mediapool/Images/covers/chronorift-cove.svg",
     "shortDescription": "Stabilize time-tossed tides and guide explorers through a shimmering coastal rift.",
     "longDescription": "The cove fractures in waves of time. Activate chrono buoys, anchor the currents, and chart a safe path before the anomaly swallows the harbor.",
     "deployEnabled": true
@@ -28,9 +28,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/aurora-beacon.svg",
+        "actionTarget": "/media/mediapool/Images/icons/aurora-beacon.svg",
         "actionLabel": "Flash shoreline beacon",
-        "actionThumbnail": "/media/icons/aurora-beacon.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/aurora-beacon.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -49,9 +49,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/chrono-switch.svg",
+        "actionTarget": "/media/mediapool/Images/icons/chrono-switch.svg",
         "actionLabel": "Stabilize current wave",
-        "actionThumbnail": "/media/icons/chrono-switch.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/chrono-switch.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -70,9 +70,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/quantum-anchor.svg",
+        "actionTarget": "/media/mediapool/Images/icons/quantum-anchor.svg",
         "actionLabel": "Pin anomaly gate",
-        "actionThumbnail": "/media/icons/quantum-anchor.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/quantum-anchor.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -91,9 +91,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/voyager-dial.svg",
+        "actionTarget": "/media/mediapool/Images/icons/voyager-dial.svg",
         "actionLabel": "Chart safe heading",
-        "actionThumbnail": "/media/icons/voyager-dial.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/voyager-dial.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -104,27 +104,27 @@
   "powerups": [],
   "media": {
     "rewardsPool": [
-      { "url": "/media/bundles/GOLDEN%20COIN.png", "label": "Chrono Token" },
-      { "url": "/media/bundles/CLUEgreen.png", "label": "Seafarer Clue" }
+      { "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png", "label": "Chrono Token" },
+      { "url": "/media/mediapool/Images/bundles/CLUEgreen.png", "label": "Seafarer Clue" }
     ],
     "penaltiesPool": [
-      { "url": "/media/bundles/SMOKE%20BOMB.png", "label": "Fog Burst" }
+      { "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png", "label": "Fog Burst" }
     ]
   },
   "icons": {
     "missions": [
-      { "key": "helm-brief", "name": "Helm Brief", "url": "/media/icons/voyager-dial.svg" }
+      { "key": "helm-brief", "name": "Helm Brief", "url": "/media/mediapool/Images/icons/voyager-dial.svg" }
     ],
     "devices": [
-      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/icons/aurora-beacon.svg" },
-      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/icons/lumen-halo.svg" },
-      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/icons/quantum-anchor.svg" },
-      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/icons/chrono-switch.svg" },
-      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/icons/voyager-dial.svg" }
+      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
+      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/mediapool/Images/icons/lumen-halo.svg" },
+      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/mediapool/Images/icons/quantum-anchor.svg" },
+      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/mediapool/Images/icons/chrono-switch.svg" },
+      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/mediapool/Images/icons/voyager-dial.svg" }
     ],
     "rewards": [
-      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/bundles/GOLDEN%20COIN.png" },
-      { "key": "clue-green", "name": "Clue", "url": "/media/bundles/CLUEgreen.png" }
+      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png" },
+      { "key": "clue-green", "name": "Clue", "url": "/media/mediapool/Images/bundles/CLUEgreen.png" }
     ]
   },
   "appearance": {
