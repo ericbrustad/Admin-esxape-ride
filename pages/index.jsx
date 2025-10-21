@@ -619,8 +619,21 @@ export default function Admin() {
   }, []);
 
   const setStatus = useCallback((message) => {
-    setStatusInternal(message);
-    if (message) logConversation('GPT', message);
+    if (typeof message === 'function') {
+      setStatusInternal((prev) => {
+        const resolved = message(prev);
+        const next = typeof resolved === 'string' ? resolved : '';
+        if (next.trim() && next !== prev) logConversation('GPT', next);
+        return next;
+      });
+      return;
+    }
+
+    setStatusInternal((prev) => {
+      const next = typeof message === 'string' ? message : '';
+      if (next.trim() && next !== prev) logConversation('GPT', next);
+      return next;
+    });
   }, [logConversation]);
 
   const [protectionPrompt, setProtectionPrompt] = useState({
