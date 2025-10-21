@@ -2084,23 +2084,21 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+  const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
+  const fallbackConfig = useMemo(() => defaultConfig(), []);
+  const viewSuite = suite || fallbackSuite;
+  const viewConfig = config || fallbackConfig;
+  const isBootstrapping = !suite || !config;
 
-  if (!suite || !config) {
-    return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
-          Loading… (pulling config & missions)
-        </div>
-      </main>
-    );
-  }
-
-  const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
-  const mapZoom = Number(config.map?.defaultZoom)||13;
+  const mapCenter = {
+    lat: Number((viewConfig?.map?.centerLat ?? 44.9778)) || 44.9778,
+    lng: Number((viewConfig?.map?.centerLng ?? -93.2650)) || -93.2650,
+  };
+  const mapZoom = Number(viewConfig?.map?.defaultZoom ?? 13) || 13;
 
   const missionRadiusDisabled = (selectedMissionIdx==null);
   const missionRadiusValue = selectedMissionIdx!=null
-    ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
+    ? Number(viewSuite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
 
   const missionTitleDraft = (editing?.title || '').trim();
@@ -2125,10 +2123,10 @@ export default function Admin() {
         options.push({ key, name: icon?.name || key, url: icon?.url || '' });
       });
     };
-    append(config?.icons?.missions || []);
-    append(config?.icons?.devices || []);
+    append(viewConfig?.icons?.missions || []);
+    append(viewConfig?.icons?.devices || []);
     return options;
-  }, [config?.icons?.missions, config?.icons?.devices]);
+  }, [viewConfig?.icons?.missions, viewConfig?.icons?.devices]);
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
@@ -2144,17 +2142,17 @@ export default function Admin() {
   const deviceButtonLabel = `Save and Close ${deviceButtonContextLabel} Device`;
   const deviceButtonTitleAttr = `Save and close ${deviceButtonContextLabel} device`;
 
-  const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
-    ? config.appearanceSkin
+  const storedAppearanceSkin = viewConfig.appearanceSkin && ADMIN_SKIN_TO_UI.has(viewConfig.appearanceSkin)
+    ? viewConfig.appearanceSkin
     : null;
-  const detectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const detectedAppearanceSkin = detectAppearanceSkin(viewConfig.appearance, viewConfig.appearanceSkin);
   const selectedAppearanceSkin = storedAppearanceSkin || detectedAppearanceSkin;
   const selectedAppearanceSkinLabel = storedAppearanceSkin
     ? `${APPEARANCE_SKIN_MAP.get(storedAppearanceSkin)?.label || storedAppearanceSkin}${detectedAppearanceSkin === 'custom' ? ' (modified)' : ''}`
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
-  const interfaceTone = normalizeTone(config.appearanceTone);
+  const interfaceTone = normalizeTone(viewConfig.appearanceTone);
   const PROTECTION_COLOR_SAFE = '#16f78f';
   const PROTECTION_COLOR_ALERT = '#ff4d57';
   const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
@@ -2318,13 +2316,13 @@ export default function Admin() {
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
   const isDefault = slugForMeta === 'default';
-  const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
-  const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = config?.game?.deployEnabled !== false;
-  const headerGameTitle = (config?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
-  const headerCoverThumb = config?.game?.coverImage
-    ? toDirectMediaURL(config.game.coverImage)
+  const hasCoverForSave = Boolean((viewConfig?.game?.coverImage || '').trim() || coverUploadPreview);
+  const deployGameEnabled = viewConfig?.game?.deployEnabled !== false;
+  const headerGameTitle = (viewConfig?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
+  const headerCoverThumb = viewConfig?.game?.coverImage
+    ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
@@ -2343,9 +2341,27 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
-  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
+  const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
+
+  if (isBootstrapping) {
+    return (
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid var(--admin-border-soft)',
+            background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+            boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+          }}
+        >
+          Loading… (pulling config & missions)
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div style={S.body}>
@@ -3858,8 +3874,55 @@ export default function Admin() {
               Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
             </div>
           </div>
-      </main>
-    )}
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12 }}>
+              <div>
+                <div style={S.fieldLabel}>Repository</div>
+                {metaRepoUrl ? (
+                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                    {metaOwnerRepo || 'unknown'}
+                  </a>
+                ) : (
+                  <div style={S.readonlyValue}>{metaOwnerRepo || 'unknown'}</div>
+                )}
+                <div style={S.noteText}>Source project detected from the latest admin metadata.</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Branch</div>
+                <div style={S.readonlyValue}>{metaBranchLabel}</div>
+                <div style={S.noteText}>Updated at {metaTimestampLabel || '—'}.</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Commit</div>
+                {metaCommitUrl ? (
+                  <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                    {metaCommitLabel || '—'}
+                  </a>
+                ) : (
+                  <div style={S.readonlyValue}>{metaCommitLabel || '—'}</div>
+                )}
+                <div style={S.noteText}>Last build snapshot captured at {metaNowLabel || '—'}.</div>
+              </div>
+              <div>
+                <div style={S.fieldLabel}>Vercel Deployment</div>
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                    {metaDeploymentState || '—'}
+                  </a>
+                ) : (
+                  <div style={S.readonlyValue}>{metaDeploymentState || '—'}</div>
+                )}
+                <div style={S.noteText}>{metaVercelLabel ? `Target: ${metaVercelLabel}` : 'No deployment URL reported.'}</div>
+              </div>
+            </div>
+            {adminMeta.error && (
+              <div style={{ ...S.metaBannerError, marginTop:12 }}>{adminMeta.error}</div>
+            )}
+          </div>
+        </main>
+      )}
 
       {/* TEXT rules */}
       {tab==='text' && <TextTab config={config} setConfig={setConfig} />}
