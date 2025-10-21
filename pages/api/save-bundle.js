@@ -2,6 +2,7 @@
 // Safely write missions.json + config.json (admin + game copies) in sequence
 // to avoid GitHub 409 "expected <sha>" conflicts.
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { syncSupabaseJson } from '../../lib/supabase-storage.js';
 
 const owner  = process.env.REPO_OWNER;
 const repo   = process.env.REPO_NAME;
@@ -121,8 +122,28 @@ export default async function handler(req, res) {
       }
     }
 
+    const supabase = {};
+    try {
+      supabase.missions = await syncSupabaseJson('missions', slug || 'default', missions);
+    } catch (error) {
+      supabase.missions = { ok: false, error: error?.message || String(error), kind: 'missions', slug: slug || 'default' };
+    }
+
+    try {
+      supabase.settings = await syncSupabaseJson('settings', slug || 'default', config);
+    } catch (error) {
+      supabase.settings = { ok: false, error: error?.message || String(error), kind: 'settings', slug: slug || 'default' };
+    }
+
+    try {
+      const devicesPayload = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
+      supabase.devices = await syncSupabaseJson('devices', slug || 'default', devicesPayload);
+    } catch (error) {
+      supabase.devices = { ok: false, error: error?.message || String(error), kind: 'devices', slug: slug || 'default' };
+    }
+
     // Return null slug for default to match previous behavior
-    res.status(200).json({ ok: true, slug: isDefaultSlug ? null : slug, wrote });
+    res.status(200).json({ ok: true, slug: isDefaultSlug ? null : slug, wrote, supabase });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });
   }
