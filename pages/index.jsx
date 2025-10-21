@@ -2483,6 +2483,9 @@ export default function Admin() {
     : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
+  const metaDeploymentLabel = metaDeploymentUrl
+    ? metaDeploymentUrl.replace(/^https?:\/\//, '')
+    : (metaDeploymentState || '—');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
@@ -4024,6 +4027,72 @@ export default function Admin() {
               <div style={{ ...S.metaBannerError, margin:0 }}>{adminMeta.error}</div>
             </div>
           )}
+
+          <footer style={S.settingsFooter}>
+            <div style={S.settingsFooterRow}>
+              <span style={S.settingsFooterItem}>
+                <strong>Repo:</strong>{' '}
+                {metaRepoUrl ? (
+                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                    {metaOwnerRepo || '—'}
+                  </a>
+                ) : (
+                  metaOwnerRepo || '—'
+                )}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Branch:</strong>{' '}
+                {metaBranchLabel || '—'}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Commit:</strong>{' '}
+                {metaCommitLabel ? (
+                  metaCommitUrl ? (
+                    <a
+                      href={metaCommitUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={S.settingsFooterLink}
+                      title={`Open commit ${metaCommitLabel}`}
+                    >
+                      {metaCommitLabel}
+                    </a>
+                  ) : (
+                    metaCommitLabel
+                  )
+                ) : (
+                  '—'
+                )}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                    {metaDeploymentLabel}
+                  </a>
+                ) : (
+                  metaDeploymentLabel
+                )}
+              </span>
+              {metaVercelUrl && (
+                <>
+                  <span style={S.settingsFooterSeparator}>•</span>
+                  <span style={S.settingsFooterItem}>
+                    <strong>Vercel:</strong>{' '}
+                    <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                      {metaVercelLabel || metaDeploymentLabel}
+                    </a>
+                  </span>
+                </>
+              )}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
+            </div>
+          </footer>
         </main>
       )}
 
@@ -4603,6 +4672,44 @@ const S = {
   metaErrorCard: {
     border: '1px solid rgba(248, 113, 113, 0.3)',
     background: 'rgba(248, 113, 113, 0.08)',
+  },
+  settingsFooter: {
+    marginTop: 24,
+    padding: '16px 18px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, rgba(15, 23, 42, 0.32))',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  settingsFooterRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsFooterItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  settingsFooterSeparator: {
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  settingsFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+    wordBreak: 'break-word',
+  },
+  settingsFooterTime: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   header: {
     padding: 20,
