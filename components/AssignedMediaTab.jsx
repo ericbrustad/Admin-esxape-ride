@@ -319,7 +319,11 @@ export default function AssignedMediaTab({
                         }}
                       >
                         {item.thumbUrl ? (
-                          <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img
+                            src={item.thumbUrl}
+                            alt={item.label}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
                         ) : item.kind === 'audio' ? (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
                         ) : (
@@ -445,7 +449,7 @@ export default function AssignedMediaTab({
         {renderUsageSection('Cover Art', coverImages, {
           emptyLabel: 'No cover art selected.',
           noun: 'cover assignment',
-          showThumbnail: false,
+          showThumbnail: true,
         })}
         {renderUsageSection('Mission Media', missionUsage, {
           emptyLabel: 'No mission media assigned.',
