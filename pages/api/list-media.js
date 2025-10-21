@@ -367,19 +367,8 @@ export default async function handler(req, res) {
             if (!placeholder.kind) placeholder.kind = derived.kind;
           }
         }
-        const supabaseMeta = entry.supabase || null;
-        const supabaseUrl = supabaseMeta?.publicUrl
-          || (supabaseMeta?.bucket && supabaseMeta?.path
-            ? buildSupabasePublicUrl(supabaseMeta.bucket, supabaseMeta.path)
-            : '');
-        const url = entry.url
-          || supabaseUrl
-          || (repoPath ? buildUrlFromPath(repoPath) : '')
-          || placeholderUrl;
-        const thumbUrl = entry.thumbUrl
-          || supabaseUrl
-          || placeholderUrl
-          || (placeholderPath ? buildUrlFromPath(placeholderPath) : '');
+        const url = entry.url || (repoPath ? buildUrlFromPath(repoPath) : '') || placeholderUrl;
+        const thumbUrl = entry.thumbUrl || placeholderUrl || (placeholderPath ? buildUrlFromPath(placeholderPath) : '');
         const key = (entry.id || repoPath || entry.url || `${folder}/${entry.fileName || entry.name || ''}`).toLowerCase();
         if (seenKeys.has(key)) return;
         seenKeys.add(key);
