@@ -8,10 +8,10 @@ import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 const EXTS = {
-  image: /\.(png|jpg|jpeg|webp)$/i,
+  image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif)$/i,
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i,
 };
 
 function classify(name) {
@@ -22,12 +22,20 @@ function classify(name) {
   return 'other';
 }
 
-function listFiles(absDir) {
+function listFiles(absDir, prefix = '') {
   try {
-    return fs
-      .readdirSync(absDir, { withFileTypes: true })
-      .filter(d => d.isFile())
-      .map(d => d.name);
+    const entries = fs.readdirSync(absDir, { withFileTypes: true });
+    const files = [];
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const nextPrefix = prefix ? path.posix.join(prefix, entry.name) : entry.name;
+        files.push(...listFiles(path.join(absDir, entry.name), nextPrefix));
+      } else if (entry.isFile()) {
+        const rel = prefix ? path.posix.join(prefix, entry.name) : entry.name;
+        files.push(rel);
+      }
+    }
+    return files;
   } catch {
     return [];
   }
@@ -52,14 +60,16 @@ export default async function handler(req, res) {
     // 1) Admin (canonical)
     for (const name of adminNames) {
       const type = classify(name);
-      if (type === 'other') continue;
       const key = name.toLowerCase();
       if (seenByName.has(key)) continue;
       seenByName.add(key);
       const relativePath = path.posix.join('public', 'media', dir, name);
+      const encoded = name.split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
       out.push({
         name,
-        url: `/media/${dir}/${encodeURIComponent(name)}`,
+        url: `/media/${dir}/${encoded}`,
         type,
         source: 'admin',
         path: relativePath,
@@ -70,13 +80,15 @@ export default async function handler(req, res) {
     if (GAME_ENABLED && gameOrigin) {
       for (const name of gameNames) {
         const type = classify(name);
-        if (type === 'other') continue;
         const key = name.toLowerCase();
         if (seenByName.has(key)) continue; // Admin has it → skip Game
         seenByName.add(key);
+        const encoded = name.split('/')
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
         out.push({
           name,
-          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
+          url: `${gameOrigin}/media/${dir}/${encoded}`,
           type,
           source: 'game',
           path: '',

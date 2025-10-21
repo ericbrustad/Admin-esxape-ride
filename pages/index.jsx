@@ -2046,13 +2046,28 @@ export default function Admin() {
   async function uploadToRepo(file, subfolder='uploads') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
+    const normalizedFolder = String(subfolder || 'uploads').replace(/^\/+|\/+$/g, '');
+    const classification = classifyByExt(file.name || file.type || safeName);
+    let resolvedFolder = normalizedFolder || 'uploads';
+    if (resolvedFolder === 'mediapool') {
+      const typeFolderMap = {
+        image: 'images',
+        gif: 'gif',
+        audio: 'audio',
+        video: 'video',
+        other: 'other',
+      };
+      const target = typeFolderMap[classification] || 'other';
+      resolvedFolder = `mediapool/${target}`;
+    }
+    const path   = `public/media/${resolvedFolder}/${Date.now()}-${safeName}`;
     const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
     const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
+    const destinationLabel = resolvedFolder;
     if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync into ${destinationLabel}.`);
     } else {
-      setUploadStatus(`Uploading ${safeName}…`);
+      setUploadStatus(`Uploading ${safeName} to ${destinationLabel}…`);
     }
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
@@ -2060,7 +2075,7 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${destinationLabel}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -5446,19 +5461,20 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const [folder, setFolder] = useState('mediapool');
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
 
 
-  
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
+
+  // Sub-tabs inside Media Pool. Default → 'image'.
   const subTabs = [
     { key:'image', label:'Images' },
     { key:'video', label:'Videos' },
     { key:'audio', label:'Audio' },
     { key:'gif',   label:'GIFs'  },
+    { key:'other', label:'Other' },
   ];
   const [subTab, setSubTab] = useState('image');
 
@@ -5580,9 +5596,10 @@ function MediaPoolTab({
 
   // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
-    const t = classifyByExt(it.url);
-    if (!acc[t]) acc[t] = [];
-    acc[t].push(it);
+    const guess = classifyByExt(it.url || it.path || it.name || '');
+    const key = String(it.type || guess || 'other').toLowerCase();
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(it);
     return acc;
   }, {});
   const sections = [
@@ -5590,8 +5607,9 @@ function MediaPoolTab({
     { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
     { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
     { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
+    { key:'other', title:'Other (unclassified)', items: itemsByType.other || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+  const active = sections.find(s => s.key === subTab) || sections[0];
 
   return (
     <main style={S.wrap}>
@@ -5601,6 +5619,7 @@ function MediaPoolTab({
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
           <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
+            <option value="mediapool">mediapool</option>
             <option value="uploads">uploads</option>
             <option value="bundles">bundles</option>
             <option value="icons">icons</option>
