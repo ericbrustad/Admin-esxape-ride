@@ -2046,13 +2046,14 @@ export default function Admin() {
   async function uploadToRepo(file, subfolder='uploads') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
+    const safeFolder = String(subfolder || 'uploads').replace(/[^a-z0-9_\-]/gi, '') || 'uploads';
+    const path   = `public/media/${safeFolder}/${Date.now()}-${safeName}`;
     const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
     const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
     if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — uploading to ${safeFolder} may take longer to sync.`);
     } else {
-      setUploadStatus(`Uploading ${safeName}…`);
+      setUploadStatus(`Uploading ${safeName} → ${safeFolder}…`);
     }
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
@@ -2060,7 +2061,7 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${safeFolder}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -5444,9 +5445,12 @@ function MediaPoolTab({
   uploadToRepo,
   onInventoryRefresh,
 }) {
+  const AUTO_FOLDER = 'auto';
+  const ICON_EXT = /\.(svg|svgz|ico|icns)$/i;
+  const BUNDLE_EXT = /\.(json|ya?ml|zip)$/i;
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const [folder, setFolder] = useState(AUTO_FOLDER);
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -5461,6 +5465,26 @@ function MediaPoolTab({
     { key:'gif',   label:'GIFs'  },
   ];
   const [subTab, setSubTab] = useState('image');
+
+  const folderOptions = useMemo(() => ([
+    { value: AUTO_FOLDER, label: 'Auto (detect type)' },
+    { value: 'uploads', label: 'uploads' },
+    { value: 'bundles', label: 'bundles' },
+    { value: 'icons', label: 'icons' },
+    { value: 'mediapool', label: 'mediapool' },
+  ]), []);
+
+  function detectFolderForFile(file) {
+    if (!file) return 'uploads';
+    const name = String(file.name || '').toLowerCase();
+    const mime = String(file.type || '').toLowerCase();
+    if (mime.includes('svg') || ICON_EXT.test(name)) return 'icons';
+    if (BUNDLE_EXT.test(name)) return 'bundles';
+    if (mime.startsWith('audio/') || EXTS.audio.test(name)) return 'uploads';
+    if (mime.startsWith('video/') || EXTS.video.test(name)) return 'uploads';
+    if (mime.startsWith('image/') || EXTS.image.test(name) || EXTS.gif.test(name)) return 'uploads';
+    return 'uploads';
+  }
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -5524,19 +5548,26 @@ function MediaPoolTab({
     if (!files.length) return;
     let success = 0;
     let lastUrl = '';
+    const folderCounts = new Map();
     for (const file of files) {
+      const targetFolder = folder === AUTO_FOLDER ? detectFolderForFile(file) : folder;
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, targetFolder);
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+        folderCounts.set(targetFolder, (folderCounts.get(targetFolder) || 0) + 1);
       }
     }
     if (lastUrl) setAddUrl(lastUrl);
     if (success) await refreshInventory();
     if (files.length > 1) {
       const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+      const summaryParts = Array.from(folderCounts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, count]) => `${count} → ${key}`);
+      const summary = summaryParts.length ? ` (${summaryParts.join(', ')})` : '';
+      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files${summary}`);
     }
   }
 
@@ -5601,9 +5632,9 @@ function MediaPoolTab({
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
           <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+            {folderOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             type="button"

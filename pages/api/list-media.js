@@ -8,10 +8,10 @@ import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
 
 const EXTS = {
-  image: /\.(png|jpg|jpeg|webp)$/i,
+  image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif|ico|icns)$/i,
   gif: /\.(gif)$/i,
-  video: /\.(mp4|webm|mov)$/i,
-  audio: /\.(mp3|wav|ogg|m4a)$/i,
+  video: /\.(mp4|webm|mov|m4v)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif|aac|flac)$/i,
 };
 
 function classify(name) {
