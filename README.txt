@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
+  - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
+  - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.
 - 2025-10-20 — Settings log relocation & repository snapshot panel. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`
   - Notes: Moved the Operator ↔ GPT conversation history into the Settings tab with status copy, removed it from the global header, and added a repository snapshot card that surfaces the repo, branch, commit, Vercel target, and timestamp for quick QA reference.
@@ -118,3 +121,19 @@ If you want, I can:
 - Integrate these components into your actual pages/index.jsx and wire up your existing state/handlers.
 - Convert styles to your project's theme or CSS modules.
 - Add accessible keyboard support for reordering and selection.
+
+## Supabase Lookup Cheatsheet
+
+- **Games & Configs**
+  - Slugs are generated automatically as `<title-slug>-<seed>` (example: `escape-ride-a1b2c3`) and stored in `games.slug` plus each `config.game.slug` payload.
+  - Mission IDs auto-increment from `m01`, `m02`, … while device IDs start at `d01`, `d02`, … so Supabase JSON lookups stay predictable.
+  - Publishing protection uses `config.game.deployEnabled`. When `true`, the admin shows “🟢 Protected” and blocks edits; when `false`, the admin shows “🔴 Editing unlocked”.
+
+- **Media Pool (Supabase Storage `media` bucket)**
+  - Objects save under `mediapool/<Category>/...` with tags noting the type (e.g., `image`, `audio`), folder (`folder:mediapool-images-icons`), and a `slug:<type>-<folder>-<filename>` identifier.
+  - API responses surface `supabase.bucket` and `supabase.path` so deletions and mission/device bindings can recall the exact asset.
+  - Dashboard deletions remove the Supabase object (when available) and prune the manifest entry so Assigned Media updates immediately.
+
+- **Editors & Assigned Media**
+  - Media Pool cards show the slug plus up to six tags for quick verification (icons vs. covers vs. mission pins, etc.).
+  - The upload destination dropdown feeds the folder-derived tagging logic—choose the closest match (Images → Icons, Audio, Video, etc.) for accurate slugging.

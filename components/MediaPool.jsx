@@ -108,6 +108,43 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
               >
                 {displayId}
               </div>
+              {m.slug && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--admin-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={`Slug: ${m.slug}`}
+                >
+                  #{m.slug}
+                </div>
+              )}
+              {Array.isArray(m.tags) && m.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {m.tags.slice(0, 6).map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        background: 'var(--admin-border-soft)',
+                        color: 'var(--appearance-font-color, var(--admin-body-color))',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {m.tags.length > 6 && (
+                    <span style={{ fontSize: 10, color: 'var(--admin-muted)' }}>+{m.tags.length - 6}</span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
