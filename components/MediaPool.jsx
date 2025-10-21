@@ -27,6 +27,8 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
         {media.map((m) => {
           const previewUrl = m.thumbUrl || m.url || m.id;
           const typeLower = String(m.type || '').toLowerCase();
+          const fileNameLower = String(m.fileName || '').toLowerCase();
+          const isPlaceholder = typeLower === 'placeholder' || fileNameLower === '.gitkeep';
           const isImage = looksLikeImage(m);
           const isAr = ['ar', 'ar-target', 'ar-overlay'].includes(typeLower);
           const displayType = m.categoryLabel
@@ -39,17 +41,18 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
           return (
             <div
               key={m.id}
-              onClick={() => onSelect(m)}
+              onClick={() => { if (!isPlaceholder) onSelect(m); }}
               style={{
                 borderRadius: 12,
                 overflow: 'hidden',
                 background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
                 padding: 8,
-                cursor: 'pointer',
+                cursor: isPlaceholder ? 'default' : 'pointer',
                 border: '1px solid var(--admin-border-soft)',
                 display: 'grid',
                 gap: 6,
               }}
+              title={isPlaceholder ? 'Placeholder keep-alive file (read-only)' : undefined}
             >
               <div
                 style={{
