@@ -25,52 +25,8 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [
-    {
-      "id": "d01",
-      "title": "hh",
-      "type": "smoke",
-      "iconKey": "chrono-switch",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": false,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.979735,
-      "lng": -93.266802
-    }
-  ],
-  "powerups": [
-    {
-      "id": "d01",
-      "title": "hh",
-      "type": "smoke",
-      "iconKey": "chrono-switch",
-      "pickupRadius": 100,
-      "effectSeconds": 120,
-      "trigger": {
-        "enabled": false,
-        "actionType": "media",
-        "actionTarget": "",
-        "actionLabel": "",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      },
-      "lat": 44.979735,
-      "lng": -93.266802
-    }
-  ],
+  "devices": [],
+  "powerups": [],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
