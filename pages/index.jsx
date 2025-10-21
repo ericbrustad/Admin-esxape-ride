@@ -218,19 +218,31 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const STARFIELD_DEFAULTS = {
+  title: 'Starfield Station Break',
+  type: 'Sci-Fi',
+  slug: 'starfield-station-break',
+  coverImage: '/media/covers/starfield-station-break.svg',
+  tags: ['starfield-station-break', 'default-game'],
+};
+
 const DEFAULT_BUNDLES = {
   devices: [
-    { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
-    { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/icons/aurora-beacon.svg' },
+    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/icons/lumen-halo.svg' },
+    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/icons/quantum-anchor.svg' },
+    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/icons/chrono-switch.svg' },
+    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/icons/voyager-dial.svg' },
   ],
   missions: [
-    { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
-    { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
+    { key: 'briefing-star', name: 'Briefing Star', url: '/media/icons/aurora-beacon.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/icons/aurora-beacon.svg' },
+    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/icons/lumen-halo.svg' },
   ],
   rewards: [
-    { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
-    { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
-    { key:'gold-coin', name:'Gold Coin', url:'/media/bundles/GOLDEN%20COIN.png' },
+    { key: 'evidence', name: 'Evidence', url: '/media/bundles/evidence%202.png' },
+    { key: 'clue', name: 'Clue', url: '/media/bundles/CLUEgreen.png' },
+    { key: 'gold-coin', name: 'Gold Coin', url: '/media/bundles/GOLDEN%20COIN.png' },
   ],
 };
 
@@ -525,9 +537,13 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push(normalizedSlug);
     seen.add(normalizedSlug);
   }
-  if (normalizedSlug === 'default' && !seen.has('default-game')) {
-    cleaned.push('default-game');
-    seen.add('default-game');
+  if (normalizedSlug === 'default') {
+    STARFIELD_DEFAULTS.tags.forEach((tag) => {
+      const key = tag.toLowerCase();
+      if (seen.has(key)) return;
+      cleaned.push(tag);
+      seen.add(key);
+    });
   }
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
@@ -535,9 +551,9 @@ function normalizeGameMetadata(cfg, slug = '') {
   const normalizedShort = typeof game.shortDescription === 'string' ? game.shortDescription.trim() : '';
   const normalizedLong = typeof game.longDescription === 'string' ? game.longDescription.trim() : '';
   game.tags = cleaned;
-  game.title = normalizedTitle || 'Default Game';
-  game.type = normalizedType || 'Mystery';
-  game.coverImage = normalizedCover;
+  game.title = normalizedTitle || STARFIELD_DEFAULTS.title;
+  game.type = normalizedType || STARFIELD_DEFAULTS.type;
+  game.coverImage = normalizedCover || (normalizedSlug === 'default' ? STARFIELD_DEFAULTS.coverImage : '');
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
@@ -563,7 +579,7 @@ export default function Admin() {
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
+  const [activeSlug, setActiveSlug] = useState('default'); // Starfield default stored on legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -1186,7 +1202,13 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:false, mode:'single' },
-      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'', deployEnabled:true },
+      game: {
+        title: STARFIELD_DEFAULTS.title,
+        type: STARFIELD_DEFAULTS.type,
+        tags: [...STARFIELD_DEFAULTS.tags],
+        coverImage: STARFIELD_DEFAULTS.coverImage,
+        deployEnabled: true,
+      },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1567,8 +1589,10 @@ export default function Admin() {
   }
   function missionIconUrlFromKey(key) {
     if (!key) return '';
-    const it = (config?.icons?.missions || []).find(x => (x.key||'') === key);
-    return it?.url || '';
+    const missionIcon = (config?.icons?.missions || []).find(x => (x.key || '') === key);
+    if (missionIcon?.url) return missionIcon.url;
+    const deviceFallback = (config?.icons?.devices || []).find(x => (x.key || '') === key);
+    return deviceFallback?.url || '';
   }
   const triggerOptionSets = useMemo(() => {
     const mediaOptions = (inventory || []).map((it, idx) => {
@@ -2041,7 +2065,7 @@ export default function Admin() {
   }
 
   const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Admin-esxape-ride (root)' }];
+    const baseOptions = [{ value: 'default', label: `${STARFIELD_DEFAULTS.title} (default)` }];
     const extra = Array.isArray(games)
       ? games
           .filter((g) => g && g.slug && g.slug !== 'default')
@@ -2079,11 +2103,46 @@ export default function Admin() {
     ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
 
+  const missionTitleDraft = (editing?.title || '').trim();
+  const missionButtonContextLabel = editing
+    ? (missionTitleDraft || (editingIsNew ? 'New' : 'Current'))
+    : 'Mission';
+  const missionButtonLabel = `Save and Close ${missionButtonContextLabel} Mission`;
+  const missionButtonTitleAttr = editing
+    ? `Save and close ${missionButtonContextLabel} mission`
+    : 'Save and close mission';
+  const missionIconPreviewUrl = editing
+    ? toDirectMediaURL(missionIconUrlFromKey(editing.iconKey) || '')
+    : '';
+  const missionIconOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    const append = (list = []) => {
+      list.forEach((icon) => {
+        const key = (icon?.key || '').trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
+      });
+    };
+    append(config?.icons?.missions || []);
+    append(config?.icons?.devices || []);
+    return options;
+  }, [config?.icons?.missions, config?.icons?.devices]);
+
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
+
+  const deviceTitleDraft = (devDraft?.title || '').trim();
+  const deviceButtonContextLabel = deviceTitleDraft
+    || (deviceEditorMode === 'new'
+      ? 'New'
+      : ((selectedDevIdx != null && (devices?.[selectedDevIdx]?.title || '').trim()) || 'Current'));
+  const deviceButtonLabel = `Save and Close ${deviceButtonContextLabel} Device`;
+  const deviceButtonTitleAttr = `Save and close ${deviceButtonContextLabel} device`;
 
   const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
     ? config.appearanceSkin
@@ -2263,7 +2322,7 @@ export default function Admin() {
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
   const deployGameEnabled = config?.game?.deployEnabled !== false;
-  const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
+  const headerGameTitle = (config?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
   const headerCoverThumb = config?.game?.coverImage
     ? toDirectMediaURL(config.game.coverImage)
     : '';
@@ -2284,6 +2343,7 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
+  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
@@ -2419,7 +2479,7 @@ export default function Admin() {
               <div style={S.headerNavSecondary}>
                 <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                  <option value="default">(Default Game)</option>
+                  <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
                   {games.map(g=>(
                     <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                   ))}
@@ -2562,7 +2622,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -2629,16 +2689,7 @@ export default function Admin() {
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
-                      <input
-                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
-                        value={editing.title || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, title: e.target.value });
-                          setDirty(true);
-                        }}
-                        placeholder="Mission title"
-                      />
-                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
+                      <div style={S.noteText}>Update the mission heading, type, and icon, then save.</div>
                     </div>
                     <div style={S.overlayBarSide}>
                       <button
@@ -2647,46 +2698,73 @@ export default function Admin() {
                           ...(missionActionFlash ? S.action3DFlash : {}),
                         }}
                         onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
+                        title={missionButtonTitleAttr}
                       >
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                        {missionButtonLabel}
                       </button>
                       <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
                     </div>
                   </div>
 
-                  <Field label="Type">
-                    <select style={S.input} value={editing.type}
-                      onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map((k)=>(
-                        <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  {/* Icon select with thumbnail (inventory-only) */}
-                  <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <div style={S.missionPrimaryRow}>
+                    <div>
+                      {missionIconPreviewUrl ? (
+                        <img
+                          alt="icon preview"
+                          src={missionIconPreviewUrl}
+                          style={{ width: 48, height: 48, objectFit: 'contain', border: '1px solid var(--admin-border-soft)', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <div style={{ width: 48, height: 48, border: '1px dashed var(--admin-border-soft)', borderRadius: 8, display: 'grid', placeItems: 'center', color: 'var(--admin-muted)' }}>
+                          icon
+                        </div>
+                      )}
+                    </div>
+                    <Field label="Title">
+                      <input
+                        style={S.input}
+                        value={editing.title || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, title: e.target.value });
+                          setDirty(true);
+                        }}
+                        placeholder="Mission title"
+                      />
+                    </Field>
+                    <Field label="Type">
+                      <select
+                        style={S.input}
+                        value={editing.type}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setEditing({ ...editing, type: t, content: defaultContentForType(t) });
+                          setDirty(true);
+                        }}
+                      >
+                        {Object.keys(TYPE_FIELDS).map((k) => (
+                          <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
                       <select
                         style={S.input}
                         value={editing.iconKey || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                        onChange={(e) => {
+                          setEditing({ ...editing, iconKey: e.target.value });
+                          setDirty(true);
+                        }}
                       >
                         <option value="">(default)</option>
-                        {(config?.icons?.missions||[]).map((it)=>(
-                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        {missionIconOptions.map((it) => (
+                          <option key={it.key} value={it.key}>{it.name || it.key}</option>
                         ))}
                       </select>
-                      <div>
-                        {(() => {
-                          const sel = (config?.icons?.missions||[]).find(it => it.key === editing.iconKey);
-                          return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
-                        })()}
-                      </div>
-                    </div>
-                  </Field>
+                    </Field>
+                  </div>
+                  <div style={{ ...S.noteText, marginTop: -6 }}>
+                    This label appears inside the admin and player timelines.
+                  </div>
 
                   <hr style={S.hr}/>
 
@@ -3174,9 +3252,9 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Commit device updates'}
+                          title={deviceButtonTitleAttr}
                         >
-                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
+                          {deviceButtonLabel}
                         </button>
                         <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
                       </div>
@@ -3326,7 +3404,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -3713,26 +3791,71 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+            <div style={S.metaFooterGrid}>
               <div>
-                <div style={S.fieldLabel}>Repository</div>
-                <div style={S.readonlyValue}>{metaOwnerRepo || 'unknown'}</div>
+                <div style={S.metaFooterLabel}>Repository</div>
+                {metaRepoUrl ? (
+                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaOwnerRepo || 'unknown'}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>{metaOwnerRepo || 'unknown'}</span>
+                )}
               </div>
               <div>
-                <div style={S.fieldLabel}>Branch</div>
-                <div style={S.readonlyValue}>{metaBranchLabel}</div>
+                <div style={S.metaFooterLabel}>Branch</div>
+                <span style={S.metaFooterValue}>{metaBranchLabel}</span>
               </div>
               <div>
-                <div style={S.fieldLabel}>Commit</div>
-                <div style={S.readonlyValue}>{metaCommitLabel || '—'}</div>
+                <div style={S.metaFooterLabel}>Commit</div>
+                {metaCommitLabel ? (
+                  metaCommitUrl ? (
+                    <a
+                      href={metaCommitUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={S.metaFooterLink}
+                      title={`Open commit ${metaCommitLabel}`}
+                    >
+                      #{metaCommitShort || metaCommitLabel}
+                    </a>
+                  ) : (
+                    <span style={S.metaFooterValue}>#{metaCommitShort || metaCommitLabel}</span>
+                  )
+                ) : (
+                  <span style={S.metaFooterValue}>—</span>
+                )}
               </div>
               <div>
-                <div style={S.fieldLabel}>Vercel Deployment</div>
-                <div style={S.readonlyValue}>{metaDeploymentUrl ? metaDeploymentUrl.replace(/^https?:\/\//, '') : (metaDeploymentState || '—')}</div>
+                <div style={S.metaFooterLabel}>Deployment</div>
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>{metaDeploymentState || '—'}</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Vercel Project</div>
+                {metaVercelUrl ? (
+                  <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaVercelLabel || metaVercelUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>—</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Snapshot Time</div>
+                <div style={S.metaFooterValue}>
+                  <div style={S.metaFooterTimeLine}>Fetched: {metaTimestampLabel || '—'}</div>
+                  <div style={S.metaFooterTimeLine}>Rendered: {metaNowLabel || '—'}</div>
+                </div>
               </div>
             </div>
-            <div style={{ color:'var(--admin-muted)', marginTop:12, fontSize:12 }}>
-              Snapshot taken at {metaTimestampLabel || formatLocalDateTime(new Date())}.
+            <div style={S.metaFooterNote}>
+              Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
             </div>
           </div>
       </main>
@@ -4256,6 +4379,42 @@ const S = {
     color: '#f87171',
     fontWeight: 600,
   },
+  metaFooterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+    marginTop: 8,
+  },
+  metaFooterLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: 4,
+  },
+  metaFooterValue: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    wordBreak: 'break-word',
+    lineHeight: 1.4,
+  },
+  metaFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+    wordBreak: 'break-all',
+  },
+  metaFooterTimeLine: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  metaFooterNote: {
+    color: 'var(--admin-muted)',
+    marginTop: 12,
+    fontSize: 12,
+  },
   header: {
     padding: 20,
     background: 'rgba(248, 250, 252, 0.72)',
@@ -4646,8 +4805,9 @@ const S = {
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 380px',
-    minHeight: 280,
+    flex: '0 1 200px',
+    maxWidth: 220,
+    minHeight: 140,
     border: '1px dashed rgba(94, 234, 212, 0.35)',
     borderRadius: 20,
     background: 'rgba(15, 23, 42, 0.75)',
@@ -4756,6 +4916,13 @@ const S = {
   },
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  missionPrimaryRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(64px, 72px) repeat(3, minmax(160px, 1fr))',
+    gap: 8,
+    alignItems: 'center',
+    margin: '16px 0 12px',
+  },
   overlayBarSide: {
     display: 'flex',
     flexDirection: 'column',
