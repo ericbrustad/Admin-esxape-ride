@@ -222,21 +222,44 @@ function formatLocalDateTime(value) {
 }
 
 
-async function deleteMediaPath(repoPath) {
+async function deleteMediaEntry(entry) {
+  const payload = (() => {
+    if (!entry) return {};
+    if (typeof entry === 'string') return { path: entry };
+    const body = {};
+    if (entry.path) body.path = entry.path;
+    if (entry.id) body.id = entry.id;
+    if (entry.supabase && entry.supabase.path) {
+      body.supabase = {
+        bucket: entry.supabase.bucket,
+        path: entry.supabase.path,
+      };
+    }
+    if (!body.path && entry.url) {
+      const maybePath = pathFromUrl(entry.url);
+      if (maybePath) body.path = maybePath;
+    }
+    return body;
+  })();
+
+  if (!payload.path && !(payload.supabase && payload.supabase.path)) {
+    return false;
+  }
+
   const endpoints = [
+    '/api/media/delete',
     '/api/delete-media',
     '/api/delete',
-    '/api/media/delete',
     '/api/repo-delete',
     '/api/github/delete',
   ];
   for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        credentials:'include',
-        body: JSON.stringify({ path: repoPath })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
       if (r.ok) return true;
     } catch {}
@@ -647,7 +670,7 @@ export default function Admin() {
   const [newDurationMin, setNewDurationMin] = useState(0);
   const [newAlertMin, setNewAlertMin] = useState(10);
   const [newGameSlug, setNewGameSlug] = useState('');
-  const [newSlugTouched, setNewSlugTouched] = useState(false);
+  const [newGameStatusTone, setNewGameStatusTone] = useState('info');
   const [newShortDesc, setNewShortDesc] = useState('');
   const [newLongDesc, setNewLongDesc] = useState('');
   const [newCoverPreview, setNewCoverPreview] = useState('');
@@ -659,6 +682,24 @@ export default function Admin() {
   const [newGameBusy, setNewGameBusy] = useState(false);
   const [newCoverDropActive, setNewCoverDropActive] = useState(false);
   const newGameCoverInputRef = useRef(null);
+  const newGameSlugSeed = useRef('');
+
+  const [suite, setSuite] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [status, setStatusInternal] = useState('');
+  const [statusLog, setStatusLog] = useState([]);
+  const publishingLocked = config?.game?.deployEnabled === true;
+  const newGameProtectionBanner = useMemo(() => {
+    if (!gameEnabled) {
+      return {
+        tone: 'danger',
+        text: 'Game project publishing is currently disabled. Enable it in Settings before creating a new game.',
+      };
+    }
+    return publishingLocked
+      ? { tone: 'success', text: '🟢 This Game is Protected and can not be changed' }
+      : { tone: 'danger', text: '🔴 This Game can be edited, overwritten and saved' };
+  }, [gameEnabled, publishingLocked]);
 
   const [missionActionFlash, setMissionActionFlash] = useState(false);
   const [deviceActionFlash, setDeviceActionFlash] = useState(false);
@@ -677,6 +718,18 @@ export default function Admin() {
       return next.slice(-20);
     });
   }, []);
+
+  function updateNewGameStatus(message, tone = 'info') {
+    setNewGameStatus(message);
+    setNewGameStatusTone(tone);
+  }
+
+  function ensureNewGameSlugSeed() {
+    if (!newGameSlugSeed.current) {
+      newGameSlugSeed.current = Math.random().toString(36).slice(2, 8);
+    }
+    return newGameSlugSeed.current;
+  }
 
   const setStatus = useCallback((message) => {
     if (typeof message === 'function') {
@@ -712,7 +765,7 @@ export default function Admin() {
     setNewDurationMin(0);
     setNewAlertMin(10);
     setNewGameSlug('');
-    setNewSlugTouched(false);
+    newGameSlugSeed.current = '';
     setNewShortDesc('');
     setNewLongDesc('');
     setNewCoverPreview('');
@@ -720,7 +773,7 @@ export default function Admin() {
     setNewCoverSelectedUrl('');
     setNewCoverOptions([]);
     setNewCoverLookupLoading(false);
-    setNewGameStatus('');
+    updateNewGameStatus('', 'info');
     setNewGameBusy(false);
     setNewCoverDropActive(false);
     if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
@@ -728,18 +781,19 @@ export default function Admin() {
 
   const openNewGameModal = useCallback(() => {
     logConversation('You', 'Opened “Create New Game”');
+    if (newGameProtectionBanner?.text) {
+      updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone);
+      logConversation('GPT', newGameProtectionBanner.text);
+    } else {
+      updateNewGameStatus('', 'info');
+    }
     setShowNewGame(true);
-  }, [logConversation]);
+  }, [logConversation, newGameProtectionBanner]);
 
   function handleNewGameModalClose() {
     logConversation('You', 'Closed “Create New Game” dialog');
     setShowNewGame(false);
     resetNewGameForm();
-  }
-
-  function handleNewSlugInput(value) {
-    setNewSlugTouched(true);
-    setNewGameSlug(slugifyTitle(value));
   }
 
   function clearNewGameCover() {
@@ -753,13 +807,13 @@ export default function Admin() {
     const safeName = file.name || 'cover';
     const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
     if (!looksLikeImage) {
-      setNewGameStatus(`❌ ${safeName} must be an image file.`);
+      updateNewGameStatus(`❌ ${safeName} must be an image file.`, 'danger');
       return;
     }
     const sizeBytes = file.size || 0;
     if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
       const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
-      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB.`);
+      updateNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB.`, 'danger');
       return;
     }
     try {
@@ -769,9 +823,9 @@ export default function Admin() {
       setNewCoverPreview(previewUrl);
       setNewCoverFile(file);
       setNewCoverSelectedUrl('');
-      setNewGameStatus('✅ Cover ready — it will upload when you create the game.');
+      updateNewGameStatus('✅ Cover ready — it will upload when you create the game.', 'success');
     } catch (err) {
-      setNewGameStatus(`❌ Unable to preview ${safeName}`);
+      updateNewGameStatus(`❌ Unable to preview ${safeName}`, 'danger');
     }
   }
 
@@ -782,10 +836,10 @@ export default function Admin() {
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
-        setNewGameStatus('No reusable covers found yet. Try uploading one.');
+        updateNewGameStatus('No reusable covers found yet. Try uploading one.', 'info');
       }
     } catch (err) {
-      setNewGameStatus('❌ Unable to load media pool covers.');
+      updateNewGameStatus('❌ Unable to load media pool covers.', 'danger');
       setNewCoverOptions([]);
     } finally {
       setNewCoverLookupLoading(false);
@@ -798,33 +852,36 @@ export default function Admin() {
     setNewCoverSelectedUrl(url);
     setNewCoverPreview(direct);
     setNewCoverFile(null);
-    setNewGameStatus('✅ Using cover from the media pool.');
+    updateNewGameStatus('✅ Using cover from the media pool.', 'success');
   }
 
   async function handleCreateNewGame() {
     if (newGameBusy) return;
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
-    if (!deployGameEnabled) {
-      setNewGameStatus('🔴 Turn on Publishing to create a game.');
-      logConversation('GPT', 'Turn on Publishing to create a game.');
+    if (publishingLocked) {
+      if (newGameProtectionBanner?.text) {
+        updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone);
+        logConversation('GPT', newGameProtectionBanner.text);
+      }
       return;
     }
     if (!gameEnabled) {
-      setNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…');
-      logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
+      if (newGameProtectionBanner?.text) {
+        updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone || 'info');
+        logConversation('GPT', newGameProtectionBanner.text);
+      } else {
+        updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
+        logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
+      }
     }
     if (!title) {
-      setNewGameStatus('❌ Title is required.');
+      updateNewGameStatus('❌ Title is required.', 'danger');
       return;
     }
-    const slugInput = (newGameSlug || slugifyTitle(title) || 'game').trim();
-    if (!slugInput) {
-      setNewGameStatus('❌ Please provide a slug for this game.');
-      return;
-    }
+    const slugInput = (newGameSlug || `${slugifyTitle(title) || 'escape-ride'}-${ensureNewGameSlugSeed()}`).trim().slice(0, 48);
     setNewGameBusy(true);
-    setNewGameStatus('Creating game…');
+    updateNewGameStatus('Creating game…', 'info');
     let coverPath = newCoverSelectedUrl;
     try {
       if (!coverPath && newCoverFile) {
@@ -853,19 +910,21 @@ export default function Admin() {
       await reloadGamesList();
       setActiveSlug(data.slug || slugInput || 'default');
       setStatus(`✅ Created game “${title}”`);
-      setNewGameStatus('✅ Game created! Loading…');
+      updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
     } catch (err) {
-      setNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`);
+      updateNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`, 'danger');
     } finally {
       setNewGameBusy(false);
     }
   }
 
   useEffect(() => {
-    if (newSlugTouched) return;
-    setNewGameSlug(slugifyTitle(newTitle));
-  }, [newTitle, newSlugTouched]);
+    const base = slugifyTitle(newTitle) || 'escape-ride';
+    const suffix = ensureNewGameSlugSeed();
+    const combined = `${base}-${suffix}`.replace(/-+/g, '-');
+    setNewGameSlug(combined.slice(0, 48));
+  }, [newTitle]);
 
   useEffect(() => {
     return () => {
@@ -895,11 +954,6 @@ export default function Admin() {
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
-
-  const [suite, setSuite]   = useState(null);
-  const [config, setConfig] = useState(null);
-  const [status, setStatusInternal] = useState('');
-  const [statusLog, setStatusLog] = useState([]);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1207,40 +1261,66 @@ export default function Admin() {
     (async () => {
       try {
         setStatus('Loading…');
-        const isDefault = !activeSlug || activeSlug === 'default';
+        const slugParam = !activeSlug ? 'default' : activeSlug;
+        const supaUrl = `/api/load${qs({ slug: slugParam, channel: 'draft' })}`;
 
-        const missionUrls = isDefault
-          ? ['/missions.json']
-          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+        const supaPayload = await fetchJsonSafe(supaUrl, null);
 
-        const configUrls = isDefault
-          ? ['/api/config']
-          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+        let missionsSource = null;
+        let configSource = null;
+        let fallbackUsed = false;
 
-        const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchFirstJson(configUrls, defaultConfig());
+        if (supaPayload && supaPayload.ok) {
+          missionsSource = {
+            version: supaPayload.game?.config?.version
+              || supaPayload.game?.version
+              || supaPayload.config?.version
+              || '0.0.0',
+            missions: Array.isArray(supaPayload.missions) ? supaPayload.missions : [],
+          };
+          configSource = supaPayload.config || supaPayload.game?.config || {};
+        }
+
+        if (!missionsSource || !configSource) {
+          fallbackUsed = true;
+          const isDefault = !activeSlug || activeSlug === 'default';
+          const missionUrls = isDefault
+            ? ['/missions.json']
+            : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+          const configUrls = isDefault
+            ? ['/api/config']
+            : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+          missionsSource = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
+          configSource = await fetchFirstJson(configUrls, defaultConfig());
+        }
 
         const dc = defaultConfig();
+        const missionsList = Array.isArray(missionsSource?.missions) ? missionsSource.missions : [];
         const normalized = {
-          ...m,
-          missions: (m.missions || []).map(x => ({
+          ...missionsSource,
+          missions: missionsList.map((x) => ({
             ...x,
             appearanceOverrideEnabled: !!x.appearanceOverrideEnabled,
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
-            correct: x.correct || { mode:'none' },
-            wrong:   x.wrong   || { mode:'none' },
+            correct: x.correct || { mode: 'none' },
+            wrong: x.wrong || { mode: 'none' },
             showContinue: x.showContinue !== false,
           })),
         };
 
+        const c0 = { ...configSource };
         let merged = {
-          ...dc, ...c0,
+          ...dc,
+          ...c0,
           game: { ...dc.game, ...(c0.game || {}) },
           splash: { ...dc.splash, ...(c0.splash || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
-          devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
-                   : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
-          media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
+          devices: Array.isArray(c0.devices)
+            ? c0.devices
+            : Array.isArray(c0.powerups)
+              ? c0.powerups
+              : [],
+          media: { rewardsPool: [], penaltiesPool: [], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: {
             ...defaultAppearance(),
@@ -1262,9 +1342,12 @@ export default function Admin() {
 
         setSuite(normalized);
         setConfig(merged);
-        setSelected(null); setEditing(null); setDirty(false);
-        setSelectedDevIdx(null); setSelectedMissionIdx(null);
-        setStatus('');
+        setSelected(null);
+        setEditing(null);
+        setDirty(false);
+        setSelectedDevIdx(null);
+        setSelectedMissionIdx(null);
+        setStatus(fallbackUsed ? 'Loaded (legacy fallback)' : '');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
@@ -1329,6 +1412,24 @@ export default function Admin() {
     const preparedConfig = normalizeGameMetadata(config, slugTag);
     if (preparedConfig !== config) setConfig(preparedConfig);
 
+    const supaPayload = {
+      slug,
+      config: preparedConfig,
+      missions: suite?.missions || [],
+      devices: getDevices(),
+    };
+
+    const attemptSupabase = async () => {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(supaPayload),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'supabase save failed');
+    };
+
     const bundleUrl = isDefault ? '/api/save-bundle' : `/api/save-bundle${qs({ slug })}`;
     const attemptBundle = async () => {
       const response = await fetch(bundleUrl, {
@@ -1366,19 +1467,26 @@ export default function Admin() {
     };
 
     try {
-      await attemptBundle();
+      await attemptSupabase();
       setStatus('✅ Saved');
       return true;
-    } catch (bundleError) {
+    } catch (supaError) {
+      console.warn('Supabase save failed, attempting fallback', supaError);
       try {
-        setStatus('Bundle save unavailable — retrying legacy save…');
-        await attemptLegacy();
+        await attemptBundle();
         setStatus('✅ Saved');
         return true;
-      } catch (legacyError) {
-        console.error('Save failed', { bundleError, legacyError });
-        setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError));
-        return false;
+      } catch (bundleError) {
+        try {
+          setStatus('Bundle save unavailable — retrying legacy save…');
+          await attemptLegacy();
+          setStatus('✅ Saved');
+          return true;
+        } catch (legacyError) {
+          console.error('Save failed', { supaError, bundleError, legacyError });
+          setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError || supaError));
+          return false;
+        }
       }
     }
   }
@@ -2329,8 +2437,8 @@ export default function Admin() {
     });
     setDirty(true);
     setStatus(nextEnabled
-      ? 'Game deployment enabled — Save & Publish will deploy the game build.'
-      : 'Game deployment disabled — Save & Publish updates admin data only.');
+      ? '🟢 Publishing enabled — Save & Publish will deploy the live game and protect edits.'
+      : '🔴 Publishing disabled — admin changes can be edited, overwritten, and saved.');
   }
 
   async function handleCoverFile(file) {
@@ -2463,7 +2571,6 @@ export default function Admin() {
   const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((viewConfig?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = viewConfig?.game?.deployEnabled !== false;
   const headerGameTitle = (viewConfig?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
   const headerCoverThumb = viewConfig?.game?.coverImage
     ? toDirectMediaURL(viewConfig.game.coverImage)
@@ -2622,7 +2729,7 @@ export default function Admin() {
                 style={{ ...S.button, ...S.headerNewGameButton }}
               >
                 <span style={S.newGameLabel}>
-                  {!deployGameEnabled && <span aria-hidden="true" style={S.headerNewGameLight} />}
+                  {!publishingLocked && <span aria-hidden="true" style={S.headerNewGameLight} />}
                   <span>+ New Game</span>
                 </span>
               </button>
@@ -2644,25 +2751,30 @@ export default function Admin() {
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                   <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
                   {games.map(g=>(
-                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                    <option key={g.slug} value={g.slug}>{g.title || g.slug}{g.mode ? ` — ${g.mode}` : ''}</option>
                   ))}
                 </select>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
                   <input
                     type="checkbox"
-                    checked={deployGameEnabled}
+                    checked={publishingLocked}
                     onChange={(e)=>setDeployEnabled(e.target.checked)}
                   />
-                  Deploy game build
+                  Enable publishing to live game
                 </label>
+                <div style={S.deployStatusCopy}>
+                  {publishingLocked
+                    ? '🟢 Protected — publishing to the live game is enabled.'
+                    : '🔴 Editing unlocked — drafts can be edited and saved.'}
+                </div>
                 <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  Deploy delay (sec):
+                  Publish delay (sec):
                   <input
                     type="number" min={0} max={120}
                     value={deployDelaySec}
                     onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90, opacity: deployGameEnabled ? 1 : 0.45 }}
-                    disabled={!deployGameEnabled}
+                    style={{ ...S.input, width:90, opacity: publishingLocked ? 1 : 0.45 }}
+                    disabled={!publishingLocked}
                   />
                 </label>
               </div>
@@ -3734,7 +3846,7 @@ export default function Admin() {
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input
                   type="checkbox"
-                  checked={deployGameEnabled}
+                  checked={publishingLocked}
                   onChange={(e)=>setDeployEnabled(e.target.checked)}
                 />
                 Enable publishing to the live game build
@@ -4092,6 +4204,9 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
+            <div style={S.settingsFooterTime}>
+              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • {metaCommitShort || metaCommitLabel || '—'} • {metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
+            </div>
           </footer>
         </main>
       )}
@@ -4291,19 +4406,22 @@ export default function Admin() {
               <button style={S.cancelGlowButton} onClick={handleNewGameModalClose}>Cancel & Close</button>
               <div style={S.modalTitleStack}>
                 <div style={S.modalTitle}>Create New Game</div>
-                {!deployGameEnabled && (
-                  <div style={S.modalPublishWarning}>
-                    <span aria-hidden="true" style={S.modalPublishLight} />
-                    <span>Turn on Publishing to create a game</span>
-                  </div>
-                )}
               </div>
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
-              {!gameEnabled && (
-                <div style={S.modalStatusError}>
-                  Game project publishing is currently disabled. Enable it in settings before creating a new game.
+              {newGameProtectionBanner?.text && (
+                <div
+                  style={{
+                    ...S.modalStatus,
+                    ...(newGameProtectionBanner.tone === 'success'
+                      ? S.modalStatusSuccess
+                      : newGameProtectionBanner.tone === 'danger'
+                        ? S.modalStatusDanger
+                        : S.modalStatusInfo),
+                  }}
+                >
+                  {newGameProtectionBanner.text}
                 </div>
               )}
               <Field label="Game Title">
@@ -4314,15 +4432,7 @@ export default function Admin() {
                   placeholder="Starship Escape"
                 />
                 <div style={S.noteText}>This name appears wherever the game is listed.</div>
-              </Field>
-              <Field label="Slug (folder name)">
-                <input
-                  style={S.input}
-                  value={newGameSlug}
-                  onChange={(e)=>handleNewSlugInput(e.target.value)}
-                  placeholder="starship-escape"
-                />
-                <div style={S.noteText}>Stored at <code>/public/games/[slug]</code> alongside missions and config.</div>
+                <div style={S.noteText}>A unique slug is generated automatically for storage and Supabase lookups.</div>
               </Field>
               <Field label="Game Type">
                 <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
@@ -4445,16 +4555,29 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {newGameStatus && <div style={S.modalStatus}>{newGameStatus}</div>}
+              {newGameStatus && (
+                <div
+                  style={{
+                    ...S.modalStatus,
+                    ...(newGameStatusTone === 'success'
+                      ? S.modalStatusSuccess
+                      : newGameStatusTone === 'danger'
+                        ? S.modalStatusDanger
+                        : S.modalStatusInfo),
+                  }}
+                >
+                  {newGameStatus}
+                </div>
+              )}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:12, flexWrap:'wrap' }}>
                 <button
                   style={{
                     ...S.action3DButton,
                     ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}),
-                    ...(!deployGameEnabled ? { opacity:0.55, cursor:'not-allowed' } : {}),
+                    ...((publishingLocked || !gameEnabled) ? { opacity:0.55, cursor:'not-allowed' } : {}),
                   }}
                   onClick={handleCreateNewGame}
-                  disabled={newGameBusy || !deployGameEnabled}
+                  disabled={newGameBusy || publishingLocked || !gameEnabled}
                 >
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
@@ -4987,6 +5110,12 @@ const S = {
     background: '#ef4444',
     boxShadow: '0 0 12px rgba(239, 68, 68, 0.65)',
   },
+  deployStatusCopy: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    marginTop: -4,
+    marginBottom: 8,
+  },
   headerTopRow: {
     display: 'flex',
     flexDirection: 'column',
@@ -5426,23 +5555,6 @@ const S = {
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
   },
-  modalPublishWarning: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    fontSize: 12,
-    color: '#ef4444',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    fontWeight: 600,
-  },
-  modalPublishLight: {
-    width: 12,
-    height: 12,
-    borderRadius: '50%',
-    background: '#ef4444',
-    boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
-  },
   modalCloseButton: {
     border: 'none',
     background: 'transparent',
@@ -5498,6 +5610,17 @@ const S = {
     fontSize: 13,
     color: 'var(--admin-muted)',
     minHeight: 20,
+  },
+  modalStatusInfo: {
+    color: 'var(--admin-muted)',
+  },
+  modalStatusSuccess: {
+    color: '#16a34a',
+    fontWeight: 600,
+  },
+  modalStatusDanger: {
+    color: '#ef4444',
+    fontWeight: 600,
   },
   modalStatusError: {
     fontSize: 13,
@@ -6081,13 +6204,13 @@ function MediaPoolTab({
     const repoPath = typeof item === 'string'
       ? pathFromUrl(item)
       : (item?.path || pathFromUrl(item?.url || item?.id || ''));
-    if (!repoPath) {
+    if (!repoPath && !(item?.supabase?.path)) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
     }
     if (!window.confirm(`Delete this media file?\n${targetUrl}`)) return false;
     setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(repoPath);
+    const ok = await deleteMediaEntry({ ...item, path: repoPath });
     setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
     if (ok) await refreshInventory();
     return ok;
@@ -6100,9 +6223,9 @@ function MediaPoolTab({
     let okCount = 0;
     for (const it of list) {
       const path = it?.path || pathFromUrl(it?.url || it?.id || '');
-      if (!path) continue;
+      if (!path && !(it?.supabase?.path)) continue;
       // eslint-disable-next-line no-await-in-loop
-      const ok = await deleteMediaPath(path);
+      const ok = await deleteMediaEntry({ ...it, path });
       if (ok) okCount++;
     }
     setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
@@ -6456,6 +6579,7 @@ function AssignedMediaPageTab({
         category: item?.category || '',
         categoryLabel: item?.categoryLabel || '',
         tags: Array.isArray(item?.tags) ? item.tags : [],
+        slug: item?.slug || '',
         thumbUrl: thumb,
         url: directUrl,
         openUrl: rawUrl || directUrl,

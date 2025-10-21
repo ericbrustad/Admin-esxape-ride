@@ -1,110 +1,90 @@
-// pages/api/games.js
-// ------------------
-// [1] GitHub API config + helpers
+import { supaService } from '../../lib/supabase/server.js';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
-const GH = 'https://api.github.com';
-const owner  = process.env.REPO_OWNER;
-const repo   = process.env.REPO_NAME;
-const token  = process.env.GITHUB_TOKEN;
-const branch = (
-  process.env.REPO_BRANCH ||
-  process.env.GITHUB_BRANCH ||
-  process.env.VERCEL_GIT_COMMIT_REF ||
-  process.env.COMMIT_REF ||
-  'main'
-);
 
-const authHeaders = {
-  Authorization: `Bearer ${token}`,
-  'User-Agent': 'esx-admin',
-  Accept: 'application/vnd.github+json',
-};
-
-async function getFile(path) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${branch}`;
-  const res = await fetch(url, { headers: authHeaders });
-  if (!res.ok) return null;
-  const json = await res.json();
-  const text = Buffer.from(json.content || '', 'base64').toString('utf8');
-  return { sha: json.sha, text };
-}
-
-async function putFile(path, text, message) {
-  const url = `${GH}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const head = await getFile(path);
-  const body = {
-    message,
-    content: Buffer.from(text, 'utf8').toString('base64'),
-    branch,
-    ...(head ? { sha: head.sha } : {}),
-  };
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: { ...authHeaders, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`GitHub PUT failed: ${res.status} ${await res.text()}`);
-  return res.json();
-}
-
-const slugify = (s) =>
-  String(s || '')
+function slugify(value) {
+  return String(value || '')
     .toLowerCase()
     .replace(/['"]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'game';
+}
 
-// [2] Defaults for a brand-new game
-function defaultSuite(title, type) {
+function defaultSuite(title) {
   return {
     version: '0.0.1',
     missions: [
       {
         id: 'm01',
-        title: 'Welcome',
+        title: title || 'Welcome',
         type: 'statement',
         rewards: { points: 10 },
-        content: { text: `Welcome to ${title}! Ready to play?` }
-      }
+        content: { text: `Welcome to ${title || 'the adventure'}! Ready to play?` },
+      },
     ],
   };
 }
 
-function defaultConfig(title, gameType, mode = 'single', slugTag = '', extras = {}) {
+function defaultConfig({ title, gameType, mode, slug, extras = {} }) {
   const players = mode === 'head2head' ? 2 : mode === 'multi' ? 4 : 1;
-  const normSlug = (slugTag || slugify(title)).toLowerCase();
-  const tags = normSlug ? [normSlug] : [];
-  if (normSlug === 'default' && !tags.includes('default-game')) tags.push('default-game');
-  return {
-    splash: { enabled: true, mode }, // single | head2head | multi
+  const tags = new Set();
+  if (slug) tags.add(slug);
+  if (slug === 'default') tags.add('default-game');
+  const baseConfig = {
+    splash: { enabled: true, mode },
     game: {
       title,
       type: gameType || 'Mystery',
-      tags,
+      tags: Array.from(tags),
       coverImage: extras.coverImage || '',
       shortDescription: extras.shortDescription || '',
       longDescription: extras.longDescription || '',
-      slug: normSlug,
+      slug,
+      deployEnabled: false,
     },
-    forms: { players },              // 1 | 2 | 4
-    textRules: []
+    forms: { players },
+    textRules: [],
+    timer: { durationMinutes: 0, alertMinutes: 10 },
+    devices: [],
+    powerups: [],
+    media: { rewardsPool: [], penaltiesPool: [] },
+    appearance: {},
+    appearanceSkin: '',
+    appearanceTone: 'light',
+    map: { centerLat: 0, centerLng: 0, defaultZoom: 13 },
+    geofence: { mode: 'test' },
+    mediaTriggers: {},
   };
+  return baseConfig;
 }
 
-// [3] Handler: GET (list), POST (create)
 export default async function handler(req, res) {
-
-  if (!token || !owner || !repo) {
-    return res.status(500).json({ ok: false, error: 'Missing env: GITHUB_TOKEN, REPO_OWNER, REPO_NAME' });
+  let supa;
+  try {
+    supa = supaService();
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || 'Supabase configuration missing' });
   }
 
-  const indexPath = 'public/games/index.json';
-
   if (req.method === 'GET') {
-    const file = await getFile(indexPath);
-    const list = file ? JSON.parse(file.text || '[]') : [];
-    return res.json({ ok: true, games: list, gameProjectEnabled: GAME_ENABLED });
+    const { data, error } = await supa.from('games').select('*', { order: { column: 'updated_at', ascending: false } });
+    if (error) {
+      return res.status(500).json({ ok: false, error: error.message || 'Failed to load games' });
+    }
+    const games = (data || []).map((entry) => {
+      const config = entry?.config || {};
+      const gameMeta = config?.game || {};
+      return {
+        slug: entry.slug,
+        title: entry.title || gameMeta.title || entry.slug,
+        status: entry.status || 'draft',
+        mode: config?.splash?.mode || 'single',
+        updatedAt: entry.updated_at,
+        createdAt: entry.created_at,
+        config,
+      };
+    });
+    return res.status(200).json({ ok: true, games, gameProjectEnabled: GAME_ENABLED });
   }
 
   if (req.method === 'POST') {
@@ -117,57 +97,71 @@ export default async function handler(req, res) {
         shortDescription = '',
         longDescription = '',
         coverImage = '',
+        missions: providedMissions,
+        config: providedConfig,
       } = req.body || {};
-      if (!title) return res.status(400).json({ ok: false, error: 'title required' });
 
-      // load index & ensure unique slug
-      const file = await getFile(indexPath);
-      const list = file ? JSON.parse(file.text || '[]') : [];
-      const taken = new Set(list.map(g => g.slug));
+      if (!title) {
+        return res.status(400).json({ ok: false, error: 'Title is required' });
+      }
 
-      let base = slugify(requestedSlug || title);
-      let slug = base || 'game';
-      let i = 2;
-      while (taken.has(slug)) slug = `${base}-${i++}`;
+      const baseSlug = slugify(requestedSlug || title);
+      const slug = baseSlug || 'game';
+      const now = new Date().toISOString();
 
-      const trimmedShort = String(shortDescription || '').trim();
-      const trimmedLong = String(longDescription || '').trim();
-      const normalizedCover = String(coverImage || '').trim();
-
-      // create suite + config
-      const suite  = defaultSuite(title, type);
-      const config = defaultConfig(title, type, mode, slug, {
-        shortDescription: trimmedShort,
-        longDescription: trimmedLong,
-        coverImage: normalizedCover,
+      const config = providedConfig || defaultConfig({
+        title,
+        gameType: type,
+        mode,
+        slug,
+        extras: { shortDescription, longDescription, coverImage },
       });
 
-      await putFile(`public/games/${slug}/missions.json`, JSON.stringify(suite, null, 2),
-        `feat: create game ${slug} missions.json`);
-      await putFile(`public/games/${slug}/config.json`, JSON.stringify(config, null, 2),
-        `feat: create game ${slug} config.json`);
+      const suite = providedMissions || defaultSuite(title);
+      const missions = Array.isArray(suite?.missions) ? suite.missions : [];
+      const devices = Array.isArray(config?.devices) ? config.devices : Array.isArray(config?.powerups) ? config.powerups : [];
 
-      // update index.json
-      const item = {
-        slug,
-        title,
-        type: type || 'Mystery',
-        mode,
-        shortDescription: trimmedShort,
-        longDescription: trimmedLong,
-        coverImage: normalizedCover,
-        createdAt: new Date().toISOString(),
-      };
-      const next = [...list, item];
-      await putFile(indexPath, JSON.stringify(next, null, 2), `chore: update games index (${slug})`);
+      const upserts = [
+        supa.from('games').upsert({
+          slug,
+          title: title || slug,
+          status: 'draft',
+          theme: config.appearance || {},
+          map: config.map || {},
+          config,
+          updated_at: now,
+        }),
+        supa.from('missions').upsert({
+          game_slug: slug,
+          channel: 'draft',
+          items: missions,
+          updated_at: now,
+        }),
+        supa.from('missions').upsert({
+          game_slug: slug,
+          channel: 'published',
+          items: [],
+          updated_at: now,
+        }),
+        supa.from('devices').upsert({
+          game_slug: slug,
+          items: devices,
+          updated_at: now,
+        }),
+      ];
 
-      return res.json({ ok: true, slug, game: item });
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ ok: false, error: String(err.message || err) });
+      const results = await Promise.all(upserts);
+      const failed = results.find((result) => result?.error);
+      if (failed && failed.error) {
+        throw failed.error;
+      }
+
+      return res.status(200).json({ ok: true, slug });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: error?.message || 'Failed to create game' });
     }
   }
 
   res.setHeader('Allow', 'GET, POST');
-  return res.status(405).end();
+  return res.status(405).end('Method Not Allowed');
 }
