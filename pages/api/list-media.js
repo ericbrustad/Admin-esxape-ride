@@ -124,7 +124,7 @@ export default async function handler(req, res) {
       const meta = metaByUrl || metaByName || {};
       out.push({
         name,
-        url: `/media/${dir}/${encodeURIComponent(name)}`,
+        url: `/media/${dir}/${encoded}`,
         type,
         source: 'admin',
         path: relativePath,
@@ -147,7 +147,7 @@ export default async function handler(req, res) {
         seenByName.add(key);
         out.push({
           name,
-          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
+          url: `${gameOrigin}/media/${dir}/${encoded}`,
           type,
           source: 'game',
           path: '',

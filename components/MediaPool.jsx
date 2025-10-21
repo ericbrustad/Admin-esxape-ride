@@ -27,6 +27,7 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
         {media.map((m) => {
           const previewUrl = m.thumbUrl || m.url || m.id;
           const isImage = looksLikeImage(m);
+          const isAr = String(m.type || '').toLowerCase() === 'ar';
           const displayId = m.name || m.label || m.id;
           return (
             <div
@@ -61,6 +62,20 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
                     alt={displayId || 'media preview'}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
+                ) : isAr ? (
+                  <div
+                    style={{
+                      color: 'var(--admin-muted)',
+                      fontSize: 12,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      display: 'grid',
+                      gap: 4,
+                      placeItems: 'center',
+                    }}
+                  >
+                    <span>AR Asset</span>
+                  </div>
                 ) : (
                   <div
                     style={{
