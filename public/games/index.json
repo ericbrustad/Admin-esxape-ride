@@ -81,5 +81,15 @@
     "longDescription": "gngg g g dhrdhrdff srr r  r",
     "coverImage": "/media/covers/1760917344366-20face2eye03.png",
     "createdAt": "2025-10-19T23:42:27.345Z"
+  },
+  {
+    "slug": "hello",
+    "title": "Hello",
+    "type": "Mystery",
+    "mode": "single",
+    "shortDescription": "",
+    "longDescription": "",
+    "coverImage": "/media/covers/1761017327804-3_ring_answer_02.JPG",
+    "createdAt": "2025-10-21T03:28:50.080Z"
   }
 ]
