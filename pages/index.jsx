@@ -304,31 +304,37 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const PLACEHOLDER_MEDIA = {
+  cover: '/media/placeholders/cover.svg',
+  icon: '/media/placeholders/icon.svg',
+  bundle: '/media/placeholders/bundle.svg',
+};
+
 const STARFIELD_DEFAULTS = {
   title: 'Starfield Station Break',
   type: 'Sci-Fi',
   slug: 'starfield-station-break',
-  coverImage: '/media/mediapool/Images/covers/starfield-station-break.svg',
+  coverImage: PLACEHOLDER_MEDIA.cover,
   tags: ['starfield-station-break', 'default-game'],
 };
 
 const DEFAULT_BUNDLES = {
   devices: [
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
-    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/mediapool/Images/icons/quantum-anchor.svg' },
-    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/mediapool/Images/icons/chrono-switch.svg' },
-    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/mediapool/Images/icons/voyager-dial.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'lumen-halo', name: 'Lumen Halo', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'quantum-anchor', name: 'Quantum Anchor', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'chrono-switch', name: 'Chrono Switch', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'voyager-dial', name: 'Voyager Dial', url: PLACEHOLDER_MEDIA.icon },
   ],
   missions: [
-    { key: 'briefing-star', name: 'Briefing Star', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
-    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
+    { key: 'briefing-star', name: 'Briefing Star', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: PLACEHOLDER_MEDIA.icon },
+    { key: 'decoy-glow', name: 'Decoy Glow', url: PLACEHOLDER_MEDIA.icon },
   ],
   rewards: [
-    { key: 'evidence', name: 'Evidence', url: '/media/mediapool/Images/bundles/evidence%202.png' },
-    { key: 'clue', name: 'Clue', url: '/media/mediapool/Images/bundles/CLUEgreen.png' },
-    { key: 'gold-coin', name: 'Gold Coin', url: '/media/mediapool/Images/bundles/GOLDEN%20COIN.png' },
+    { key: 'evidence', name: 'Evidence', url: PLACEHOLDER_MEDIA.bundle },
+    { key: 'clue', name: 'Clue', url: PLACEHOLDER_MEDIA.bundle },
+    { key: 'gold-coin', name: 'Gold Coin', url: PLACEHOLDER_MEDIA.bundle },
   ],
 };
 
