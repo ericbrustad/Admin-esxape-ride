@@ -79,13 +79,12 @@ The admin upload flow is ready to target Supabase Storage for persistent media.
    admin dashboard to surface thumbnails.
 2. Supply the following environment variables to the Next.js runtime:
 
-   * `SUPABASE_URL` — the Supabase project URL.
-   * `SUPABASE_ANON_KEY` — the client key used for public uploads/listing.
+   * `SUPABASE_URL` — https://qgtccnxfuebirrcenxdn.supabase.co
+   * `SUPABASE_ANON_KEY` — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFndGNjbnhmdWViaXJyY2VueGRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTExMjAsImV4cCI6MjA3NjEyNzEyMH0.pYsQOr-M2umyTKLqbiD_pSrjN201h7nC5lhnEpIaxZM
    * `SUPABASE_SERVICE_ROLE_KEY` — optional; unlocks server-side management
      tasks (keep it secret and only expose it on the API layer).
-   * `SUPABASE_MEDIA_BUCKET` — bucket name that will store admin media.
-   * `SUPABASE_MEDIA_PREFIX` — optional folder prefix inside the bucket (for
-     example, `mediapool/`).
+   * `SUPABASE_MEDIA_BUCKET` — admin-media
+   * `SUPABASE_MEDIA_PREFIX` — mediapool/
 
 3. Once credentials are available, update `/api/upload` to write the incoming
    binary payload to the Supabase bucket and persist the returned public URL in
