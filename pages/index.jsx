@@ -2194,7 +2194,17 @@ export default function Admin() {
       body: JSON.stringify(body),
     });
     const j = await res.json().catch(() => ({}));
-    setUploadStatus(res.ok ? `✅ Registered ${safeName} in ${destinationLabel}` : `❌ ${j?.error || 'upload failed'}`);
+    if (res.ok) {
+      let message = `✅ Registered ${safeName} in ${destinationLabel}`;
+      if (j?.manifestFallback && j?.manifestPath) {
+        message += ` (manifest fallback: ${j.manifestPath})`;
+      } else if (j?.manifestPath) {
+        message += ` (manifest: ${j.manifestPath})`;
+      }
+      setUploadStatus(message);
+    } else {
+      setUploadStatus(`❌ ${j?.error || 'upload failed'}`);
+    }
     return res.ok ? (j?.item?.url || '') : '';
   }
 

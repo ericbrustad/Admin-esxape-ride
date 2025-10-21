@@ -11,10 +11,7 @@
 // be hosted externally; this endpoint only records references so uploads remain
 // hidden from Git history.
 
-import fs from 'fs';
-import path from 'path';
-
-const MANIFEST_PATH = path.join(process.cwd(), 'public', 'media', 'manifest.json');
+import { readManifest, writeManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -31,22 +28,6 @@ function classify(name = '') {
   if (EXTS.audio.test(name)) return 'audio';
   if (EXTS.ar.test(name)) return 'ar-overlay';
   return 'other';
-}
-
-function readManifest() {
-  try {
-    const raw = fs.readFileSync(MANIFEST_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (parsed && Array.isArray(parsed.items)) return parsed;
-  } catch (error) {
-    console.warn('[upload] unable to read manifest:', error?.message || error);
-  }
-  return { version: 1, updatedAt: new Date().toISOString(), items: [] };
-}
-
-function writeManifest(data) {
-  const payload = `${JSON.stringify(data, null, 2)}\n`;
-  fs.writeFileSync(MANIFEST_PATH, payload, 'utf8');
 }
 
 function resolveFolder(input = '') {
@@ -92,7 +73,7 @@ export default async function handler(req, res) {
     }
 
     const resolvedFolder = resolveFolder(derivedFolder);
-    const manifest = readManifest();
+    const { manifest } = readManifest();
 
     const type = classify(safeName);
     const repoPath = `public/media/${resolvedFolder}/${safeName}`.replace(/\\/g, '/');
@@ -117,13 +98,26 @@ export default async function handler(req, res) {
     manifest.items = Array.isArray(manifest.items) ? manifest.items : [];
     manifest.items.push(entry);
     manifest.updatedAt = new Date().toISOString();
-    writeManifest(manifest);
+
+    const writeResult = writeManifest(manifest);
 
     if (contentBase64) {
       console.warn('[upload] contentBase64 received but ignored; configure external storage to persist binaries.');
     }
 
-    return res.status(200).json({ ok: true, item: entry });
+    const debug = getManifestDebugInfo();
+
+    return res.status(200).json({
+      ok: true,
+      item: entry,
+      manifestPath: writeResult.path,
+      manifestFallback: writeResult.fallback,
+      storage: {
+        manifestPath: writeResult.path,
+        fallbackUsed: writeResult.fallback,
+        debug,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error?.message || String(error) });
   }

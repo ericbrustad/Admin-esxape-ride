@@ -28,3 +28,11 @@
 **You:** Remove every tracked binary asset, restructure the media pool so uploads route into the right type (with an "Other" tab), and log repository metadata at the bottom of Settings after verifying the app.
 
 **GPT:** Purged PNG/SVG/MP3 assets from git, replaced them with a manifest-driven media catalog that highlights external or missing files, rewired `/api/list-media` and the upload API to rely on text metadata, and ensured the Settings snapshot keeps repo, branch, commit, deployment, and timestamps anchored at the footer.
+
+---
+
+**Timestamp:** 2025-10-21T18:05:00Z
+
+**You:** Uploads say “0 of 1 uploaded” and the API throws `EROFS` when it tries to write `public/media/manifest.json`. Please make sure the media types still auto-sort, show an “Other” folder, pick up existing entries, and get ready to move everything over to Supabase. Let me know what you still need from me.
+
+**GPT:** Added a writable manifest adapter that falls back to `.next/cache/admin-media/manifest.json` (or custom env paths) whenever the repo directory is read-only, exposed the active storage path in the API responses for debugging, refreshed the Media Pool inventory logic, and documented the Supabase bucket requirements so we can finish the migration once credentials arrive.

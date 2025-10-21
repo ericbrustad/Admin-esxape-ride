@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { readManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -168,18 +169,6 @@ function listFiles(absDir, prefix = '') {
   }
 }
 
-function readManifest() {
-  try {
-    const manifestPath = path.join(process.cwd(), 'public', 'media', 'manifest.json');
-    const contents = fs.readFileSync(manifestPath, 'utf8');
-    const parsed = JSON.parse(contents);
-    if (parsed && Array.isArray(parsed.items)) return parsed.items;
-  } catch (error) {
-    console.warn('[list-media] Unable to read manifest:', error?.message || error);
-  }
-  return [];
-}
-
 function normalizeFolder(folder = '') {
   return String(folder || '')
     .trim()
@@ -268,7 +257,8 @@ export default async function handler(req, res) {
     const dirParam = (req.query.dir || 'mediapool').toString();
     const dir = resolveDir(dirParam);
     const cwd = process.cwd();
-    const manifestItems = readManifest();
+    const { manifest, path: manifestPath } = readManifest();
+    const manifestItems = manifest.items || [];
     const seenKeys = new Set();
     const out = [];
 
@@ -368,7 +358,9 @@ export default async function handler(req, res) {
       return (a.name || '').toString().toLowerCase().localeCompare((b.name || '').toString().toLowerCase());
     });
 
-    return res.status(200).json({ ok: true, dir, items: out });
+    const debug = getManifestDebugInfo();
+
+    return res.status(200).json({ ok: true, dir, items: out, manifestPath, manifestDebug: debug });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }

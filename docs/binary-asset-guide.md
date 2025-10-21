@@ -67,8 +67,33 @@ GitHub.
 | --- | --- |
 | Media card shows `pending external` | Update the manifest entry with a valid public `url`. |
 | "Open" button disabled | Provide an external URL or drop a local file inside the `.gitignored` media folder while testing. |
-| Manifest write fails on upload | Ensure the server process has write access to `public/media/manifest.json` (not available on serverless builds). |
+| Manifest write fails on upload | The API now falls back to `.next/cache/admin-media/manifest.json` (or `MEDIA_MANIFEST_FALLBACK_PATH`). If you still see errors, set `MEDIA_MANIFEST_PATH` or point `MEDIA_STORAGE_ROOT` at a writable volume such as `/tmp`. |
 | Need a historical asset | Check prior commits or the external storage provider; binaries are no longer in git history after 2025-10-20. |
+
+## 6. Preparing Supabase storage
+
+The admin upload flow is ready to target Supabase Storage for persistent media.
+
+1. Provision a Supabase project and create a storage bucket (for example,
+   `escape-ride-media`). Enable public access or generate signed URLs for the
+   admin dashboard to surface thumbnails.
+2. Supply the following environment variables to the Next.js runtime:
+
+   * `SUPABASE_URL` — https://qgtccnxfuebirrcenxdn.supabase.co
+   * `SUPABASE_ANON_KEY` — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFndGNjbnhmdWViaXJyY2VueGRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTExMjAsImV4cCI6MjA3NjEyNzEyMH0.pYsQOr-M2umyTKLqbiD_pSrjN201h7nC5lhnEpIaxZM
+   * `SUPABASE_SERVICE_ROLE_KEY` — optional; unlocks server-side management
+     tasks (keep it secret and only expose it on the API layer).
+   * `SUPABASE_MEDIA_BUCKET` — admin-media
+   * `SUPABASE_MEDIA_PREFIX` — mediapool/
+
+3. Once credentials are available, update `/api/upload` to write the incoming
+   binary payload to the Supabase bucket and persist the returned public URL in
+   the manifest entry. `/api/list-media` is already structured so you can merge
+   Supabase listings with the manifest data without further schema changes.
+
+> **Request:** Share the Supabase bucket name, region, and access policy (public
+> vs signed URLs). With those details we can wire the API to stream uploads to
+> Supabase while keeping the manifest as the source of truth.
 
 Following this flow keeps the repository lightweight, satisfies the "no binary"
 requirement, and still presents a full media catalog inside the admin dashboard.
