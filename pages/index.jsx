@@ -2085,6 +2085,24 @@ export default function Admin() {
     return combined;
   }, [games]);
 
+  const missionIconOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    const append = (list = []) => {
+      (list || []).forEach((icon) => {
+        const key = (icon?.key || '').trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
+      });
+    };
+    append(config?.icons?.missions || []);
+    append(config?.icons?.devices || []);
+    return options;
+  }, [config?.icons?.missions, config?.icons?.devices]);
+
+  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
+
   if (!suite || !config) {
     return (
       <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
@@ -2114,21 +2132,6 @@ export default function Admin() {
   const missionIconPreviewUrl = editing
     ? toDirectMediaURL(missionIconUrlFromKey(editing.iconKey) || '')
     : '';
-  const missionIconOptions = useMemo(() => {
-    const seen = new Set();
-    const options = [];
-    const append = (list = []) => {
-      list.forEach((icon) => {
-        const key = (icon?.key || '').trim();
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
-      });
-    };
-    append(config?.icons?.missions || []);
-    append(config?.icons?.devices || []);
-    return options;
-  }, [config?.icons?.missions, config?.icons?.devices]);
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
@@ -2343,7 +2346,6 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
-  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
