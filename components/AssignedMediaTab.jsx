@@ -140,6 +140,7 @@ export default function AssignedMediaTab({
     responseWrong: responseWrongUsage = [],
     responseAudio: responseAudioUsage = [],
     actionMedia: actionUsage = [],
+    arMedia: arUsage = [],
   } = usageSummary || {};
 
   const pluralize = (word, count) => (count === 1 ? word : `${word}s`);
@@ -226,6 +227,7 @@ export default function AssignedMediaTab({
       ...(responseWrongUsage || []),
       ...(responseAudioUsage || []),
       ...(actionOverview || []),
+      ...(arUsage || []),
     ];
 
     const responseTrigger = new Set();
@@ -322,6 +324,8 @@ export default function AssignedMediaTab({
                           <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : item.kind === 'audio' ? (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
+                        ) : item.kind === 'ar' ? (
+                          <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>AR</span>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>No preview</span>
                         )}
@@ -484,6 +488,10 @@ export default function AssignedMediaTab({
           noun: 'trigger',
           allowRemove: true,
           onRemove: removeActionMedia,
+        })}
+        {renderUsageSection('AR Media', arUsage, {
+          emptyLabel: 'No AR media assigned yet.',
+          noun: 'AR reference',
         })}
       </Section>
     </div>

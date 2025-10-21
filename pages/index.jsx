@@ -71,8 +71,10 @@ const EXTS = {
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
+  ar: /\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i,
 };
 const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
+const MEDIA_WARNING_BYTES = 5 * 1024 * 1024; // warn when media exceeds 5 MB
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
   commit: '',
@@ -91,6 +93,7 @@ function classifyByExt(u) {
   if (EXTS.image.test(s)) return 'image';
   if (EXTS.video.test(s)) return 'video';
   if (EXTS.audio.test(s)) return 'audio';
+  if (EXTS.ar.test(s)) return 'ar';
   return 'other';
 }
 
@@ -2068,17 +2071,18 @@ export default function Admin() {
         gif: 'gif',
         audio: 'audio',
         video: 'video',
+        ar: 'ar',
         other: 'other',
       };
       const target = typeFolderMap[classification] || 'other';
       resolvedFolder = `mediapool/${target}`;
     }
     const path   = `public/media/${resolvedFolder}/${Date.now()}-${safeName}`;
-    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
-    const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
     const destinationLabel = resolvedFolder;
-    if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync into ${destinationLabel}.`);
+    const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
+    if (overWarning) {
+      const sizeMb = Math.max(0.01, (file.size || 0) / (1024 * 1024));
+      setUploadStatus(`⚠️ ${safeName} is ${sizeMb.toFixed(sizeMb >= 10 ? 0 : 1)} MB — uploads over 5 MB may take longer to sync into ${destinationLabel}.`);
     } else {
       setUploadStatus(`Uploading ${safeName} to ${destinationLabel}…`);
     }
@@ -4384,6 +4388,7 @@ function MediaPreview({ url, kind }) {
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
+  const isAr = /\.(glb|gltf|usdz|reality|vrm|fbx|obj)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ color:'var(--admin-muted)', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
@@ -4391,6 +4396,24 @@ function MediaPreview({ url, kind }) {
         <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
+      ) : isAr ? (
+        <div
+          style={{
+            width: '100%',
+            maxHeight: 200,
+            borderRadius: 10,
+            border: '1px dashed var(--admin-border-soft)',
+            background: 'rgba(148, 163, 184, 0.08)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+            color: 'var(--admin-muted)',
+            fontSize: 12,
+            textAlign: 'center',
+          }}
+        >
+          AR asset preview not available — open in a compatible viewer.
+        </div>
       ) : isAudio ? (
         <audio src={u} controls style={{ width:'100%' }} />
       ) : (
@@ -4985,6 +5008,111 @@ const S = {
     boxShadow: '0 12px 24px rgba(14, 165, 233, 0.35)',
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
   },
+  buttonDisabled: {
+    opacity: 0.65,
+    cursor: 'not-allowed',
+  },
+  pendingWrap: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
+    display: 'grid',
+    gap: 12,
+  },
+  pendingHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  pendingTitle: {
+    fontWeight: 700,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingCount: {
+    padding: '2px 10px',
+    borderRadius: 999,
+    background: 'rgba(59, 130, 246, 0.18)',
+    color: '#1d4ed8',
+    fontWeight: 700,
+    fontSize: 12,
+  },
+  pendingGrid: {
+    display: 'grid',
+    gap: 10,
+  },
+  pendingItem: {
+    display: 'grid',
+    gridTemplateColumns: '60px 1fr auto',
+    gap: 12,
+    alignItems: 'center',
+    padding: '8px 10px',
+    borderRadius: 10,
+    background: 'rgba(148, 163, 184, 0.08)',
+  },
+  pendingThumb: {
+    width: 60,
+    height: 48,
+    borderRadius: 10,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    display: 'grid',
+    placeItems: 'center',
+  },
+  pendingThumbImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  pendingThumbPlaceholder: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    color: 'var(--admin-muted)',
+  },
+  pendingMeta: {
+    display: 'grid',
+    gap: 4,
+  },
+  pendingName: {
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  pendingDetails: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingRemove: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid rgba(248, 113, 113, 0.55)',
+    background: 'rgba(248, 113, 113, 0.12)',
+    color: '#f87171',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  pendingWarning: {
+    fontSize: 12,
+    color: '#b45309',
+    background: 'rgba(234, 179, 8, 0.12)',
+    border: '1px solid rgba(234, 179, 8, 0.24)',
+    borderRadius: 10,
+    padding: '8px 10px',
+  },
+  pendingActions: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
   tab: {
     padding: '8px 12px',
     borderRadius: 12,
@@ -5478,18 +5606,11 @@ function MediaPoolTab({
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const pendingFilesRef = useRef([]);
+  const [pendingActionBusy, setPendingActionBusy] = useState(false);
 
-
-
-  // Sub-tabs inside Media Pool. Default → 'image'.
-  const subTabs = [
-    { key:'image', label:'Images' },
-    { key:'video', label:'Videos' },
-    { key:'audio', label:'Audio' },
-    { key:'gif',   label:'GIFs'  },
-    { key:'other', label:'Other' },
-  ];
-  const [subTab, setSubTab] = useState('image');
+  const [subTab, setSubTab] = useState('audio');
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -5549,28 +5670,149 @@ function MediaPoolTab({
   }
 
   async function uploadFiles(fileList) {
-    const files = Array.from(fileList || []).filter(Boolean);
-    if (!files.length) return;
+    const entries = Array.from(fileList || [])
+      .map((item) => {
+        if (!item) return null;
+        if (item.file instanceof File) return item;
+        if (item instanceof File) return { file: item };
+        return null;
+      })
+      .filter(Boolean);
+    if (!entries.length) return { success: 0, total: 0, results: [] };
     let success = 0;
     let lastUrl = '';
-    for (const file of files) {
+    const results = [];
+    for (const entry of entries) {
+      const file = entry.file;
+      if (!file) {
+        results.push({ entry, ok: false, url: '' });
+        // eslint-disable-next-line no-continue
+        continue;
+      }
       // eslint-disable-next-line no-await-in-loop
       const uploaded = await uploadToRepo(file, folder);
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
       }
+      results.push({ entry, ok: !!uploaded, url: uploaded });
     }
     if (lastUrl) setAddUrl(lastUrl);
     if (success) await refreshInventory();
-    if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+    if (entries.length > 1) {
+      const prefix = success === entries.length ? '✅' : '⚠️';
+      setUploadStatus(`${prefix} Uploaded ${success}/${entries.length} files`);
+    }
+    return { success, total: entries.length, results };
+  }
+
+  function revokePreview(entry) {
+    if (entry?.previewUrl) {
+      try { URL.revokeObjectURL(entry.previewUrl); } catch (err) { /* noop */ }
     }
   }
 
+  function formatFileSize(bytes = 0) {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    const fixed = size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1);
+    return `${fixed} ${units[unitIndex]}`;
+  }
+
+  function stageFiles(fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    let added = false;
+    setPendingFiles((prev) => {
+      const existingKeys = new Set(
+        prev.map((item) => `${item.file?.name || ''}-${item.file?.size || 0}-${item.file?.lastModified || 0}`)
+      );
+      const additions = [];
+      files.forEach((file) => {
+        const key = `${file.name || 'file'}-${file.size || 0}-${file.lastModified || 0}`;
+        if (existingKeys.has(key)) return;
+        existingKeys.add(key);
+        const previewUrl = ((file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || ''))
+          ? URL.createObjectURL(file)
+          : '';
+        additions.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          file,
+          name: file.name || 'upload',
+          size: file.size || 0,
+          previewUrl,
+          type: classifyByExt(file.name || file.type || ''),
+        });
+      });
+      if (!additions.length) return prev;
+      added = true;
+      return [...prev, ...additions];
+    });
+    if (!added) return;
+    const oversize = files.filter((file) => (file.size || 0) > MEDIA_WARNING_BYTES);
+    if (oversize.length) {
+      const label = oversize.length === 1
+        ? `${oversize[0].name || 'file'} (${formatFileSize(oversize[0].size || 0)})`
+        : `${oversize.length} files over 5 MB`;
+      setUploadStatus(`⚠️ ${label} — uploads over 5 MB may take longer. Click “Save to Media Pool” to continue.`);
+    } else {
+      setUploadStatus(`Ready to upload ${files.length} file${files.length === 1 ? '' : 's'}. Click “Save to Media Pool”.`);
+    }
+  }
+
+  function removePending(id) {
+    setPendingFiles((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      const removed = prev.find((item) => item.id === id);
+      if (removed) revokePreview(removed);
+      return next;
+    });
+  }
+
+  function clearPending() {
+    setPendingFiles((prev) => {
+      prev.forEach(revokePreview);
+      return [];
+    });
+  }
+
+  async function savePending() {
+    if (!pendingFiles.length) return;
+    setPendingActionBusy(true);
+    try {
+      const result = await uploadFiles(pendingFiles);
+      if (result?.success && result.success === pendingFiles.length) {
+        clearPending();
+      } else if (result?.success) {
+        setPendingFiles((prev) => {
+          const keepers = prev.filter((item) => !result.results.some((r) => r.entry === item && r.ok));
+          prev
+            .filter((item) => result.results.some((r) => r.entry === item && r.ok))
+            .forEach(revokePreview);
+          return keepers;
+        });
+      }
+    } finally {
+      setPendingActionBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    pendingFilesRef.current = pendingFiles;
+  }, [pendingFiles]);
+
+  useEffect(() => () => {
+    pendingFilesRef.current.forEach(revokePreview);
+  }, []);
+
   async function onUpload(e) {
-    await uploadFiles(e.target.files);
+    stageFiles(e.target.files);
     if (e.target) e.target.value = '';
   }
 
@@ -5615,14 +5857,32 @@ function MediaPoolTab({
     acc[key].push(it);
     return acc;
   }, {});
-  const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
-    { key:'other', title:'Other (unclassified)', items: itemsByType.other || [] },
+  const baseTabs = [
+    { key:'audio', label:'Audio' },
+    { key:'video', label:'Video' },
+    { key:'image', label:'Images' },
+    { key:'ar', label:'AR' },
+    { key:'gif', label:'Gif' },
   ];
+  if ((itemsByType.other || []).length) baseTabs.push({ key:'other', label:'Other' });
+  const sections = [
+    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
+    { key:'video', title:'Video (mp4/mov)', items: itemsByType.video || [] },
+    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
+    { key:'ar', title:'AR Assets', items: itemsByType.ar || [] },
+    { key:'gif', title:'GIF', items: itemsByType.gif || [] },
+  ];
+  if ((itemsByType.other || []).length) {
+    sections.push({ key:'other', title:'Other (unclassified)', items: itemsByType.other || [] });
+  }
   const active = sections.find(s => s.key === subTab) || sections[0];
+  const availableTabKeys = baseTabs.map((tab) => tab.key);
+  useEffect(() => {
+    if (!availableTabKeys.includes(subTab) && availableTabKeys.length) {
+      setSubTab(availableTabKeys[0]);
+    }
+  }, [availableTabKeys.join('::'), subTab]);
+  const subTabs = baseTabs;
 
   return (
     <main style={S.wrap}>
@@ -5651,7 +5911,7 @@ function MediaPoolTab({
           onDrop={(e)=>{
             e.preventDefault();
             setDropActive(false);
-            uploadFiles(e.dataTransfer?.files);
+            stageFiles(e.dataTransfer?.files);
           }}
           style={{ ...S.mediaDropZone, ...(dropActive ? S.mediaDropZoneActive : {}) }}
         >
@@ -5662,13 +5922,77 @@ function MediaPoolTab({
           <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
         </div>
         <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
+        {pendingFiles.length > 0 && (
+          <div style={S.pendingWrap}>
+            <div style={S.pendingHeader}>
+              <div style={S.pendingTitle}>Pending uploads</div>
+              <div style={S.pendingCount}>{pendingFiles.length}</div>
+            </div>
+            <div style={S.pendingGrid}>
+              {pendingFiles.map((item) => {
+                const typeLabel = (item.type || 'file').toUpperCase();
+                return (
+                  <div key={item.id} style={S.pendingItem}>
+                    <div style={S.pendingThumb}>
+                      {item.previewUrl ? (
+                        <img src={item.previewUrl} alt={item.name} style={S.pendingThumbImage} />
+                      ) : (
+                        <div style={S.pendingThumbPlaceholder}>
+                          {item.type === 'ar' ? 'AR' : typeLabel}
+                        </div>
+                      )}
+                    </div>
+                    <div style={S.pendingMeta}>
+                      <div style={S.pendingName}>{item.name}</div>
+                      <div style={S.pendingDetails}>
+                        {formatFileSize(item.size)} · {typeLabel}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={{ ...S.pendingRemove, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                      onClick={() => removePending(item.id)}
+                      title="Remove from pending uploads"
+                      disabled={pendingActionBusy}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {pendingFiles.some((item) => (item.size || 0) > MEDIA_WARNING_BYTES) && (
+              <div style={S.pendingWarning}>
+                Files over 5 MB may take longer to sync. Saving keeps all sizes allowed.
+              </div>
+            )}
+            <div style={S.pendingActions}>
+              <button
+                type="button"
+                style={{ ...S.button, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                onClick={savePending}
+                disabled={pendingActionBusy}
+              >
+                {pendingActionBusy ? 'Saving…' : 'Save to Media Pool'}
+              </button>
+              <button
+                type="button"
+                style={{ ...S.button, ...S.buttonDanger, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                onClick={clearPending}
+                disabled={pendingActionBusy}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
       </div>
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      {/* Sub-tabs: Audio • Video • Images • AR • GIF (Audio default) */}
       <div style={{ ...S.card, marginTop:16 }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
           {subTabs.map(st => (
@@ -5960,6 +6284,7 @@ function AssignedMediaPageTab({
     const responseWrongMap = new Map();
     const responseAudioMap = new Map();
     const coverMap = new Map();
+    const arMap = new Map();
 
     const missionIconLookup = new Map();
     (safeIcons.missions || []).forEach((icon) => {
@@ -5986,6 +6311,14 @@ function AssignedMediaPageTab({
       if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
       if (mission.onCorrect?.audioUrl) addUsage(responseAudioMap, mission.onCorrect.audioUrl, `${title} — Correct`);
       if (mission.onWrong?.audioUrl) addUsage(responseAudioMap, mission.onWrong.audioUrl, `${title} — Wrong`);
+
+      const content = mission.content || {};
+      if (content.markerUrl) {
+        addUsage(arMap, content.markerUrl, `${title} — Marker`, { label: `${title} marker`, kind: 'ar' });
+      }
+      if (content.assetUrl) {
+        addUsage(arMap, content.assetUrl, `${title} — Overlay`, { label: `${title} overlay`, kind: 'ar' });
+      }
     });
 
     const deviceIconLookup = new Map();
@@ -6042,7 +6375,7 @@ function AssignedMediaPageTab({
       const label = entry.label || info?.name || baseNameFromUrl(entry.url);
       const kind = entry.kind || info?.type || classifyByExt(entry.url);
       const openUrl = info?.openUrl || entry.url;
-      const thumb = kind === 'audio'
+      const thumb = (kind === 'audio' || kind === 'ar')
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
       const tagSet = new Set();
@@ -6075,6 +6408,7 @@ function AssignedMediaPageTab({
       responseWrong: finalize(responseWrongMap),
       responseAudio: finalize(responseAudioMap),
       coverImages: finalize(coverMap),
+      arMedia: finalize(arMap),
     };
     } catch (err) {
       console.error('Failed to compute media usage summary', err);
@@ -6088,6 +6422,7 @@ function AssignedMediaPageTab({
         responseWrong: [],
         responseAudio: [],
         coverImages: [],
+        arMedia: [],
       };
     }
   }, [config, missions, mediaPool]);

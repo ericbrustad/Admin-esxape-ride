@@ -12,6 +12,7 @@ const EXTS = {
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i,
+  ar: /\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i,
 };
 
 function classify(name) {
@@ -19,6 +20,7 @@ function classify(name) {
   if (EXTS.image.test(name)) return 'image';
   if (EXTS.video.test(name)) return 'video';
   if (EXTS.audio.test(name)) return 'audio';
+  if (EXTS.ar.test(name)) return 'ar';
   return 'other';
 }
 
