@@ -178,6 +178,80 @@ function normalizeFolder(folder = '') {
     || 'mediapool';
 }
 
+const PLACEHOLDER_BASE_PATH = 'public/media/placeholders';
+const PLACEHOLDER_BASE_URL = '/media/placeholders';
+const PLACEHOLDER_RULES = [
+  {
+    file: 'ar-overlay.svg',
+    kind: 'ar-overlay',
+    match: (folder, type) => folder.includes('ar overlay') || type === 'ar-overlay' || type === 'ar',
+  },
+  {
+    file: 'ar-target.svg',
+    kind: 'ar-target',
+    match: (folder, type) => folder.includes('ar target') || type === 'ar-target',
+  },
+  {
+    file: 'bundle.svg',
+    kind: 'bundle',
+    match: (folder) => folder.includes('bundles'),
+  },
+  {
+    file: 'cover.svg',
+    kind: 'cover',
+    match: (folder) => folder.includes('covers'),
+  },
+  {
+    file: 'icon.svg',
+    kind: 'icon',
+    match: (folder) => folder.includes('icons'),
+  },
+  {
+    file: 'upload.svg',
+    kind: 'upload',
+    match: (folder) => folder.includes('uploads'),
+  },
+  {
+    file: 'audio.svg',
+    kind: 'audio',
+    match: (_, type) => type === 'audio',
+  },
+  {
+    file: 'video.svg',
+    kind: 'video',
+    match: (_, type) => type === 'video',
+  },
+];
+
+function resolvePlaceholder(folder = '', type = '') {
+  const folderLower = String(folder || '').toLowerCase();
+  const typeLower = String(type || '').toLowerCase();
+  for (const rule of PLACEHOLDER_RULES) {
+    if (rule.match(folderLower, typeLower)) {
+      const pathRel = `${PLACEHOLDER_BASE_PATH}/${rule.file}`;
+      const url = `${PLACEHOLDER_BASE_URL}/${rule.file}`;
+      return { ...rule, path: pathRel, url };
+    }
+  }
+  const fallbackFile = folderLower.includes('video')
+    ? 'video.svg'
+    : folderLower.includes('audio')
+      ? 'audio.svg'
+      : 'image.svg';
+  const fallbackKind = folderLower.includes('video')
+    ? 'video'
+    : folderLower.includes('audio')
+      ? 'audio'
+      : 'image';
+  const pathRel = `${PLACEHOLDER_BASE_PATH}/${fallbackFile}`;
+  return {
+    file: fallbackFile,
+    kind: fallbackKind,
+    path: pathRel,
+    url: `${PLACEHOLDER_BASE_URL}/${fallbackFile}`,
+  };
+}
+
 function folderMatchesTarget(folder = '', target = '') {
   const normalizedFolder = normalizeFolder(folder).toLowerCase();
   const normalizedTarget = normalizeFolder(target).toLowerCase();
@@ -267,12 +341,30 @@ export default async function handler(req, res) {
       .filter((entry) => folderMatchesTarget(entry.folder || '', dir))
       .forEach((entry) => {
         const folder = normalizeFolder(entry.folder || dir);
-        const repoPath = entry.path
-          ? entry.path
+        const hasExplicitPath = Object.prototype.hasOwnProperty.call(entry, 'path');
+        const repoPath = hasExplicitPath
+          ? (entry.path || '')
           : path.posix.join('public', 'media', folder, entry.fileName || '').replace(/\\/g, '/');
         const meta = enrichMeta(path.posix.join(folder, entry.fileName || entry.name || ''));
         const type = (entry.type || meta.type || classify(entry.fileName || entry.url || entry.name || '')).toLowerCase();
-        const url = entry.url || buildUrlFromPath(repoPath);
+        let placeholderPath = entry.placeholderPath || entry.placeholder?.path || '';
+        let placeholderUrl = entry.placeholderUrl || entry.placeholder?.url || '';
+        let placeholder = entry.placeholder || null;
+        if (!placeholderPath || !placeholderUrl || !placeholder) {
+          const derived = resolvePlaceholder(folder, type);
+          if (!placeholderPath) placeholderPath = derived.path;
+          if (!placeholderUrl) placeholderUrl = derived.url;
+          if (!placeholder) {
+            placeholder = { kind: derived.kind, path: derived.path, url: derived.url };
+          } else {
+            placeholder = { ...derived, ...placeholder };
+            if (!placeholder.path) placeholder.path = derived.path;
+            if (!placeholder.url) placeholder.url = derived.url;
+            if (!placeholder.kind) placeholder.kind = derived.kind;
+          }
+        }
+        const url = entry.url || (repoPath ? buildUrlFromPath(repoPath) : '') || placeholderUrl;
+        const thumbUrl = entry.thumbUrl || placeholderUrl || (placeholderPath ? buildUrlFromPath(placeholderPath) : '');
         const key = (entry.id || repoPath || entry.url || `${folder}/${entry.fileName || entry.name || ''}`).toLowerCase();
         if (seenKeys.has(key)) return;
         seenKeys.add(key);
@@ -297,6 +389,8 @@ export default async function handler(req, res) {
           notes: entry.notes || '',
           existsOnDisk,
           supabase: entry.supabase || null,
+          thumbUrl,
+          placeholder: placeholder,
         });
       });
 
@@ -312,6 +406,8 @@ export default async function handler(req, res) {
           if (item.publicUrl) seenKeys.add(item.publicUrl.toLowerCase());
           const relative = path.posix.join(dir, name || '');
           const meta = enrichMeta(relative);
+          const placeholder = resolvePlaceholder(dir, meta.type || classify(name || item.supabasePath));
+          const placeholderUrl = placeholder.url;
           out.push({
             id: key,
             name: name || item.supabasePath,
@@ -334,6 +430,8 @@ export default async function handler(req, res) {
               size: item.size,
               updatedAt: item.updatedAt,
             },
+            thumbUrl: item.publicUrl || placeholderUrl,
+            placeholder,
           });
         }
       } catch (error) {

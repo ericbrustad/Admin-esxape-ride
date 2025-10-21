@@ -40,7 +40,9 @@ resolve relative paths while assets reside in Supabase.
 
 `public/media/manifest.json` catalogs every asset that should exist in
 Supabase. Each entry includes the expected bucket and object path inside the
-`supabase` block. Example:
+`supabase` block and now carries a lightweight SVG placeholder so the Admin UI
+can keep rendering thumbnails even when the binary only lives in Storage.
+Example:
 
 ```json
 {
@@ -51,12 +53,21 @@ Supabase. Each entry includes the expected bucket and object path inside the
   "supabase": {
     "bucket": "admin-media",
     "path": "mediapool/Images/bundles/CLUEgreen.png"
+  },
+  "thumbUrl": "/media/placeholders/bundle.svg",
+  "placeholder": {
+    "kind": "bundle",
+    "path": "public/media/placeholders/bundle.svg",
+    "url": "/media/placeholders/bundle.svg"
   }
 }
 ```
 
 The manifest keeps the repo reviewable while ensuring the dashboard knows which
-Supabase keys to look for.
+Supabase keys to look for. Placeholders live in
+`public/media/placeholders/**` and cover every Media Pool category (covers,
+icons, bundles, uploads, AR, audio, video, etc.). They are text-based SVGs, so
+the zero-binary policy remains intact while previews stay informative.
 
 ## 3. How uploads work
 
@@ -66,8 +77,9 @@ Supabase keys to look for.
 3. The manifest is updated with the new object metadata (no binaries are
    committed).
 4. `/api/list-media` merges three sources when building the Media Pool
-   inventory:
-   * manifest entries,
+   inventory and attaches the manifest placeholder data as `thumbUrl` so
+   thumbnails no longer break when objects are Supabase-only:
+   * manifest entries (with placeholder previews),
    * live Supabase listings (so thumbnails appear as soon as the object exists),
    * any fallback repo files (only placeholders now).
 
