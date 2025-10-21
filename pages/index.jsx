@@ -98,19 +98,25 @@ function classifyByExt(u) {
 }
 
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
+async function listInventory(dirs = ['mediapool']) {
   const seen = new Set();
   const out = [];
-  await Promise.all(dirs.map(async (dir) => {
-    try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
-      const j = await r.json();
-      (j?.items || []).forEach(it => {
-        const url = it.url || '';
-        if (!seen.has(url)) { seen.add(url); out.push(it); }
-      });
-    } catch {}
-  }));
+  await Promise.all(
+    (dirs || ['mediapool']).map(async (dir) => {
+      if (!dir) return;
+      try {
+        const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
+        const j = await r.json();
+        (j?.items || []).forEach((it = {}) => {
+          const key = it.path || it.url || it.id || '';
+          if (!key) return;
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(it);
+        });
+      } catch {}
+    })
+  );
   return out;
 }
 function baseNameFromUrl(url) {
@@ -225,27 +231,27 @@ const STARFIELD_DEFAULTS = {
   title: 'Starfield Station Break',
   type: 'Sci-Fi',
   slug: 'starfield-station-break',
-  coverImage: '/media/covers/starfield-station-break.svg',
+  coverImage: '/media/mediapool/Images/covers/starfield-station-break.svg',
   tags: ['starfield-station-break', 'default-game'],
 };
 
 const DEFAULT_BUNDLES = {
   devices: [
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/icons/aurora-beacon.svg' },
-    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/icons/lumen-halo.svg' },
-    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/icons/quantum-anchor.svg' },
-    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/icons/chrono-switch.svg' },
-    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/icons/voyager-dial.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
+    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/mediapool/Images/icons/quantum-anchor.svg' },
+    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/mediapool/Images/icons/chrono-switch.svg' },
+    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/mediapool/Images/icons/voyager-dial.svg' },
   ],
   missions: [
-    { key: 'briefing-star', name: 'Briefing Star', url: '/media/icons/aurora-beacon.svg' },
-    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/icons/aurora-beacon.svg' },
-    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/icons/lumen-halo.svg' },
+    { key: 'briefing-star', name: 'Briefing Star', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
   ],
   rewards: [
-    { key: 'evidence', name: 'Evidence', url: '/media/bundles/evidence%202.png' },
-    { key: 'clue', name: 'Clue', url: '/media/bundles/CLUEgreen.png' },
-    { key: 'gold-coin', name: 'Gold Coin', url: '/media/bundles/GOLDEN%20COIN.png' },
+    { key: 'evidence', name: 'Evidence', url: '/media/mediapool/Images/bundles/evidence%202.png' },
+    { key: 'clue', name: 'Clue', url: '/media/mediapool/Images/bundles/CLUEgreen.png' },
+    { key: 'gold-coin', name: 'Gold Coin', url: '/media/mediapool/Images/bundles/GOLDEN%20COIN.png' },
   ],
 };
 
@@ -721,7 +727,7 @@ export default function Admin() {
   async function loadNewCoverOptions() {
     setNewCoverLookupLoading(true);
     try {
-      const items = await listInventory(['covers','mediapool','uploads']);
+      const items = await listInventory(['mediapool']);
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
@@ -854,7 +860,7 @@ export default function Admin() {
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+      const items = await listInventory(['mediapool']);
       return Array.isArray(items) ? items : [];
     } catch {
       return [];
@@ -2027,7 +2033,7 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     logConversation('You', 'Scanning media usage for unused files');
-    const inv = await listInventory(['uploads','bundles','icons']);
+    const inv = await listInventory(['mediapool']);
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -2059,24 +2065,60 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='uploads') {
+  async function uploadToRepo(file, subfolder='auto') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const normalizedFolder = String(subfolder || 'uploads').replace(/^\/+|\/+$/g, '');
+    const normalizedFolder = String(subfolder || 'auto').replace(/^\/+|\/+$/g, '');
     const classification = classifyByExt(file.name || file.type || safeName);
-    let resolvedFolder = normalizedFolder || 'uploads';
-    if (resolvedFolder === 'mediapool') {
-      const typeFolderMap = {
-        image: 'images',
-        gif: 'gif',
-        audio: 'audio',
-        video: 'video',
-        ar: 'ar',
-        other: 'other',
+    const folderKey = normalizedFolder.toLowerCase();
+    const folderMap = new Map([
+      ['audio', 'mediapool/Audio'],
+      ['mediapool/audio', 'mediapool/Audio'],
+      ['video', 'mediapool/Video'],
+      ['mediapool/video', 'mediapool/Video'],
+      ['ar-target', 'mediapool/AR Target'],
+      ['mediapool/ar target', 'mediapool/AR Target'],
+      ['mediapool/ar-target', 'mediapool/AR Target'],
+      ['ar-overlay', 'mediapool/AR Overlay'],
+      ['mediapool/ar overlay', 'mediapool/AR Overlay'],
+      ['mediapool/ar-overlay', 'mediapool/AR Overlay'],
+      ['images', 'mediapool/Images'],
+      ['mediapool/images', 'mediapool/Images'],
+      ['images/icons', 'mediapool/Images/icons'],
+      ['mediapool/images/icons', 'mediapool/Images/icons'],
+      ['images/covers', 'mediapool/Images/covers'],
+      ['mediapool/images/covers', 'mediapool/Images/covers'],
+      ['images/bundles', 'mediapool/Images/bundles'],
+      ['mediapool/images/bundles', 'mediapool/Images/bundles'],
+      ['images/uploads', 'mediapool/Images/uploads'],
+      ['mediapool/images/uploads', 'mediapool/Images/uploads'],
+      ['gif', 'mediapool/Gif'],
+      ['mediapool/gif', 'mediapool/Gif'],
+      ['gifs', 'mediapool/Gif'],
+      ['mediapool/gifs', 'mediapool/Gif'],
+      ['other', 'mediapool/Other'],
+      ['mediapool/other', 'mediapool/Other'],
+    ]);
+
+    let resolvedFolder = '';
+    if (!folderKey || folderKey === 'auto') {
+      const autoMap = {
+        image: 'mediapool/Images',
+        gif: 'mediapool/Gif',
+        audio: 'mediapool/Audio',
+        video: 'mediapool/Video',
+        ar: 'mediapool/AR Target',
+        other: 'mediapool/Other',
       };
-      const target = typeFolderMap[classification] || 'other';
-      resolvedFolder = `mediapool/${target}`;
+      resolvedFolder = autoMap[classification] || 'mediapool/Other';
+    } else if (folderMap.has(folderKey)) {
+      resolvedFolder = folderMap.get(folderKey);
+    } else if (normalizedFolder.startsWith('mediapool/')) {
+      resolvedFolder = normalizedFolder;
+    } else {
+      resolvedFolder = `mediapool/${normalizedFolder}`;
     }
+
     const path   = `public/media/${resolvedFolder}/${Date.now()}-${safeName}`;
     const destinationLabel = resolvedFolder;
     const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
@@ -2299,7 +2341,7 @@ export default function Admin() {
     setCoverPickerLoading(true);
     setCoverPickerItems([]);
     try {
-      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const items = await listInventory(['mediapool']);
       const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
       setCoverPickerItems(filtered);
     } catch {
@@ -5602,7 +5644,7 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('mediapool');
+  const [folder, setFolder] = useState('auto');
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -5611,13 +5653,27 @@ function MediaPoolTab({
   const [pendingActionBusy, setPendingActionBusy] = useState(false);
 
   const [subTab, setSubTab] = useState('audio');
+  const uploadDestinations = [
+    { value: 'auto', label: 'Auto — detect from file type' },
+    { value: 'images', label: 'Images (general)' },
+    { value: 'images/icons', label: 'Images · Icons' },
+    { value: 'images/covers', label: 'Images · Covers' },
+    { value: 'images/bundles', label: 'Images · Bundles' },
+    { value: 'images/uploads', label: 'Images · Uploads' },
+    { value: 'audio', label: 'Audio' },
+    { value: 'video', label: 'Video' },
+    { value: 'gif', label: 'Gif' },
+    { value: 'ar-target', label: 'AR Target' },
+    { value: 'ar-overlay', label: 'AR Overlay' },
+    { value: 'other', label: 'Other' },
+  ];
 
   useEffect(() => { refreshInventory(); }, []);
 
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
+      const items = await listInventory(['mediapool']);
       setInv(items || []);
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
@@ -5852,7 +5908,14 @@ function MediaPoolTab({
   // Group by type
   const itemsByType = (inv || []).reduce((acc, it) => {
     const guess = classifyByExt(it.url || it.path || it.name || '');
-    const key = String(it.type || guess || 'other').toLowerCase();
+    const rawKind = String(it.kind || it.category || it.type || guess || 'other').toLowerCase();
+    let key = rawKind;
+    if (rawKind === 'ar') key = 'ar-target';
+    if (rawKind === 'image' || rawKind === 'images') key = 'image';
+    if (rawKind === 'gif' || rawKind === 'gifs') key = 'gif';
+    if (!['audio', 'video', 'image', 'gif', 'ar-target', 'ar-overlay', 'other'].includes(key)) {
+      key = 'other';
+    }
     if (!acc[key]) acc[key] = [];
     acc[key].push(it);
     return acc;
@@ -5861,16 +5924,18 @@ function MediaPoolTab({
     { key:'audio', label:'Audio' },
     { key:'video', label:'Video' },
     { key:'image', label:'Images' },
-    { key:'ar', label:'AR' },
     { key:'gif', label:'Gif' },
+    { key:'ar-target', label:'AR Targets' },
+    { key:'ar-overlay', label:'AR Overlays' },
   ];
   if ((itemsByType.other || []).length) baseTabs.push({ key:'other', label:'Other' });
   const sections = [
     { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
     { key:'video', title:'Video (mp4/mov)', items: itemsByType.video || [] },
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'ar', title:'AR Assets', items: itemsByType.ar || [] },
+    { key:'image', title:'Images (PNG/JPG/SVG)', items: itemsByType.image || [] },
     { key:'gif', title:'GIF', items: itemsByType.gif || [] },
+    { key:'ar-target', title:'AR Targets (markers)', items: itemsByType['ar-target'] || [] },
+    { key:'ar-overlay', title:'AR Overlays (assets)', items: itemsByType['ar-overlay'] || [] },
   ];
   if ((itemsByType.other || []).length) {
     sections.push({ key:'other', title:'Other (unclassified)', items: itemsByType.other || [] });
@@ -5892,10 +5957,9 @@ function MediaPoolTab({
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
           <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="mediapool">mediapool</option>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+            {uploadDestinations.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -6046,7 +6110,7 @@ function MediaPoolTab({
                       <img src={previewCandidate} alt={name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                     </div>
                   ) : (
-                    <MediaPreview url={url} kind={active.key} />
+                    <MediaPreview url={url} kind={it.kind || it.category || active.key} />
                   )}
                   <div>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
@@ -6191,7 +6255,9 @@ function AssignedMediaPageTab({
       return {
         id: directUrl,
         name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
-        type: item?.type || item?.kind || '',
+        type: item?.kind || item?.type || classifyByExt(directUrl),
+        category: item?.category || '',
+        categoryLabel: item?.categoryLabel || '',
         tags: Array.isArray(item?.tags) ? item.tags : [],
         thumbUrl: thumb,
         url: directUrl,
@@ -6284,7 +6350,8 @@ function AssignedMediaPageTab({
     const responseWrongMap = new Map();
     const responseAudioMap = new Map();
     const coverMap = new Map();
-    const arMap = new Map();
+    const arTargetMap = new Map();
+    const arOverlayMap = new Map();
 
     const missionIconLookup = new Map();
     (safeIcons.missions || []).forEach((icon) => {
@@ -6314,10 +6381,10 @@ function AssignedMediaPageTab({
 
       const content = mission.content || {};
       if (content.markerUrl) {
-        addUsage(arMap, content.markerUrl, `${title} — Marker`, { label: `${title} marker`, kind: 'ar' });
+        addUsage(arTargetMap, content.markerUrl, `${title} — Marker`, { label: `${title} marker`, kind: 'ar-target', tags: ['ar-target'] });
       }
       if (content.assetUrl) {
-        addUsage(arMap, content.assetUrl, `${title} — Overlay`, { label: `${title} overlay`, kind: 'ar' });
+        addUsage(arOverlayMap, content.assetUrl, `${title} — Overlay`, { label: `${title} overlay`, kind: 'ar-overlay', tags: ['ar-overlay'] });
       }
     });
 
@@ -6375,7 +6442,9 @@ function AssignedMediaPageTab({
       const label = entry.label || info?.name || baseNameFromUrl(entry.url);
       const kind = entry.kind || info?.type || classifyByExt(entry.url);
       const openUrl = info?.openUrl || entry.url;
-      const thumb = (kind === 'audio' || kind === 'ar')
+      const isAudioKind = kind === 'audio';
+      const isArKind = kind === 'ar' || kind === 'ar-target' || kind === 'ar-overlay';
+      const thumb = (isAudioKind || isArKind)
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
       const tagSet = new Set();
@@ -6408,7 +6477,8 @@ function AssignedMediaPageTab({
       responseWrong: finalize(responseWrongMap),
       responseAudio: finalize(responseAudioMap),
       coverImages: finalize(coverMap),
-      arMedia: finalize(arMap),
+      arTargets: finalize(arTargetMap),
+      arOverlays: finalize(arOverlayMap),
     };
     } catch (err) {
       console.error('Failed to compute media usage summary', err);
@@ -6422,7 +6492,8 @@ function AssignedMediaPageTab({
         responseWrong: [],
         responseAudio: [],
         coverImages: [],
-        arMedia: [],
+        arTargets: [],
+        arOverlays: [],
       };
     }
   }, [config, missions, mediaPool]);

@@ -10,7 +10,7 @@
       "starfield-station-break",
       "default-game"
     ],
-    "coverImage": "/media/covers/starfield-station-break.svg",
+    "coverImage": "/media/mediapool/Images/covers/starfield-station-break.svg",
     "shortDescription": "Sneak through sunrise-lit docking bays to free the crew before lockdown.",
     "longDescription": "A covert dawn extraction beneath the capital's transit station. Follow beacon clues, disable holo-decoys, and guide the shuttle pilots out before the shutters seal for the day.",
     "deployEnabled": true
@@ -40,9 +40,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/aurora-beacon.svg",
+        "actionTarget": "/media/mediapool/Images/icons/aurora-beacon.svg",
         "actionLabel": "Broadcast sunrise route",
-        "actionThumbnail": "/media/icons/aurora-beacon.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/aurora-beacon.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -61,9 +61,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/lumen-halo.svg",
+        "actionTarget": "/media/mediapool/Images/icons/lumen-halo.svg",
         "actionLabel": "Deploy holographic lantern",
-        "actionThumbnail": "/media/icons/lumen-halo.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/lumen-halo.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -82,9 +82,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/quantum-anchor.svg",
+        "actionTarget": "/media/mediapool/Images/icons/quantum-anchor.svg",
         "actionLabel": "Stabilize security grid",
-        "actionThumbnail": "/media/icons/quantum-anchor.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/quantum-anchor.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -124,9 +124,9 @@
       "trigger": {
         "enabled": true,
         "actionType": "media",
-        "actionTarget": "/media/icons/voyager-dial.svg",
+        "actionTarget": "/media/mediapool/Images/icons/voyager-dial.svg",
         "actionLabel": "Cue departure tone",
-        "actionThumbnail": "/media/icons/voyager-dial.svg",
+        "actionThumbnail": "/media/mediapool/Images/icons/voyager-dial.svg",
         "triggerDeviceId": "",
         "triggerDeviceLabel": "",
         "triggeredResponseKey": "",
@@ -137,28 +137,28 @@
   "powerups": [],
   "media": {
     "rewardsPool": [
-      { "url": "/media/bundles/GOLDEN%20COIN.png", "label": "Golden Coin" },
-      { "url": "/media/bundles/evidence%202.png", "label": "Recovered Evidence" }
+      { "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png", "label": "Golden Coin" },
+      { "url": "/media/mediapool/Images/bundles/evidence%202.png", "label": "Recovered Evidence" }
     ],
     "penaltiesPool": [
-      { "url": "/media/bundles/SMOKE%20BOMB.png", "label": "Emergency Smoke" }
+      { "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png", "label": "Emergency Smoke" }
     ]
   },
   "icons": {
     "missions": [
-      { "key": "briefing-star", "name": "Briefing Star", "url": "/media/icons/aurora-beacon.svg" },
-      { "key": "decoy-glow", "name": "Decoy Glow", "url": "/media/icons/lumen-halo.svg" }
+      { "key": "briefing-star", "name": "Briefing Star", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
+      { "key": "decoy-glow", "name": "Decoy Glow", "url": "/media/mediapool/Images/icons/lumen-halo.svg" }
     ],
     "devices": [
-      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/icons/aurora-beacon.svg" },
-      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/icons/lumen-halo.svg" },
-      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/icons/quantum-anchor.svg" },
-      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/icons/chrono-switch.svg" },
-      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/icons/voyager-dial.svg" }
+      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
+      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/mediapool/Images/icons/lumen-halo.svg" },
+      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/mediapool/Images/icons/quantum-anchor.svg" },
+      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/mediapool/Images/icons/chrono-switch.svg" },
+      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/mediapool/Images/icons/voyager-dial.svg" }
     ],
     "rewards": [
-      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/bundles/GOLDEN%20COIN.png" },
-      { "key": "evidence", "name": "Evidence", "url": "/media/bundles/evidence%202.png" }
+      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png" },
+      { "key": "evidence", "name": "Evidence", "url": "/media/mediapool/Images/bundles/evidence%202.png" }
     ]
   },
   "appearance": {

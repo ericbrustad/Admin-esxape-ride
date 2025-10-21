@@ -30,41 +30,41 @@
       {
         "key": "trivia",
         "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
+        "url": "/media/mediapool/Images/bundles/trivia%20icon.png"
       },
       {
         "key": "trivia-2",
         "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
+        "url": "/media/mediapool/Images/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
       {
         "key": "smoke-shield",
         "name": "Smoke Shield",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
+        "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png"
       },
       {
         "key": "roaming-robot",
         "name": "Roaming Robot",
-        "url": "/media/bundles/ROBOT1small.png"
+        "url": "/media/mediapool/Images/bundles/ROBOT1small.png"
       }
     ],
     "rewards": [
       {
         "key": "evidence",
         "name": "Evidence",
-        "url": "/media/bundles/evidence%202.png"
+        "url": "/media/mediapool/Images/bundles/evidence%202.png"
       },
       {
         "key": "clue",
         "name": "Clue",
-        "url": "/media/bundles/CLUEgreen.png"
+        "url": "/media/mediapool/Images/bundles/CLUEgreen.png"
       },
       {
         "key": "gold-coin",
         "name": "Gold Coin",
-        "url": "/media/bundles/GOLDEN%20COIN.png"
+        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png"
       }
     ]
   },

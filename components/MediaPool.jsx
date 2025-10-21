@@ -26,8 +26,15 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
       <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
         {media.map((m) => {
           const previewUrl = m.thumbUrl || m.url || m.id;
+          const typeLower = String(m.type || '').toLowerCase();
           const isImage = looksLikeImage(m);
-          const isAr = String(m.type || '').toLowerCase() === 'ar';
+          const isAr = ['ar', 'ar-target', 'ar-overlay'].includes(typeLower);
+          const displayType = m.categoryLabel
+            || (typeLower === 'ar-target'
+              ? 'AR Target'
+              : typeLower === 'ar-overlay'
+                ? 'AR Overlay'
+                : String(m.type || m.category || 'media'));
           const displayId = m.name || m.label || m.id;
           return (
             <div
@@ -74,7 +81,7 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
                       placeItems: 'center',
                     }}
                   >
-                    <span>AR Asset</span>
+                    <span>{displayType}</span>
                   </div>
                 ) : (
                   <div
@@ -85,7 +92,7 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
                       textTransform: 'uppercase',
                     }}
                   >
-                    {String(m.type || 'media')}
+                    {displayType}
                   </div>
                 )}
               </div>

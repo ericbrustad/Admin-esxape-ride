@@ -1,5 +1,5 @@
 // pages/api/upload.js
-// JSON body: { path: "public/media/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
+// JSON body: { path: "public/media/mediapool/Images/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
 // Writes into your GitHub repo via Contents API. Creates folders as needed.
 
 export default async function handler(req, res) {
