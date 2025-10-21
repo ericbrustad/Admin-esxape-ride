@@ -640,7 +640,7 @@ function normalizeGameMetadata(cfg, slug = '') {
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
-  game.deployEnabled = game.deployEnabled !== false;
+  game.deployEnabled = false;
   base.game = game;
   return base;
 }
@@ -737,15 +737,6 @@ export default function Admin() {
       return next;
     });
   }, [logConversation]);
-
-  const [protectionPrompt, setProtectionPrompt] = useState({
-    open: false,
-    mode: 'enable',
-    requireConfirm: false,
-    password: '',
-    confirm: '',
-    error: '',
-  });
 
   function resetNewGameForm() {
     setNewTitle('');
@@ -1032,36 +1023,6 @@ export default function Admin() {
   }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
-  const [protectionError, setProtectionError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/admin-protection?mode=ui', { cache: 'no-store', credentials: 'include' });
-        const data = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (res.ok) {
-          setProtectionState({
-            enabled: !!data.protected,
-            loading: false,
-            saving: false,
-            updatedAt: data.updatedAt || null,
-            passwordSet: !!data.passwordSet,
-          });
-          setProtectionError('');
-        } else {
-          throw new Error(data?.error || 'Failed to load protection status');
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setProtectionState(prev => ({ ...prev, loading: false }));
-        setProtectionError('Unable to read protection status');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     if (!config) {
@@ -2022,69 +1983,6 @@ export default function Admin() {
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
-  function openProtectionPrompt() {
-    const target = !protectionState.enabled;
-    setProtectionError('');
-    setProtectionPrompt({
-      open: true,
-      mode: target ? 'enable' : 'disable',
-      requireConfirm: target && !protectionState.passwordSet,
-      password: '',
-      confirm: '',
-      error: '',
-    });
-  }
-
-  function closeProtectionPrompt() {
-    setProtectionPrompt(prev => ({ ...prev, open: false, password: '', confirm: '', error: '' }));
-    setProtectionState(prev => ({ ...prev, saving: false }));
-  }
-
-  async function submitProtectionPrompt() {
-    const { mode, password, confirm, requireConfirm } = protectionPrompt;
-    if (!password.trim()) {
-      setProtectionPrompt(prev => ({ ...prev, error: 'Password required' }));
-      return;
-    }
-    if (requireConfirm && password !== confirm) {
-      setProtectionPrompt(prev => ({ ...prev, error: 'Passwords must match to enable protection' }));
-      return;
-    }
-    setProtectionError('');
-    setProtectionState(prev => ({ ...prev, saving: true }));
-    setProtectionPrompt(prev => ({ ...prev, error: '' }));
-    try {
-      const res = await fetch('/api/admin-protection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          protected: mode === 'enable',
-          password,
-          ...(requireConfirm ? { confirmPassword: confirm } : {}),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || res.statusText || 'Toggle failed');
-      }
-      setProtectionState({
-        enabled: !!data.protected,
-        loading: false,
-        saving: false,
-        updatedAt: data.updatedAt || null,
-        passwordSet: data.passwordSet !== false,
-      });
-      setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
-      setProtectionPrompt({ open: false, mode: 'enable', requireConfirm: false, password: '', confirm: '', error: '' });
-    } catch (err) {
-      setProtectionState(prev => ({ ...prev, saving: false }));
-      const msg = err?.message || 'Toggle failed';
-      setProtectionPrompt(prev => ({ ...prev, error: msg }));
-      setStatus('❌ Failed to toggle admin protection');
-    }
-  }
-
   // Missions selection operations (Missions tab only)
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
@@ -2387,20 +2285,6 @@ export default function Admin() {
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(viewConfig.appearanceTone);
-  const PROTECTION_COLOR_SAFE = '#16f78f';
-  const PROTECTION_COLOR_ALERT = '#ff4d57';
-  const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
-  const protectionIndicatorShadow = protectionState.enabled
-    ? '0 0 22px rgba(22, 247, 143, 0.65)'
-    : '0 0 18px rgba(255, 77, 87, 0.75)';
-  const protectionIndicatorLabel = protectionState.loading
-    ? 'Checking…'
-    : protectionState.enabled
-      ? 'Protection Enabled'
-      : 'Protection Disabled';
-  const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
-  const showProtectionIndicator = tab === 'settings';
-
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   function updateGameTagsDraft(value) {
@@ -2410,17 +2294,6 @@ export default function Admin() {
       if (!prev) return prev;
       return normalizeGameMetadata({ ...prev, game: { ...prev.game, tags } }, slugForMeta);
     });
-  }
-
-  function setDeployEnabled(nextEnabled) {
-    setConfig(prev => {
-      if (!prev) return prev;
-      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
-    });
-    setDirty(true);
-    setStatus(nextEnabled
-      ? '🟢 Publishing enabled — Save & Publish will deploy the live game and protect edits.'
-      : '🔴 Publishing disabled — admin changes can be edited, overwritten, and saved.');
   }
 
   async function handleCoverFile(file) {
@@ -2601,72 +2474,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitLabel && (
-            <span style={S.metaCommitBlock}>
-              <strong>Commit:</strong>{' '}
-              {metaCommitUrl ? (
-                <a
-                  href={metaCommitUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={S.metaCommitLink}
-                  title={`Open commit ${metaCommitLabel}`}
-                >
-                  <span style={S.metaBadge}>#{metaCommitShort || metaCommitLabel}</span>
-                </a>
-              ) : (
-                <span style={S.metaBadge} title={`Commit ${metaCommitLabel}`}>
-                  #{metaCommitShort || metaCommitLabel}
-                </span>
-              )}
-              {metaCommitLabel.length > 7 && (
-                <span style={S.metaCommitCode}>{metaCommitLabel}</span>
-              )}
-            </span>
-          )}
-          {metaOwnerRepo && (
-            <span>
-              <strong>Repo:</strong>{' '}
-              {metaRepoUrl ? (
-                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaOwnerRepo}
-                </a>
-              ) : (
-                <span style={S.metaMuted}>{metaOwnerRepo}</span>
-              )}
-            </span>
-          )}
-          {metaDeploymentState && (
-            <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
-            </span>
-          )}
-          {metaVercelUrl && (
-            <span>
-              <strong>Vercel:</strong>{' '}
-              <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                {metaVercelLabel || metaVercelUrl}
-              </a>
-            </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Updated:</strong> {metaTimestampLabel}</span>
-          )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
-      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2736,79 +2543,10 @@ export default function Admin() {
                     <option key={g.slug} value={g.slug}>{g.title || g.slug}{g.mode ? ` — ${g.mode}` : ''}</option>
                   ))}
                 </select>
-                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  <input
-                    type="checkbox"
-                    checked={publishingLocked}
-                    onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  />
-                  Enable publishing to live game
-                </label>
-                <div style={S.deployStatusCopy}>
-                  {publishingLocked
-                    ? '🟢 Protected — publishing to the live game is enabled.'
-                    : '🔴 Editing unlocked — drafts can be edited and saved.'}
-                </div>
-                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  Publish delay (sec):
-                  <input
-                    type="number" min={0} max={120}
-                    value={deployDelaySec}
-                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90, opacity: publishingLocked ? 1 : 0.45 }}
-                    disabled={!publishingLocked}
-                  />
-                </label>
               </div>
             )}
           </div>
 
-          {(showProtectionIndicator || tab === 'settings') && (
-            <div style={{ display:'flex', gap:16, justifyContent:'space-between', alignItems:'stretch', flexWrap:'wrap', marginBottom:16 }}>
-              <div style={{ flex:'1 1 520px', minWidth:280, display:'flex', flexDirection:'column', gap:12 }}>
-                {showProtectionIndicator && (
-                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                    <div
-                      style={{
-                        display:'flex',
-                        alignItems:'center',
-                        gap:10,
-                        padding:'8px 16px',
-                        borderRadius:999,
-                        border:`1px solid ${protectionIndicatorColor}`,
-                        background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
-                        color: protectionIndicatorColor,
-                        fontWeight:700,
-                        letterSpacing:1,
-                        textTransform:'uppercase',
-                        boxShadow: protectionIndicatorShadow,
-                      }}
-                    >
-                      <span style={{ display:'inline-block', width:16, height:16, borderRadius:'50%', background:protectionIndicatorColor, boxShadow: protectionIndicatorShadow }} />
-                      {protectionIndicatorLabel}
-                    </div>
-                    <button
-                      onClick={openProtectionPrompt}
-                      disabled={protectionState.saving || protectionState.loading}
-                      style={{
-                        ...S.button,
-                        ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
-                        minWidth: 180,
-                        opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
-                      }}
-                    >
-                      {protectionState.saving ? 'Updating…' : protectionToggleLabel}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {showProtectionIndicator && protectionError && (
-            <div style={{ color: PROTECTION_COLOR_ALERT, fontSize: 12, marginBottom: 12 }}>
-              {protectionError}
-            </div>
-          )}
         </div>
       </header>
 
@@ -3824,19 +3562,6 @@ export default function Admin() {
                 The current slug and <code>default-game</code> are enforced automatically.
               </div>
             </Field>
-            <Field label="Game Deployment">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  type="checkbox"
-                  checked={publishingLocked}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                />
-                Enable publishing to the live game build
-              </label>
-              <div style={S.noteText}>
-                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
-              </div>
-            </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input type="checkbox" checked={config.splash.enabled}
@@ -4187,7 +3912,7 @@ export default function Admin() {
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • {metaCommitShort || metaCommitLabel || '—'} • {metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
+              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
@@ -4302,82 +4027,6 @@ export default function Admin() {
             )}
           </div>
         </main>
-      )}
-
-      {protectionPrompt.open && (
-        <div style={{ ...S.modalBackdrop, zIndex: 4200 }}>
-          <div style={{ ...S.card, ...S.modalCard }}>
-            <div style={S.modalTopBar}>
-              <button style={S.cancelGlowButton} onClick={closeProtectionPrompt}>Cancel & Close</button>
-              <div style={S.modalTitle}>
-                {protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection'}
-              </div>
-              <button
-                style={S.modalCloseButton}
-                onClick={closeProtectionPrompt}
-                aria-label="Close protection dialog"
-              >
-                ×
-              </button>
-            </div>
-            <form
-              style={S.modalContent}
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitProtectionPrompt();
-              }}
-            >
-              <div style={S.noteText}>
-                {protectionPrompt.mode === 'enable'
-                  ? 'Set a password to require authentication before anyone enters the Admin Control Deck.'
-                  : 'Confirm the current password to disable the lock and return to open access.'}
-              </div>
-              <Field label="Password">
-                <input
-                  type="password"
-                  style={S.input}
-                  value={protectionPrompt.password}
-                  onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, password: e.target.value }))}
-                  placeholder="Enter password"
-                  autoFocus
-                />
-              </Field>
-              {protectionPrompt.requireConfirm && (
-                <Field label="Confirm Password">
-                  <input
-                    type="password"
-                    style={S.input}
-                    value={protectionPrompt.confirm}
-                    onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, confirm: e.target.value }))}
-                    placeholder="Re-enter password"
-                  />
-                </Field>
-              )}
-              {protectionPrompt.error && (
-                <div style={{ ...S.modalStatus, color: PROTECTION_COLOR_ALERT }}>
-                  {protectionPrompt.error}
-                </div>
-              )}
-              <div style={{ display:'flex', justifyContent:'flex-end', gap:12 }}>
-                <button
-                  type="submit"
-                  style={{
-                    ...S.button,
-                    ...(protectionPrompt.mode === 'enable' ? S.buttonSuccess : S.buttonDanger),
-                    minWidth: 220,
-                    opacity: protectionState.saving ? 0.7 : 1,
-                    cursor: protectionState.saving ? 'wait' : 'pointer',
-                  }}
-                  disabled={protectionState.saving}
-                >
-                  {protectionState.saving
-                    ? 'Saving…'
-                    : (protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {/* New Game modal */}
@@ -4666,64 +4315,6 @@ const S = {
     color: 'var(--appearance-font-color, var(--admin-body-color))',
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
-  },
-  metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
-    backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
-  },
-  metaBannerLine: {
-    maxWidth: 1400,
-    margin: '0 auto',
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaCommitBlock: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  metaCommitLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
-  metaCommitCode: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    background: 'rgba(148, 163, 184, 0.12)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    padding: '2px 6px',
-    borderRadius: 6,
-    lineHeight: 1.4,
-    wordBreak: 'break-all',
-  },
-  metaBadge: {
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: 'rgba(59, 130, 246, 0.16)',
-    color: '#9cc0ff',
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  metaMuted: {
-    color: 'var(--admin-muted)',
-    fontSize: 12,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-  },
-  metaLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
   },
   metaBannerError: {
     color: '#f87171',
@@ -5082,12 +4673,6 @@ const S = {
     borderRadius: '50%',
     background: '#ef4444',
     boxShadow: '0 0 12px rgba(239, 68, 68, 0.65)',
-  },
-  deployStatusCopy: {
-    fontSize: 11,
-    color: 'var(--admin-muted)',
-    marginTop: -4,
-    marginBottom: 8,
   },
   headerTopRow: {
     display: 'flex',
