@@ -2,6 +2,14 @@
 // JSON body: { path: "public/media/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
 // Writes into your GitHub repo via Contents API. Creates folders as needed.
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'Use POST' });

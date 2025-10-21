@@ -217,6 +217,119 @@ async function fileToBase64(file) {
   throw new Error('Base64 conversion is not supported in this environment');
 }
 
+function IconSelect({ options = [], value = '', onChange, placeholder = '(default)', allowEmpty = true }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const selected = useMemo(() => options.find((opt) => opt?.key === value) || null, [options, value]);
+  const selectedThumb = selected?.url ? toDirectMediaURL(selected.url) : '';
+
+  useEffect(() => {
+    function handleClick(event) {
+      if (!containerRef.current) return;
+      if (containerRef.current.contains(event.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return () => {};
+    function handleKey(event) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [open]);
+
+  const handleSelect = useCallback((next) => {
+    if (typeof onChange === 'function') {
+      onChange(next);
+    }
+    setOpen(false);
+  }, [onChange]);
+
+  const renderPreview = (thumbUrl) => {
+    if (thumbUrl) {
+      return <img src={thumbUrl} alt="" style={S.iconSelectThumbImage} />;
+    }
+    return <div style={S.iconSelectEmpty}>∅</div>;
+  };
+
+  return (
+    <div ref={containerRef} style={S.iconSelect}>
+      <button
+        type="button"
+        style={{ ...S.iconSelectButton, ...(open ? S.iconSelectButtonOpen : {}) }}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <div style={S.iconSelectPreview}>
+          {renderPreview(selectedThumb)}
+        </div>
+        <div style={S.iconSelectSelection}>
+          <div style={S.iconSelectLabel}>
+            {selected ? (selected.name || selected.key) : placeholder}
+          </div>
+          <div style={S.iconSelectSubLabel}>
+            {selected ? selected.key : 'Uses default icon'}
+          </div>
+        </div>
+        <span style={S.iconSelectCaret}>{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div style={S.iconSelectMenu}>
+          {allowEmpty && (
+            <button
+              type="button"
+              onClick={() => handleSelect('')}
+              style={{
+                ...S.iconSelectOption,
+                ...(value === '' ? S.iconSelectOptionActive : {}),
+              }}
+            >
+              <div style={S.iconSelectThumbSlot}>
+                <div style={S.iconSelectEmpty}>∅</div>
+              </div>
+              <div>
+                <div style={S.iconSelectOptionLabel}>{placeholder}</div>
+                <div style={S.iconSelectOptionSubLabel}>Reset to default</div>
+              </div>
+            </button>
+          )}
+          {options.length === 0 && (
+            <div style={S.iconSelectEmptyState}>No icons available.</div>
+          )}
+          {options.map((opt, idx) => {
+            const thumb = opt?.url ? toDirectMediaURL(opt.url) : '';
+            const isActive = value === opt?.key;
+            return (
+              <button
+                type="button"
+                key={opt?.key || `icon-${idx}`}
+                onClick={() => handleSelect(opt?.key || '')}
+                style={{
+                  ...S.iconSelectOption,
+                  ...(isActive ? S.iconSelectOptionActive : {}),
+                }}
+              >
+                <div style={S.iconSelectThumbSlot}>
+                  {renderPreview(thumb)}
+                </div>
+                <div>
+                  <div style={S.iconSelectOptionLabel}>{opt?.name || opt?.key || 'Untitled icon'}</div>
+                  <div style={S.iconSelectOptionSubLabel}>{opt?.key || '—'}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────────── Defaults ───────────────────────── */
 const STARFIELD_DEFAULTS = {
   title: 'Starfield Station Break',
@@ -2130,6 +2243,18 @@ export default function Admin() {
     return options;
   }, [config?.icons?.missions, config?.icons?.devices]);
 
+  const deviceIconOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    (config?.icons?.devices || []).forEach((icon) => {
+      const key = (icon?.key || '').trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      options.push({ key, name: icon?.name || key, url: icon?.url || '' });
+    });
+    return options;
+  }, [config?.icons?.devices]);
+
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
   const deviceRadiusValue = selectedDevIdx!=null
@@ -2747,19 +2872,15 @@ export default function Admin() {
                       </select>
                     </Field>
                     <Field label="Icon">
-                      <select
-                        style={S.input}
+                      <IconSelect
+                        options={missionIconOptions}
                         value={editing.iconKey || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, iconKey: e.target.value });
+                        onChange={(next) => {
+                          setEditing({ ...editing, iconKey: next });
                           setDirty(true);
                         }}
-                      >
-                        <option value="">(default)</option>
-                        {missionIconOptions.map((it) => (
-                          <option key={it.key} value={it.key}>{it.name || it.key}</option>
-                        ))}
-                      </select>
+                        placeholder="(default)"
+                      />
                     </Field>
                   </div>
                   <div style={{ ...S.noteText, marginTop: -6 }}>
@@ -3272,10 +3393,12 @@ export default function Admin() {
                         </select>
                       </Field>
                       <Field label="Icon">
-                        <select style={S.input} value={devDraft.iconKey} onChange={(e)=>setDevDraft(d=>({ ...d, iconKey:e.target.value }))}>
-                          <option value="">(default)</option>
-                          {(config?.icons?.devices||[]).map(it=><option key={it.key} value={it.key}>{it.name||it.key}</option>)}
-                        </select>
+                        <IconSelect
+                          options={deviceIconOptions}
+                          value={devDraft.iconKey || ''}
+                          onChange={(next) => setDevDraft((d) => ({ ...d, iconKey: next }))}
+                          placeholder="(default)"
+                        />
                       </Field>
                       <Field label="Effect (sec)">
                         <input type="number" min={5} max={3600} style={S.input} value={devDraft.effectSeconds}
@@ -4561,6 +4684,118 @@ const S = {
     background: 'var(--admin-input-bg)',
     color: 'var(--admin-input-color)',
     boxShadow: 'var(--admin-glass-sheen)',
+  },
+  iconSelect: {
+    position: 'relative',
+  },
+  iconSelectButton: {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: 12,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  iconSelectButtonOpen: {
+    boxShadow: '0 0 0 3px rgba(96, 165, 250, 0.28)',
+  },
+  iconSelectPreview: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    display: 'grid',
+    placeItems: 'center',
+    background: 'var(--admin-tab-bg)',
+  },
+  iconSelectThumbImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  iconSelectEmpty: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  iconSelectSelection: {
+    flex: 1,
+    minWidth: 0,
+  },
+  iconSelectLabel: {
+    fontWeight: 600,
+    color: 'var(--admin-input-color)',
+    lineHeight: 1.2,
+  },
+  iconSelectSubLabel: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    lineHeight: 1.2,
+    marginTop: 2,
+  },
+  iconSelectCaret: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  iconSelectMenu: {
+    position: 'absolute',
+    top: 'calc(100% + 6px)',
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+    boxShadow: '0 18px 36px rgba(8, 13, 19, 0.45)',
+    maxHeight: 260,
+    overflowY: 'auto',
+    display: 'grid',
+    gap: 0,
+  },
+  iconSelectOption: {
+    display: 'grid',
+    gridTemplateColumns: '48px 1fr',
+    gap: 10,
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: 'transparent',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    width: '100%',
+  },
+  iconSelectOptionActive: {
+    background: 'rgba(96, 165, 250, 0.16)',
+  },
+  iconSelectOptionLabel: {
+    fontWeight: 600,
+  },
+  iconSelectOptionSubLabel: {
+    fontSize: 11,
+    color: 'var(--admin-muted)',
+    marginTop: 2,
+  },
+  iconSelectThumbSlot: {
+    width: 48,
+    height: 44,
+    borderRadius: 10,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    display: 'grid',
+    placeItems: 'center',
+    background: 'var(--admin-tab-bg)',
+  },
+  iconSelectEmptyState: {
+    padding: '10px 12px',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   button: {
     padding: '10px 14px',
