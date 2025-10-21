@@ -106,7 +106,6 @@ they appear in Supabase.
 | --- | --- |
 | Media card shows `status: missing` | The Supabase object probably does not exist. Upload the file or adjust the manifest to the correct path. |
 | Upload API returns `Supabase upload failed` | Confirm `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MEDIA_BUCKET`, and `SUPABASE_MEDIA_PREFIX` are configured. |
-| Supabase responses show `status 401 Unauthorized` | Double-check the keys and ensure the dashboard has the service-role key configured; the API now forwards the key as both `Authorization` and `apikey` headers. |
 | JSON mirrors are missing | Ensure `SUPABASE_DATA_BUCKET`/`SUPABASE_DATA_PREFIX` are set or allow the API to reuse the media bucket. |
 | Manifest writes crash with `ENOENT: .../admin-media` | The API falls back to the OS temp directory (`/tmp/admin-media/manifest.json`). Verify the environment allows writing to `/tmp` or override with `MEDIA_STORAGE_ROOT`. |
 

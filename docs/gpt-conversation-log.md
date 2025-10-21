@@ -68,11 +68,3 @@
 **You:** Uploading new media still fails with `ENOENT: no such file or directory, mkdir '/var/task/next/cache/admin-media'`. Keep the Supabase workflow, but make sure manifest updates land somewhere writable so cards appear again.
 
 **GPT:** Pointed the manifest fallback to the runtime temp directory (`/tmp/admin-media/manifest.json`) so serverless environments can persist updates, and extended the binary asset guide with the new troubleshooting step while re-running the build.
-
----
-
-**Timestamp:** 2025-10-21T21:40:00Z
-
-**You:** Supabase media still doesn't show up in the Admin and uploads throw errors. Keep the zero-binary setup but make the Storage integration work end-to-end.
-
-**GPT:** Updated the Supabase adapter so every Storage request sends the service role key as both the bearer token and `apikey`, refreshed the troubleshooting guide with the 401 fix, and verified the dashboard build so listings and uploads can finally talk to the bucket.
