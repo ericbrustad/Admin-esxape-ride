@@ -689,6 +689,17 @@ export default function Admin() {
   const [status, setStatusInternal] = useState('');
   const [statusLog, setStatusLog] = useState([]);
   const publishingLocked = config?.game?.deployEnabled === true;
+  const newGameProtectionBanner = useMemo(() => {
+    if (!gameEnabled) {
+      return {
+        tone: 'danger',
+        text: 'Game project publishing is currently disabled. Enable it in Settings before creating a new game.',
+      };
+    }
+    return publishingLocked
+      ? { tone: 'success', text: '🟢 This Game is Protected and can not be changed' }
+      : { tone: 'danger', text: '🔴 This Game can be edited, overwritten and saved' };
+  }, [gameEnabled, publishingLocked]);
 
   const [missionActionFlash, setMissionActionFlash] = useState(false);
   const [deviceActionFlash, setDeviceActionFlash] = useState(false);
@@ -770,13 +781,14 @@ export default function Admin() {
 
   const openNewGameModal = useCallback(() => {
     logConversation('You', 'Opened “Create New Game”');
-    const message = publishingLocked
-      ? '🟢 This Game is Protected and can not be changed'
-      : '🔴 This Game can be edited, overwritten and saved';
-    updateNewGameStatus(message, publishingLocked ? 'success' : 'danger');
-    logConversation('GPT', message);
+    if (newGameProtectionBanner?.text) {
+      updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone);
+      logConversation('GPT', newGameProtectionBanner.text);
+    } else {
+      updateNewGameStatus('', 'info');
+    }
     setShowNewGame(true);
-  }, [publishingLocked, logConversation]);
+  }, [logConversation, newGameProtectionBanner]);
 
   function handleNewGameModalClose() {
     logConversation('You', 'Closed “Create New Game” dialog');
@@ -848,14 +860,20 @@ export default function Admin() {
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
     if (publishingLocked) {
-      const message = '🟢 This Game is Protected and can not be changed';
-      updateNewGameStatus(message, 'success');
-      logConversation('GPT', message);
+      if (newGameProtectionBanner?.text) {
+        updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone);
+        logConversation('GPT', newGameProtectionBanner.text);
+      }
       return;
     }
     if (!gameEnabled) {
-      updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
-      logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
+      if (newGameProtectionBanner?.text) {
+        updateNewGameStatus(newGameProtectionBanner.text, newGameProtectionBanner.tone || 'info');
+        logConversation('GPT', newGameProtectionBanner.text);
+      } else {
+        updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
+        logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
+      }
     }
     if (!title) {
       updateNewGameStatus('❌ Title is required.', 'danger');
@@ -4392,9 +4410,18 @@ export default function Admin() {
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
-              {!gameEnabled && (
-                <div style={S.modalStatusError}>
-                  Game project publishing is currently disabled. Enable it in settings before creating a new game.
+              {newGameProtectionBanner?.text && (
+                <div
+                  style={{
+                    ...S.modalStatus,
+                    ...(newGameProtectionBanner.tone === 'success'
+                      ? S.modalStatusSuccess
+                      : newGameProtectionBanner.tone === 'danger'
+                        ? S.modalStatusDanger
+                        : S.modalStatusInfo),
+                  }}
+                >
+                  {newGameProtectionBanner.text}
                 </div>
               )}
               <Field label="Game Title">
@@ -4547,10 +4574,10 @@ export default function Admin() {
                   style={{
                     ...S.action3DButton,
                     ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}),
-                    ...(publishingLocked ? { opacity:0.55, cursor:'not-allowed' } : {}),
+                    ...((publishingLocked || !gameEnabled) ? { opacity:0.55, cursor:'not-allowed' } : {}),
                   }}
                   onClick={handleCreateNewGame}
-                  disabled={newGameBusy || publishingLocked}
+                  disabled={newGameBusy || publishingLocked || !gameEnabled}
                 >
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
