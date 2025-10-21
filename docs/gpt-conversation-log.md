@@ -36,3 +36,43 @@
 **You:** Uploads say “0 of 1 uploaded” and the API throws `EROFS` when it tries to write `public/media/manifest.json`. Please make sure the media types still auto-sort, show an “Other” folder, pick up existing entries, and get ready to move everything over to Supabase. Let me know what you still need from me.
 
 **GPT:** Added a writable manifest adapter that falls back to `.next/cache/admin-media/manifest.json` (or custom env paths) whenever the repo directory is read-only, exposed the active storage path in the API responses for debugging, refreshed the Media Pool inventory logic, and documented the Supabase bucket requirements so we can finish the migration once credentials arrive.
+
+---
+
+**Timestamp:** 2025-10-21T15:30:00Z
+
+**You:** Restore every deleted media asset, wire the Admin APIs to Supabase so uploads, settings, missions, and devices save into bucket directories, and make sure the Settings footer still shows the repository metadata.
+
+**GPT:** Recovered the full media pack in `public/media/**`, refreshed the manifest so each item points at the restored files, added a Supabase storage adapter that uploads binaries and mirrors JSON (missions/settings/devices) into dedicated prefixes, updated the media listing to surface Supabase objects, and kept the Settings footer metadata intact after verifying the build.
+
+---
+
+**Timestamp:** 2025-10-21T16:45:00Z
+
+**You:** GitHub flagged the previous fix because it reintroduced binaries. Please reapply the zero-binary rule, keep the manifest useful for Supabase, and document how the dashboard still finds settings, missions, and device JSON in storage.
+
+**GPT:** Deleted every tracked media binary, restored `.gitkeep` placeholders for the expected directory structure, rewrote the manifest to reference Supabase bucket paths, refreshed the binary asset guide with the zero-binary workflow, and confirmed the Supabase sync helpers still mirror settings, missions, and devices.
+
+---
+
+**Timestamp:** 2025-10-21T17:05:00Z
+
+**You:** All image previews disappeared after the zero-binary update. Bring back the new placeholders alongside the legacy images, keep using the latest Supabase configuration, and make sure settings, missions, and devices still sync into their directories.
+
+**GPT:** Added a reusable SVG placeholder library, updated the media manifest to pair each Supabase object with a local thumbnail plus metadata, taught `/api/list-media` to emit placeholder-aware previews, refreshed the storage guide, and revalidated the Supabase sync directories for settings, missions, and devices.
+
+---
+
+**Timestamp:** 2025-10-21T19:20:00Z
+
+**You:** Uploading new media still fails with `ENOENT: no such file or directory, mkdir '/var/task/next/cache/admin-media'`. Keep the Supabase workflow, but make sure manifest updates land somewhere writable so cards appear again.
+
+**GPT:** Pointed the manifest fallback to the runtime temp directory (`/tmp/admin-media/manifest.json`) so serverless environments can persist updates, and extended the binary asset guide with the new troubleshooting step while re-running the build.
+
+---
+
+**Timestamp:** 2025-10-21T21:40:00Z
+
+**You:** Supabase media still doesn't show up in the Admin and uploads throw errors. Keep the zero-binary setup but make the Storage integration work end-to-end.
+
+**GPT:** Updated the Supabase adapter so every Storage request sends the service role key as both the bearer token and `apikey`, refreshed the troubleshooting guide with the 401 fix, and verified the dashboard build so listings and uploads can finally talk to the bucket.

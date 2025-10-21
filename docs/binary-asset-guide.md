@@ -1,99 +1,114 @@
-# Media Storage Without Git Binaries
+# Media Storage & Supabase Synchronization
 
-As of 2025-10-20 the Admin Escape Ride repository no longer tracks binary assets.
-All images, audio, video, and AR models must be hosted outside of GitHub and
-referenced through `public/media/manifest.json`. This guide explains the new
-workflow so uploads still appear in the Media Pool without introducing large
-blobs into the git history.
+The Admin Escape Ride repository follows a strict zero-binary policy: no PNGs,
+JPGs, MP4s, or other binary payloads are tracked in Git. All production art now
+lives in Supabase Storage. The repo only contains JSON manifests and empty
+directory placeholders so teammates know which folders map to Supabase bucket
+prefixes.
 
-## 1. How the manifest works
+This guide explains how the Supabase-centric workflow is wired and how to keep
+the bucket in sync with the admin dashboard.
 
-* `public/media/manifest.json` lists every media entry the dashboard should
-  display. Each entry includes:
-  * `folder` — the logical Media Pool directory (for example
-    `mediapool/Images/uploads`).
-  * `type` — normalized media type (`image`, `audio`, `video`, `gif`,
-    `ar-overlay`, `other`).
-  * `url` — the externally hosted asset. When absent the item is flagged as
-    `pending-external` in the UI.
-  * Optional notes, tags, and timestamps for auditing.
-* `/api/list-media` merges the manifest with any local files that exist in
-  `.gitignored` directories, classifies each entry, and exposes the combined
-  inventory to the Media Pool, Assigned Media tab, and mission editors.
-* Because the manifest is plain JSON it can be reviewed, diffed, and versioned
-  without storing binary payloads.
+## 1. Directory map
 
-## 2. Registering new media
+The Media Pool and game bundle still expect the following folder structure:
 
-1. Upload the binary to an external provider (S3, GCS, Azure Blob, Dropbox,
-   Google Drive, etc.) and obtain a public URL. The dashboard will rewrite
-   common hosts (Dropbox, Drive) into direct-download links automatically.
-2. In the Media Pool, drop the file you want to register. The new upload API
-   (`pages/api/upload.js`) records metadata, ignores the raw payload, and appends
-   a manifest entry pointing at the external URL you supplied in the "Paste URL"
-   field.
-3. The Media Pool refreshes automatically and routes the entry into the correct
-   media type tab. If you omit the URL the item remains in a
-   `pending external` state until you edit the manifest with the real link.
-
-> **Tip:** you can edit `public/media/manifest.json` manually when bulk-updating
-> links. Each commit should explain where the assets live so QA can verify.
-
-## 3. Local development shortcuts
-
-* Drop assets into the `public/media/mediapool/...` directories while testing.
-  They are `.gitkeep` placeholders, so anything you place there remains
-  untracked. `/api/list-media` still surfaces them in the UI alongside manifest
-  entries.
-* Add temporary notes to manifest items when you delete or migrate assets. The
-  Media Pool surfaces those notes directly in the card UI.
-
-## 4. Verifying the repository is binary-free
-
-Run a quick audit before committing:
-
-```bash
-npm run verify:binaries
+```
+public/media/mediapool/
+  Audio/
+  Video/
+  Gif/
+  Images/
+    bundles/
+    covers/
+    icons/
+    uploads/
+  AR Overlay/
+  AR Target/
+  Other/
 ```
 
-The command exits with status `0` when no tracked binaries are found. If you do
-intend to keep a binary checked in (for example, a design token screenshot)
-explain why in the commit message and attach a follow-up task to migrate it off
-GitHub.
+Each directory ships with a `.gitkeep` placeholder only. When you upload media
+the API streams the file to Supabase and records the object path, leaving Git
+untouched.
 
-## 5. Troubleshooting checklist
+Game-specific mirrors (`game/lib/media/overlays`, `lib/media/overlays`,
+`public/game/public/media/*`) also contain `.gitkeep` files so the runtime can
+resolve relative paths while assets reside in Supabase.
+
+## 2. Manifest as the source of truth
+
+`public/media/manifest.json` catalogs every asset that should exist in
+Supabase. Each entry includes the expected bucket and object path inside the
+`supabase` block and now carries a lightweight SVG placeholder so the Admin UI
+can keep rendering thumbnails even when the binary only lives in Storage.
+Example:
+
+```json
+{
+  "id": "supabase-bundle-clue-green",
+  "folder": "mediapool/Images/bundles",
+  "fileName": "CLUEgreen.png",
+  "status": "supabase",
+  "supabase": {
+    "bucket": "admin-media",
+    "path": "mediapool/Images/bundles/CLUEgreen.png"
+  },
+  "thumbUrl": "/media/placeholders/bundle.svg",
+  "placeholder": {
+    "kind": "bundle",
+    "path": "public/media/placeholders/bundle.svg",
+    "url": "/media/placeholders/bundle.svg"
+  }
+}
+```
+
+The manifest keeps the repo reviewable while ensuring the dashboard knows which
+Supabase keys to look for. Placeholders live in
+`public/media/placeholders/**` and cover every Media Pool category (covers,
+icons, bundles, uploads, AR, audio, video, etc.). They are text-based SVGs, so
+the zero-binary policy remains intact while previews stay informative.
+
+## 3. How uploads work
+
+1. The Admin UI converts dropped files into base64 payloads.
+2. `/api/upload` detects that Supabase Storage is enabled and writes the bytes
+   to `SUPABASE_MEDIA_BUCKET/SUPABASE_MEDIA_PREFIX`.
+3. The manifest is updated with the new object metadata (no binaries are
+   committed).
+4. `/api/list-media` merges three sources when building the Media Pool
+   inventory and attaches the manifest placeholder data as `thumbUrl` so
+   thumbnails no longer break when objects are Supabase-only:
+   * manifest entries (with placeholder previews),
+   * live Supabase listings (so thumbnails appear as soon as the object exists),
+   * any fallback repo files (only placeholders now).
+
+## 4. Mirroring settings, missions, and devices
+
+The data APIs (`/api/save-config`, `/api/save-bundle`, `/api/save-publish`) call
+`syncSupabaseJson()` so drafts land in Supabase alongside media. JSON payloads
+are stored under `SUPABASE_DATA_PREFIX/{settings|missions|devices}`. This keeps
+the storage layer authoritative for both configuration and art.
+
+## 5. Operating procedures
+
+* Treat Supabase as the canonical store. If you remove an object, update the
+  manifest entry or delete it entirely.
+* Never commit binaries. If you need to test locally, place files in the
+  appropriate folder without committing them, or upload through the dashboard so
+they appear in Supabase.
+* Include bucket and folder changes in code review by updating the manifest and
+  docs.
+
+## 6. Troubleshooting checklist
 
 | Symptom | Fix |
 | --- | --- |
-| Media card shows `pending external` | Update the manifest entry with a valid public `url`. |
-| "Open" button disabled | Provide an external URL or drop a local file inside the `.gitignored` media folder while testing. |
-| Manifest write fails on upload | The API now falls back to `.next/cache/admin-media/manifest.json` (or `MEDIA_MANIFEST_FALLBACK_PATH`). If you still see errors, set `MEDIA_MANIFEST_PATH` or point `MEDIA_STORAGE_ROOT` at a writable volume such as `/tmp`. |
-| Need a historical asset | Check prior commits or the external storage provider; binaries are no longer in git history after 2025-10-20. |
+| Media card shows `status: missing` | The Supabase object probably does not exist. Upload the file or adjust the manifest to the correct path. |
+| Upload API returns `Supabase upload failed` | Confirm `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MEDIA_BUCKET`, and `SUPABASE_MEDIA_PREFIX` are configured. |
+| Supabase responses show `status 401 Unauthorized` | Double-check the keys and ensure the dashboard has the service-role key configured; the API now forwards the key as both `Authorization` and `apikey` headers. |
+| JSON mirrors are missing | Ensure `SUPABASE_DATA_BUCKET`/`SUPABASE_DATA_PREFIX` are set or allow the API to reuse the media bucket. |
+| Manifest writes crash with `ENOENT: .../admin-media` | The API falls back to the OS temp directory (`/tmp/admin-media/manifest.json`). Verify the environment allows writing to `/tmp` or override with `MEDIA_STORAGE_ROOT`. |
 
-## 6. Preparing Supabase storage
-
-The admin upload flow is ready to target Supabase Storage for persistent media.
-
-1. Provision a Supabase project and create a storage bucket (for example,
-   `escape-ride-media`). Enable public access or generate signed URLs for the
-   admin dashboard to surface thumbnails.
-2. Supply the following environment variables to the Next.js runtime:
-
-   * `SUPABASE_URL` — https://qgtccnxfuebirrcenxdn.supabase.co
-   * `SUPABASE_ANON_KEY` — eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFndGNjbnhmdWViaXJyY2VueGRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTExMjAsImV4cCI6MjA3NjEyNzEyMH0.pYsQOr-M2umyTKLqbiD_pSrjN201h7nC5lhnEpIaxZM
-   * `SUPABASE_SERVICE_ROLE_KEY` — optional; unlocks server-side management
-     tasks (keep it secret and only expose it on the API layer).
-   * `SUPABASE_MEDIA_BUCKET` — admin-media
-   * `SUPABASE_MEDIA_PREFIX` — mediapool/
-
-3. Once credentials are available, update `/api/upload` to write the incoming
-   binary payload to the Supabase bucket and persist the returned public URL in
-   the manifest entry. `/api/list-media` is already structured so you can merge
-   Supabase listings with the manifest data without further schema changes.
-
-> **Request:** Share the Supabase bucket name, region, and access policy (public
-> vs signed URLs). With those details we can wire the API to stream uploads to
-> Supabase while keeping the manifest as the source of truth.
-
-Following this flow keeps the repository lightweight, satisfies the "no binary"
-requirement, and still presents a full media catalog inside the admin dashboard.
+Following this workflow honors the zero-binary requirement while keeping the
+admin dashboard fully aware of every asset stored in Supabase.

@@ -12,6 +12,7 @@
 // hidden from Git history.
 
 import { readManifest, writeManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
+import { uploadSupabaseMedia, isSupabaseMediaEnabled } from '../../lib/supabase-storage.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -95,15 +96,41 @@ export default async function handler(req, res) {
       createdAt: new Date().toISOString(),
     };
 
+    let supabaseUpload = null;
+    if (isSupabaseMediaEnabled() && contentBase64) {
+      try {
+        supabaseUpload = await uploadSupabaseMedia({
+          folder: resolvedFolder,
+          fileName: safeName,
+          contentBase64,
+          sizeBytes,
+        });
+        if (supabaseUpload?.ok) {
+          entry.url = supabaseUpload.publicUrl || entry.url;
+          entry.status = 'supabase';
+          entry.notes = 'Uploaded to Supabase storage.';
+          entry.supabase = {
+            bucket: supabaseUpload.bucket,
+            path: supabaseUpload.path,
+            publicUrl: supabaseUpload.publicUrl,
+            sizeBytes: supabaseUpload.sizeBytes,
+          };
+          entry.sizeBytes = supabaseUpload.sizeBytes;
+        } else if (supabaseUpload && !supabaseUpload.skipped) {
+          entry.notes = supabaseUpload.error || supabaseUpload.reason || 'Supabase upload failed.';
+          entry.status = 'error-supabase';
+        }
+      } catch (error) {
+        entry.status = 'error-supabase';
+        entry.notes = error?.message || 'Supabase upload threw unexpectedly.';
+      }
+    }
+
     manifest.items = Array.isArray(manifest.items) ? manifest.items : [];
     manifest.items.push(entry);
     manifest.updatedAt = new Date().toISOString();
 
     const writeResult = writeManifest(manifest);
-
-    if (contentBase64) {
-      console.warn('[upload] contentBase64 received but ignored; configure external storage to persist binaries.');
-    }
 
     const debug = getManifestDebugInfo();
 
@@ -116,6 +143,7 @@ export default async function handler(req, res) {
         manifestPath: writeResult.path,
         fallbackUsed: writeResult.fallback,
         debug,
+        supabase: supabaseUpload,
       },
     });
   } catch (error) {
