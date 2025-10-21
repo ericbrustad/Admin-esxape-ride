@@ -22,15 +22,23 @@ function classify(name) {
   return 'other';
 }
 
-function listFiles(absDir) {
+function walkFiles(absDir, relative = '') {
+  const results = [];
   try {
-    return fs
-      .readdirSync(absDir, { withFileTypes: true })
-      .filter(d => d.isFile())
-      .map(d => d.name);
+    const entries = fs.readdirSync(absDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const nextRelative = relative ? `${relative}/${entry.name}` : entry.name;
+      const nextAbs = path.join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...walkFiles(nextAbs, nextRelative));
+      } else if (entry.isFile()) {
+        results.push(nextRelative);
+      }
+    }
   } catch {
-    return [];
+    /* ignore missing directories */
   }
+  return results;
 }
 
 export default async function handler(req, res) {
@@ -43,23 +51,30 @@ export default async function handler(req, res) {
     const adminRoot = path.join(cwd, 'public', 'media', dir);
     const gameRoot  = GAME_ENABLED ? path.join(cwd, 'game', 'public', 'media', dir) : null;
 
-    const adminNames = listFiles(adminRoot);
-    const gameNames  = gameRoot ? listFiles(gameRoot) : [];
+    const adminNames = walkFiles(adminRoot);
+    const gameNames  = gameRoot ? walkFiles(gameRoot) : [];
 
-    const seenByName = new Set(); // case-insensitive
+    const seenByPath = new Set(); // exact relative path
     const out = [];
 
     // 1) Admin (canonical)
-    for (const name of adminNames) {
+    for (const relative of adminNames) {
+      const name = path.basename(relative);
       const type = classify(name);
       if (type === 'other') continue;
-      const key = name.toLowerCase();
-      if (seenByName.has(key)) continue;
-      seenByName.add(key);
-      const relativePath = path.posix.join('public', 'media', dir, name);
+      const normalizedRelative = relative.replace(/\\/g, '/');
+      const key = normalizedRelative.toLowerCase();
+      if (seenByPath.has(key)) continue;
+      seenByPath.add(key);
+      const encoded = normalizedRelative
+        .split('/')
+        .map(seg => encodeURIComponent(seg))
+        .join('/');
+      const relativePath = path.posix.join('public', 'media', dir, normalizedRelative);
       out.push({
+        id: `${dir}/${normalizedRelative}`,
         name,
-        url: `/media/${dir}/${encodeURIComponent(name)}`,
+        url: `/media/${dir}/${encoded}`,
         type,
         source: 'admin',
         path: relativePath,
@@ -68,15 +83,22 @@ export default async function handler(req, res) {
 
     // 2) Game (fallback only for names not present in Admin)
     if (GAME_ENABLED && gameOrigin) {
-      for (const name of gameNames) {
+      for (const relative of gameNames) {
+        const name = path.basename(relative);
         const type = classify(name);
         if (type === 'other') continue;
-        const key = name.toLowerCase();
-        if (seenByName.has(key)) continue; // Admin has it → skip Game
-        seenByName.add(key);
+        const normalizedRelative = relative.replace(/\\/g, '/');
+        const key = normalizedRelative.toLowerCase();
+        if (seenByPath.has(key)) continue; // Admin has it → skip Game
+        seenByPath.add(key);
+        const encoded = normalizedRelative
+          .split('/')
+          .map(seg => encodeURIComponent(seg))
+          .join('/');
         out.push({
+          id: `${dir}/${normalizedRelative}`,
           name,
-          url: `${gameOrigin}/media/${dir}/${encodeURIComponent(name)}`,
+          url: `${gameOrigin}/media/${dir}/${encoded}`,
           type,
           source: 'game',
           path: '',
