@@ -1,6 +1,6 @@
 {
   "id": "msuite_starfield_station_break",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -19,7 +19,7 @@
         "answer": "solstice",
         "acceptable": "solstice",
         "hint": "Listen for the brightening beacon loop.",
-        "mediaUrl": "/media/covers/starfield-station-break.svg",
+        "mediaUrl": "/media/mediapool/Images/covers/starfield-station-break.svg",
         "geofenceEnabled": true,
         "lat": 38.9072,
         "lng": -77.0369,
@@ -60,7 +60,7 @@
         "answer": "platform six",
         "acceptable": "platform 6,platform six",
         "hint": "Halo Decoy flashes twice toward the correct door.",
-        "mediaUrl": "/media/icons/aurora-beacon.svg",
+        "mediaUrl": "/media/mediapool/Images/icons/aurora-beacon.svg",
         "geofenceEnabled": true,
         "lat": 38.9125,
         "lng": -77.0473,
@@ -101,7 +101,7 @@
         "answer": "chief navarre",
         "acceptable": "chief navarre,navarre",
         "hint": "The voyager dial pulses orange when they're nearby.",
-        "mediaUrl": "/media/icons/voyager-dial.svg",
+        "mediaUrl": "/media/mediapool/Images/icons/voyager-dial.svg",
         "geofenceEnabled": true,
         "lat": 38.9005,
         "lng": -77.045,
@@ -128,6 +128,64 @@
         "textVertical": "top"
       },
       "showContinue": true
+    },
+    {
+      "id": "m04",
+      "title": "New Mission",
+      "type": "multiple_choice",
+      "iconKey": "",
+      "rewards": {
+        "points": 25
+      },
+      "correct": {
+        "mode": "none"
+      },
+      "wrong": {
+        "mode": "none"
+      },
+      "onCorrect": {
+        "statement": "",
+        "mediaUrl": "https://admin-esxape-ride-7z2wos43u-erics-projects-27f0c1b3.vercel.app/media/mediapool/Images/uploads/1760531435763-black_magic_book_-_Copy.jpg",
+        "durationSeconds": 0,
+        "buttonText": "OK",
+        "enabled": true
+      },
+      "onWrong": {
+        "statement": "",
+        "mediaUrl": "",
+        "audioUrl": "",
+        "durationSeconds": 0,
+        "buttonText": "OK",
+        "enabled": false
+      },
+      "content": {
+        "question": "ddv",
+        "choices": [
+          "dv",
+          "dvdvd"
+        ],
+        "correctIndex": 0,
+        "mediaUrl": "",
+        "geofenceEnabled": false,
+        "lat": "",
+        "lng": "",
+        "radiusMeters": 25,
+        "cooldownSeconds": 30
+      },
+      "appearanceOverrideEnabled": false,
+      "showContinue": true,
+      "trigger": {
+        "enabled": false,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "_hasResponseTrigger": true
     }
   ]
 }
