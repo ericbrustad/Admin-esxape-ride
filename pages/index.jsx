@@ -823,10 +823,13 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
 
-  const [suite, setSuite]   = useState(null);
-  const [config, setConfig] = useState(null);
+  const [suite, setSuite]   = useState(() => ({ version: '0.0.0', missions: [] }));
+  const [config, setConfig] = useState(() => defaultConfig());
+  const [initialLoading, setInitialLoading] = useState(true);
   const [status, setStatusInternal] = useState('');
   const [statusLog, setStatusLog] = useState([]);
+
+  const dataReady = useMemo(() => !initialLoading && !!suite && !!config, [initialLoading, suite, config]);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1131,9 +1134,11 @@ export default function Admin() {
 
   /* load suite/config when slug changes */
   useEffect(() => {
+    let cancelled = false;
+    setInitialLoading(true);
     (async () => {
       try {
-        setStatus('Loading…');
+        if (!cancelled) setStatus('Loading…');
         const isDefault = !activeSlug || activeSlug === 'default';
 
         const missionUrls = isDefault
@@ -1187,15 +1192,23 @@ export default function Admin() {
         merged = applyDefaultIcons(merged);
         merged = normalizeGameMetadata(merged, slugForMeta);
 
+        if (cancelled) return;
         setSuite(normalized);
         setConfig(merged);
         setSelected(null); setEditing(null); setDirty(false);
         setSelectedDevIdx(null); setSelectedMissionIdx(null);
         setStatus('');
       } catch (e) {
-        setStatus('Load failed: ' + (e?.message || e));
+        if (!cancelled) {
+          setStatus('Load failed: ' + (e?.message || e));
+        }
+      } finally {
+        if (!cancelled) setInitialLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSlug]);
 
@@ -1246,7 +1259,7 @@ export default function Admin() {
   function isDefaultSlug(slug) { return !slug || slug === 'default'; }
 
   async function saveAllWithSlug(slug) {
-    if (!suite || !config) return false;
+    if (!dataReady) return false;
     setStatus((prev) => {
       if (typeof prev === 'string' && prev.toLowerCase().includes('publishing')) return prev;
       return 'Saving…';
@@ -1378,7 +1391,7 @@ export default function Admin() {
 
   async function saveAndPublish() {
     logConversation('You', 'Requested Save & Publish');
-    if (!suite || !config) return;
+    if (!dataReady) return;
     const slug = activeSlug || 'default';
     const shouldPublish = gameEnabled && config?.game?.deployEnabled === true;
     setSavePubBusy(true);
@@ -1519,7 +1532,7 @@ export default function Admin() {
     return p.join('.');
   }
   function saveToList() {
-    if (!editing || !suite) return;
+    if (!editing || !dataReady) return;
     if (!editing.id || !editing.title || !editing.type) return setStatus('❌ Fill id, title, type');
 
     const fields = TYPE_FIELDS[editing.type] || [];
@@ -1555,13 +1568,13 @@ export default function Admin() {
     saveToList();
   }
   function removeMission(id) {
-    if (!suite) return;
+    if (!dataReady) return;
     setSuite({ ...suite, missions: (suite.missions || []).filter(m => m.id !== id) });
     setDirty(true);
     if (selected === id) { setSelected(null); setEditing(null); }
   }
   function moveMission(idx, dir) {
-    if (!suite) return;
+    if (!dataReady) return;
     const list = [...(suite.missions || [])];
     const j = idx + dir; if (j < 0 || j >= list.length) return;
     const [row] = list.splice(idx, 1); list.splice(j, 0, row);
@@ -2085,16 +2098,6 @@ export default function Admin() {
     return combined;
   }, [games]);
 
-  if (!suite || !config) {
-    return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
-          Loading… (pulling config & missions)
-        </div>
-      </main>
-    );
-  }
-
   const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
   const mapZoom = Number(config.map?.defaultZoom)||13;
 
@@ -2347,6 +2350,24 @@ export default function Admin() {
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
+  if (!dataReady) {
+    return (
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid var(--admin-border-soft)',
+            background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+            boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+          }}
+        >
+          Loading… (pulling config & missions)
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div style={S.body}>
       <div style={S.metaBanner}>
@@ -2469,8 +2490,13 @@ export default function Admin() {
                   const isDefaultNow = !activeSlug || activeSlug === 'default';
                   setActiveSlug(isDefaultNow ? 'default' : activeSlug);
                 }}
-                disabled={savePubBusy}
-                style={{ ...S.button, ...S.savePublishButton, opacity: savePubBusy ? 0.65 : 1 }}
+                disabled={savePubBusy || !dataReady}
+                style={{
+                  ...S.button,
+                  ...S.savePublishButton,
+                  opacity: (savePubBusy || !dataReady) ? 0.65 : 1,
+                  cursor: (savePubBusy || !dataReady) ? 'not-allowed' : 'pointer',
+                }}
               >
                 {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
               </button>
@@ -3858,6 +3884,21 @@ export default function Admin() {
               Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
             </div>
           </div>
+
+          <div style={S.settingsFooterMeta}>
+            <div style={S.settingsFooterLine}>
+              <span><strong>Repo:</strong> {metaOwnerRepo || 'unknown'}</span>
+              <span><strong>Branch:</strong> {metaBranchLabel || 'unknown'}</span>
+              <span><strong>Commit:</strong> {metaCommitLabel ? `#${metaCommitLabel}` : '—'}</span>
+              <span>
+                <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl
+                  ? metaDeploymentUrl.replace(/^https?:\/\//, '')
+                  : (metaDeploymentState || '—')}
+              </span>
+            </div>
+            <div style={S.settingsFooterTime}>Snapshot rendered {metaNowLabel || formatLocalDateTime(new Date())}</div>
+          </div>
       </main>
     )}
 
@@ -4414,6 +4455,26 @@ const S = {
     color: 'var(--admin-muted)',
     marginTop: 12,
     fontSize: 12,
+  },
+  settingsFooterMeta: {
+    marginTop: 24,
+    paddingTop: 12,
+    borderTop: '1px solid var(--admin-border-soft)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  settingsFooterLine: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    rowGap: 6,
+  },
+  settingsFooterTime: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   header: {
     padding: 20,
