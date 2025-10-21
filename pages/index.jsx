@@ -94,8 +94,31 @@ function classifyByExt(u) {
   return 'other';
 }
 
+const MEDIA_DIRECTORIES = [
+  'mediapool',
+  'mediapool/responses/correct',
+  'mediapool/responses/wrong',
+  'covers',
+  'uploads',
+  'bundles',
+  'icons',
+];
+
+const INITIAL_CONVERSATION_LOG = [
+  {
+    speaker: 'You',
+    text: 'Debug Admin so GIF previews work for mission responses, keep media paths accurate, and simplify the Media Pool upload folders.',
+    timestamp: '2025-10-20T02:30:00.000Z',
+  },
+  {
+    speaker: 'GPT',
+    text: 'Acknowledged — focusing on mission GIF previews, media storage paths, and Media Pool folder cleanup.',
+    timestamp: '2025-10-20T02:30:05.000Z',
+  },
+];
+
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
+async function listInventory(dirs = MEDIA_DIRECTORIES) {
   const seen = new Set();
   const out = [];
   await Promise.all(dirs.map(async (dir) => {
@@ -705,7 +728,7 @@ export default function Admin() {
   async function loadNewCoverOptions() {
     setNewCoverLookupLoading(true);
     try {
-      const items = await listInventory(['covers','mediapool','uploads']);
+      const items = await listInventory(['covers', 'mediapool', 'mediapool/responses/correct', 'mediapool/responses/wrong']);
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
@@ -826,7 +849,7 @@ export default function Admin() {
   const [suite, setSuite]   = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatusInternal] = useState('');
-  const [statusLog, setStatusLog] = useState([]);
+  const [statusLog, setStatusLog] = useState(() => INITIAL_CONVERSATION_LOG.slice());
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -838,7 +861,15 @@ export default function Admin() {
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+      const items = await listInventory([
+        'mediapool',
+        'mediapool/responses/correct',
+        'mediapool/responses/wrong',
+        'covers',
+        'uploads',
+        'bundles',
+        'icons',
+      ]);
       return Array.isArray(items) ? items : [];
     } catch {
       return [];
@@ -2026,7 +2057,7 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     logConversation('You', 'Scanning media usage for unused files');
-    const inv = await listInventory(['uploads','bundles','icons']);
+    const inv = await listInventory(['mediapool', 'mediapool/responses/correct', 'mediapool/responses/wrong', 'uploads', 'bundles', 'icons']);
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -2058,7 +2089,7 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='uploads') {
+  async function uploadToRepo(file, subfolder='mediapool') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
     const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
@@ -5419,7 +5450,7 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const uploadFolder = 'mediapool';
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -5440,7 +5471,15 @@ function MediaPoolTab({
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
+      const items = await listInventory([
+        'mediapool',
+        'mediapool/responses/correct',
+        'mediapool/responses/wrong',
+        'covers',
+        'uploads',
+        'bundles',
+        'icons',
+      ]);
       setInv(items || []);
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
@@ -5499,7 +5538,7 @@ function MediaPoolTab({
     let lastUrl = '';
     for (const file of files) {
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, uploadFolder);
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
@@ -5571,13 +5610,8 @@ function MediaPoolTab({
       {/* Upload */}
       <div style={S.card}>
         <h3 style={{ marginTop:0 }}>Upload</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
-          </select>
           <button
             type="button"
             style={{ ...S.button, display:'grid', placeItems:'center' }}
@@ -5585,6 +5619,9 @@ function MediaPoolTab({
           >
             Upload
           </button>
+        </div>
+        <div style={{ color:'var(--admin-muted)', marginTop:6, fontSize:12 }}>
+          Files upload to <code style={S.inlineCode}>/media/mediapool</code> automatically.
         </div>
         <div
           onDragOver={(e)=>{ e.preventDefault(); setDropActive(true); }}

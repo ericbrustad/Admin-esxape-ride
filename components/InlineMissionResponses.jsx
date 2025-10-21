@@ -77,7 +77,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
-  const dropRef = useRef(null);
 
   const normalizedInventory = useMemo(() => {
     if (!Array.isArray(inventory)) return [];
@@ -173,7 +172,13 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     });
   }
 
-  async function uploadFileAsMedia(file, subfolder="uploads") {
+  function uploadFolderForSide(sideKey) {
+    if (sideKey === "onCorrect") return "mediapool/responses/correct";
+    if (sideKey === "onWrong") return "mediapool/responses/wrong";
+    return "mediapool/responses";
+  }
+
+  async function uploadFileAsMedia(file, subfolder="mediapool/responses") {
     if (!file) return "";
     try {
       const base64 = await readFileAsBase64(file);
@@ -197,35 +202,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     }
   }
 
-  // drag & drop handling
-  useEffect(() => {
-    const el = dropRef.current;
-    if (!el) return;
-    function onDrop(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      const f = e.dataTransfer?.files?.[0];
-      if (f) {
-        (async () => {
-          const url = await uploadFileAsMedia(f, "uploads");
-          if (url) {
-            // add to inventory locally and to selected side
-            // default: attach to onCorrect if it's present in editing, otherwise onWrong
-            const side = editing?.onCorrect ? "onCorrect" : "onWrong";
-            updateSide(side, { mediaUrl: url });
-            setSelectedPreviewUrl(url);
-          }
-        })();
-      }
-    }
-    function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }
-    el.addEventListener("drop", onDrop);
-    el.addEventListener("dragover", onDragOver);
-    return () => {
-      el.removeEventListener("drop", onDrop);
-      el.removeEventListener("dragover", onDragOver);
-    };
-  }, [dropRef, editing]);
+  // drag & drop handling is attached within each response editor
 
   function filteredInventory() {
     if (mediaFilter === "auto") return normalizedInventory;
@@ -255,8 +232,6 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     updateSide(side, { enabled: !!on });
   }
 
-  const currentSideRef = useRef("onCorrect"); // used by select buttons inside tiles
-
   function ResponseEditor({ sideKey = "onCorrect", title = "On Correct" }) {
     const side = ensureSide(sideKey);
     const enabled = !!side.enabled;
@@ -268,8 +243,38 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
     // device options from devices state
     const hasDevices = devices && devices.length > 0;
 
-    // keep currentSideRef in sync for renderMediaTile's "Select" buttons
-    useEffect(() => { currentSideRef.current = sideKey; }, [sideKey]);
+    const dropZoneRef = useRef(null);
+
+    useEffect(() => {
+      const el = dropZoneRef.current;
+      if (!el) return () => {};
+
+      function handleDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+        (async () => {
+          const url = await uploadFileAsMedia(file, uploadFolderForSide(sideKey));
+          if (url) {
+            chooseMediaForSide(sideKey, url);
+            setSelectedPreviewUrl(url);
+          }
+        })();
+      }
+
+      function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }
+
+      el.addEventListener("drop", handleDrop);
+      el.addEventListener("dragover", handleDragOver);
+      return () => {
+        el.removeEventListener("drop", handleDrop);
+        el.removeEventListener("dragover", handleDragOver);
+      };
+    }, [sideKey, chooseMediaForSide, uploadFileAsMedia, uploadFolderForSide]);
 
     return (
       <div style={{ border:'1px solid #1f2b2f', borderRadius:10, padding:12, marginBottom:12, background:'#071014' }}>
@@ -341,7 +346,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
         <hr style={{ border:'1px solid #0f2527', margin:'12px 0' }} />
 
         {/* Media selector area */}
-        <div ref={dropRef} style={{ border:'1px dashed #123033', borderRadius:8, padding:10, background:'#061015' }}>
+        <div ref={dropZoneRef} style={{ border:'1px dashed #123033', borderRadius:8, padding:10, background:'#061015' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:8 }}>
             <div style={{ fontWeight:600 }}>{title} — Media</div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -414,7 +419,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
               Choose file
               <input type="file" style={{ display:'none' }} onChange={async (e)=>{
                 const f = e.target.files?.[0]; if (!f) return;
-                const url = await uploadFileAsMedia(f, 'uploads');
+                const url = await uploadFileAsMedia(f, uploadFolderForSide(sideKey));
                 if (url) {
                   // add new inventory item locally (won't reload global pool automatically)
                   chooseMediaForSide(sideKey, url);
