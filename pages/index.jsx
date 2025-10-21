@@ -4129,7 +4129,7 @@ export default function Admin() {
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
-              {!gameEnabled && (
+              {!deployGameEnabled && (
                 <div style={S.modalStatusError}>
                   Game project publishing is currently disabled. Enable it in settings before creating a new game.
                 </div>
