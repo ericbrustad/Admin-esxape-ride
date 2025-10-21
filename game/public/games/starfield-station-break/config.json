@@ -137,28 +137,73 @@
   "powerups": [],
   "media": {
     "rewardsPool": [
-      { "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png", "label": "Golden Coin" },
-      { "url": "/media/mediapool/Images/bundles/evidence%202.png", "label": "Recovered Evidence" }
+      {
+        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png",
+        "label": "Golden Coin"
+      },
+      {
+        "url": "/media/mediapool/Images/bundles/evidence%202.png",
+        "label": "Recovered Evidence"
+      }
     ],
     "penaltiesPool": [
-      { "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png", "label": "Emergency Smoke" }
+      {
+        "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png",
+        "label": "Emergency Smoke"
+      }
     ]
   },
   "icons": {
     "missions": [
-      { "key": "briefing-star", "name": "Briefing Star", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
-      { "key": "decoy-glow", "name": "Decoy Glow", "url": "/media/mediapool/Images/icons/lumen-halo.svg" }
+      {
+        "key": "briefing-star",
+        "name": "Briefing Star",
+        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "decoy-glow",
+        "name": "Decoy Glow",
+        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+      }
     ],
     "devices": [
-      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
-      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/mediapool/Images/icons/lumen-halo.svg" },
-      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/mediapool/Images/icons/quantum-anchor.svg" },
-      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/mediapool/Images/icons/chrono-switch.svg" },
-      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/mediapool/Images/icons/voyager-dial.svg" }
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "lumen-halo",
+        "name": "Lumen Halo",
+        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+      },
+      {
+        "key": "quantum-anchor",
+        "name": "Quantum Anchor",
+        "url": "/media/mediapool/Images/icons/quantum-anchor.svg"
+      },
+      {
+        "key": "chrono-switch",
+        "name": "Chrono Switch",
+        "url": "/media/mediapool/Images/icons/chrono-switch.svg"
+      },
+      {
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/mediapool/Images/icons/voyager-dial.svg"
+      }
     ],
     "rewards": [
-      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png" },
-      { "key": "evidence", "name": "Evidence", "url": "/media/mediapool/Images/bundles/evidence%202.png" }
+      {
+        "key": "golden-coin",
+        "name": "Golden Coin",
+        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png"
+      },
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "/media/mediapool/Images/bundles/evidence%202.png"
+      }
     ]
   },
   "appearance": {
@@ -169,10 +214,10 @@
     "textBgOpacity": 0.7,
     "screenBgColor": "#e0dcfa",
     "screenBgOpacity": 0.46,
-    "screenBgImage": "/media/skins/starfield-dawn.svg",
+    "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top",
-    "screenBgImageEnabled": true
+    "screenBgImageEnabled": false
   },
   "appearanceSkin": "starfield-dawn",
   "appearanceTone": "light",

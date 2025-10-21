@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start -p 3000"
+    "start": "next start -p 3000",
+    "list:binaries": "node scripts/list-binary-files.mjs",
+    "verify:binaries": "node scripts/list-binary-files.mjs --fail"
   },
   "dependencies": {
     "next": "^15.5.5",

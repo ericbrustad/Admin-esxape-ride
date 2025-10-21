@@ -14,10 +14,15 @@
     "longDescription": "A glow-soaked caper weaving between vendors, rooftop relays, and contraband ferries. Balance stealth with speed as you outmaneuver rival crews under the lantern lights.",
     "deployEnabled": true
   },
-  "forms": { "players": 1 },
-  "timer": { "durationMinutes": 35, "alertMinutes": 8 },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 35,
+    "alertMinutes": 8
+  },
   "textRules": [
-    "Do not unplug the actual market lighting — use the provided switches.",
+    "Do not unplug the actual market lighting \u2014 use the provided switches.",
     "Return the encoded lantern core to storage between bookings."
   ],
   "devices": [
@@ -88,25 +93,59 @@
   "powerups": [],
   "media": {
     "rewardsPool": [
-      { "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png", "label": "Lantern Token" }
+      {
+        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png",
+        "label": "Lantern Token"
+      }
     ],
     "penaltiesPool": [
-      { "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png", "label": "Market Smoke" }
+      {
+        "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png",
+        "label": "Market Smoke"
+      }
     ]
   },
   "icons": {
     "missions": [
-      { "key": "lantern-clue", "name": "Lantern Clue", "url": "/media/mediapool/Images/icons/lumen-halo.svg" }
+      {
+        "key": "lantern-clue",
+        "name": "Lantern Clue",
+        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+      }
     ],
     "devices": [
-      { "key": "aurora-beacon", "name": "Aurora Beacon", "url": "/media/mediapool/Images/icons/aurora-beacon.svg" },
-      { "key": "lumen-halo", "name": "Lumen Halo", "url": "/media/mediapool/Images/icons/lumen-halo.svg" },
-      { "key": "quantum-anchor", "name": "Quantum Anchor", "url": "/media/mediapool/Images/icons/quantum-anchor.svg" },
-      { "key": "chrono-switch", "name": "Chrono Switch", "url": "/media/mediapool/Images/icons/chrono-switch.svg" },
-      { "key": "voyager-dial", "name": "Voyager Dial", "url": "/media/mediapool/Images/icons/voyager-dial.svg" }
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "lumen-halo",
+        "name": "Lumen Halo",
+        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+      },
+      {
+        "key": "quantum-anchor",
+        "name": "Quantum Anchor",
+        "url": "/media/mediapool/Images/icons/quantum-anchor.svg"
+      },
+      {
+        "key": "chrono-switch",
+        "name": "Chrono Switch",
+        "url": "/media/mediapool/Images/icons/chrono-switch.svg"
+      },
+      {
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/mediapool/Images/icons/voyager-dial.svg"
+      }
     ],
     "rewards": [
-      { "key": "golden-coin", "name": "Golden Coin", "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png" }
+      {
+        "key": "golden-coin",
+        "name": "Golden Coin",
+        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png"
+      }
     ]
   },
   "appearance": {
@@ -117,10 +156,10 @@
     "textBgOpacity": 0.7,
     "screenBgColor": "#e0dcfa",
     "screenBgOpacity": 0.46,
-    "screenBgImage": "/media/skins/starfield-dawn.svg",
+    "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top",
-    "screenBgImageEnabled": true
+    "screenBgImageEnabled": false
   },
   "appearanceSkin": "starfield-dawn",
   "appearanceTone": "light",
@@ -140,5 +179,7 @@
     "centerLng": -77.037,
     "defaultZoom": 14
   },
-  "geofence": { "mode": "test" }
+  "geofence": {
+    "mode": "test"
+  }
 }
