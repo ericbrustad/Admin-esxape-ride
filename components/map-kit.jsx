@@ -19,7 +19,7 @@ export function MapOverview({
   function iconUrl(kind,key){ if(!key)return''; const list=icons?.[kind]||[]; const it=list.find(x=>x.key===key); return it?(it.url||''):''; }
   function numberedIcon(number, imgUrl, color='#60a5fa', highlight=false){
     const img = imgUrl
-      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"/>`
+      ? `<img src="${imgUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:contain;border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937;background:#0b1116"/>`
       : `<div style="width:20px;height:20px;border-radius:50%;background:${color};border:2px solid ${highlight?'#22c55e':'white'};box-shadow:0 0 0 2px #1f2937"></div>`;
     return window.L.divIcon({
       className:'num-pin',
