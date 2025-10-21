@@ -1594,6 +1594,21 @@ export default function Admin() {
     const deviceFallback = (config?.icons?.devices || []).find(x => (x.key || '') === key);
     return deviceFallback?.url || '';
   }
+  const missionIconOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    const append = (list = []) => {
+      list.forEach((icon) => {
+        const key = (icon?.key || '').trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
+      });
+    };
+    append(config?.icons?.missions || []);
+    append(config?.icons?.devices || []);
+    return options;
+  }, [config?.icons?.missions, config?.icons?.devices]);
   const triggerOptionSets = useMemo(() => {
     const mediaOptions = (inventory || []).map((it, idx) => {
       const rawUrl = it?.url || it?.path || it;
@@ -2084,6 +2099,7 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
 
   if (!suite || !config) {
     return (
@@ -2114,21 +2130,6 @@ export default function Admin() {
   const missionIconPreviewUrl = editing
     ? toDirectMediaURL(missionIconUrlFromKey(editing.iconKey) || '')
     : '';
-  const missionIconOptions = useMemo(() => {
-    const seen = new Set();
-    const options = [];
-    const append = (list = []) => {
-      list.forEach((icon) => {
-        const key = (icon?.key || '').trim();
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
-      });
-    };
-    append(config?.icons?.missions || []);
-    append(config?.icons?.devices || []);
-    return options;
-  }, [config?.icons?.missions, config?.icons?.devices]);
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
@@ -2343,7 +2344,6 @@ export default function Admin() {
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
-  const metaNowLabel = useMemo(() => formatLocalDateTime(new Date()), [adminMeta.fetchedAt]);
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
@@ -3858,6 +3858,26 @@ export default function Admin() {
               Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
             </div>
           </div>
+
+          <div style={S.settingsSnapshotTicker}>
+            <span style={S.settingsSnapshotRow}>
+              <span><strong>Repo:</strong> {metaOwnerRepo || 'unknown'}</span>
+              <span>• <strong>Branch:</strong> {metaBranchLabel}</span>
+              <span>• <strong>Commit:</strong> {metaCommitShort ? `#${metaCommitShort}` : (metaCommitLabel ? `#${metaCommitLabel}` : '—')}</span>
+              <span>
+                • <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  <span>{metaDeploymentState || '—'}</span>
+                )}
+              </span>
+              <span>• <strong>Fetched:</strong> {metaTimestampLabel || '—'}</span>
+              <span>• <strong>Rendered:</strong> {metaNowLabel || '—'}</span>
+            </span>
+          </div>
       </main>
     )}
 
@@ -4414,6 +4434,22 @@ const S = {
     color: 'var(--admin-muted)',
     marginTop: 12,
     fontSize: 12,
+  },
+  settingsSnapshotTicker: {
+    marginTop: 16,
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  settingsSnapshotRow: {
+    display: 'inline-flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    lineHeight: 1.6,
   },
   header: {
     padding: 20,
