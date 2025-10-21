@@ -1207,40 +1207,66 @@ export default function Admin() {
     (async () => {
       try {
         setStatus('Loading…');
-        const isDefault = !activeSlug || activeSlug === 'default';
+        const slugParam = !activeSlug ? 'default' : activeSlug;
+        const supaUrl = `/api/load${qs({ slug: slugParam, channel: 'draft' })}`;
 
-        const missionUrls = isDefault
-          ? ['/missions.json']
-          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+        const supaPayload = await fetchJsonSafe(supaUrl, null);
 
-        const configUrls = isDefault
-          ? ['/api/config']
-          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+        let missionsSource = null;
+        let configSource = null;
+        let fallbackUsed = false;
 
-        const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchFirstJson(configUrls, defaultConfig());
+        if (supaPayload && supaPayload.ok) {
+          missionsSource = {
+            version: supaPayload.game?.config?.version
+              || supaPayload.game?.version
+              || supaPayload.config?.version
+              || '0.0.0',
+            missions: Array.isArray(supaPayload.missions) ? supaPayload.missions : [],
+          };
+          configSource = supaPayload.config || supaPayload.game?.config || {};
+        }
+
+        if (!missionsSource || !configSource) {
+          fallbackUsed = true;
+          const isDefault = !activeSlug || activeSlug === 'default';
+          const missionUrls = isDefault
+            ? ['/missions.json']
+            : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+          const configUrls = isDefault
+            ? ['/api/config']
+            : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+          missionsSource = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
+          configSource = await fetchFirstJson(configUrls, defaultConfig());
+        }
 
         const dc = defaultConfig();
+        const missionsList = Array.isArray(missionsSource?.missions) ? missionsSource.missions : [];
         const normalized = {
-          ...m,
-          missions: (m.missions || []).map(x => ({
+          ...missionsSource,
+          missions: missionsList.map((x) => ({
             ...x,
             appearanceOverrideEnabled: !!x.appearanceOverrideEnabled,
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
-            correct: x.correct || { mode:'none' },
-            wrong:   x.wrong   || { mode:'none' },
+            correct: x.correct || { mode: 'none' },
+            wrong: x.wrong || { mode: 'none' },
             showContinue: x.showContinue !== false,
           })),
         };
 
+        const c0 = { ...configSource };
         let merged = {
-          ...dc, ...c0,
+          ...dc,
+          ...c0,
           game: { ...dc.game, ...(c0.game || {}) },
           splash: { ...dc.splash, ...(c0.splash || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
-          devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
-                   : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
-          media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
+          devices: Array.isArray(c0.devices)
+            ? c0.devices
+            : Array.isArray(c0.powerups)
+              ? c0.powerups
+              : [],
+          media: { rewardsPool: [], penaltiesPool: [], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: {
             ...defaultAppearance(),
@@ -1262,9 +1288,12 @@ export default function Admin() {
 
         setSuite(normalized);
         setConfig(merged);
-        setSelected(null); setEditing(null); setDirty(false);
-        setSelectedDevIdx(null); setSelectedMissionIdx(null);
-        setStatus('');
+        setSelected(null);
+        setEditing(null);
+        setDirty(false);
+        setSelectedDevIdx(null);
+        setSelectedMissionIdx(null);
+        setStatus(fallbackUsed ? 'Loaded (legacy fallback)' : '');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
@@ -1329,6 +1358,24 @@ export default function Admin() {
     const preparedConfig = normalizeGameMetadata(config, slugTag);
     if (preparedConfig !== config) setConfig(preparedConfig);
 
+    const supaPayload = {
+      slug,
+      config: preparedConfig,
+      missions: suite?.missions || [],
+      devices: getDevices(),
+    };
+
+    const attemptSupabase = async () => {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(supaPayload),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'supabase save failed');
+    };
+
     const bundleUrl = isDefault ? '/api/save-bundle' : `/api/save-bundle${qs({ slug })}`;
     const attemptBundle = async () => {
       const response = await fetch(bundleUrl, {
@@ -1366,19 +1413,26 @@ export default function Admin() {
     };
 
     try {
-      await attemptBundle();
+      await attemptSupabase();
       setStatus('✅ Saved');
       return true;
-    } catch (bundleError) {
+    } catch (supaError) {
+      console.warn('Supabase save failed, attempting fallback', supaError);
       try {
-        setStatus('Bundle save unavailable — retrying legacy save…');
-        await attemptLegacy();
+        await attemptBundle();
         setStatus('✅ Saved');
         return true;
-      } catch (legacyError) {
-        console.error('Save failed', { bundleError, legacyError });
-        setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError));
-        return false;
+      } catch (bundleError) {
+        try {
+          setStatus('Bundle save unavailable — retrying legacy save…');
+          await attemptLegacy();
+          setStatus('✅ Saved');
+          return true;
+        } catch (legacyError) {
+          console.error('Save failed', { supaError, bundleError, legacyError });
+          setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError || supaError));
+          return false;
+        }
       }
     }
   }
@@ -4091,6 +4145,9 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • {metaCommitShort || metaCommitLabel || '—'} • {metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
