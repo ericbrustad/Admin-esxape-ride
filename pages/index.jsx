@@ -101,16 +101,45 @@ function classifyByExt(u) {
 async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
   const seen = new Set();
   const out = [];
+  const audit = {};
+
   await Promise.all(dirs.map(async (dir) => {
+    const summary = { count: 0, bytes: 0, missing: [] };
     try {
       const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
       const j = await r.json();
-      (j?.items || []).forEach(it => {
-        const url = it.url || '';
-        if (!seen.has(url)) { seen.add(url); out.push(it); }
+      const items = Array.isArray(j?.items) ? j.items : [];
+      summary.count = items.length;
+      items.forEach((it) => {
+        const key = it?.path || it?.url || `${dir}/${it?.name || ''}`;
+        const size = Number(it?.size) || 0;
+        summary.bytes += size;
+        if (!key) return;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const enriched = {
+          ...it,
+          folder: it?.folder || dir,
+          size,
+        };
+        out.push(enriched);
       });
-    } catch {}
+      if (Array.isArray(j?.metadata?.missing) && j.metadata.missing.length) {
+        summary.missing = j.metadata.missing;
+      }
+    } catch (err) {
+      summary.error = err?.message || 'Failed to read folder';
+    }
+    audit[dir] = summary;
   }));
+
+  Object.defineProperty(out, 'audit', {
+    value: audit,
+    enumerable: false,
+    configurable: true,
+    writable: false,
+  });
+
   return out;
 }
 function baseNameFromUrl(url) {
@@ -164,6 +193,46 @@ function formatLocalDateTime(value) {
   }
 }
 
+function formatBytes(bytes, { fractionDigits = 1 } = {}) {
+  const value = Number(bytes) || 0;
+  if (value <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const idx = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+  const scaled = value / (1024 ** idx);
+  return `${scaled.toFixed(idx === 0 ? 0 : fractionDigits)} ${units[idx]}`;
+}
+
+function normalizeInventoryEntryType(item) {
+  const type = item?.type || classifyByExt(item?.url || item?.path || '');
+  if (!type || !['image', 'gif', 'video', 'audio'].includes(type)) return classifyByExt(item?.url || '');
+  return type;
+}
+
+function computeInventoryStats(list = []) {
+  const totals = {
+    totalBytes: 0,
+    byType: {
+      image: 0,
+      gif: 0,
+      video: 0,
+      audio: 0,
+      other: 0,
+    },
+  };
+  const seen = new Set();
+  (Array.isArray(list) ? list : []).forEach((item) => {
+    const key = item?.path || item?.url || item?.id;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const size = Number(item?.size) || 0;
+    totals.totalBytes += size;
+    const type = normalizeInventoryEntryType(item);
+    const bucket = totals.byType[type] != null ? type : 'other';
+    totals.byType[bucket] = (totals.byType[bucket] || 0) + size;
+  });
+  return totals;
+}
+
 
 async function deleteMediaPath(repoPath) {
   const endpoints = [
@@ -173,6 +242,7 @@ async function deleteMediaPath(repoPath) {
     '/api/repo-delete',
     '/api/github/delete',
   ];
+  let lastError = '';
   for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
@@ -181,10 +251,21 @@ async function deleteMediaPath(repoPath) {
         credentials:'include',
         body: JSON.stringify({ path: repoPath })
       });
-      if (r.ok) return true;
-    } catch {}
+      if (r.ok) {
+        const data = await r.json().catch(() => ({}));
+        return { ok: data?.ok !== false, ...data };
+      }
+      if (r.status === 404 && ep === '/api/media/delete') {
+        lastError = 'File not found';
+        continue;
+      }
+      const text = await r.text().catch(() => '');
+      lastError = text || r.statusText || 'Delete failed';
+    } catch (err) {
+      lastError = err?.message || 'Delete failed';
+    }
   }
-  return false;
+  return { ok:false, error: lastError || 'Delete failed' };
 }
 
 async function fileToBase64(file) {
@@ -2062,29 +2143,14 @@ export default function Admin() {
   async function uploadToRepo(file, subfolder='uploads') {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const normalizedFolder = String(subfolder || 'uploads').replace(/^\/+|\/+$/g, '');
-    const classification = classifyByExt(file.name || file.type || safeName);
-    let resolvedFolder = normalizedFolder || 'uploads';
-    if (resolvedFolder === 'mediapool') {
-      const typeFolderMap = {
-        image: 'images',
-        gif: 'gif',
-        audio: 'audio',
-        video: 'video',
-        ar: 'ar',
-        other: 'other',
-      };
-      const target = typeFolderMap[classification] || 'other';
-      resolvedFolder = `mediapool/${target}`;
-    }
-    const path   = `public/media/${resolvedFolder}/${Date.now()}-${safeName}`;
-    const destinationLabel = resolvedFolder;
-    const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
-    if (overWarning) {
-      const sizeMb = Math.max(0.01, (file.size || 0) / (1024 * 1024));
-      setUploadStatus(`⚠️ ${safeName} is ${sizeMb.toFixed(sizeMb >= 10 ? 0 : 1)} MB — uploads over 5 MB may take longer to sync into ${destinationLabel}.`);
+    const safeFolder = String(subfolder || 'uploads').replace(/[^a-z0-9_\-]/gi, '') || 'uploads';
+    const path   = `public/media/${safeFolder}/${Date.now()}-${safeName}`;
+    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
+    const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
+    if (isImage && file.size > 1024 * 1024) {
+      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — uploading to ${safeFolder} may take longer to sync.`);
     } else {
-      setUploadStatus(`Uploading ${safeName} to ${destinationLabel}…`);
+      setUploadStatus(`Uploading ${safeName} → ${safeFolder}…`);
     }
     const base64 = await fileToBase64(file);
     const res = await fetch('/api/upload', {
@@ -2092,7 +2158,7 @@ export default function Admin() {
       body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
     });
     const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${destinationLabel}` : `❌ ${j?.error || 'upload failed'}`);
+    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${safeFolder}` : `❌ ${j?.error || 'upload failed'}`);
     return res.ok ? `/${path.replace(/^public\//,'')}` : '';
   }
 
@@ -2121,6 +2187,8 @@ export default function Admin() {
   const viewSuite = suite || fallbackSuite;
   const viewConfig = config || fallbackConfig;
   const isBootstrapping = !suite || !config;
+  const inventoryStats = useMemo(() => computeInventoryStats(inventory), [inventory]);
+  const headerMemoryLabel = formatBytes(inventoryStats.totalBytes || 0, { fractionDigits: 1 });
 
   const mapCenter = {
     lat: Number((viewConfig?.map?.centerLat ?? 44.9778)) || 44.9778,
@@ -2283,6 +2351,8 @@ export default function Admin() {
             type: 'image',
             thumbUrl: url,
             label: baseNameFromUrl(url),
+            folder: 'covers',
+            size: Number(file?.size) || 0,
           },
         ];
       });
@@ -2481,6 +2551,10 @@ export default function Admin() {
               <div style={S.headerTitleColumn}>
                 <div style={S.headerGameTitle}>{headerGameTitle}</div>
                 <div style={S.headerSubtitle}>Admin Control Deck</div>
+                <div style={S.headerMemoryLine}>
+                  <span style={{ fontWeight: 600 }}>Total Memory Used:</span>{' '}
+                  <span>{headerMemoryLabel}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -3953,6 +4027,40 @@ export default function Admin() {
               <div style={{ ...S.metaBannerError, marginTop:12 }}>{adminMeta.error}</div>
             )}
           </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Build Stamp</h3>
+            <div style={S.repoStampGrid}>
+              <div>
+                <span style={S.repoStampLabel}>Game Title</span>
+                <span style={S.repoStampValue}>{headerGameTitle}</span>
+              </div>
+              <div>
+                <span style={S.repoStampLabel}>Repository</span>
+                <span style={S.repoStampValue}>{metaOwnerRepo || 'unknown'}</span>
+              </div>
+              <div>
+                <span style={S.repoStampLabel}>Branch</span>
+                <span style={S.repoStampValue}>{metaBranchLabel}</span>
+              </div>
+              <div>
+                <span style={S.repoStampLabel}>Commit</span>
+                <span style={S.repoStampValue}>{metaCommitLabel ? `#${metaCommitShort || metaCommitLabel}` : '—'}</span>
+              </div>
+              <div>
+                <span style={S.repoStampLabel}>Vercel Deployment</span>
+                <span style={S.repoStampValue}>
+                  {metaDeploymentUrl
+                    ? metaDeploymentUrl.replace(/^https?:\/\//, '')
+                    : (metaDeploymentState || '—')}
+                </span>
+              </div>
+              <div>
+                <span style={S.repoStampLabel}>Stamped</span>
+                <span style={S.repoStampValue}>{metaNowLabel || formatLocalDateTime(new Date())}</span>
+              </div>
+            </div>
+          </div>
         </main>
       )}
 
@@ -3972,6 +4080,7 @@ export default function Admin() {
             return url;
           }}
           onInventoryRefresh={syncInventory}
+          logConversation={logConversation}
         />
       )}
 
@@ -4856,6 +4965,108 @@ const S = {
     textTransform: 'uppercase',
     color: 'var(--admin-muted)',
   },
+  headerMemoryLine: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.02em',
+  },
+  inventorySummaryRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
+  inventoryChip: {
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    minWidth: 130,
+    display: 'grid',
+    gap: 4,
+  },
+  inventoryChipLabel: {
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: 'var(--admin-muted)',
+  },
+  inventoryChipValue: {
+    fontSize: 16,
+    fontWeight: 600,
+  },
+  inventoryAuditSection: {
+    marginTop: 16,
+    borderTop: '1px solid var(--admin-border-soft)',
+    paddingTop: 12,
+    display: 'grid',
+    gap: 10,
+  },
+  inventoryAuditTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  inventoryAuditGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: 10,
+  },
+  inventoryAuditCard: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    padding: 10,
+    background: 'var(--appearance-subpanel-bg, var(--admin-panel-bg))',
+    display: 'grid',
+    gap: 6,
+  },
+  inventoryAuditFolder: {
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  },
+  inventoryAuditMetrics: {
+    display: 'flex',
+    gap: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  inventoryAuditWarning: {
+    fontSize: 12,
+    color: '#f97316',
+  },
+  inventoryAuditEmpty: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  inventoryWarning: {
+    marginTop: 12,
+    padding: '12px 14px',
+    borderRadius: 12,
+    border: '1px solid rgba(249, 115, 22, 0.4)',
+    background: 'rgba(249, 115, 22, 0.1)',
+    color: '#f97316',
+  },
+  repoStampGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 12,
+  },
+  repoStampLabel: {
+    display: 'block',
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: 'var(--admin-muted)',
+  },
+  repoStampValue: {
+    display: 'block',
+    fontSize: 16,
+    fontWeight: 600,
+    marginTop: 4,
+  },
   headerNavRow: {
     display: 'flex',
     flexDirection: 'column',
@@ -5599,18 +5810,41 @@ function MediaPoolTab({
   setUploadStatus,
   uploadToRepo,
   onInventoryRefresh,
+  logConversation,
 }) {
+  const AUTO_FOLDER = 'auto';
+  const ICON_EXT = /\.(svg|svgz|ico|icns)$/i;
+  const BUNDLE_EXT = /\.(json|ya?ml|zip)$/i;
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('mediapool');
+  const [folder, setFolder] = useState(AUTO_FOLDER);
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
-  const [pendingFiles, setPendingFiles] = useState([]);
-  const pendingFilesRef = useRef([]);
-  const [pendingActionBusy, setPendingActionBusy] = useState(false);
+  const [inventoryAudit, setInventoryAudit] = useState({});
+  const [missingList, setMissingList] = useState([]);
 
   const [subTab, setSubTab] = useState('audio');
+
+  const folderOptions = useMemo(() => ([
+    { value: AUTO_FOLDER, label: 'Auto (detect type)' },
+    { value: 'uploads', label: 'uploads' },
+    { value: 'bundles', label: 'bundles' },
+    { value: 'icons', label: 'icons' },
+    { value: 'mediapool', label: 'mediapool' },
+  ]), []);
+
+  function detectFolderForFile(file) {
+    if (!file) return 'uploads';
+    const name = String(file.name || '').toLowerCase();
+    const mime = String(file.type || '').toLowerCase();
+    if (mime.includes('svg') || ICON_EXT.test(name)) return 'icons';
+    if (BUNDLE_EXT.test(name)) return 'bundles';
+    if (mime.startsWith('audio/') || EXTS.audio.test(name)) return 'uploads';
+    if (mime.startsWith('video/') || EXTS.video.test(name)) return 'uploads';
+    if (mime.startsWith('image/') || EXTS.image.test(name) || EXTS.gif.test(name)) return 'uploads';
+    return 'uploads';
+  }
 
   useEffect(() => { refreshInventory(); }, []);
 
@@ -5618,7 +5852,21 @@ function MediaPoolTab({
     setBusy(true);
     try {
       const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
-      setInv(items || []);
+      const arr = Array.isArray(items) ? items : [];
+      setInv(arr);
+      const audit = items?.audit || {};
+      setInventoryAudit(audit);
+      const missing = Object.values(audit || {})
+        .flatMap((info) => Array.isArray(info?.missing) ? info.missing : [])
+        .map((entry) => ({
+          name: entry?.name || entry?.url || 'unknown',
+          url: entry?.url || '',
+          folder: entry?.folder || '',
+        }));
+      setMissingList(missing);
+      if (missing.length && typeof logConversation === 'function') {
+        logConversation('GPT', `Inventory check found ${missing.length} metadata entr${missing.length === 1 ? 'y' : 'ies'} to review.`);
+      }
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
       }
@@ -5681,88 +5929,27 @@ function MediaPoolTab({
     if (!entries.length) return { success: 0, total: 0, results: [] };
     let success = 0;
     let lastUrl = '';
-    const results = [];
-    for (const entry of entries) {
-      const file = entry.file;
-      if (!file) {
-        results.push({ entry, ok: false, url: '' });
-        // eslint-disable-next-line no-continue
-        continue;
-      }
+    const folderCounts = new Map();
+    for (const file of files) {
+      const targetFolder = folder === AUTO_FOLDER ? detectFolderForFile(file) : folder;
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, targetFolder);
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+        folderCounts.set(targetFolder, (folderCounts.get(targetFolder) || 0) + 1);
       }
       results.push({ entry, ok: !!uploaded, url: uploaded });
     }
     if (lastUrl) setAddUrl(lastUrl);
     if (success) await refreshInventory();
-    if (entries.length > 1) {
-      const prefix = success === entries.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${entries.length} files`);
-    }
-    return { success, total: entries.length, results };
-  }
-
-  function revokePreview(entry) {
-    if (entry?.previewUrl) {
-      try { URL.revokeObjectURL(entry.previewUrl); } catch (err) { /* noop */ }
-    }
-  }
-
-  function formatFileSize(bytes = 0) {
-    if (!bytes) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let size = bytes;
-    let unitIndex = 0;
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex += 1;
-    }
-    const fixed = size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1);
-    return `${fixed} ${units[unitIndex]}`;
-  }
-
-  function stageFiles(fileList) {
-    const files = Array.from(fileList || []).filter(Boolean);
-    if (!files.length) return;
-    let added = false;
-    setPendingFiles((prev) => {
-      const existingKeys = new Set(
-        prev.map((item) => `${item.file?.name || ''}-${item.file?.size || 0}-${item.file?.lastModified || 0}`)
-      );
-      const additions = [];
-      files.forEach((file) => {
-        const key = `${file.name || 'file'}-${file.size || 0}-${file.lastModified || 0}`;
-        if (existingKeys.has(key)) return;
-        existingKeys.add(key);
-        const previewUrl = ((file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || ''))
-          ? URL.createObjectURL(file)
-          : '';
-        additions.push({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-          file,
-          name: file.name || 'upload',
-          size: file.size || 0,
-          previewUrl,
-          type: classifyByExt(file.name || file.type || ''),
-        });
-      });
-      if (!additions.length) return prev;
-      added = true;
-      return [...prev, ...additions];
-    });
-    if (!added) return;
-    const oversize = files.filter((file) => (file.size || 0) > MEDIA_WARNING_BYTES);
-    if (oversize.length) {
-      const label = oversize.length === 1
-        ? `${oversize[0].name || 'file'} (${formatFileSize(oversize[0].size || 0)})`
-        : `${oversize.length} files over 5 MB`;
-      setUploadStatus(`⚠️ ${label} — uploads over 5 MB may take longer. Click “Save to Media Pool” to continue.`);
-    } else {
-      setUploadStatus(`Ready to upload ${files.length} file${files.length === 1 ? '' : 's'}. Click “Save to Media Pool”.`);
+    if (files.length > 1) {
+      const prefix = success === files.length ? '✅' : '⚠️';
+      const summaryParts = Array.from(folderCounts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, count]) => `${count} → ${key}`);
+      const summary = summaryParts.length ? ` (${summaryParts.join(', ')})` : '';
+      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files${summary}`);
     }
   }
 
@@ -5827,10 +6014,23 @@ function MediaPoolTab({
     }
     if (!window.confirm(`Delete this media file?\n${targetUrl}`)) return false;
     setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(repoPath);
-    setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
-    if (ok) await refreshInventory();
-    return ok;
+    const result = await deleteMediaPath(repoPath);
+    const success = !!result?.ok;
+    const removedTags = Array.isArray(result?.removedTags) ? result.removedTags.filter(Boolean) : [];
+    const warning = result?.warning ? String(result.warning) : '';
+    let message = success ? '✅ Deleted' : `❌ ${result?.error || 'Delete failed'}`;
+    if (success && removedTags.length) {
+      message += ` (tags cleared: ${removedTags.join(', ')})`;
+      if (typeof logConversation === 'function') {
+        logConversation('GPT', `Removed tags for deleted media: ${removedTags.join(', ')}`);
+      }
+    }
+    if (success && warning) {
+      message += ` • ${warning}`;
+    }
+    setUploadStatus(message);
+    if (success) await refreshInventory();
+    return success;
   }
 
   async function deleteAll(list) {
@@ -5838,14 +6038,36 @@ function MediaPoolTab({
     if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
     setUploadStatus('Deleting group…');
     let okCount = 0;
+    const removedTags = new Set();
+    const warnings = new Set();
+    let failure = false;
     for (const it of list) {
       const path = it?.path || pathFromUrl(it?.url || it?.id || '');
       if (!path) continue;
       // eslint-disable-next-line no-await-in-loop
-      const ok = await deleteMediaPath(path);
-      if (ok) okCount++;
+      const result = await deleteMediaPath(path);
+      if (result?.ok) {
+        okCount++;
+        (Array.isArray(result?.removedTags) ? result.removedTags : []).forEach((tag) => {
+          if (tag) removedTags.add(String(tag));
+        });
+        if (result?.warning) warnings.add(String(result.warning));
+      } else {
+        failure = true;
+      }
     }
-    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    let summary = `${failure ? '⚠️' : '✅'} Deleted ${okCount}/${list.length}`;
+    if (removedTags.size) {
+      const tags = Array.from(removedTags);
+      summary += ` · tags cleared: ${tags.join(', ')}`;
+      if (typeof logConversation === 'function') {
+        logConversation('GPT', `Batch delete removed tags: ${tags.join(', ')}`);
+      }
+    }
+    if (warnings.size) {
+      summary += ` · warnings: ${Array.from(warnings).join('; ')}`;
+    }
+    setUploadStatus(summary);
     await refreshInventory();
   }
 
@@ -5884,6 +6106,28 @@ function MediaPoolTab({
   }, [availableTabKeys.join('::'), subTab]);
   const subTabs = baseTabs;
 
+  const poolStats = useMemo(() => computeInventoryStats(inv), [inv]);
+  const typeSummaries = useMemo(() => ([
+    { key: 'image', label: 'Images', bytes: poolStats.byType.image },
+    { key: 'gif', label: 'GIFs', bytes: poolStats.byType.gif },
+    { key: 'video', label: 'Videos', bytes: poolStats.byType.video },
+    { key: 'audio', label: 'Audio', bytes: poolStats.byType.audio },
+    { key: 'other', label: 'Other', bytes: poolStats.byType.other },
+  ]), [poolStats]);
+
+  const folderSummaries = useMemo(() => Object.entries(inventoryAudit || {}).map(([key, info]) => ({
+    key,
+    count: Number(info?.count) || 0,
+    bytes: Number(info?.bytes) || 0,
+    missing: Array.isArray(info?.missing) ? info.missing.length : 0,
+    error: info?.error,
+  })).sort((a, b) => a.key.localeCompare(b.key)), [inventoryAudit]);
+
+  const missingNotices = useMemo(() => (missingList || []).filter((entry, idx, arr) => {
+    const normalized = `${entry.folder}|${entry.url || entry.name}`.toLowerCase();
+    return arr.findIndex((candidate) => `${candidate.folder}|${candidate.url || candidate.name}`.toLowerCase() === normalized) === idx;
+  }), [missingList]);
+
   return (
     <main style={S.wrap}>
       {/* Upload */}
@@ -5892,10 +6136,9 @@ function MediaPoolTab({
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
           <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="mediapool">mediapool</option>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+            {folderOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -5990,6 +6233,59 @@ function MediaPoolTab({
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
           Inventory {busy ? '(loading…)':''}: {inv.length} files
         </div>
+        <div style={S.inventorySummaryRow}>
+          {typeSummaries.map((summary) => (
+            <div key={summary.key} style={S.inventoryChip}>
+              <div style={S.inventoryChipLabel}>{summary.label}</div>
+              <div style={S.inventoryChipValue}>{formatBytes(summary.bytes)}</div>
+            </div>
+          ))}
+          <div style={{ ...S.inventoryChip, borderStyle: 'dashed' }}>
+            <div style={S.inventoryChipLabel}>Grand Total</div>
+            <div style={S.inventoryChipValue}>{formatBytes(poolStats.totalBytes)}</div>
+          </div>
+        </div>
+        <div style={S.inventoryAuditSection}>
+          <div style={S.inventoryAuditTitle}>Folder Verification</div>
+          {folderSummaries.length === 0 ? (
+            <div style={S.inventoryAuditEmpty}>Waiting for inventory scan…</div>
+          ) : (
+            <div style={S.inventoryAuditGrid}>
+              {folderSummaries.map((entry) => (
+                <div key={entry.key} style={S.inventoryAuditCard}>
+                  <div style={S.inventoryAuditFolder}>{entry.key}</div>
+                  <div style={S.inventoryAuditMetrics}>
+                    <span>{entry.count} files</span>
+                    <span>· {formatBytes(entry.bytes)}</span>
+                  </div>
+                  {entry.missing > 0 && (
+                    <div style={S.inventoryAuditWarning}>{entry.missing} metadata missing</div>
+                  )}
+                  {entry.error && (
+                    <div style={S.inventoryAuditWarning}>Error: {entry.error}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {missingNotices.length > 0 && (
+          <div style={S.inventoryWarning}>
+            <div style={{ fontWeight: 600 }}>Missing inventory entries</div>
+            <ul style={{ margin: '6px 0 0 16px' }}>
+              {missingNotices.map((item, idx) => (
+                <li key={`${item.folder}-${item.url || item.name}-${idx}`}>
+                  {item.name} ({item.folder || 'unknown folder'})
+                  {item.url && (
+                    <>
+                      {' '}• <a href={item.url} target="_blank" rel="noreferrer">open</a>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* Sub-tabs: Audio • Video • Images • AR • GIF (Audio default) */}
