@@ -71,8 +71,10 @@ const EXTS = {
   gif: /\.(gif)$/i,
   video: /\.(mp4|webm|mov)$/i,
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
+  ar: /\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i,
 };
 const COVER_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB limit for cover uploads
+const MEDIA_WARNING_BYTES = 5 * 1024 * 1024; // warn when media exceeds 5 MB
 const ADMIN_META_INITIAL_STATE = {
   branch: '',
   commit: '',
@@ -91,23 +93,81 @@ function classifyByExt(u) {
   if (EXTS.image.test(s)) return 'image';
   if (EXTS.video.test(s)) return 'video';
   if (EXTS.audio.test(s)) return 'audio';
+  if (EXTS.ar.test(s)) return 'ar';
   return 'other';
 }
 
+const MEDIA_TYPE_DEFS = [
+  { key: 'audio', label: 'Audio', title: 'Audio (mp3/wav/aiff)' },
+  { key: 'video', label: 'Video', title: 'Video (mp4/mov)' },
+  { key: 'image', label: 'Images', title: 'Images (PNG/JPG/SVG)' },
+  { key: 'gif', label: 'GIF', title: 'GIF' },
+  { key: 'ar-target', label: 'AR Targets', title: 'AR Targets (markers)' },
+  { key: 'ar-overlay', label: 'AR Overlays', title: 'AR Overlays (assets)' },
+  { key: 'other', label: 'Other', title: 'Other (unclassified)' },
+];
+
+const MEDIA_CLASS_TO_TYPE = {
+  audio: 'audio',
+  video: 'video',
+  image: 'image',
+  gif: 'gif',
+  ar: 'ar-target',
+  other: 'other',
+};
+
+const FOLDER_TO_TYPE = new Map([
+  ['audio', 'audio'],
+  ['mediapool/audio', 'audio'],
+  ['video', 'video'],
+  ['mediapool/video', 'video'],
+  ['image', 'image'],
+  ['images', 'image'],
+  ['mediapool/images', 'image'],
+  ['images/icons', 'image'],
+  ['mediapool/images/icons', 'image'],
+  ['images/covers', 'image'],
+  ['mediapool/images/covers', 'image'],
+  ['images/bundles', 'image'],
+  ['mediapool/images/bundles', 'image'],
+  ['images/uploads', 'image'],
+  ['mediapool/images/uploads', 'image'],
+  ['gif', 'gif'],
+  ['gifs', 'gif'],
+  ['mediapool/gif', 'gif'],
+  ['mediapool/gifs', 'gif'],
+  ['ar-target', 'ar-target'],
+  ['ar target', 'ar-target'],
+  ['mediapool/ar-target', 'ar-target'],
+  ['mediapool/ar target', 'ar-target'],
+  ['ar-overlay', 'ar-overlay'],
+  ['ar overlay', 'ar-overlay'],
+  ['mediapool/ar-overlay', 'ar-overlay'],
+  ['mediapool/ar overlay', 'ar-overlay'],
+  ['other', 'other'],
+  ['mediapool/other', 'other'],
+]);
+
 /** Merge inventory across dirs so uploads show up everywhere */
-async function listInventory(dirs = ['uploads', 'bundles', 'icons', 'covers', 'mediapool']) {
+async function listInventory(dirs = ['mediapool']) {
   const seen = new Set();
   const out = [];
-  await Promise.all(dirs.map(async (dir) => {
-    try {
-      const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
-      const j = await r.json();
-      (j?.items || []).forEach(it => {
-        const url = it.url || '';
-        if (!seen.has(url)) { seen.add(url); out.push(it); }
-      });
-    } catch {}
-  }));
+  await Promise.all(
+    (dirs || ['mediapool']).map(async (dir) => {
+      if (!dir) return;
+      try {
+        const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
+        const j = await r.json();
+        (j?.items || []).forEach((it = {}) => {
+          const key = it.path || it.url || it.id || '';
+          if (!key) return;
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(it);
+        });
+      } catch {}
+    })
+  );
   return out;
 }
 function baseNameFromUrl(url) {
@@ -218,19 +278,31 @@ async function fileToBase64(file) {
 }
 
 /* ───────────────────────── Defaults ───────────────────────── */
+const STARFIELD_DEFAULTS = {
+  title: 'Starfield Station Break',
+  type: 'Sci-Fi',
+  slug: 'starfield-station-break',
+  coverImage: '/media/mediapool/Images/covers/starfield-station-break.svg',
+  tags: ['starfield-station-break', 'default-game'],
+};
+
 const DEFAULT_BUNDLES = {
   devices: [
-    { key:'smoke-shield', name:'Smoke Shield', url:'/media/bundles/SMOKE%20BOMB.png' },
-    { key:'roaming-robot', name:'Roaming Robot', url:'/media/bundles/ROBOT1small.png' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'lumen-halo', name: 'Lumen Halo', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
+    { key: 'quantum-anchor', name: 'Quantum Anchor', url: '/media/mediapool/Images/icons/quantum-anchor.svg' },
+    { key: 'chrono-switch', name: 'Chrono Switch', url: '/media/mediapool/Images/icons/chrono-switch.svg' },
+    { key: 'voyager-dial', name: 'Voyager Dial', url: '/media/mediapool/Images/icons/voyager-dial.svg' },
   ],
   missions: [
-    { key:'trivia',    name:'Trivia',    url:'/media/bundles/trivia%20icon.png' },
-    { key:'trivia-2', name:'Trivia 2', url:'/media/bundles/trivia%20yellow.png' },
+    { key: 'briefing-star', name: 'Briefing Star', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'aurora-beacon', name: 'Aurora Beacon', url: '/media/mediapool/Images/icons/aurora-beacon.svg' },
+    { key: 'decoy-glow', name: 'Decoy Glow', url: '/media/mediapool/Images/icons/lumen-halo.svg' },
   ],
   rewards: [
-    { key:'evidence',  name:'Evidence',  url:'/media/bundles/evidence%202.png' },
-    { key:'clue',      name:'Clue',      url:'/media/bundles/CLUEgreen.png' },
-    { key:'gold-coin', name:'Gold Coin', url:'/media/bundles/GOLDEN%20COIN.png' },
+    { key: 'evidence', name: 'Evidence', url: '/media/mediapool/Images/bundles/evidence%202.png' },
+    { key: 'clue', name: 'Clue', url: '/media/mediapool/Images/bundles/CLUEgreen.png' },
+    { key: 'gold-coin', name: 'Gold Coin', url: '/media/mediapool/Images/bundles/GOLDEN%20COIN.png' },
   ],
 };
 
@@ -371,8 +443,8 @@ const STARFIELD_DAWN_APPEARANCE = {
   textBgOpacity: 0.7,
   screenBgColor: '#e0dcfa',
   screenBgOpacity: 0.46,
-  screenBgImage: '/media/skins/starfield-dawn.svg',
-  screenBgImageEnabled: true,
+  screenBgImage: '',
+  screenBgImageEnabled: false,
   textAlign: 'center',
   textVertical: 'top',
 };
@@ -525,9 +597,13 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push(normalizedSlug);
     seen.add(normalizedSlug);
   }
-  if (normalizedSlug === 'default' && !seen.has('default-game')) {
-    cleaned.push('default-game');
-    seen.add('default-game');
+  if (normalizedSlug === 'default') {
+    STARFIELD_DEFAULTS.tags.forEach((tag) => {
+      const key = tag.toLowerCase();
+      if (seen.has(key)) return;
+      cleaned.push(tag);
+      seen.add(key);
+    });
   }
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
@@ -535,9 +611,9 @@ function normalizeGameMetadata(cfg, slug = '') {
   const normalizedShort = typeof game.shortDescription === 'string' ? game.shortDescription.trim() : '';
   const normalizedLong = typeof game.longDescription === 'string' ? game.longDescription.trim() : '';
   game.tags = cleaned;
-  game.title = normalizedTitle || 'Default Game';
-  game.type = normalizedType || 'Mystery';
-  game.coverImage = normalizedCover;
+  game.title = normalizedTitle || STARFIELD_DEFAULTS.title;
+  game.type = normalizedType || STARFIELD_DEFAULTS.type;
+  game.coverImage = normalizedCover || (normalizedSlug === 'default' ? STARFIELD_DEFAULTS.coverImage : '');
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
@@ -563,7 +639,7 @@ export default function Admin() {
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
-  const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
+  const [activeSlug, setActiveSlug] = useState('default'); // Starfield default stored on legacy root
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -603,8 +679,21 @@ export default function Admin() {
   }, []);
 
   const setStatus = useCallback((message) => {
-    setStatusInternal(message);
-    if (message) logConversation('GPT', message);
+    if (typeof message === 'function') {
+      setStatusInternal((prev) => {
+        const resolved = message(prev);
+        const next = typeof resolved === 'string' ? resolved : '';
+        if (next.trim() && next !== prev) logConversation('GPT', next);
+        return next;
+      });
+      return;
+    }
+
+    setStatusInternal((prev) => {
+      const next = typeof message === 'string' ? message : '';
+      if (next.trim() && next !== prev) logConversation('GPT', next);
+      return next;
+    });
   }, [logConversation]);
 
   const [protectionPrompt, setProtectionPrompt] = useState({
@@ -689,7 +778,7 @@ export default function Admin() {
   async function loadNewCoverOptions() {
     setNewCoverLookupLoading(true);
     try {
-      const items = await listInventory(['covers','mediapool','uploads']);
+      const items = await listInventory(['mediapool']);
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
@@ -822,7 +911,7 @@ export default function Admin() {
   const [inventory, setInventory] = useState([]);
   const fetchInventory = useCallback(async () => {
     try {
-      const items = await listInventory(['uploads','bundles','icons','mediapool','covers']);
+      const items = await listInventory(['mediapool']);
       return Array.isArray(items) ? items : [];
     } catch {
       return [];
@@ -1186,7 +1275,13 @@ export default function Admin() {
   function defaultConfig() {
     return {
       splash: { enabled:false, mode:'single' },
-      game:   { title:'Default Game', type:'Mystery', tags:['default','default-game'], coverImage:'', deployEnabled:true },
+      game: {
+        title: STARFIELD_DEFAULTS.title,
+        type: STARFIELD_DEFAULTS.type,
+        tags: [...STARFIELD_DEFAULTS.tags],
+        coverImage: STARFIELD_DEFAULTS.coverImage,
+        deployEnabled: true,
+      },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
       textRules: [],
@@ -1567,8 +1662,10 @@ export default function Admin() {
   }
   function missionIconUrlFromKey(key) {
     if (!key) return '';
-    const it = (config?.icons?.missions || []).find(x => (x.key||'') === key);
-    return it?.url || '';
+    const missionIcon = (config?.icons?.missions || []).find(x => (x.key || '') === key);
+    if (missionIcon?.url) return missionIcon.url;
+    const deviceFallback = (config?.icons?.devices || []).find(x => (x.key || '') === key);
+    return deviceFallback?.url || '';
   }
   const triggerOptionSets = useMemo(() => {
     const mediaOptions = (inventory || []).map((it, idx) => {
@@ -1987,7 +2084,7 @@ export default function Admin() {
   // Project Health scan
   async function scanProject() {
     logConversation('You', 'Scanning media usage for unused files');
-    const inv = await listInventory(['uploads','bundles','icons']);
+    const inv = await listInventory(['mediapool']);
     const used = new Set();
 
     const iconUrlByKey = {};
@@ -2019,29 +2116,100 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='uploads') {
+  async function uploadToRepo(file, subfolder = 'auto', options = {}) {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
-    const path   = `public/media/${subfolder}/${Date.now()}-${safeName}`;
-    const isImage = (file.type && file.type.startsWith('image/')) || /\.(png|jpe?g|gif|bmp|webp|svg)$/i.test(file.name || '');
-    const sizeKb = Math.max(1, Math.round((file.size || 0) / 1024));
-    if (isImage && file.size > 1024 * 1024) {
-      setUploadStatus(`⚠️ ${safeName} is ${sizeKb} KB — large images may take longer to sync.`);
+    const normalizedFolder = String(subfolder || 'auto').replace(/^\/+|\/+$/g, '');
+    const classification = classifyByExt(file.name || file.type || safeName);
+    const folderKey = normalizedFolder.toLowerCase();
+    const folderMap = new Map([
+      ['audio', 'mediapool/Audio'],
+      ['mediapool/audio', 'mediapool/Audio'],
+      ['video', 'mediapool/Video'],
+      ['mediapool/video', 'mediapool/Video'],
+      ['ar-target', 'mediapool/AR Target'],
+      ['mediapool/ar target', 'mediapool/AR Target'],
+      ['mediapool/ar-target', 'mediapool/AR Target'],
+      ['ar-overlay', 'mediapool/AR Overlay'],
+      ['mediapool/ar overlay', 'mediapool/AR Overlay'],
+      ['mediapool/ar-overlay', 'mediapool/AR Overlay'],
+      ['images', 'mediapool/Images'],
+      ['mediapool/images', 'mediapool/Images'],
+      ['images/icons', 'mediapool/Images/icons'],
+      ['mediapool/images/icons', 'mediapool/Images/icons'],
+      ['images/covers', 'mediapool/Images/covers'],
+      ['mediapool/images/covers', 'mediapool/Images/covers'],
+      ['images/bundles', 'mediapool/Images/bundles'],
+      ['mediapool/images/bundles', 'mediapool/Images/bundles'],
+      ['images/uploads', 'mediapool/Images/uploads'],
+      ['mediapool/images/uploads', 'mediapool/Images/uploads'],
+      ['gif', 'mediapool/Gif'],
+      ['mediapool/gif', 'mediapool/Gif'],
+      ['gifs', 'mediapool/Gif'],
+      ['mediapool/gifs', 'mediapool/Gif'],
+      ['other', 'mediapool/Other'],
+      ['mediapool/other', 'mediapool/Other'],
+    ]);
+
+    let resolvedFolder = '';
+    if (!folderKey || folderKey === 'auto') {
+      const autoMap = {
+        image: 'mediapool/Images',
+        gif: 'mediapool/Gif',
+        audio: 'mediapool/Audio',
+        video: 'mediapool/Video',
+        ar: 'mediapool/AR Target',
+        other: 'mediapool/Other',
+      };
+      resolvedFolder = autoMap[classification] || 'mediapool/Other';
+    } else if (folderMap.has(folderKey)) {
+      resolvedFolder = folderMap.get(folderKey);
+    } else if (normalizedFolder.startsWith('mediapool/')) {
+      resolvedFolder = normalizedFolder;
     } else {
-      setUploadStatus(`Uploading ${safeName}…`);
+      resolvedFolder = `mediapool/${normalizedFolder}`;
+    }
+
+    const uniqueName = `${Date.now()}-${safeName}`;
+    const destinationLabel = resolvedFolder;
+    const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
+    if (overWarning) {
+      const sizeMb = Math.max(0.01, (file.size || 0) / (1024 * 1024));
+      setUploadStatus(`⚠️ ${safeName} is ${sizeMb.toFixed(sizeMb >= 10 ? 0 : 1)} MB — uploads over 5 MB may take longer to sync into ${destinationLabel}.`);
+    } else {
+      setUploadStatus(`Uploading ${safeName} to ${destinationLabel}…`);
     }
     const base64 = await fileToBase64(file);
+    const body = {
+      fileName: uniqueName,
+      folder: resolvedFolder,
+      sizeBytes: file.size || 0,
+      contentBase64: base64,
+      remoteUrl: options.remoteUrl || '',
+    };
     const res = await fetch('/api/upload', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
     });
-    const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName}` : `❌ ${j?.error || 'upload failed'}`);
-    return res.ok ? `/${path.replace(/^public\//,'')}` : '';
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) {
+      let message = `✅ Registered ${safeName} in ${destinationLabel}`;
+      if (j?.manifestFallback && j?.manifestPath) {
+        message += ` (manifest fallback: ${j.manifestPath})`;
+      } else if (j?.manifestPath) {
+        message += ` (manifest: ${j.manifestPath})`;
+      }
+      setUploadStatus(message);
+    } else {
+      setUploadStatus(`❌ ${j?.error || 'upload failed'}`);
+    }
+    return res.ok ? (j?.item?.url || '') : '';
   }
 
   const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: 'Admin-esxape-ride (root)' }];
+    const baseOptions = [{ value: 'default', label: `${STARFIELD_DEFAULTS.title} (default)` }];
     const extra = Array.isArray(games)
       ? games
           .filter((g) => g && g.slug && g.slug !== 'default')
@@ -2060,24 +2228,49 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+  const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
+  const fallbackConfig = useMemo(() => defaultConfig(), []);
+  const viewSuite = suite || fallbackSuite;
+  const viewConfig = config || fallbackConfig;
+  const isBootstrapping = !suite || !config;
 
-  if (!suite || !config) {
-    return (
-      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid var(--admin-border-soft)', background: 'var(--appearance-panel-bg, var(--admin-panel-bg))', boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))' }}>
-          Loading… (pulling config & missions)
-        </div>
-      </main>
-    );
-  }
-
-  const mapCenter = { lat: Number(config.map?.centerLat)||44.9778, lng: Number(config.map?.centerLng)||-93.2650 };
-  const mapZoom = Number(config.map?.defaultZoom)||13;
+  const mapCenter = {
+    lat: Number((viewConfig?.map?.centerLat ?? 44.9778)) || 44.9778,
+    lng: Number((viewConfig?.map?.centerLng ?? -93.2650)) || -93.2650,
+  };
+  const mapZoom = Number(viewConfig?.map?.defaultZoom ?? 13) || 13;
 
   const missionRadiusDisabled = (selectedMissionIdx==null);
   const missionRadiusValue = selectedMissionIdx!=null
-    ? Number(suite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
+    ? Number(viewSuite.missions?.[selectedMissionIdx]?.content?.radiusMeters ?? 25)
     : 25;
+
+  const missionTitleDraft = (editing?.title || '').trim();
+  const missionButtonContextLabel = editing
+    ? (missionTitleDraft || (editingIsNew ? 'New' : 'Current'))
+    : 'Mission';
+  const missionButtonLabel = `Save and Close ${missionButtonContextLabel} Mission`;
+  const missionButtonTitleAttr = editing
+    ? `Save and close ${missionButtonContextLabel} mission`
+    : 'Save and close mission';
+  const missionIconPreviewUrl = editing
+    ? toDirectMediaURL(missionIconUrlFromKey(editing.iconKey) || '')
+    : '';
+  const missionIconOptions = useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    const append = (list = []) => {
+      list.forEach((icon) => {
+        const key = (icon?.key || '').trim();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        options.push({ key, name: icon?.name || key, url: icon?.url || '' });
+      });
+    };
+    append(viewConfig?.icons?.missions || []);
+    append(viewConfig?.icons?.devices || []);
+    return options;
+  }, [viewConfig?.icons?.missions, viewConfig?.icons?.devices]);
 
   const isAddingDevice = isDeviceEditorOpen && deviceEditorMode === 'new';
   const deviceRadiusDisabled = (selectedDevIdx==null && !isAddingDevice);
@@ -2085,17 +2278,25 @@ export default function Admin() {
     ? Number(devices?.[selectedDevIdx]?.pickupRadius ?? 0)
     : Number(devDraft.pickupRadius ?? 100);
 
-  const storedAppearanceSkin = config.appearanceSkin && ADMIN_SKIN_TO_UI.has(config.appearanceSkin)
-    ? config.appearanceSkin
+  const deviceTitleDraft = (devDraft?.title || '').trim();
+  const deviceButtonContextLabel = deviceTitleDraft
+    || (deviceEditorMode === 'new'
+      ? 'New'
+      : ((selectedDevIdx != null && (devices?.[selectedDevIdx]?.title || '').trim()) || 'Current'));
+  const deviceButtonLabel = `Save and Close ${deviceButtonContextLabel} Device`;
+  const deviceButtonTitleAttr = `Save and close ${deviceButtonContextLabel} device`;
+
+  const storedAppearanceSkin = viewConfig.appearanceSkin && ADMIN_SKIN_TO_UI.has(viewConfig.appearanceSkin)
+    ? viewConfig.appearanceSkin
     : null;
-  const detectedAppearanceSkin = detectAppearanceSkin(config.appearance, config.appearanceSkin);
+  const detectedAppearanceSkin = detectAppearanceSkin(viewConfig.appearance, viewConfig.appearanceSkin);
   const selectedAppearanceSkin = storedAppearanceSkin || detectedAppearanceSkin;
   const selectedAppearanceSkinLabel = storedAppearanceSkin
     ? `${APPEARANCE_SKIN_MAP.get(storedAppearanceSkin)?.label || storedAppearanceSkin}${detectedAppearanceSkin === 'custom' ? ' (modified)' : ''}`
     : detectedAppearanceSkin === 'custom'
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
-  const interfaceTone = normalizeTone(config.appearanceTone);
+  const interfaceTone = normalizeTone(viewConfig.appearanceTone);
   const PROTECTION_COLOR_SAFE = '#16f78f';
   const PROTECTION_COLOR_ALERT = '#ff4d57';
   const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
@@ -2210,7 +2411,7 @@ export default function Admin() {
     setCoverPickerLoading(true);
     setCoverPickerItems([]);
     try {
-      const items = await listInventory(['covers','mediapool','uploads','bundles','icons']);
+      const items = await listInventory(['mediapool']);
       const filtered = (items || []).filter(it => ['image', 'gif'].includes(it.type));
       setCoverPickerItems(filtered);
     } catch {
@@ -2259,13 +2460,13 @@ export default function Admin() {
   const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
 
   const isDefault = slugForMeta === 'default';
-  const coverImageUrl = config?.game?.coverImage ? toDirectMediaURL(config.game.coverImage) : '';
+  const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
-  const hasCoverForSave = Boolean((config?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = config?.game?.deployEnabled !== false;
-  const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
-  const headerCoverThumb = config?.game?.coverImage
-    ? toDirectMediaURL(config.game.coverImage)
+  const hasCoverForSave = Boolean((viewConfig?.game?.coverImage || '').trim() || coverUploadPreview);
+  const deployGameEnabled = viewConfig?.game?.deployEnabled !== false;
+  const headerGameTitle = (viewConfig?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
+  const headerCoverThumb = viewConfig?.game?.coverImage
+    ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
   const headerStyle = S.header;
   const metaBranchLabel = adminMeta.branch || 'unknown';
@@ -2282,10 +2483,32 @@ export default function Admin() {
     : '';
   const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
+  const metaDeploymentLabel = metaDeploymentUrl
+    ? metaDeploymentUrl.replace(/^https?:\/\//, '')
+    : (metaDeploymentState || '—');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const metaVercelUrl = adminMeta.vercelUrl || '';
+  const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
+
+  if (isBootstrapping) {
+    return (
+      <main style={{ maxWidth: 900, margin: '40px auto', color: 'var(--admin-muted)', padding: 16 }}>
+        <div
+          style={{
+            padding: 16,
+            borderRadius: 12,
+            border: '1px solid var(--admin-border-soft)',
+            background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
+            boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+          }}
+        >
+          Loading… (pulling config & missions)
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div style={S.body}>
@@ -2419,7 +2642,7 @@ export default function Admin() {
               <div style={S.headerNavSecondary}>
                 <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                  <option value="default">(Default Game)</option>
+                  <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
                   {games.map(g=>(
                     <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
                   ))}
@@ -2492,25 +2715,6 @@ export default function Admin() {
               {protectionError}
             </div>
           )}
-          <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
-          {statusLog.length > 0 && (
-            <div style={S.conversationLog}>
-              <div style={S.conversationLogHeading}>Operator ↔ GPT Log</div>
-              <div style={S.conversationLogEntries}>
-                {statusLog.slice().reverse().map((entry, idx) => (
-                  <div key={`${entry.timestamp}-${idx}`} style={S.conversationLogRow}>
-                    <span style={{ ...S.conversationBadge, ...(entry.speaker === 'GPT' ? S.conversationBadgeGpt : S.conversationBadgeYou) }}>
-                      {entry.speaker}
-                    </span>
-                    <span style={S.conversationMessage}>{entry.text}</span>
-                    <time style={S.conversationTime} dateTime={entry.timestamp}>
-                      {formatLocalDateTime(entry.timestamp)}
-                    </time>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
@@ -2581,7 +2785,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedMissionIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -2648,16 +2852,7 @@ export default function Admin() {
                       <h3 style={{ margin: '0', fontSize: 18 }}>
                         {editingIsNew ? 'New Mission' : 'Edit Mission'}
                       </h3>
-                      <input
-                        style={{ ...S.input, width: '100%', maxWidth: 320, textAlign: 'center' }}
-                        value={editing.title || ''}
-                        onChange={(e) => {
-                          setEditing({ ...editing, title: e.target.value });
-                          setDirty(true);
-                        }}
-                        placeholder="Mission title"
-                      />
-                      <div style={S.noteText}>This label appears inside the admin and player timelines.</div>
+                      <div style={S.noteText}>Update the mission heading, type, and icon, then save.</div>
                     </div>
                     <div style={S.overlayBarSide}>
                       <button
@@ -2666,46 +2861,73 @@ export default function Admin() {
                           ...(missionActionFlash ? S.action3DFlash : {}),
                         }}
                         onClick={handleMissionSave}
-                        title={editingIsNew ? 'Save this new mission to the list' : 'Commit mission updates'}
+                        title={missionButtonTitleAttr}
                       >
-                        {editingIsNew ? 'New Mission' : 'Edit Mission'}
+                        {missionButtonLabel}
                       </button>
                       <div style={S.noteText}>Glows green each time a mission save succeeds.</div>
                     </div>
                   </div>
 
-                  <Field label="Type">
-                    <select style={S.input} value={editing.type}
-                      onChange={(e)=>{ const t=e.target.value; setEditing({ ...editing, type:t, content:defaultContentForType(t) }); setDirty(true); }}>
-                      {Object.keys(TYPE_FIELDS).map((k)=>(
-                        <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  {/* Icon select with thumbnail (inventory-only) */}
-                  <Field label="Icon">
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <div style={S.missionPrimaryRow}>
+                    <div>
+                      {missionIconPreviewUrl ? (
+                        <img
+                          alt="icon preview"
+                          src={missionIconPreviewUrl}
+                          style={{ width: 48, height: 48, objectFit: 'contain', border: '1px solid var(--admin-border-soft)', borderRadius: 8 }}
+                        />
+                      ) : (
+                        <div style={{ width: 48, height: 48, border: '1px dashed var(--admin-border-soft)', borderRadius: 8, display: 'grid', placeItems: 'center', color: 'var(--admin-muted)' }}>
+                          icon
+                        </div>
+                      )}
+                    </div>
+                    <Field label="Title">
+                      <input
+                        style={S.input}
+                        value={editing.title || ''}
+                        onChange={(e) => {
+                          setEditing({ ...editing, title: e.target.value });
+                          setDirty(true);
+                        }}
+                        placeholder="Mission title"
+                      />
+                    </Field>
+                    <Field label="Type">
+                      <select
+                        style={S.input}
+                        value={editing.type}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setEditing({ ...editing, type: t, content: defaultContentForType(t) });
+                          setDirty(true);
+                        }}
+                      >
+                        {Object.keys(TYPE_FIELDS).map((k) => (
+                          <option key={k} value={k}>{TYPE_LABELS[k] || k}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Icon">
                       <select
                         style={S.input}
                         value={editing.iconKey || ''}
-                        onChange={(e)=>{ setEditing({ ...editing, iconKey:e.target.value }); setDirty(true); }}
+                        onChange={(e) => {
+                          setEditing({ ...editing, iconKey: e.target.value });
+                          setDirty(true);
+                        }}
                       >
                         <option value="">(default)</option>
-                        {(config?.icons?.missions||[]).map((it)=>(
-                          <option key={it.key} value={it.key}>{it.name||it.key}</option>
+                        {missionIconOptions.map((it) => (
+                          <option key={it.key} value={it.key}>{it.name || it.key}</option>
                         ))}
                       </select>
-                      <div>
-                        {(() => {
-                          const sel = (config?.icons?.missions||[]).find(it => it.key === editing.iconKey);
-                          return sel?.url
-                            ? <img alt="icon" src={toDirectMediaURL(sel.url)} style={{ width:48, height:48, objectFit:'contain', border:'1px solid var(--admin-border-soft)', borderRadius:8 }}/>
-                            : <div style={{ width:48, height:48, border:'1px dashed var(--admin-border-soft)', borderRadius:8, display:'grid', placeItems:'center', color:'var(--admin-muted)' }}>icon</div>;
-                        })()}
-                      </div>
-                    </div>
-                  </Field>
+                    </Field>
+                  </div>
+                  <div style={{ ...S.noteText, marginTop: -6 }}>
+                    This label appears inside the admin and player timelines.
+                  </div>
 
                   <hr style={S.hr}/>
 
@@ -3193,9 +3415,9 @@ export default function Admin() {
                             ...(deviceActionFlash ? S.action3DFlash : {}),
                           }}
                           onClick={handleDeviceSave}
-                          title={deviceEditorMode === 'new' ? 'Save this new device' : 'Commit device updates'}
+                          title={deviceButtonTitleAttr}
                         >
-                          {deviceEditorMode === 'new' ? 'New Device' : 'Edit Device'}
+                          {deviceButtonLabel}
                         </button>
                         <div style={S.noteText}>Watch for the green flash when the device is stored.</div>
                       </div>
@@ -3345,7 +3567,7 @@ export default function Admin() {
                   </label>
                   <label style={{ display:'flex', alignItems:'center', gap:6 }}>
                     Selected pin size:
-                    <input type="range" min={16} max={48} step={2} value={selectedPinSize}
+                    <input type="range" min={16} max={120} step={2} value={selectedPinSize}
                       disabled={selectedDevIdx==null}
                       onChange={(e)=>setSelectedPinSize(Number(e.target.value))}
                     />
@@ -3703,6 +3925,174 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Operator ↔ GPT Log</h3>
+            {status && (
+              <div style={{ color:'var(--admin-muted)', marginBottom:12, whiteSpace:'pre-wrap' }}>{status}</div>
+            )}
+            <div style={S.conversationLog}>
+              {statusLog.length === 0 ? (
+                <div style={{ color:'var(--admin-muted)', fontSize:12 }}>No exchanges recorded yet.</div>
+              ) : (
+                <div style={S.conversationLogEntries}>
+                  {statusLog.slice().reverse().map((entry, idx) => (
+                    <div key={`${entry.timestamp}-${idx}`} style={S.conversationLogRow}>
+                      <span style={{ ...S.conversationBadge, ...(entry.speaker === 'GPT' ? S.conversationBadgeGpt : S.conversationBadgeYou) }}>
+                        {entry.speaker}
+                      </span>
+                      <span style={S.conversationMessage}>{entry.text}</span>
+                      <time style={S.conversationTime} dateTime={entry.timestamp}>
+                        {formatLocalDateTime(entry.timestamp)}
+                      </time>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
+            <div style={S.metaFooterGrid}>
+              <div>
+                <div style={S.metaFooterLabel}>Repository</div>
+                {metaRepoUrl ? (
+                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaOwnerRepo || 'unknown'}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>{metaOwnerRepo || 'unknown'}</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Branch</div>
+                <span style={S.metaFooterValue}>{metaBranchLabel}</span>
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Commit</div>
+                {metaCommitLabel ? (
+                  metaCommitUrl ? (
+                    <a
+                      href={metaCommitUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={S.metaFooterLink}
+                      title={`Open commit ${metaCommitLabel}`}
+                    >
+                      #{metaCommitShort || metaCommitLabel}
+                    </a>
+                  ) : (
+                    <span style={S.metaFooterValue}>#{metaCommitShort || metaCommitLabel}</span>
+                  )
+                ) : (
+                  <span style={S.metaFooterValue}>—</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Deployment</div>
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>{metaDeploymentState || '—'}</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Vercel Project</div>
+                {metaVercelUrl ? (
+                  <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
+                    {metaVercelLabel || metaVercelUrl.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : (
+                  <span style={S.metaFooterValue}>—</span>
+                )}
+              </div>
+              <div>
+                <div style={S.metaFooterLabel}>Snapshot Time</div>
+                <div style={S.metaFooterValue}>
+                  <div style={S.metaFooterTimeLine}>Fetched: {metaTimestampLabel || '—'}</div>
+                  <div style={S.metaFooterTimeLine}>Rendered: {metaNowLabel || '—'}</div>
+                </div>
+              </div>
+            </div>
+            <div style={S.metaFooterNote}>
+              Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
+            </div>
+          </div>
+
+          {adminMeta.error && (
+            <div style={{ ...S.card, marginTop:16, ...S.metaErrorCard }}>
+              <div style={{ ...S.metaBannerError, margin:0 }}>{adminMeta.error}</div>
+            </div>
+          )}
+
+          <footer style={S.settingsFooter}>
+            <div style={S.settingsFooterRow}>
+              <span style={S.settingsFooterItem}>
+                <strong>Repo:</strong>{' '}
+                {metaRepoUrl ? (
+                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                    {metaOwnerRepo || '—'}
+                  </a>
+                ) : (
+                  metaOwnerRepo || '—'
+                )}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Branch:</strong>{' '}
+                {metaBranchLabel || '—'}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Commit:</strong>{' '}
+                {metaCommitLabel ? (
+                  metaCommitUrl ? (
+                    <a
+                      href={metaCommitUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={S.settingsFooterLink}
+                      title={`Open commit ${metaCommitLabel}`}
+                    >
+                      {metaCommitLabel}
+                    </a>
+                  ) : (
+                    metaCommitLabel
+                  )
+                ) : (
+                  '—'
+                )}
+              </span>
+              <span style={S.settingsFooterSeparator}>•</span>
+              <span style={S.settingsFooterItem}>
+                <strong>Deployment:</strong>{' '}
+                {metaDeploymentUrl ? (
+                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                    {metaDeploymentLabel}
+                  </a>
+                ) : (
+                  metaDeploymentLabel
+                )}
+              </span>
+              {metaVercelUrl && (
+                <>
+                  <span style={S.settingsFooterSeparator}>•</span>
+                  <span style={S.settingsFooterItem}>
+                    <strong>Vercel:</strong>{' '}
+                    <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                      {metaVercelLabel || metaDeploymentLabel}
+                    </a>
+                  </span>
+                </>
+              )}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
+            </div>
+          </footer>
         </main>
       )}
 
@@ -3717,8 +4107,8 @@ export default function Admin() {
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          uploadToRepo={async (file, folder)=> {
-            const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
+          uploadToRepo={async (file, folder, options = {}) => {
+            const url = await (async () => { try { return await uploadToRepo(file, folder, options); } catch { return ''; } })();
             return url;
           }}
           onInventoryRefresh={syncInventory}
@@ -4138,6 +4528,7 @@ function MediaPreview({ url, kind }) {
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/.test(lower);
   const isImage = /\.(png|jpg|jpeg|gif|webp)(\?|#|$)/.test(lower) || u.includes('drive.google.com/uc?export=view');
   const isAudio = /\.(mp3|wav|ogg|m4a|aiff|aif)(\?|#|$)/.test(lower);
+  const isAr = /\.(glb|gltf|usdz|reality|vrm|fbx|obj)(\?|#|$)/.test(lower);
   return (
     <div style={{ marginTop:8 }}>
       <div style={{ color:'var(--admin-muted)', fontSize:12, marginBottom:6 }}>Preview ({kind})</div>
@@ -4145,6 +4536,24 @@ function MediaPreview({ url, kind }) {
         <video src={u} controls style={{ width:'100%', maxHeight:260, borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
       ) : isImage ? (
         <img src={u} alt="preview" style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:10, border:'1px solid var(--admin-border-soft)' }}/>
+      ) : isAr ? (
+        <div
+          style={{
+            width: '100%',
+            maxHeight: 200,
+            borderRadius: 10,
+            border: '1px dashed var(--admin-border-soft)',
+            background: 'rgba(148, 163, 184, 0.08)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+            color: 'var(--admin-muted)',
+            fontSize: 12,
+            textAlign: 'center',
+          }}
+        >
+          AR asset preview not available — open in a compatible viewer.
+        </div>
       ) : isAudio ? (
         <audio src={u} controls style={{ width:'100%' }} />
       ) : (
@@ -4223,6 +4632,84 @@ const S = {
   metaBannerError: {
     color: '#f87171',
     fontWeight: 600,
+  },
+  metaFooterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+    marginTop: 8,
+  },
+  metaFooterLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: 4,
+  },
+  metaFooterValue: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    wordBreak: 'break-word',
+    lineHeight: 1.4,
+  },
+  metaFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+    wordBreak: 'break-all',
+  },
+  metaFooterTimeLine: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  metaFooterNote: {
+    color: 'var(--admin-muted)',
+    marginTop: 12,
+    fontSize: 12,
+  },
+  metaErrorCard: {
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    background: 'rgba(248, 113, 113, 0.08)',
+  },
+  settingsFooter: {
+    marginTop: 24,
+    padding: '16px 18px',
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, rgba(15, 23, 42, 0.32))',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  settingsFooterRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsFooterItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  settingsFooterSeparator: {
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  settingsFooterLink: {
+    color: 'var(--admin-link-color, #60a5fa)',
+    textDecoration: 'none',
+    fontWeight: 600,
+    wordBreak: 'break-word',
+  },
+  settingsFooterTime: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   header: {
     padding: 20,
@@ -4614,8 +5101,9 @@ const S = {
     alignItems: 'stretch',
   },
   coverDropZone: {
-    flex: '1 1 380px',
-    minHeight: 280,
+    flex: '0 1 200px',
+    maxWidth: 220,
+    minHeight: 140,
     border: '1px dashed rgba(94, 234, 212, 0.35)',
     borderRadius: 20,
     background: 'rgba(15, 23, 42, 0.75)',
@@ -4702,6 +5190,111 @@ const S = {
     boxShadow: '0 12px 24px rgba(14, 165, 233, 0.35)',
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
   },
+  buttonDisabled: {
+    opacity: 0.65,
+    cursor: 'not-allowed',
+  },
+  pendingWrap: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
+    display: 'grid',
+    gap: 12,
+  },
+  pendingHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  pendingTitle: {
+    fontWeight: 700,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingCount: {
+    padding: '2px 10px',
+    borderRadius: 999,
+    background: 'rgba(59, 130, 246, 0.18)',
+    color: '#1d4ed8',
+    fontWeight: 700,
+    fontSize: 12,
+  },
+  pendingGrid: {
+    display: 'grid',
+    gap: 10,
+  },
+  pendingItem: {
+    display: 'grid',
+    gridTemplateColumns: '60px 1fr auto',
+    gap: 12,
+    alignItems: 'center',
+    padding: '8px 10px',
+    borderRadius: 10,
+    background: 'rgba(148, 163, 184, 0.08)',
+  },
+  pendingThumb: {
+    width: 60,
+    height: 48,
+    borderRadius: 10,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    display: 'grid',
+    placeItems: 'center',
+  },
+  pendingThumbImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  pendingThumbPlaceholder: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    color: 'var(--admin-muted)',
+  },
+  pendingMeta: {
+    display: 'grid',
+    gap: 4,
+  },
+  pendingName: {
+    fontWeight: 600,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  pendingDetails: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingRemove: {
+    padding: '6px 10px',
+    borderRadius: 8,
+    border: '1px solid rgba(248, 113, 113, 0.55)',
+    background: 'rgba(248, 113, 113, 0.12)',
+    color: '#f87171',
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  pendingWarning: {
+    fontSize: 12,
+    color: '#b45309',
+    background: 'rgba(234, 179, 8, 0.12)',
+    border: '1px solid rgba(234, 179, 8, 0.24)',
+    borderRadius: 10,
+    padding: '8px 10px',
+  },
+  pendingActions: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
   tab: {
     padding: '8px 12px',
     borderRadius: 12,
@@ -4724,6 +5317,13 @@ const S = {
   },
   hr: { border: '1px solid var(--admin-border-soft)', borderBottom: 'none', margin: '12px 0' },
   overlay: { position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', background: 'rgba(0,0,0,0.55)', zIndex: 2000, padding: 16 },
+  missionPrimaryRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(64px, 72px) repeat(3, minmax(160px, 1fr))',
+    gap: 8,
+    alignItems: 'center',
+    margin: '16px 0 12px',
+  },
   overlayBarSide: {
     display: 'flex',
     flexDirection: 'column',
@@ -5184,33 +5784,99 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
+  const [folder, setFolder] = useState('auto');
   const [addUrl, setAddUrl] = useState('');
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const pendingFilesRef = useRef([]);
+  const [pendingActionBusy, setPendingActionBusy] = useState(false);
 
+  const [subTab, setSubTab] = useState('audio');
+  const sanitizedInventory = useMemo(() => {
+    return (inv || []).filter((item) => {
+      const raw = String(item?.path || item?.name || item?.url || '').trim();
+      if (!raw) return false;
+      const withoutQuery = raw.split('?')[0];
+      const base = withoutQuery.split('/').pop()?.toLowerCase() || '';
+      if (base === '.gitkeep' || base === 'index.json' || base === '.ds_store') return false;
+      return true;
+    });
+  }, [inv]);
 
-  
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
-  const subTabs = [
-    { key:'image', label:'Images' },
-    { key:'video', label:'Videos' },
-    { key:'audio', label:'Audio' },
-    { key:'gif',   label:'GIFs'  },
+  const itemsByType = useMemo(() => {
+    const grouped = sanitizedInventory.reduce((acc, it) => {
+      const guess = classifyByExt(it.url || it.path || it.name || '');
+      const metaType = String(it.kind || it.category || it.type || guess || 'other').toLowerCase();
+      let key = metaType.replace(/\s+/g, '-');
+      if (key === 'ar') key = 'ar-target';
+      if (key === 'images' || key === 'image') key = 'image';
+      if (key === 'gifs' || key === 'gif') key = 'gif';
+      if (!MEDIA_TYPE_DEFS.find((def) => def.key === key)) {
+        key = 'other';
+      }
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(it);
+      return acc;
+    }, {});
+
+    Object.keys(grouped).forEach((key) => {
+      grouped[key].sort((a, b) => {
+        const nameA = (a?.name || a?.url || a?.path || '').toString().toLowerCase();
+        const nameB = (b?.name || b?.url || b?.path || '').toString().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    });
+
+    return grouped;
+  }, [sanitizedInventory]);
+  const uploadDestinations = [
+    { value: 'auto', label: 'Auto — detect from file type' },
+    { value: 'images', label: 'Images (general)' },
+    { value: 'images/icons', label: 'Images · Icons' },
+    { value: 'images/covers', label: 'Images · Covers' },
+    { value: 'images/bundles', label: 'Images · Bundles' },
+    { value: 'images/uploads', label: 'Images · Uploads' },
+    { value: 'audio', label: 'Audio' },
+    { value: 'video', label: 'Video' },
+    { value: 'gif', label: 'Gif' },
+    { value: 'ar-target', label: 'AR Target' },
+    { value: 'ar-overlay', label: 'AR Overlay' },
+    { value: 'other', label: 'Other' },
   ];
-  const [subTab, setSubTab] = useState('image');
 
   useEffect(() => { refreshInventory(); }, []);
 
   async function refreshInventory() {
     setBusy(true);
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
+      const items = await listInventory(['mediapool']);
       setInv(items || []);
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
       }
     } finally { setBusy(false); }
+  }
+
+  function resolveUploadType(targetFolder, classification = 'other') {
+    const normalized = String(targetFolder || '').trim().toLowerCase();
+    if (!normalized || normalized === 'auto') {
+      return MEDIA_CLASS_TO_TYPE[classification] || 'other';
+    }
+
+    if (FOLDER_TO_TYPE.has(normalized)) return FOLDER_TO_TYPE.get(normalized);
+
+    if (normalized.startsWith('mediapool/')) {
+      const after = normalized.replace(/^mediapool\//, '');
+      if (FOLDER_TO_TYPE.has(after)) return FOLDER_TO_TYPE.get(after);
+      const slug = after.replace(/\s+/g, '-');
+      if (FOLDER_TO_TYPE.has(slug)) return FOLDER_TO_TYPE.get(slug);
+    }
+
+    const slugged = normalized.replace(/\s+/g, '-');
+    if (FOLDER_TO_TYPE.has(slugged)) return FOLDER_TO_TYPE.get(slugged);
+
+    return MEDIA_CLASS_TO_TYPE[classification] || 'other';
   }
 
   // Per-file usage counts retained for backwards compatibility
@@ -5258,28 +5924,155 @@ function MediaPoolTab({
   }
 
   async function uploadFiles(fileList) {
-    const files = Array.from(fileList || []).filter(Boolean);
-    if (!files.length) return;
+    const entries = Array.from(fileList || [])
+      .map((item) => {
+        if (!item) return null;
+        if (item.file instanceof File) return item;
+        if (item instanceof File) return { file: item };
+        return null;
+      })
+      .filter(Boolean);
+    if (!entries.length) return { success: 0, total: 0, results: [] };
     let success = 0;
     let lastUrl = '';
-    for (const file of files) {
+    const results = [];
+    let lastTypeKey = '';
+    for (const entry of entries) {
+      const file = entry.file;
+      if (!file) {
+        results.push({ entry, ok: false, url: '' });
+        // eslint-disable-next-line no-continue
+        continue;
+      }
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, folder, { remoteUrl: addUrl });
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+        const classification = classifyByExt(file.name || file.type || uploaded || '');
+        lastTypeKey = resolveUploadType(folder, classification);
       }
+      results.push({ entry, ok: !!uploaded, url: uploaded });
     }
-    if (lastUrl) setAddUrl(lastUrl);
-    if (success) await refreshInventory();
-    if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
+    if (success) {
+      setAddUrl('');
+      await refreshInventory();
+      if (lastTypeKey) setSubTab(lastTypeKey);
+    }
+    if (entries.length > 1) {
+      const prefix = success === entries.length ? '✅' : '⚠️';
+      setUploadStatus(`${prefix} Uploaded ${success}/${entries.length} files`);
+    }
+    return { success, total: entries.length, results };
+  }
+
+  function revokePreview(entry) {
+    if (entry?.previewUrl) {
+      try { URL.revokeObjectURL(entry.previewUrl); } catch (err) { /* noop */ }
     }
   }
 
+  function formatFileSize(bytes = 0) {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex += 1;
+    }
+    const fixed = size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1);
+    return `${fixed} ${units[unitIndex]}`;
+  }
+
+  function stageFiles(fileList) {
+    const files = Array.from(fileList || []).filter(Boolean);
+    if (!files.length) return;
+    let added = false;
+    setPendingFiles((prev) => {
+      const existingKeys = new Set(
+        prev.map((item) => `${item.file?.name || ''}-${item.file?.size || 0}-${item.file?.lastModified || 0}`)
+      );
+      const additions = [];
+      files.forEach((file) => {
+        const key = `${file.name || 'file'}-${file.size || 0}-${file.lastModified || 0}`;
+        if (existingKeys.has(key)) return;
+        existingKeys.add(key);
+        const previewUrl = ((file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || ''))
+          ? URL.createObjectURL(file)
+          : '';
+        additions.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          file,
+          name: file.name || 'upload',
+          size: file.size || 0,
+          previewUrl,
+          type: classifyByExt(file.name || file.type || ''),
+        });
+      });
+      if (!additions.length) return prev;
+      added = true;
+      return [...prev, ...additions];
+    });
+    if (!added) return;
+    const oversize = files.filter((file) => (file.size || 0) > MEDIA_WARNING_BYTES);
+    if (oversize.length) {
+      const label = oversize.length === 1
+        ? `${oversize[0].name || 'file'} (${formatFileSize(oversize[0].size || 0)})`
+        : `${oversize.length} files over 5 MB`;
+      setUploadStatus(`⚠️ ${label} — uploads over 5 MB may take longer. Click “Save to Media Pool” to continue.`);
+    } else {
+      setUploadStatus(`Ready to upload ${files.length} file${files.length === 1 ? '' : 's'}. Click “Save to Media Pool”.`);
+    }
+  }
+
+  function removePending(id) {
+    setPendingFiles((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      const removed = prev.find((item) => item.id === id);
+      if (removed) revokePreview(removed);
+      return next;
+    });
+  }
+
+  function clearPending() {
+    setPendingFiles((prev) => {
+      prev.forEach(revokePreview);
+      return [];
+    });
+  }
+
+  async function savePending() {
+    if (!pendingFiles.length) return;
+    setPendingActionBusy(true);
+    try {
+      const result = await uploadFiles(pendingFiles);
+      if (result?.success && result.success === pendingFiles.length) {
+        clearPending();
+      } else if (result?.success) {
+        setPendingFiles((prev) => {
+          const keepers = prev.filter((item) => !result.results.some((r) => r.entry === item && r.ok));
+          prev
+            .filter((item) => result.results.some((r) => r.entry === item && r.ok))
+            .forEach(revokePreview);
+          return keepers;
+        });
+      }
+    } finally {
+      setPendingActionBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    pendingFilesRef.current = pendingFiles;
+  }, [pendingFiles]);
+
+  useEffect(() => () => {
+    pendingFilesRef.current.forEach(revokePreview);
+  }, []);
+
   async function onUpload(e) {
-    await uploadFiles(e.target.files);
+    stageFiles(e.target.files);
     if (e.target) e.target.value = '';
   }
 
@@ -5316,20 +6109,21 @@ function MediaPoolTab({
     await refreshInventory();
   }
 
-  // Group by type
-  const itemsByType = (inv || []).reduce((acc, it) => {
-    const t = classifyByExt(it.url);
-    if (!acc[t]) acc[t] = [];
-    acc[t].push(it);
-    return acc;
-  }, {});
-  const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
-  ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+  const baseTabs = MEDIA_TYPE_DEFS.map(({ key, label }) => ({ key, label }));
+  const sections = MEDIA_TYPE_DEFS.map(({ key, title }) => ({
+    key,
+    title,
+    items: itemsByType[key] || [],
+  }));
+  const active = sections.find((s) => s.key === subTab) || sections[0];
+  const availableTabKeys = baseTabs.map((tab) => tab.key);
+  useEffect(() => {
+    if (!availableTabKeys.includes(subTab) && availableTabKeys.length) {
+      setSubTab(availableTabKeys[0]);
+    }
+  }, [availableTabKeys.join('::'), subTab]);
+  const subTabs = baseTabs;
+  const inventoryCount = sanitizedInventory.length;
 
   return (
     <main style={S.wrap}>
@@ -5339,9 +6133,9 @@ function MediaPoolTab({
         <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
           <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
           <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
+            {uploadDestinations.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
           <button
             type="button"
@@ -5351,13 +6145,17 @@ function MediaPoolTab({
             Upload
           </button>
         </div>
+        <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
+          Host media on an external service and paste the public URL before saving. The dashboard stores metadata only,
+          keeping binary files out of Git history.
+        </div>
         <div
           onDragOver={(e)=>{ e.preventDefault(); setDropActive(true); }}
           onDragLeave={(e)=>{ e.preventDefault(); setDropActive(false); }}
           onDrop={(e)=>{
             e.preventDefault();
             setDropActive(false);
-            uploadFiles(e.dataTransfer?.files);
+            stageFiles(e.dataTransfer?.files);
           }}
           style={{ ...S.mediaDropZone, ...(dropActive ? S.mediaDropZoneActive : {}) }}
         >
@@ -5368,13 +6166,77 @@ function MediaPoolTab({
           <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
         </div>
         <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
+        {pendingFiles.length > 0 && (
+          <div style={S.pendingWrap}>
+            <div style={S.pendingHeader}>
+              <div style={S.pendingTitle}>Pending uploads</div>
+              <div style={S.pendingCount}>{pendingFiles.length}</div>
+            </div>
+            <div style={S.pendingGrid}>
+              {pendingFiles.map((item) => {
+                const typeLabel = (item.type || 'file').toUpperCase();
+                return (
+                  <div key={item.id} style={S.pendingItem}>
+                    <div style={S.pendingThumb}>
+                      {item.previewUrl ? (
+                        <img src={item.previewUrl} alt={item.name} style={S.pendingThumbImage} />
+                      ) : (
+                        <div style={S.pendingThumbPlaceholder}>
+                          {item.type === 'ar' ? 'AR' : typeLabel}
+                        </div>
+                      )}
+                    </div>
+                    <div style={S.pendingMeta}>
+                      <div style={S.pendingName}>{item.name}</div>
+                      <div style={S.pendingDetails}>
+                        {formatFileSize(item.size)} · {typeLabel}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={{ ...S.pendingRemove, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                      onClick={() => removePending(item.id)}
+                      title="Remove from pending uploads"
+                      disabled={pendingActionBusy}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {pendingFiles.some((item) => (item.size || 0) > MEDIA_WARNING_BYTES) && (
+              <div style={S.pendingWarning}>
+                Files over 5 MB may take longer to sync. Saving keeps all sizes allowed.
+              </div>
+            )}
+            <div style={S.pendingActions}>
+              <button
+                type="button"
+                style={{ ...S.button, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                onClick={savePending}
+                disabled={pendingActionBusy}
+              >
+                {pendingActionBusy ? 'Saving…' : 'Save to Media Pool'}
+              </button>
+              <button
+                type="button"
+                style={{ ...S.button, ...S.buttonDanger, ...(pendingActionBusy ? S.buttonDisabled : {}) }}
+                onClick={clearPending}
+                disabled={pendingActionBusy}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
+          Inventory {busy ? '(loading…)':''}: {inventoryCount} file{inventoryCount === 1 ? '' : 's'}
         </div>
       </div>
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
+      {/* Sub-tabs: Audio • Video • Images • AR • GIF (Audio default) */}
       <div style={{ ...S.card, marginTop:16 }}>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
           {subTabs.map(st => (
@@ -5410,6 +6272,10 @@ function MediaPoolTab({
               const name = baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
               const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
+              const status = String(it.status || (url ? 'external' : 'pending')).replace(/[-_]+/g, ' ');
+              const statusColor = it.existsOnDisk
+                ? 'var(--admin-success)'
+                : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
@@ -5428,18 +6294,31 @@ function MediaPoolTab({
                       <img src={previewCandidate} alt={name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                     </div>
                   ) : (
-                    <MediaPreview url={url} kind={active.key} />
+                    <MediaPreview url={url} kind={it.kind || it.category || active.key} />
                   )}
                   <div>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
                     <div style={{ fontSize:12, color:'var(--admin-muted)', wordBreak:'break-word' }}>{url}</div>
+                    <div style={{ fontSize:12, color: statusColor, marginTop:4 }}>Status: {status}</div>
+                    {it.notes ? (
+                      <div style={{ fontSize:11, color:'var(--admin-muted)', marginTop:4 }}>{it.notes}</div>
+                    ) : null}
                   </div>
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     <a
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ ...S.button, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                      style={{
+                        ...S.button,
+                        textDecoration:'none',
+                        display:'inline-flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        pointerEvents: url ? 'auto' : 'none',
+                        opacity: url ? 1 : 0.5,
+                      }}
+                      aria-disabled={url ? undefined : true}
                     >
                       Open
                     </a>
@@ -5573,7 +6452,9 @@ function AssignedMediaPageTab({
       return {
         id: directUrl,
         name: item?.label || baseNameFromUrl(directUrl) || `Media ${idx + 1}`,
-        type: item?.type || item?.kind || '',
+        type: item?.kind || item?.type || classifyByExt(directUrl),
+        category: item?.category || '',
+        categoryLabel: item?.categoryLabel || '',
         tags: Array.isArray(item?.tags) ? item.tags : [],
         thumbUrl: thumb,
         url: directUrl,
@@ -5666,6 +6547,8 @@ function AssignedMediaPageTab({
     const responseWrongMap = new Map();
     const responseAudioMap = new Map();
     const coverMap = new Map();
+    const arTargetMap = new Map();
+    const arOverlayMap = new Map();
 
     const missionIconLookup = new Map();
     (safeIcons.missions || []).forEach((icon) => {
@@ -5692,6 +6575,14 @@ function AssignedMediaPageTab({
       if (mission.onWrong?.mediaUrl) addUsage(responseWrongMap, mission.onWrong.mediaUrl, `${title} — Wrong`);
       if (mission.onCorrect?.audioUrl) addUsage(responseAudioMap, mission.onCorrect.audioUrl, `${title} — Correct`);
       if (mission.onWrong?.audioUrl) addUsage(responseAudioMap, mission.onWrong.audioUrl, `${title} — Wrong`);
+
+      const content = mission.content || {};
+      if (content.markerUrl) {
+        addUsage(arTargetMap, content.markerUrl, `${title} — Marker`, { label: `${title} marker`, kind: 'ar-target', tags: ['ar-target'] });
+      }
+      if (content.assetUrl) {
+        addUsage(arOverlayMap, content.assetUrl, `${title} — Overlay`, { label: `${title} overlay`, kind: 'ar-overlay', tags: ['ar-overlay'] });
+      }
     });
 
     const deviceIconLookup = new Map();
@@ -5748,7 +6639,9 @@ function AssignedMediaPageTab({
       const label = entry.label || info?.name || baseNameFromUrl(entry.url);
       const kind = entry.kind || info?.type || classifyByExt(entry.url);
       const openUrl = info?.openUrl || entry.url;
-      const thumb = kind === 'audio'
+      const isAudioKind = kind === 'audio';
+      const isArKind = kind === 'ar' || kind === 'ar-target' || kind === 'ar-overlay';
+      const thumb = (isAudioKind || isArKind)
         ? ''
         : (info?.thumbUrl || entry.thumbUrl || openUrl);
       const tagSet = new Set();
@@ -5781,6 +6674,8 @@ function AssignedMediaPageTab({
       responseWrong: finalize(responseWrongMap),
       responseAudio: finalize(responseAudioMap),
       coverImages: finalize(coverMap),
+      arTargets: finalize(arTargetMap),
+      arOverlays: finalize(arOverlayMap),
     };
     } catch (err) {
       console.error('Failed to compute media usage summary', err);
@@ -5794,6 +6689,8 @@ function AssignedMediaPageTab({
         responseWrong: [],
         responseAudio: [],
         coverImages: [],
+        arTargets: [],
+        arOverlays: [],
       };
     }
   }, [config, missions, mediaPool]);

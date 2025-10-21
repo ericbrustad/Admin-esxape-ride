@@ -53,6 +53,7 @@ function classifyByExt(u) {
   if (/\.(gif)$/i.test(s)) return "gif";
   if (/\.(mp4|webm|mov)$/i.test(s)) return "video";
   if (/\.(mp3|wav|ogg|m4a|aiff|aif)$/i.test(s)) return "audio";
+  if (/\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i.test(s)) return "ar";
   return "other";
 }
 
@@ -75,7 +76,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
   const safeEditing = useMemo(() => normalizeMission(editing), [editing]);
   const [devices, setDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / other
+  const [mediaFilter, setMediaFilter] = useState("auto"); // auto / image / video / audio / gif / ar / other
   const [selectedPreviewUrl, setSelectedPreviewUrl] = useState("");
   const dropRef = useRef(null);
 
@@ -351,6 +352,7 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <option value="video">Videos</option>
                 <option value="audio">Audio</option>
                 <option value="gif">GIFs</option>
+                <option value="ar">AR</option>
                 <option value="other">Other</option>
               </select>
               <input placeholder="Paste URL to assign…" style={styles.inputSmall} onKeyDown={async (e)=>{
@@ -403,6 +405,10 @@ export default function InlineMissionResponses({ editing, setEditing, inventory 
                 <video src={selectedPreviewUrl} controls style={{ width:'100%', maxHeight:260, borderRadius:8 }} />
               ) : classifyByExt(selectedPreviewUrl) === 'audio' ? (
                 <audio src={selectedPreviewUrl} controls style={{ width:'100%' }} />
+              ) : classifyByExt(selectedPreviewUrl) === 'ar' ? (
+                <div style={{ padding:16, border:'1px dashed #334155', borderRadius:8, color:'#9fb0bf', fontSize:12, textAlign:'center' }}>
+                  AR asset preview not available. Open in an AR viewer to inspect the model.
+                </div>
               ) : (
                 <a href={selectedPreviewUrl} target="_blank" rel="noreferrer" style={{ color:'#9fb0bf' }}>{selectedPreviewUrl}</a>
               )}

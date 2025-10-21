@@ -1,6 +1,7 @@
 // pages/api/save.js
 // Save draft missions to Admin + mirror to Game. Robust against concurrent SHA changes.
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { syncSupabaseJson } from '../../lib/supabase-storage.js';
 
 export const config = { api: { bodyParser: true } };
 
@@ -107,7 +108,15 @@ export default async function handler(req, res) {
       }
     }
 
-    res.json({ ok: true, slug: slug || null, wrote });
+    let supabase = null;
+    try {
+      const payload = typeof missions === 'string' ? JSON.parse(missions) : missions;
+      supabase = await syncSupabaseJson('missions', slug || 'default', payload);
+    } catch (error) {
+      supabase = { ok: false, error: error?.message || String(error), kind: 'missions', slug: slug || 'default' };
+    }
+
+    res.json({ ok: true, slug: slug || null, wrote, supabase });
   } catch (e) {
     res.status(500).send(String(e?.message || e));
   }
