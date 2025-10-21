@@ -97,6 +97,57 @@ function classifyByExt(u) {
   return 'other';
 }
 
+const MEDIA_TYPE_DEFS = [
+  { key: 'audio', label: 'Audio', title: 'Audio (mp3/wav/aiff)' },
+  { key: 'video', label: 'Video', title: 'Video (mp4/mov)' },
+  { key: 'image', label: 'Images', title: 'Images (PNG/JPG/SVG)' },
+  { key: 'gif', label: 'GIF', title: 'GIF' },
+  { key: 'ar-target', label: 'AR Targets', title: 'AR Targets (markers)' },
+  { key: 'ar-overlay', label: 'AR Overlays', title: 'AR Overlays (assets)' },
+  { key: 'other', label: 'Other', title: 'Other (unclassified)' },
+];
+
+const MEDIA_CLASS_TO_TYPE = {
+  audio: 'audio',
+  video: 'video',
+  image: 'image',
+  gif: 'gif',
+  ar: 'ar-target',
+  other: 'other',
+};
+
+const FOLDER_TO_TYPE = new Map([
+  ['audio', 'audio'],
+  ['mediapool/audio', 'audio'],
+  ['video', 'video'],
+  ['mediapool/video', 'video'],
+  ['image', 'image'],
+  ['images', 'image'],
+  ['mediapool/images', 'image'],
+  ['images/icons', 'image'],
+  ['mediapool/images/icons', 'image'],
+  ['images/covers', 'image'],
+  ['mediapool/images/covers', 'image'],
+  ['images/bundles', 'image'],
+  ['mediapool/images/bundles', 'image'],
+  ['images/uploads', 'image'],
+  ['mediapool/images/uploads', 'image'],
+  ['gif', 'gif'],
+  ['gifs', 'gif'],
+  ['mediapool/gif', 'gif'],
+  ['mediapool/gifs', 'gif'],
+  ['ar-target', 'ar-target'],
+  ['ar target', 'ar-target'],
+  ['mediapool/ar-target', 'ar-target'],
+  ['mediapool/ar target', 'ar-target'],
+  ['ar-overlay', 'ar-overlay'],
+  ['ar overlay', 'ar-overlay'],
+  ['mediapool/ar-overlay', 'ar-overlay'],
+  ['mediapool/ar overlay', 'ar-overlay'],
+  ['other', 'other'],
+  ['mediapool/other', 'other'],
+]);
+
 /** Merge inventory across dirs so uploads show up everywhere */
 async function listInventory(dirs = ['mediapool']) {
   const seen = new Set();
@@ -392,8 +443,8 @@ const STARFIELD_DAWN_APPEARANCE = {
   textBgOpacity: 0.7,
   screenBgColor: '#e0dcfa',
   screenBgOpacity: 0.46,
-  screenBgImage: '/media/skins/starfield-dawn.svg',
-  screenBgImageEnabled: true,
+  screenBgImage: '',
+  screenBgImageEnabled: false,
   textAlign: 'center',
   textVertical: 'top',
 };
@@ -2065,7 +2116,7 @@ export default function Admin() {
     );
   }
 
-  async function uploadToRepo(file, subfolder='auto') {
+  async function uploadToRepo(file, subfolder = 'auto', options = {}) {
     if (!file) return '';
     const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
     const normalizedFolder = String(subfolder || 'auto').replace(/^\/+|\/+$/g, '');
@@ -2119,7 +2170,7 @@ export default function Admin() {
       resolvedFolder = `mediapool/${normalizedFolder}`;
     }
 
-    const path   = `public/media/${resolvedFolder}/${Date.now()}-${safeName}`;
+    const uniqueName = `${Date.now()}-${safeName}`;
     const destinationLabel = resolvedFolder;
     const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
     if (overWarning) {
@@ -2129,13 +2180,22 @@ export default function Admin() {
       setUploadStatus(`Uploading ${safeName} to ${destinationLabel}…`);
     }
     const base64 = await fileToBase64(file);
+    const body = {
+      fileName: uniqueName,
+      folder: resolvedFolder,
+      sizeBytes: file.size || 0,
+      contentBase64: base64,
+      remoteUrl: options.remoteUrl || '',
+    };
     const res = await fetch('/api/upload', {
-      method:'POST', headers:{ 'Content-Type':'application/json' }, credentials:'include',
-      body: JSON.stringify({ path, contentBase64: base64, message:`upload ${safeName}` }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
     });
-    const j = await res.json().catch(()=>({}));
-    setUploadStatus(res.ok ? `✅ Uploaded ${safeName} to ${destinationLabel}` : `❌ ${j?.error || 'upload failed'}`);
-    return res.ok ? `/${path.replace(/^public\//,'')}` : '';
+    const j = await res.json().catch(() => ({}));
+    setUploadStatus(res.ok ? `✅ Registered ${safeName} in ${destinationLabel}` : `❌ ${j?.error || 'upload failed'}`);
+    return res.ok ? (j?.item?.url || '') : '';
   }
 
   const selectGameOptions = useMemo(() => {
@@ -3949,52 +4009,11 @@ export default function Admin() {
             </div>
           </div>
 
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:12 }}>
-              <div>
-                <div style={S.fieldLabel}>Repository</div>
-                {metaRepoUrl ? (
-                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                    {metaOwnerRepo || 'unknown'}
-                  </a>
-                ) : (
-                  <div style={S.readonlyValue}>{metaOwnerRepo || 'unknown'}</div>
-                )}
-                <div style={S.noteText}>Source project detected from the latest admin metadata.</div>
-              </div>
-              <div>
-                <div style={S.fieldLabel}>Branch</div>
-                <div style={S.readonlyValue}>{metaBranchLabel}</div>
-                <div style={S.noteText}>Updated at {metaTimestampLabel || '—'}.</div>
-              </div>
-              <div>
-                <div style={S.fieldLabel}>Commit</div>
-                {metaCommitUrl ? (
-                  <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                    {metaCommitLabel || '—'}
-                  </a>
-                ) : (
-                  <div style={S.readonlyValue}>{metaCommitLabel || '—'}</div>
-                )}
-                <div style={S.noteText}>Last build snapshot captured at {metaNowLabel || '—'}.</div>
-              </div>
-              <div>
-                <div style={S.fieldLabel}>Vercel Deployment</div>
-                {metaDeploymentUrl ? (
-                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                    {metaDeploymentState || '—'}
-                  </a>
-                ) : (
-                  <div style={S.readonlyValue}>{metaDeploymentState || '—'}</div>
-                )}
-                <div style={S.noteText}>{metaVercelLabel ? `Target: ${metaVercelLabel}` : 'No deployment URL reported.'}</div>
-              </div>
+          {adminMeta.error && (
+            <div style={{ ...S.card, marginTop:16, ...S.metaErrorCard }}>
+              <div style={{ ...S.metaBannerError, margin:0 }}>{adminMeta.error}</div>
             </div>
-            {adminMeta.error && (
-              <div style={{ ...S.metaBannerError, marginTop:12 }}>{adminMeta.error}</div>
-            )}
-          </div>
+          )}
         </main>
       )}
 
@@ -4009,8 +4028,8 @@ export default function Admin() {
           setConfig={setConfig}
           uploadStatus={uploadStatus}
           setUploadStatus={setUploadStatus}
-          uploadToRepo={async (file, folder)=> {
-            const url = await (async ()=>{ try { return await uploadToRepo(file, folder); } catch { return ''; }})();
+          uploadToRepo={async (file, folder, options = {}) => {
+            const url = await (async () => { try { return await uploadToRepo(file, folder, options); } catch { return ''; } })();
             return url;
           }}
           onInventoryRefresh={syncInventory}
@@ -4570,6 +4589,10 @@ const S = {
     color: 'var(--admin-muted)',
     marginTop: 12,
     fontSize: 12,
+  },
+  metaErrorCard: {
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    background: 'rgba(248, 113, 113, 0.08)',
   },
   header: {
     padding: 20,
@@ -5653,6 +5676,43 @@ function MediaPoolTab({
   const [pendingActionBusy, setPendingActionBusy] = useState(false);
 
   const [subTab, setSubTab] = useState('audio');
+  const sanitizedInventory = useMemo(() => {
+    return (inv || []).filter((item) => {
+      const raw = String(item?.path || item?.name || item?.url || '').trim();
+      if (!raw) return false;
+      const withoutQuery = raw.split('?')[0];
+      const base = withoutQuery.split('/').pop()?.toLowerCase() || '';
+      if (base === '.gitkeep' || base === 'index.json' || base === '.ds_store') return false;
+      return true;
+    });
+  }, [inv]);
+
+  const itemsByType = useMemo(() => {
+    const grouped = sanitizedInventory.reduce((acc, it) => {
+      const guess = classifyByExt(it.url || it.path || it.name || '');
+      const metaType = String(it.kind || it.category || it.type || guess || 'other').toLowerCase();
+      let key = metaType.replace(/\s+/g, '-');
+      if (key === 'ar') key = 'ar-target';
+      if (key === 'images' || key === 'image') key = 'image';
+      if (key === 'gifs' || key === 'gif') key = 'gif';
+      if (!MEDIA_TYPE_DEFS.find((def) => def.key === key)) {
+        key = 'other';
+      }
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(it);
+      return acc;
+    }, {});
+
+    Object.keys(grouped).forEach((key) => {
+      grouped[key].sort((a, b) => {
+        const nameA = (a?.name || a?.url || a?.path || '').toString().toLowerCase();
+        const nameB = (b?.name || b?.url || b?.path || '').toString().toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    });
+
+    return grouped;
+  }, [sanitizedInventory]);
   const uploadDestinations = [
     { value: 'auto', label: 'Auto — detect from file type' },
     { value: 'images', label: 'Images (general)' },
@@ -5679,6 +5739,27 @@ function MediaPoolTab({
         try { await onInventoryRefresh(); } catch {}
       }
     } finally { setBusy(false); }
+  }
+
+  function resolveUploadType(targetFolder, classification = 'other') {
+    const normalized = String(targetFolder || '').trim().toLowerCase();
+    if (!normalized || normalized === 'auto') {
+      return MEDIA_CLASS_TO_TYPE[classification] || 'other';
+    }
+
+    if (FOLDER_TO_TYPE.has(normalized)) return FOLDER_TO_TYPE.get(normalized);
+
+    if (normalized.startsWith('mediapool/')) {
+      const after = normalized.replace(/^mediapool\//, '');
+      if (FOLDER_TO_TYPE.has(after)) return FOLDER_TO_TYPE.get(after);
+      const slug = after.replace(/\s+/g, '-');
+      if (FOLDER_TO_TYPE.has(slug)) return FOLDER_TO_TYPE.get(slug);
+    }
+
+    const slugged = normalized.replace(/\s+/g, '-');
+    if (FOLDER_TO_TYPE.has(slugged)) return FOLDER_TO_TYPE.get(slugged);
+
+    return MEDIA_CLASS_TO_TYPE[classification] || 'other';
   }
 
   // Per-file usage counts retained for backwards compatibility
@@ -5738,6 +5819,7 @@ function MediaPoolTab({
     let success = 0;
     let lastUrl = '';
     const results = [];
+    let lastTypeKey = '';
     for (const entry of entries) {
       const file = entry.file;
       if (!file) {
@@ -5746,15 +5828,20 @@ function MediaPoolTab({
         continue;
       }
       // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
+      const uploaded = await uploadToRepo(file, folder, { remoteUrl: addUrl });
       if (uploaded) {
         success += 1;
         lastUrl = uploaded;
+        const classification = classifyByExt(file.name || file.type || uploaded || '');
+        lastTypeKey = resolveUploadType(folder, classification);
       }
       results.push({ entry, ok: !!uploaded, url: uploaded });
     }
-    if (lastUrl) setAddUrl(lastUrl);
-    if (success) await refreshInventory();
+    if (success) {
+      setAddUrl('');
+      await refreshInventory();
+      if (lastTypeKey) setSubTab(lastTypeKey);
+    }
     if (entries.length > 1) {
       const prefix = success === entries.length ? '✅' : '⚠️';
       setUploadStatus(`${prefix} Uploaded ${success}/${entries.length} files`);
@@ -5905,42 +5992,13 @@ function MediaPoolTab({
     await refreshInventory();
   }
 
-  // Group by type
-  const itemsByType = (inv || []).reduce((acc, it) => {
-    const guess = classifyByExt(it.url || it.path || it.name || '');
-    const rawKind = String(it.kind || it.category || it.type || guess || 'other').toLowerCase();
-    let key = rawKind;
-    if (rawKind === 'ar') key = 'ar-target';
-    if (rawKind === 'image' || rawKind === 'images') key = 'image';
-    if (rawKind === 'gif' || rawKind === 'gifs') key = 'gif';
-    if (!['audio', 'video', 'image', 'gif', 'ar-target', 'ar-overlay', 'other'].includes(key)) {
-      key = 'other';
-    }
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(it);
-    return acc;
-  }, {});
-  const baseTabs = [
-    { key:'audio', label:'Audio' },
-    { key:'video', label:'Video' },
-    { key:'image', label:'Images' },
-    { key:'gif', label:'Gif' },
-    { key:'ar-target', label:'AR Targets' },
-    { key:'ar-overlay', label:'AR Overlays' },
-  ];
-  if ((itemsByType.other || []).length) baseTabs.push({ key:'other', label:'Other' });
-  const sections = [
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'video', title:'Video (mp4/mov)', items: itemsByType.video || [] },
-    { key:'image', title:'Images (PNG/JPG/SVG)', items: itemsByType.image || [] },
-    { key:'gif', title:'GIF', items: itemsByType.gif || [] },
-    { key:'ar-target', title:'AR Targets (markers)', items: itemsByType['ar-target'] || [] },
-    { key:'ar-overlay', title:'AR Overlays (assets)', items: itemsByType['ar-overlay'] || [] },
-  ];
-  if ((itemsByType.other || []).length) {
-    sections.push({ key:'other', title:'Other (unclassified)', items: itemsByType.other || [] });
-  }
-  const active = sections.find(s => s.key === subTab) || sections[0];
+  const baseTabs = MEDIA_TYPE_DEFS.map(({ key, label }) => ({ key, label }));
+  const sections = MEDIA_TYPE_DEFS.map(({ key, title }) => ({
+    key,
+    title,
+    items: itemsByType[key] || [],
+  }));
+  const active = sections.find((s) => s.key === subTab) || sections[0];
   const availableTabKeys = baseTabs.map((tab) => tab.key);
   useEffect(() => {
     if (!availableTabKeys.includes(subTab) && availableTabKeys.length) {
@@ -5948,6 +6006,7 @@ function MediaPoolTab({
     }
   }, [availableTabKeys.join('::'), subTab]);
   const subTabs = baseTabs;
+  const inventoryCount = sanitizedInventory.length;
 
   return (
     <main style={S.wrap}>
@@ -5968,6 +6027,10 @@ function MediaPoolTab({
           >
             Upload
           </button>
+        </div>
+        <div style={{ marginTop:8, fontSize:12, color:'var(--admin-muted)' }}>
+          Host media on an external service and paste the public URL before saving. The dashboard stores metadata only,
+          keeping binary files out of Git history.
         </div>
         <div
           onDragOver={(e)=>{ e.preventDefault(); setDropActive(true); }}
@@ -6052,7 +6115,7 @@ function MediaPoolTab({
         )}
         {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
         <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
+          Inventory {busy ? '(loading…)':''}: {inventoryCount} file{inventoryCount === 1 ? '' : 's'}
         </div>
       </div>
 
@@ -6092,6 +6155,10 @@ function MediaPoolTab({
               const name = baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
               const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
+              const status = String(it.status || (url ? 'external' : 'pending')).replace(/[-_]+/g, ' ');
+              const statusColor = it.existsOnDisk
+                ? 'var(--admin-success)'
+                : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
@@ -6115,13 +6182,26 @@ function MediaPoolTab({
                   <div>
                     <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
                     <div style={{ fontSize:12, color:'var(--admin-muted)', wordBreak:'break-word' }}>{url}</div>
+                    <div style={{ fontSize:12, color: statusColor, marginTop:4 }}>Status: {status}</div>
+                    {it.notes ? (
+                      <div style={{ fontSize:11, color:'var(--admin-muted)', marginTop:4 }}>{it.notes}</div>
+                    ) : null}
                   </div>
                   <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
                     <a
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ ...S.button, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                      style={{
+                        ...S.button,
+                        textDecoration:'none',
+                        display:'inline-flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        pointerEvents: url ? 'auto' : 'none',
+                        opacity: url ? 1 : 0.5,
+                      }}
+                      aria-disabled={url ? undefined : true}
                     >
                       Open
                     </a>
