@@ -33,6 +33,16 @@ function slugify(value = '') {
     .replace(/^-+|-+$/g, '');
 }
 
+function buildMediaSlug({ folder = '', type = '', name = '' }) {
+  const typeSlug = slugify(type) || 'media';
+  const folderSlug = slugify(folder.split('/').slice(-1)[0] || '');
+  const base = slugify(String(name || '').replace(/\.[^.]+$/, '')) || 'asset';
+  const parts = [typeSlug];
+  if (folderSlug && folderSlug !== typeSlug) parts.push(folderSlug);
+  parts.push(base);
+  return parts.filter(Boolean).join('-').replace(/-+/g, '-').slice(0, 80);
+}
+
 const CATEGORY_INFO = {
   audio: {
     label: 'Audio',
@@ -155,8 +165,8 @@ function listFiles(absDir, prefix = '') {
         files.push(...listFiles(path.join(absDir, entry.name), nextPrefix));
       } else if (entry.isFile()) {
         const baseName = entry.name.toLowerCase();
-        if (baseName === '.gitkeep' || baseName === 'index.json' || baseName === '.ds_store') {
-          // Skip placeholder/metadata files so the Media Pool only surfaces real assets.
+        if (baseName === 'index.json' || baseName === '.ds_store') {
+          // Skip metadata files so the Media Pool only surfaces real assets.
           // eslint-disable-next-line no-continue
           continue;
         }
@@ -346,7 +356,16 @@ export default async function handler(req, res) {
           ? (entry.path || '')
           : path.posix.join('public', 'media', folder, entry.fileName || '').replace(/\\/g, '/');
         const meta = enrichMeta(path.posix.join(folder, entry.fileName || entry.name || ''));
-        const type = (entry.type || meta.type || classify(entry.fileName || entry.url || entry.name || '')).toLowerCase();
+        const detectedType = entry.type || entry.kind || meta.type || classify(entry.fileName || entry.url || entry.name || '');
+        const type = String(detectedType || '').toLowerCase();
+        const slug = entry.slug || buildMediaSlug({ folder, type, name: entry.fileName || entry.name || entry.url });
+        const mergedTags = new Set([
+          ...(Array.isArray(entry.tags) ? entry.tags : []),
+          ...(meta.tags || []),
+          type,
+          `folder:${slugify(folder)}`,
+        ]);
+        if (slug) mergedTags.add(`slug:${slug}`);
         let placeholderPath = entry.placeholderPath || entry.placeholder?.path || '';
         let placeholderUrl = entry.placeholderUrl || entry.placeholder?.url || '';
         let placeholder = entry.placeholder || null;
@@ -383,7 +402,7 @@ export default async function handler(req, res) {
           source: 'manifest',
           category: meta.category,
           categoryLabel: meta.categoryLabel,
-          tags: Array.from(new Set([...(meta.tags || []), ...((entry.tags || []))])),
+          tags: Array.from(mergedTags),
           kind: type,
           status: entry.status || (existsOnDisk ? 'available' : url ? 'external' : 'missing'),
           notes: entry.notes || '',
@@ -391,6 +410,7 @@ export default async function handler(req, res) {
           supabase: entry.supabase || null,
           thumbUrl,
           placeholder: placeholder,
+          slug,
         });
       });
 
@@ -408,6 +428,15 @@ export default async function handler(req, res) {
           const meta = enrichMeta(relative);
           const placeholder = resolvePlaceholder(dir, meta.type || classify(name || item.supabasePath));
           const placeholderUrl = placeholder.url;
+          const type = (meta.type || classify(name || item.supabasePath)).toLowerCase();
+          const slug = buildMediaSlug({ folder: dir, type, name });
+          const tags = new Set([
+            ...(meta.tags || []),
+            type,
+            `folder:${slugify(dir)}`,
+            item.supabasePath ? `supabase:${slugify(item.supabasePath)}` : null,
+          ].filter(Boolean));
+          if (slug) tags.add(`slug:${slug}`);
           out.push({
             id: key,
             name: name || item.supabasePath,
@@ -415,11 +444,11 @@ export default async function handler(req, res) {
             url: item.publicUrl || '',
             path: '',
             folder: dir,
-            type: (meta.type || classify(name || item.supabasePath)).toLowerCase(),
+            type,
             source: 'supabase',
             category: meta.category,
             categoryLabel: meta.categoryLabel,
-            tags: meta.tags,
+            tags: Array.from(tags),
             kind: meta.type,
             status: 'available',
             notes: 'Supabase storage object',
@@ -432,6 +461,7 @@ export default async function handler(req, res) {
             },
             thumbUrl: item.publicUrl || placeholderUrl,
             placeholder,
+            slug,
           });
         }
       } catch (error) {
@@ -466,22 +496,52 @@ export default async function handler(req, res) {
       const publicUrl = buildUrlFromPath(repoPath);
       if (publicUrl) seenKeys.add(publicUrl.toLowerCase());
       const meta = enrichMeta(path.posix.join(folder, name));
+      const isPlaceholderFile = name.toLowerCase() === '.gitkeep';
+      const normalizedMeta = isPlaceholderFile
+        ? {
+            category: 'placeholder',
+            categoryLabel: 'Placeholder',
+            type: 'placeholder',
+            tags: ['placeholder'],
+          }
+        : meta;
+      const type = (normalizedMeta.type || classify(name)).toLowerCase();
+      const slug = isPlaceholderFile
+        ? ['placeholder', slugify(folder) || 'mediapool'].filter(Boolean).join('-')
+        : buildMediaSlug({ folder, type, name });
+      const tags = new Set([
+        ...(normalizedMeta.tags || []),
+        `folder:${slugify(folder)}`,
+      ]);
+      if (!isPlaceholderFile) tags.add(type);
+      if (isPlaceholderFile) {
+        tags.add('gitkeep');
+        tags.add('keepalive');
+      }
+      if (slug) tags.add(`slug:${slug}`);
+      const placeholderInfo = isPlaceholderFile ? resolvePlaceholder(folder, type) : null;
+      const placeholderUrl = placeholderInfo?.url || '';
       out.push({
         id: key,
-        name,
+        name: isPlaceholderFile ? 'Placeholder (.gitkeep)' : name,
         fileName: name,
         url: publicUrl,
         path: repoPath,
         folder,
-        type: (meta.type || classify(name)).toLowerCase(),
+        type,
         source: 'filesystem',
-        category: meta.category,
-        categoryLabel: meta.categoryLabel,
-        tags: meta.tags,
-        kind: meta.type,
-        status: 'available',
-        notes: '',
+        category: normalizedMeta.category,
+        categoryLabel: normalizedMeta.categoryLabel,
+        tags: Array.from(tags),
+        kind: normalizedMeta.type,
+        status: isPlaceholderFile ? 'placeholder' : 'available',
+        notes: isPlaceholderFile
+          ? 'Git placeholder file — keeps this folder tracked without storing media.'
+          : '',
         existsOnDisk: true,
+        thumbUrl: placeholderUrl,
+        placeholder: placeholderInfo,
+        slug,
       });
     }
 
@@ -494,6 +554,14 @@ export default async function handler(req, res) {
         const key = `game://${relative.toLowerCase()}`;
         if (seenKeys.has(key)) continue;
         const meta = enrichMeta(relative);
+        const type = (meta.type || classify(name)).toLowerCase();
+        const slug = buildMediaSlug({ folder, type, name });
+        const tags = new Set([
+          ...(meta.tags || []),
+          type,
+          `folder:${slugify(folder)}`,
+        ]);
+        if (slug) tags.add(`slug:${slug}`);
         out.push({
           id: key,
           name,
@@ -501,15 +569,16 @@ export default async function handler(req, res) {
           url: `/media/${relative}`,
           path: '',
           folder,
-          type: (meta.type || classify(name)).toLowerCase(),
+          type,
           source: 'game',
           category: meta.category,
           categoryLabel: meta.categoryLabel,
-          tags: meta.tags,
+          tags: Array.from(tags),
           kind: meta.type,
           status: 'game-fallback',
           notes: 'Served from game bundle',
           existsOnDisk: false,
+          slug,
         });
         seenKeys.add(key);
       }

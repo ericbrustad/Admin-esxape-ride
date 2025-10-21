@@ -89,6 +89,7 @@ const ADMIN_META_INITIAL_STATE = {
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
+  if (/\.gitkeep(\?|#|$)/.test(s)) return 'placeholder';
   if (EXTS.gif.test(s)) return 'gif';
   if (EXTS.image.test(s)) return 'image';
   if (EXTS.video.test(s)) return 'video';
@@ -104,6 +105,7 @@ const MEDIA_TYPE_DEFS = [
   { key: 'gif', label: 'GIF', title: 'GIF' },
   { key: 'ar-target', label: 'AR Targets', title: 'AR Targets (markers)' },
   { key: 'ar-overlay', label: 'AR Overlays', title: 'AR Overlays (assets)' },
+  { key: 'placeholder', label: 'Placeholders', title: 'Placeholder keep-alive markers (.gitkeep)' },
   { key: 'other', label: 'Other', title: 'Other (unclassified)' },
 ];
 
@@ -113,6 +115,7 @@ const MEDIA_CLASS_TO_TYPE = {
   image: 'image',
   gif: 'gif',
   ar: 'ar-target',
+  placeholder: 'placeholder',
   other: 'other',
 };
 
@@ -222,21 +225,44 @@ function formatLocalDateTime(value) {
 }
 
 
-async function deleteMediaPath(repoPath) {
+async function deleteMediaEntry(entry) {
+  const payload = (() => {
+    if (!entry) return {};
+    if (typeof entry === 'string') return { path: entry };
+    const body = {};
+    if (entry.path) body.path = entry.path;
+    if (entry.id) body.id = entry.id;
+    if (entry.supabase && entry.supabase.path) {
+      body.supabase = {
+        bucket: entry.supabase.bucket,
+        path: entry.supabase.path,
+      };
+    }
+    if (!body.path && entry.url) {
+      const maybePath = pathFromUrl(entry.url);
+      if (maybePath) body.path = maybePath;
+    }
+    return body;
+  })();
+
+  if (!payload.path && !(payload.supabase && payload.supabase.path)) {
+    return false;
+  }
+
   const endpoints = [
+    '/api/media/delete',
     '/api/delete-media',
     '/api/delete',
-    '/api/media/delete',
     '/api/repo-delete',
     '/api/github/delete',
   ];
   for (const ep of endpoints) {
     try {
       const r = await fetch(ep, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        credentials:'include',
-        body: JSON.stringify({ path: repoPath })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
       if (r.ok) return true;
     } catch {}
@@ -617,7 +643,6 @@ function normalizeGameMetadata(cfg, slug = '') {
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
-  game.deployEnabled = game.deployEnabled !== false;
   base.game = game;
   return base;
 }
@@ -647,7 +672,7 @@ export default function Admin() {
   const [newDurationMin, setNewDurationMin] = useState(0);
   const [newAlertMin, setNewAlertMin] = useState(10);
   const [newGameSlug, setNewGameSlug] = useState('');
-  const [newSlugTouched, setNewSlugTouched] = useState(false);
+  const [newGameStatusTone, setNewGameStatusTone] = useState('info');
   const [newShortDesc, setNewShortDesc] = useState('');
   const [newLongDesc, setNewLongDesc] = useState('');
   const [newCoverPreview, setNewCoverPreview] = useState('');
@@ -659,6 +684,12 @@ export default function Admin() {
   const [newGameBusy, setNewGameBusy] = useState(false);
   const [newCoverDropActive, setNewCoverDropActive] = useState(false);
   const newGameCoverInputRef = useRef(null);
+  const newGameSlugSeed = useRef('');
+
+  const [suite, setSuite] = useState(null);
+  const [config, setConfig] = useState(null);
+  const [status, setStatusInternal] = useState('');
+  const [statusLog, setStatusLog] = useState([]);
 
   const [missionActionFlash, setMissionActionFlash] = useState(false);
   const [deviceActionFlash, setDeviceActionFlash] = useState(false);
@@ -678,6 +709,18 @@ export default function Admin() {
     });
   }, []);
 
+  function updateNewGameStatus(message, tone = 'info') {
+    setNewGameStatus(message);
+    setNewGameStatusTone(tone);
+  }
+
+  function ensureNewGameSlugSeed() {
+    if (!newGameSlugSeed.current) {
+      newGameSlugSeed.current = Math.random().toString(36).slice(2, 8);
+    }
+    return newGameSlugSeed.current;
+  }
+
   const setStatus = useCallback((message) => {
     if (typeof message === 'function') {
       setStatusInternal((prev) => {
@@ -696,15 +739,6 @@ export default function Admin() {
     });
   }, [logConversation]);
 
-  const [protectionPrompt, setProtectionPrompt] = useState({
-    open: false,
-    mode: 'enable',
-    requireConfirm: false,
-    password: '',
-    confirm: '',
-    error: '',
-  });
-
   function resetNewGameForm() {
     setNewTitle('');
     setNewType('Mystery');
@@ -712,7 +746,7 @@ export default function Admin() {
     setNewDurationMin(0);
     setNewAlertMin(10);
     setNewGameSlug('');
-    setNewSlugTouched(false);
+    newGameSlugSeed.current = '';
     setNewShortDesc('');
     setNewLongDesc('');
     setNewCoverPreview('');
@@ -720,7 +754,7 @@ export default function Admin() {
     setNewCoverSelectedUrl('');
     setNewCoverOptions([]);
     setNewCoverLookupLoading(false);
-    setNewGameStatus('');
+    updateNewGameStatus('', 'info');
     setNewGameBusy(false);
     setNewCoverDropActive(false);
     if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
@@ -728,18 +762,18 @@ export default function Admin() {
 
   const openNewGameModal = useCallback(() => {
     logConversation('You', 'Opened “Create New Game”');
+    const message = gameEnabled
+      ? '🛠️ Draft games are editable before you publish.'
+      : '⚠️ Game project is disabled. New titles may not sync.';
+    updateNewGameStatus(message, gameEnabled ? 'info' : 'danger');
+    logConversation('GPT', message);
     setShowNewGame(true);
-  }, [logConversation]);
+  }, [gameEnabled, logConversation]);
 
   function handleNewGameModalClose() {
     logConversation('You', 'Closed “Create New Game” dialog');
     setShowNewGame(false);
     resetNewGameForm();
-  }
-
-  function handleNewSlugInput(value) {
-    setNewSlugTouched(true);
-    setNewGameSlug(slugifyTitle(value));
   }
 
   function clearNewGameCover() {
@@ -753,13 +787,13 @@ export default function Admin() {
     const safeName = file.name || 'cover';
     const looksLikeImage = (file.type && file.type.startsWith('image/')) || EXTS.image.test(file.name || '');
     if (!looksLikeImage) {
-      setNewGameStatus(`❌ ${safeName} must be an image file.`);
+      updateNewGameStatus(`❌ ${safeName} must be an image file.`, 'danger');
       return;
     }
     const sizeBytes = file.size || 0;
     if (sizeBytes > COVER_SIZE_LIMIT_BYTES) {
       const sizeKb = Math.max(1, Math.round(sizeBytes / 1024));
-      setNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB.`);
+      updateNewGameStatus(`❌ ${safeName} is ${sizeKb} KB — please choose an image under 5 MB.`, 'danger');
       return;
     }
     try {
@@ -769,9 +803,9 @@ export default function Admin() {
       setNewCoverPreview(previewUrl);
       setNewCoverFile(file);
       setNewCoverSelectedUrl('');
-      setNewGameStatus('✅ Cover ready — it will upload when you create the game.');
+      updateNewGameStatus('✅ Cover ready — it will upload when you create the game.', 'success');
     } catch (err) {
-      setNewGameStatus(`❌ Unable to preview ${safeName}`);
+      updateNewGameStatus(`❌ Unable to preview ${safeName}`, 'danger');
     }
   }
 
@@ -782,10 +816,10 @@ export default function Admin() {
       const filtered = (items || []).filter((item) => ['image', 'gif'].includes(item.type));
       setNewCoverOptions(filtered);
       if (!filtered.length) {
-        setNewGameStatus('No reusable covers found yet. Try uploading one.');
+        updateNewGameStatus('No reusable covers found yet. Try uploading one.', 'info');
       }
     } catch (err) {
-      setNewGameStatus('❌ Unable to load media pool covers.');
+      updateNewGameStatus('❌ Unable to load media pool covers.', 'danger');
       setNewCoverOptions([]);
     } finally {
       setNewCoverLookupLoading(false);
@@ -798,33 +832,24 @@ export default function Admin() {
     setNewCoverSelectedUrl(url);
     setNewCoverPreview(direct);
     setNewCoverFile(null);
-    setNewGameStatus('✅ Using cover from the media pool.');
+    updateNewGameStatus('✅ Using cover from the media pool.', 'success');
   }
 
   async function handleCreateNewGame() {
     if (newGameBusy) return;
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
-    if (!deployGameEnabled) {
-      setNewGameStatus('🔴 Turn on Publishing to create a game.');
-      logConversation('GPT', 'Turn on Publishing to create a game.');
-      return;
-    }
     if (!gameEnabled) {
-      setNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…');
+      updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
       logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
     }
     if (!title) {
-      setNewGameStatus('❌ Title is required.');
+      updateNewGameStatus('❌ Title is required.', 'danger');
       return;
     }
-    const slugInput = (newGameSlug || slugifyTitle(title) || 'game').trim();
-    if (!slugInput) {
-      setNewGameStatus('❌ Please provide a slug for this game.');
-      return;
-    }
+    const slugInput = (newGameSlug || `${slugifyTitle(title) || 'escape-ride'}-${ensureNewGameSlugSeed()}`).trim().slice(0, 48);
     setNewGameBusy(true);
-    setNewGameStatus('Creating game…');
+    updateNewGameStatus('Creating game…', 'info');
     let coverPath = newCoverSelectedUrl;
     try {
       if (!coverPath && newCoverFile) {
@@ -853,19 +878,21 @@ export default function Admin() {
       await reloadGamesList();
       setActiveSlug(data.slug || slugInput || 'default');
       setStatus(`✅ Created game “${title}”`);
-      setNewGameStatus('✅ Game created! Loading…');
+      updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
     } catch (err) {
-      setNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`);
+      updateNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`, 'danger');
     } finally {
       setNewGameBusy(false);
     }
   }
 
   useEffect(() => {
-    if (newSlugTouched) return;
-    setNewGameSlug(slugifyTitle(newTitle));
-  }, [newTitle, newSlugTouched]);
+    const base = slugifyTitle(newTitle) || 'escape-ride';
+    const suffix = ensureNewGameSlugSeed();
+    const combined = `${base}-${suffix}`.replace(/-+/g, '-');
+    setNewGameSlug(combined.slice(0, 48));
+  }, [newTitle]);
 
   useEffect(() => {
     return () => {
@@ -895,11 +922,6 @@ export default function Admin() {
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
-
-  const [suite, setSuite]   = useState(null);
-  const [config, setConfig] = useState(null);
-  const [status, setStatusInternal] = useState('');
-  const [statusLog, setStatusLog] = useState([]);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -996,36 +1018,6 @@ export default function Admin() {
   }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
-  const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null, passwordSet: false });
-  const [protectionError, setProtectionError] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/admin-protection?mode=ui', { cache: 'no-store', credentials: 'include' });
-        const data = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (res.ok) {
-          setProtectionState({
-            enabled: !!data.protected,
-            loading: false,
-            saving: false,
-            updatedAt: data.updatedAt || null,
-            passwordSet: !!data.passwordSet,
-          });
-          setProtectionError('');
-        } else {
-          throw new Error(data?.error || 'Failed to load protection status');
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setProtectionState(prev => ({ ...prev, loading: false }));
-        setProtectionError('Unable to read protection status');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
 
   useEffect(() => {
     if (!config) {
@@ -1145,7 +1137,6 @@ export default function Admin() {
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   // Combined Save & Publish
-  const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
   // Pin size (selected)
@@ -1173,13 +1164,10 @@ export default function Admin() {
 
   useEffect(() => {
     try {
-      const savedDelay = localStorage.getItem('deployDelaySec');
-      if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
       const savedSel = localStorage.getItem('selectedPinSize');
       if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
     } catch {}
   }, []);
-  useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
   useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
 
   const gameBase =
@@ -1207,40 +1195,66 @@ export default function Admin() {
     (async () => {
       try {
         setStatus('Loading…');
-        const isDefault = !activeSlug || activeSlug === 'default';
+        const slugParam = !activeSlug ? 'default' : activeSlug;
+        const supaUrl = `/api/load${qs({ slug: slugParam, channel: 'draft' })}`;
 
-        const missionUrls = isDefault
-          ? ['/missions.json']
-          : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+        const supaPayload = await fetchJsonSafe(supaUrl, null);
 
-        const configUrls = isDefault
-          ? ['/api/config']
-          : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+        let missionsSource = null;
+        let configSource = null;
+        let fallbackUsed = false;
 
-        const m  = await fetchFirstJson(missionUrls, { version:'0.0.0', missions:[] });
-        const c0 = await fetchFirstJson(configUrls, defaultConfig());
+        if (supaPayload && supaPayload.ok) {
+          missionsSource = {
+            version: supaPayload.game?.config?.version
+              || supaPayload.game?.version
+              || supaPayload.config?.version
+              || '0.0.0',
+            missions: Array.isArray(supaPayload.missions) ? supaPayload.missions : [],
+          };
+          configSource = supaPayload.config || supaPayload.game?.config || {};
+        }
+
+        if (!missionsSource || !configSource) {
+          fallbackUsed = true;
+          const isDefault = !activeSlug || activeSlug === 'default';
+          const missionUrls = isDefault
+            ? ['/missions.json']
+            : [`/games/${encodeURIComponent(activeSlug)}/missions.json`, `/missions.json`];
+          const configUrls = isDefault
+            ? ['/api/config']
+            : [`/api/config${qs({ slug: activeSlug })}`, '/api/config'];
+          missionsSource = await fetchFirstJson(missionUrls, { version: '0.0.0', missions: [] });
+          configSource = await fetchFirstJson(configUrls, defaultConfig());
+        }
 
         const dc = defaultConfig();
+        const missionsList = Array.isArray(missionsSource?.missions) ? missionsSource.missions : [];
         const normalized = {
-          ...m,
-          missions: (m.missions || []).map(x => ({
+          ...missionsSource,
+          missions: missionsList.map((x) => ({
             ...x,
             appearanceOverrideEnabled: !!x.appearanceOverrideEnabled,
             appearance: { ...defaultAppearance(), ...(x.appearance || {}) },
-            correct: x.correct || { mode:'none' },
-            wrong:   x.wrong   || { mode:'none' },
+            correct: x.correct || { mode: 'none' },
+            wrong: x.wrong || { mode: 'none' },
             showContinue: x.showContinue !== false,
           })),
         };
 
+        const c0 = { ...configSource };
         let merged = {
-          ...dc, ...c0,
+          ...dc,
+          ...c0,
           game: { ...dc.game, ...(c0.game || {}) },
           splash: { ...dc.splash, ...(c0.splash || {}) },
           timer: { ...dc.timer, ...(c0.timer || {}) },
-          devices: (c0.devices && Array.isArray(c0.devices)) ? c0.devices
-                   : (c0.powerups && Array.isArray(c0.powerups)) ? c0.powerups : [],
-          media: { rewardsPool:[], penaltiesPool:[], ...(c0.media || {}) },
+          devices: Array.isArray(c0.devices)
+            ? c0.devices
+            : Array.isArray(c0.powerups)
+              ? c0.powerups
+              : [],
+          media: { rewardsPool: [], penaltiesPool: [], ...(c0.media || {}) },
           icons: { ...DEFAULT_ICONS, ...(c0.icons || {}) },
           appearance: {
             ...defaultAppearance(),
@@ -1262,9 +1276,12 @@ export default function Admin() {
 
         setSuite(normalized);
         setConfig(merged);
-        setSelected(null); setEditing(null); setDirty(false);
-        setSelectedDevIdx(null); setSelectedMissionIdx(null);
-        setStatus('');
+        setSelected(null);
+        setEditing(null);
+        setDirty(false);
+        setSelectedDevIdx(null);
+        setSelectedMissionIdx(null);
+        setStatus(fallbackUsed ? 'Loaded (legacy fallback)' : '');
       } catch (e) {
         setStatus('Load failed: ' + (e?.message || e));
       }
@@ -1280,7 +1297,6 @@ export default function Admin() {
         type: STARFIELD_DEFAULTS.type,
         tags: [...STARFIELD_DEFAULTS.tags],
         coverImage: STARFIELD_DEFAULTS.coverImage,
-        deployEnabled: true,
       },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
@@ -1329,6 +1345,24 @@ export default function Admin() {
     const preparedConfig = normalizeGameMetadata(config, slugTag);
     if (preparedConfig !== config) setConfig(preparedConfig);
 
+    const supaPayload = {
+      slug,
+      config: preparedConfig,
+      missions: suite?.missions || [],
+      devices: getDevices(),
+    };
+
+    const attemptSupabase = async () => {
+      const response = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(supaPayload),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'supabase save failed');
+    };
+
     const bundleUrl = isDefault ? '/api/save-bundle' : `/api/save-bundle${qs({ slug })}`;
     const attemptBundle = async () => {
       const response = await fetch(bundleUrl, {
@@ -1366,76 +1400,26 @@ export default function Admin() {
     };
 
     try {
-      await attemptBundle();
+      await attemptSupabase();
       setStatus('✅ Saved');
       return true;
-    } catch (bundleError) {
+    } catch (supaError) {
+      console.warn('Supabase save failed, attempting fallback', supaError);
       try {
-        setStatus('Bundle save unavailable — retrying legacy save…');
-        await attemptLegacy();
+        await attemptBundle();
         setStatus('✅ Saved');
         return true;
-      } catch (legacyError) {
-        console.error('Save failed', { bundleError, legacyError });
-        setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError));
-        return false;
-      }
-    }
-  }
-
-  async function publishWithSlug(slug, channel='published') {
-    if (isDefaultSlug(slug)) {
-      try {
-        const res = await fetch('/api/publish', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          credentials:'include',
-          body: JSON.stringify({ slug: 'root' }),
-        });
-        const txt = await res.text();
-        let data = {};
-        try { data = JSON.parse(txt); } catch {}
-        if (!res.ok || data?.ok === false) {
-          const err = data?.error || txt || 'publish failed';
-          throw new Error(err);
+      } catch (bundleError) {
+        try {
+          setStatus('Bundle save unavailable — retrying legacy save…');
+          await attemptLegacy();
+          setStatus('✅ Saved');
+          return true;
+        } catch (legacyError) {
+          console.error('Save failed', { supaError, bundleError, legacyError });
+          setStatus('❌ Save failed: ' + (legacyError?.message || legacyError || bundleError || supaError));
+          return false;
         }
-        setStatus('✅ Published');
-        return true;
-      } catch (e) {
-        setStatus('❌ Publish failed: ' + (e?.message || e));
-        return false;
-      }
-    }
-
-    const first = `/api/game${qs({ slug, channel })}`;
-    const fallback = `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
-
-    try {
-      const res = await fetch(first, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-        body: JSON.stringify({ action:'publish' })
-      });
-      const txt = await res.text();
-      let data = {};
-      try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) throw new Error('try fallback');
-      setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
-      return true;
-    } catch (e) {
-      try {
-        const res2 = await fetch(fallback, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ action:'publish' })
-        });
-        const txt2 = await res2.text();
-        let data2 = {};
-        try { data2 = JSON.parse(txt2); } catch {}
-        if (!res2.ok) throw new Error(txt2||'publish failed');
-        setStatus(`✅ Published${data2?.version ? ` v${data2.version}` : ''}`);
-        return true;
-      } catch (e2) {
-        setStatus('❌ Publish failed: ' + (e2?.message || e2));
-        return false;
       }
     }
   }
@@ -1453,24 +1437,15 @@ export default function Admin() {
     logConversation('You', 'Requested Save & Publish');
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
-    const shouldPublish = gameEnabled && config?.game?.deployEnabled === true;
     setSavePubBusy(true);
-    setStatus(shouldPublish ? 'Saving & publishing…' : 'Saving…');
+    setStatus('Saving…');
 
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
 
-    if (shouldPublish && deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
-
-    if (shouldPublish) {
-      const published = await publishWithSlug(slug, 'published');
-      if (!published) { setSavePubBusy(false); return; }
-    } else {
-      setStatus('✅ Saved (game deploy disabled)');
-    }
-
+    setStatus('✅ Saved');
     await reloadGamesList();
-    setPreviewNonce(n => n + 1);
+    setPreviewNonce((n) => n + 1);
     setSavePubBusy(false);
   }
 
@@ -1932,69 +1907,6 @@ export default function Admin() {
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
-  function openProtectionPrompt() {
-    const target = !protectionState.enabled;
-    setProtectionError('');
-    setProtectionPrompt({
-      open: true,
-      mode: target ? 'enable' : 'disable',
-      requireConfirm: target && !protectionState.passwordSet,
-      password: '',
-      confirm: '',
-      error: '',
-    });
-  }
-
-  function closeProtectionPrompt() {
-    setProtectionPrompt(prev => ({ ...prev, open: false, password: '', confirm: '', error: '' }));
-    setProtectionState(prev => ({ ...prev, saving: false }));
-  }
-
-  async function submitProtectionPrompt() {
-    const { mode, password, confirm, requireConfirm } = protectionPrompt;
-    if (!password.trim()) {
-      setProtectionPrompt(prev => ({ ...prev, error: 'Password required' }));
-      return;
-    }
-    if (requireConfirm && password !== confirm) {
-      setProtectionPrompt(prev => ({ ...prev, error: 'Passwords must match to enable protection' }));
-      return;
-    }
-    setProtectionError('');
-    setProtectionState(prev => ({ ...prev, saving: true }));
-    setProtectionPrompt(prev => ({ ...prev, error: '' }));
-    try {
-      const res = await fetch('/api/admin-protection', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          protected: mode === 'enable',
-          password,
-          ...(requireConfirm ? { confirmPassword: confirm } : {}),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || res.statusText || 'Toggle failed');
-      }
-      setProtectionState({
-        enabled: !!data.protected,
-        loading: false,
-        saving: false,
-        updatedAt: data.updatedAt || null,
-        passwordSet: data.passwordSet !== false,
-      });
-      setStatus(`✅ Admin password protection ${data.protected ? 'enabled' : 'disabled'}`);
-      setProtectionPrompt({ open: false, mode: 'enable', requireConfirm: false, password: '', confirm: '', error: '' });
-    } catch (err) {
-      setProtectionState(prev => ({ ...prev, saving: false }));
-      const msg = err?.message || 'Toggle failed';
-      setProtectionPrompt(prev => ({ ...prev, error: msg }));
-      setStatus('❌ Failed to toggle admin protection');
-    }
-  }
-
   // Missions selection operations (Missions tab only)
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
@@ -2297,20 +2209,6 @@ export default function Admin() {
       ? 'Custom (manual edits)'
       : (APPEARANCE_SKIN_MAP.get(detectedAppearanceSkin)?.label || 'Custom');
   const interfaceTone = normalizeTone(viewConfig.appearanceTone);
-  const PROTECTION_COLOR_SAFE = '#16f78f';
-  const PROTECTION_COLOR_ALERT = '#ff4d57';
-  const protectionIndicatorColor = protectionState.enabled ? PROTECTION_COLOR_SAFE : PROTECTION_COLOR_ALERT;
-  const protectionIndicatorShadow = protectionState.enabled
-    ? '0 0 22px rgba(22, 247, 143, 0.65)'
-    : '0 0 18px rgba(255, 77, 87, 0.75)';
-  const protectionIndicatorLabel = protectionState.loading
-    ? 'Checking…'
-    : protectionState.enabled
-      ? 'Protection Enabled'
-      : 'Protection Disabled';
-  const protectionToggleLabel = protectionState.enabled ? 'Disable Protection' : 'Enable Protection';
-  const showProtectionIndicator = tab === 'settings';
-
   const selectedPinSizeDisabled = (selectedMissionIdx==null && selectedDevIdx==null);
 
   function updateGameTagsDraft(value) {
@@ -2320,17 +2218,6 @@ export default function Admin() {
       if (!prev) return prev;
       return normalizeGameMetadata({ ...prev, game: { ...prev.game, tags } }, slugForMeta);
     });
-  }
-
-  function setDeployEnabled(nextEnabled) {
-    setConfig(prev => {
-      if (!prev) return prev;
-      return { ...prev, game: { ...(prev.game || {}), deployEnabled: nextEnabled } };
-    });
-    setDirty(true);
-    setStatus(nextEnabled
-      ? 'Game deployment enabled — Save & Publish will deploy the game build.'
-      : 'Game deployment disabled — Save & Publish updates admin data only.');
   }
 
   async function handleCoverFile(file) {
@@ -2463,7 +2350,6 @@ export default function Admin() {
   const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
   const hasCoverForSave = Boolean((viewConfig?.game?.coverImage || '').trim() || coverUploadPreview);
-  const deployGameEnabled = viewConfig?.game?.deployEnabled !== false;
   const headerGameTitle = (viewConfig?.game?.title || '').trim() || STARFIELD_DEFAULTS.title;
   const headerCoverThumb = viewConfig?.game?.coverImage
     ? toDirectMediaURL(viewConfig.game.coverImage)
@@ -2512,72 +2398,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitLabel && (
-            <span style={S.metaCommitBlock}>
-              <strong>Commit:</strong>{' '}
-              {metaCommitUrl ? (
-                <a
-                  href={metaCommitUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={S.metaCommitLink}
-                  title={`Open commit ${metaCommitLabel}`}
-                >
-                  <span style={S.metaBadge}>#{metaCommitShort || metaCommitLabel}</span>
-                </a>
-              ) : (
-                <span style={S.metaBadge} title={`Commit ${metaCommitLabel}`}>
-                  #{metaCommitShort || metaCommitLabel}
-                </span>
-              )}
-              {metaCommitLabel.length > 7 && (
-                <span style={S.metaCommitCode}>{metaCommitLabel}</span>
-              )}
-            </span>
-          )}
-          {metaOwnerRepo && (
-            <span>
-              <strong>Repo:</strong>{' '}
-              {metaRepoUrl ? (
-                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaOwnerRepo}
-                </a>
-              ) : (
-                <span style={S.metaMuted}>{metaOwnerRepo}</span>
-              )}
-            </span>
-          )}
-          {metaDeploymentState && (
-            <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
-            </span>
-          )}
-          {metaVercelUrl && (
-            <span>
-              <strong>Vercel:</strong>{' '}
-              <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                {metaVercelLabel || metaVercelUrl}
-              </a>
-            </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Updated:</strong> {metaTimestampLabel}</span>
-          )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
-      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2622,7 +2442,7 @@ export default function Admin() {
                 style={{ ...S.button, ...S.headerNewGameButton }}
               >
                 <span style={S.newGameLabel}>
-                  {!deployGameEnabled && <span aria-hidden="true" style={S.headerNewGameLight} />}
+                  <span aria-hidden="true" style={S.headerNewGameLight} />
                   <span>+ New Game</span>
                 </span>
               </button>
@@ -2644,77 +2464,13 @@ export default function Admin() {
                 <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
                   <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
                   {games.map(g=>(
-                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                    <option key={g.slug} value={g.slug}>{g.title || g.slug}{g.mode ? ` — ${g.mode}` : ''}</option>
                   ))}
                 </select>
-                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  <input
-                    type="checkbox"
-                    checked={deployGameEnabled}
-                    onChange={(e)=>setDeployEnabled(e.target.checked)}
-                  />
-                  Deploy game build
-                </label>
-                <label style={{ color:'var(--admin-muted)', fontSize:12, display:'flex', alignItems:'center', gap:6 }}>
-                  Deploy delay (sec):
-                  <input
-                    type="number" min={0} max={120}
-                    value={deployDelaySec}
-                    onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
-                    style={{ ...S.input, width:90, opacity: deployGameEnabled ? 1 : 0.45 }}
-                    disabled={!deployGameEnabled}
-                  />
-                </label>
               </div>
             )}
           </div>
 
-          {(showProtectionIndicator || tab === 'settings') && (
-            <div style={{ display:'flex', gap:16, justifyContent:'space-between', alignItems:'stretch', flexWrap:'wrap', marginBottom:16 }}>
-              <div style={{ flex:'1 1 520px', minWidth:280, display:'flex', flexDirection:'column', gap:12 }}>
-                {showProtectionIndicator && (
-                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                    <div
-                      style={{
-                        display:'flex',
-                        alignItems:'center',
-                        gap:10,
-                        padding:'8px 16px',
-                        borderRadius:999,
-                        border:`1px solid ${protectionIndicatorColor}`,
-                        background:'var(--appearance-panel-bg, var(--admin-panel-bg))',
-                        color: protectionIndicatorColor,
-                        fontWeight:700,
-                        letterSpacing:1,
-                        textTransform:'uppercase',
-                        boxShadow: protectionIndicatorShadow,
-                      }}
-                    >
-                      <span style={{ display:'inline-block', width:16, height:16, borderRadius:'50%', background:protectionIndicatorColor, boxShadow: protectionIndicatorShadow }} />
-                      {protectionIndicatorLabel}
-                    </div>
-                    <button
-                      onClick={openProtectionPrompt}
-                      disabled={protectionState.saving || protectionState.loading}
-                      style={{
-                        ...S.button,
-                        ...(protectionState.enabled ? S.buttonDanger : S.buttonSuccess),
-                        minWidth: 180,
-                        opacity: (protectionState.saving || protectionState.loading) ? 0.7 : 1,
-                      }}
-                    >
-                      {protectionState.saving ? 'Updating…' : protectionToggleLabel}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {showProtectionIndicator && protectionError && (
-            <div style={{ color: PROTECTION_COLOR_ALERT, fontSize: 12, marginBottom: 12 }}>
-              {protectionError}
-            </div>
-          )}
         </div>
       </header>
 
@@ -3730,19 +3486,6 @@ export default function Admin() {
                 The current slug and <code>default-game</code> are enforced automatically.
               </div>
             </Field>
-            <Field label="Game Deployment">
-              <label style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  type="checkbox"
-                  checked={deployGameEnabled}
-                  onChange={(e)=>setDeployEnabled(e.target.checked)}
-                />
-                Enable publishing to the live game build
-              </label>
-              <div style={S.noteText}>
-                When disabled, Save & Publish only updates the admin data and skips deploying a game bundle.
-              </div>
-            </Field>
             <Field label="Stripe Splash Page">
               <label style={{ display:'flex', gap:8, alignItems:'center' }}>
                 <input type="checkbox" checked={config.splash.enabled}
@@ -3952,76 +3695,6 @@ export default function Admin() {
             </div>
           </div>
 
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
-            <div style={S.metaFooterGrid}>
-              <div>
-                <div style={S.metaFooterLabel}>Repository</div>
-                {metaRepoUrl ? (
-                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaOwnerRepo || 'unknown'}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>{metaOwnerRepo || 'unknown'}</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Branch</div>
-                <span style={S.metaFooterValue}>{metaBranchLabel}</span>
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Commit</div>
-                {metaCommitLabel ? (
-                  metaCommitUrl ? (
-                    <a
-                      href={metaCommitUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={S.metaFooterLink}
-                      title={`Open commit ${metaCommitLabel}`}
-                    >
-                      #{metaCommitShort || metaCommitLabel}
-                    </a>
-                  ) : (
-                    <span style={S.metaFooterValue}>#{metaCommitShort || metaCommitLabel}</span>
-                  )
-                ) : (
-                  <span style={S.metaFooterValue}>—</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Deployment</div>
-                {metaDeploymentUrl ? (
-                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>{metaDeploymentState || '—'}</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Vercel Project</div>
-                {metaVercelUrl ? (
-                  <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaVercelLabel || metaVercelUrl.replace(/^https?:\/\//, '')}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>—</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Snapshot Time</div>
-                <div style={S.metaFooterValue}>
-                  <div style={S.metaFooterTimeLine}>Fetched: {metaTimestampLabel || '—'}</div>
-                  <div style={S.metaFooterTimeLine}>Rendered: {metaNowLabel || '—'}</div>
-                </div>
-              </div>
-            </div>
-            <div style={S.metaFooterNote}>
-              Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
-            </div>
-          </div>
-
           {adminMeta.error && (
             <div style={{ ...S.card, marginTop:16, ...S.metaErrorCard }}>
               <div style={{ ...S.metaBannerError, margin:0 }}>{adminMeta.error}</div>
@@ -4029,6 +3702,7 @@ export default function Admin() {
           )}
 
           <footer style={S.settingsFooter}>
+            <div style={S.settingsFooterHeading}>Repository Snapshot</div>
             <div style={S.settingsFooterRow}>
               <span style={S.settingsFooterItem}>
                 <strong>Repo:</strong>{' '}
@@ -4091,6 +3765,9 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
@@ -4207,82 +3884,6 @@ export default function Admin() {
         </main>
       )}
 
-      {protectionPrompt.open && (
-        <div style={{ ...S.modalBackdrop, zIndex: 4200 }}>
-          <div style={{ ...S.card, ...S.modalCard }}>
-            <div style={S.modalTopBar}>
-              <button style={S.cancelGlowButton} onClick={closeProtectionPrompt}>Cancel & Close</button>
-              <div style={S.modalTitle}>
-                {protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection'}
-              </div>
-              <button
-                style={S.modalCloseButton}
-                onClick={closeProtectionPrompt}
-                aria-label="Close protection dialog"
-              >
-                ×
-              </button>
-            </div>
-            <form
-              style={S.modalContent}
-              onSubmit={(event) => {
-                event.preventDefault();
-                submitProtectionPrompt();
-              }}
-            >
-              <div style={S.noteText}>
-                {protectionPrompt.mode === 'enable'
-                  ? 'Set a password to require authentication before anyone enters the Admin Control Deck.'
-                  : 'Confirm the current password to disable the lock and return to open access.'}
-              </div>
-              <Field label="Password">
-                <input
-                  type="password"
-                  style={S.input}
-                  value={protectionPrompt.password}
-                  onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, password: e.target.value }))}
-                  placeholder="Enter password"
-                  autoFocus
-                />
-              </Field>
-              {protectionPrompt.requireConfirm && (
-                <Field label="Confirm Password">
-                  <input
-                    type="password"
-                    style={S.input}
-                    value={protectionPrompt.confirm}
-                    onChange={(e)=>setProtectionPrompt((prev)=>({ ...prev, confirm: e.target.value }))}
-                    placeholder="Re-enter password"
-                  />
-                </Field>
-              )}
-              {protectionPrompt.error && (
-                <div style={{ ...S.modalStatus, color: PROTECTION_COLOR_ALERT }}>
-                  {protectionPrompt.error}
-                </div>
-              )}
-              <div style={{ display:'flex', justifyContent:'flex-end', gap:12 }}>
-                <button
-                  type="submit"
-                  style={{
-                    ...S.button,
-                    ...(protectionPrompt.mode === 'enable' ? S.buttonSuccess : S.buttonDanger),
-                    minWidth: 220,
-                    opacity: protectionState.saving ? 0.7 : 1,
-                    cursor: protectionState.saving ? 'wait' : 'pointer',
-                  }}
-                  disabled={protectionState.saving}
-                >
-                  {protectionState.saving
-                    ? 'Saving…'
-                    : (protectionPrompt.mode === 'enable' ? 'Enable Protection' : 'Disable Protection')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* New Game modal */}
       {showNewGame && (
         <div style={S.modalBackdrop}>
@@ -4291,12 +3892,6 @@ export default function Admin() {
               <button style={S.cancelGlowButton} onClick={handleNewGameModalClose}>Cancel & Close</button>
               <div style={S.modalTitleStack}>
                 <div style={S.modalTitle}>Create New Game</div>
-                {!deployGameEnabled && (
-                  <div style={S.modalPublishWarning}>
-                    <span aria-hidden="true" style={S.modalPublishLight} />
-                    <span>Turn on Publishing to create a game</span>
-                  </div>
-                )}
               </div>
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
@@ -4314,15 +3909,7 @@ export default function Admin() {
                   placeholder="Starship Escape"
                 />
                 <div style={S.noteText}>This name appears wherever the game is listed.</div>
-              </Field>
-              <Field label="Slug (folder name)">
-                <input
-                  style={S.input}
-                  value={newGameSlug}
-                  onChange={(e)=>handleNewSlugInput(e.target.value)}
-                  placeholder="starship-escape"
-                />
-                <div style={S.noteText}>Stored at <code>/public/games/[slug]</code> alongside missions and config.</div>
+                <div style={S.noteText}>A unique slug is generated automatically for storage and Supabase lookups.</div>
               </Field>
               <Field label="Game Type">
                 <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
@@ -4445,16 +4032,28 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-              {newGameStatus && <div style={S.modalStatus}>{newGameStatus}</div>}
+              {newGameStatus && (
+                <div
+                  style={{
+                    ...S.modalStatus,
+                    ...(newGameStatusTone === 'success'
+                      ? S.modalStatusSuccess
+                      : newGameStatusTone === 'danger'
+                        ? S.modalStatusDanger
+                        : S.modalStatusInfo),
+                  }}
+                >
+                  {newGameStatus}
+                </div>
+              )}
               <div style={{ display:'flex', justifyContent:'flex-end', gap:12, flexWrap:'wrap' }}>
                 <button
                   style={{
                     ...S.action3DButton,
                     ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}),
-                    ...(!deployGameEnabled ? { opacity:0.55, cursor:'not-allowed' } : {}),
                   }}
                   onClick={handleCreateNewGame}
-                  disabled={newGameBusy || !deployGameEnabled}
+                  disabled={newGameBusy}
                 >
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
@@ -4571,64 +4170,6 @@ const S = {
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
-  metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
-    backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
-  },
-  metaBannerLine: {
-    maxWidth: 1400,
-    margin: '0 auto',
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaCommitBlock: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  metaCommitLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
-  metaCommitCode: {
-    fontFamily: 'monospace',
-    fontSize: 11,
-    background: 'rgba(148, 163, 184, 0.12)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    padding: '2px 6px',
-    borderRadius: 6,
-    lineHeight: 1.4,
-    wordBreak: 'break-all',
-  },
-  metaBadge: {
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: 'rgba(59, 130, 246, 0.16)',
-    color: '#9cc0ff',
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  metaMuted: {
-    color: 'var(--admin-muted)',
-    fontSize: 12,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-  },
-  metaLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
   metaBannerError: {
     color: '#f87171',
     fontWeight: 600,
@@ -4682,6 +4223,13 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
+  },
+  settingsFooterHeading: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   settingsFooterRow: {
     display: 'flex',
@@ -5426,23 +4974,6 @@ const S = {
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
   },
-  modalPublishWarning: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    fontSize: 12,
-    color: '#ef4444',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    fontWeight: 600,
-  },
-  modalPublishLight: {
-    width: 12,
-    height: 12,
-    borderRadius: '50%',
-    background: '#ef4444',
-    boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
-  },
   modalCloseButton: {
     border: 'none',
     background: 'transparent',
@@ -5498,6 +5029,17 @@ const S = {
     fontSize: 13,
     color: 'var(--admin-muted)',
     minHeight: 20,
+  },
+  modalStatusInfo: {
+    color: 'var(--admin-muted)',
+  },
+  modalStatusSuccess: {
+    color: '#16a34a',
+    fontWeight: 600,
+  },
+  modalStatusDanger: {
+    color: '#ef4444',
+    fontWeight: 600,
   },
   modalStatusError: {
     fontSize: 13,
@@ -5799,7 +5341,7 @@ function MediaPoolTab({
       if (!raw) return false;
       const withoutQuery = raw.split('?')[0];
       const base = withoutQuery.split('/').pop()?.toLowerCase() || '';
-      if (base === '.gitkeep' || base === 'index.json' || base === '.ds_store') return false;
+      if (base === 'index.json' || base === '.ds_store') return false;
       return true;
     });
   }, [inv]);
@@ -6081,31 +5623,47 @@ function MediaPoolTab({
     const repoPath = typeof item === 'string'
       ? pathFromUrl(item)
       : (item?.path || pathFromUrl(item?.url || item?.id || ''));
-    if (!repoPath) {
+    const type = String((item && (item.type || item.kind)) || '').toLowerCase();
+    const nameLower = String(item?.name || '').toLowerCase();
+    const fileNameLower = String(item?.fileName || '').toLowerCase();
+    if (type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep') {
+      alert('Placeholder keep-alive files cannot be deleted from the dashboard.');
+      return false;
+    }
+    if (!repoPath && !(item?.supabase?.path)) {
       alert('This file cannot be deleted here (external or unknown path).');
       return false;
     }
     if (!window.confirm(`Delete this media file?\n${targetUrl}`)) return false;
     setUploadStatus('Deleting…');
-    const ok = await deleteMediaPath(repoPath);
+    const ok = await deleteMediaEntry({ ...item, path: repoPath });
     setUploadStatus(ok ? '✅ Deleted' : '❌ Delete failed');
     if (ok) await refreshInventory();
     return ok;
   }
 
   async function deleteAll(list) {
-    if (!list?.length) return;
-    if (!window.confirm(`Delete ALL ${list.length} files in this group? This cannot be undone.`)) return;
+    const actionable = (list || []).filter((it) => {
+      const type = String((it && (it.type || it.kind)) || '').toLowerCase();
+      const nameLower = String(it?.name || '').toLowerCase();
+      const fileNameLower = String(it?.fileName || '').toLowerCase();
+      return !(type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep');
+    });
+    if (!actionable.length) {
+      alert('No deletable files in this group. Placeholder keep-alive files are protected.');
+      return;
+    }
+    if (!window.confirm(`Delete ALL ${actionable.length} files in this group? This cannot be undone.`)) return;
     setUploadStatus('Deleting group…');
     let okCount = 0;
-    for (const it of list) {
+    for (const it of actionable) {
       const path = it?.path || pathFromUrl(it?.url || it?.id || '');
-      if (!path) continue;
+      if (!path && !(it?.supabase?.path)) continue;
       // eslint-disable-next-line no-await-in-loop
-      const ok = await deleteMediaPath(path);
+      const ok = await deleteMediaEntry({ ...it, path });
       if (ok) okCount++;
     }
-    setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
+    setUploadStatus(`✅ Deleted ${okCount}/${actionable.length}`);
     await refreshInventory();
   }
 
@@ -6116,6 +5674,12 @@ function MediaPoolTab({
     items: itemsByType[key] || [],
   }));
   const active = sections.find((s) => s.key === subTab) || sections[0];
+  const canDeleteActive = active.items.some((item) => {
+    const type = String((item && (item.type || item.kind)) || '').toLowerCase();
+    const nameLower = String(item?.name || '').toLowerCase();
+    const fileNameLower = String(item?.fileName || '').toLowerCase();
+    return !(type === 'placeholder' || nameLower === '.gitkeep' || fileNameLower === '.gitkeep');
+  });
   const availableTabKeys = baseTabs.map((tab) => tab.key);
   useEffect(() => {
     if (!availableTabKeys.includes(subTab) && availableTabKeys.length) {
@@ -6254,10 +5818,10 @@ function MediaPoolTab({
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
           <h3 style={{ margin:0 }}>{active.title}</h3>
           <button
-            style={{ ...S.button, ...S.buttonDanger }}
+            style={{ ...S.button, ...S.buttonDanger, ...(!canDeleteActive ? S.buttonDisabled : {}) }}
             onClick={()=>deleteAll(active.items)}
-            disabled={!active.items.length}
-            title="Delete all files in this type"
+            disabled={!canDeleteActive}
+            title={canDeleteActive ? 'Delete all files in this type' : 'No deletable files in this type'}
           >
             Delete All
           </button>
@@ -6269,13 +5833,23 @@ function MediaPoolTab({
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
             {active.items.map((it, idx)=>{
               const url = toDirectMediaURL(it.url);
-              const name = baseNameFromUrl(url);
+              const name = it.name || baseNameFromUrl(url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
               const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
-              const status = String(it.status || (url ? 'external' : 'pending')).replace(/[-_]+/g, ' ');
-              const statusColor = it.existsOnDisk
-                ? 'var(--admin-success)'
-                : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
+              const typeLower = String((it && (it.type || it.kind || active.key)) || '').toLowerCase();
+              const fileNameLower = String(it?.fileName || '').toLowerCase();
+              const isPlaceholderItem = typeLower === 'placeholder'
+                || String(it?.name || '').toLowerCase() === '.gitkeep'
+                || fileNameLower === '.gitkeep';
+              const statusRaw = String(it.status || (url ? 'external' : 'pending'));
+              const status = isPlaceholderItem ? 'placeholder' : statusRaw.replace(/[-_]+/g, ' ');
+              const statusColor = isPlaceholderItem
+                ? 'var(--admin-info)'
+                : it.existsOnDisk
+                  ? 'var(--admin-success)'
+                  : (url ? 'var(--admin-info)' : 'var(--admin-warning)');
+              const canDelete = !isPlaceholderItem;
+              const canOpen = Boolean(url) && !isPlaceholderItem;
               return (
                 <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
                   {looksImage ? (
@@ -6315,18 +5889,21 @@ function MediaPoolTab({
                         display:'inline-flex',
                         alignItems:'center',
                         justifyContent:'center',
-                        pointerEvents: url ? 'auto' : 'none',
-                        opacity: url ? 1 : 0.5,
+                        pointerEvents: canOpen ? 'auto' : 'none',
+                        opacity: canOpen ? 1 : 0.5,
                       }}
-                      aria-disabled={url ? undefined : true}
+                      aria-disabled={canOpen ? undefined : true}
+                      title={canOpen ? 'Open media in new tab' : 'No preview available for placeholders'}
                     >
                       Open
                     </a>
                     <button
-                      style={{ ...S.button, ...S.buttonDanger }}
-                      onClick={()=>deleteOne(it)}
+                      style={{ ...S.button, ...S.buttonDanger, ...(canDelete ? {} : S.buttonDisabled) }}
+                      onClick={()=>{ if (canDelete) deleteOne(it); }}
+                      disabled={!canDelete}
+                      title={canDelete ? 'Delete this file' : 'Placeholder keep-alive files cannot be deleted'}
                     >
-                      Delete
+                      {canDelete ? 'Delete' : 'Protected'}
                     </button>
                   </div>
                 </div>
@@ -6456,6 +6033,7 @@ function AssignedMediaPageTab({
         category: item?.category || '',
         categoryLabel: item?.categoryLabel || '',
         tags: Array.isArray(item?.tags) ? item.tags : [],
+        slug: item?.slug || '',
         thumbUrl: thumb,
         url: directUrl,
         openUrl: rawUrl || directUrl,

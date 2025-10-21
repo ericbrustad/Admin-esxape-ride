@@ -27,6 +27,8 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
         {media.map((m) => {
           const previewUrl = m.thumbUrl || m.url || m.id;
           const typeLower = String(m.type || '').toLowerCase();
+          const fileNameLower = String(m.fileName || '').toLowerCase();
+          const isPlaceholder = typeLower === 'placeholder' || fileNameLower === '.gitkeep';
           const isImage = looksLikeImage(m);
           const isAr = ['ar', 'ar-target', 'ar-overlay'].includes(typeLower);
           const displayType = m.categoryLabel
@@ -39,17 +41,18 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
           return (
             <div
               key={m.id}
-              onClick={() => onSelect(m)}
+              onClick={() => { if (!isPlaceholder) onSelect(m); }}
               style={{
                 borderRadius: 12,
                 overflow: 'hidden',
                 background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
                 padding: 8,
-                cursor: 'pointer',
+                cursor: isPlaceholder ? 'default' : 'pointer',
                 border: '1px solid var(--admin-border-soft)',
                 display: 'grid',
                 gap: 6,
               }}
+              title={isPlaceholder ? 'Placeholder keep-alive file (read-only)' : undefined}
             >
               <div
                 style={{
@@ -108,6 +111,43 @@ export default function MediaPool({ media = [], onSelect = () => {} }) {
               >
                 {displayId}
               </div>
+              {m.slug && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--admin-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={`Slug: ${m.slug}`}
+                >
+                  #{m.slug}
+                </div>
+              )}
+              {Array.isArray(m.tags) && m.tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {m.tags.slice(0, 6).map((tag) => (
+                    <span
+                      key={tag}
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        background: 'var(--admin-border-soft)',
+                        color: 'var(--appearance-font-color, var(--admin-body-color))',
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {m.tags.length > 6 && (
+                    <span style={{ fontSize: 10, color: 'var(--admin-muted)' }}>+{m.tags.length - 6}</span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
