@@ -121,8 +121,8 @@
     "triggeredMissionId": ""
   },
   "map": {
-    "centerLat": 44.9778,
-    "centerLng": -93.265,
+    "centerLat": 44.803334,
+    "centerLng": -93.362126,
     "defaultZoom": 13
   },
   "geofence": {
