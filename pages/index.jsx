@@ -640,7 +640,6 @@ function normalizeGameMetadata(cfg, slug = '') {
   game.shortDescription = normalizedShort;
   game.longDescription = normalizedLong;
   game.slug = normalizedSlug;
-  game.deployEnabled = false;
   base.game = game;
   return base;
 }
@@ -688,7 +687,6 @@ export default function Admin() {
   const [config, setConfig] = useState(null);
   const [status, setStatusInternal] = useState('');
   const [statusLog, setStatusLog] = useState([]);
-  const publishingLocked = config?.game?.deployEnabled === true;
 
   const [missionActionFlash, setMissionActionFlash] = useState(false);
   const [deviceActionFlash, setDeviceActionFlash] = useState(false);
@@ -761,13 +759,13 @@ export default function Admin() {
 
   const openNewGameModal = useCallback(() => {
     logConversation('You', 'Opened “Create New Game”');
-    const message = publishingLocked
-      ? '🟢 This Game is Protected and can not be changed'
-      : '🔴 This Game can be edited, overwritten and saved';
-    updateNewGameStatus(message, publishingLocked ? 'success' : 'danger');
+    const message = gameEnabled
+      ? '🛠️ Draft games are editable before you publish.'
+      : '⚠️ Game project is disabled. New titles may not sync.';
+    updateNewGameStatus(message, gameEnabled ? 'info' : 'danger');
     logConversation('GPT', message);
     setShowNewGame(true);
-  }, [publishingLocked, logConversation]);
+  }, [gameEnabled, logConversation]);
 
   function handleNewGameModalClose() {
     logConversation('You', 'Closed “Create New Game” dialog');
@@ -838,12 +836,6 @@ export default function Admin() {
     if (newGameBusy) return;
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
-    if (publishingLocked) {
-      const message = '🟢 This Game is Protected and can not be changed';
-      updateNewGameStatus(message, 'success');
-      logConversation('GPT', message);
-      return;
-    }
     if (!gameEnabled) {
       updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
       logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
@@ -1142,7 +1134,6 @@ export default function Admin() {
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
   // Combined Save & Publish
-  const [deployDelaySec, setDeployDelaySec] = useState(5);
   const [savePubBusy, setSavePubBusy] = useState(false);
 
   // Pin size (selected)
@@ -1170,13 +1161,10 @@ export default function Admin() {
 
   useEffect(() => {
     try {
-      const savedDelay = localStorage.getItem('deployDelaySec');
-      if (savedDelay != null) setDeployDelaySec(Math.max(0, Math.min(120, Number(savedDelay) || 0)));
       const savedSel = localStorage.getItem('selectedPinSize');
       if (savedSel != null) setSelectedPinSize(clamp(Number(savedSel) || 28, 12, 64));
     } catch {}
   }, []);
-  useEffect(() => { try { localStorage.setItem('deployDelaySec', String(deployDelaySec)); } catch {} }, [deployDelaySec]);
   useEffect(() => { try { localStorage.setItem('selectedPinSize', String(selectedPinSize)); } catch {} }, [selectedPinSize]);
 
   const gameBase =
@@ -1306,7 +1294,6 @@ export default function Admin() {
         type: STARFIELD_DEFAULTS.type,
         tags: [...STARFIELD_DEFAULTS.tags],
         coverImage: STARFIELD_DEFAULTS.coverImage,
-        deployEnabled: true,
       },
       forms:  { players:1 },
       timer:  { durationMinutes:0, alertMinutes:10 },
@@ -1434,63 +1421,6 @@ export default function Admin() {
     }
   }
 
-  async function publishWithSlug(slug, channel='published') {
-    if (isDefaultSlug(slug)) {
-      try {
-        const res = await fetch('/api/publish', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          credentials:'include',
-          body: JSON.stringify({ slug: 'root' }),
-        });
-        const txt = await res.text();
-        let data = {};
-        try { data = JSON.parse(txt); } catch {}
-        if (!res.ok || data?.ok === false) {
-          const err = data?.error || txt || 'publish failed';
-          throw new Error(err);
-        }
-        setStatus('✅ Published');
-        return true;
-      } catch (e) {
-        setStatus('❌ Publish failed: ' + (e?.message || e));
-        return false;
-      }
-    }
-
-    const first = `/api/game${qs({ slug, channel })}`;
-    const fallback = `/api/game/${encodeURIComponent(slug)}${qs({ channel })}`;
-
-    try {
-      const res = await fetch(first, {
-        method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-        body: JSON.stringify({ action:'publish' })
-      });
-      const txt = await res.text();
-      let data = {};
-      try { data = JSON.parse(txt); } catch {}
-      if (!res.ok) throw new Error('try fallback');
-      setStatus(`✅ Published${data?.version ? ` v${data.version}` : ''}`);
-      return true;
-    } catch (e) {
-      try {
-        const res2 = await fetch(fallback, {
-          method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include',
-          body: JSON.stringify({ action:'publish' })
-        });
-        const txt2 = await res2.text();
-        let data2 = {};
-        try { data2 = JSON.parse(txt2); } catch {}
-        if (!res2.ok) throw new Error(txt2||'publish failed');
-        setStatus(`✅ Published${data2?.version ? ` v${data2.version}` : ''}`);
-        return true;
-      } catch (e2) {
-        setStatus('❌ Publish failed: ' + (e2?.message || e2));
-        return false;
-      }
-    }
-  }
-
   async function reloadGamesList() {
     if (!gameEnabled) { setGames([]); return; }
     try {
@@ -1504,24 +1434,15 @@ export default function Admin() {
     logConversation('You', 'Requested Save & Publish');
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
-    const shouldPublish = gameEnabled && config?.game?.deployEnabled === true;
     setSavePubBusy(true);
-    setStatus(shouldPublish ? 'Saving & publishing…' : 'Saving…');
+    setStatus('Saving…');
 
     const saved = await saveAllWithSlug(slug);
     if (!saved) { setSavePubBusy(false); return; }
 
-    if (shouldPublish && deployDelaySec > 0) await new Promise(r => setTimeout(r, deployDelaySec * 1000));
-
-    if (shouldPublish) {
-      const published = await publishWithSlug(slug, 'published');
-      if (!published) { setSavePubBusy(false); return; }
-    } else {
-      setStatus('✅ Saved (game deploy disabled)');
-    }
-
+    setStatus('✅ Saved');
     await reloadGamesList();
-    setPreviewNonce(n => n + 1);
+    setPreviewNonce((n) => n + 1);
     setSavePubBusy(false);
   }
 
@@ -2518,7 +2439,7 @@ export default function Admin() {
                 style={{ ...S.button, ...S.headerNewGameButton }}
               >
                 <span style={S.newGameLabel}>
-                  {!publishingLocked && <span aria-hidden="true" style={S.headerNewGameLight} />}
+                  <span aria-hidden="true" style={S.headerNewGameLight} />
                   <span>+ New Game</span>
                 </span>
               </button>
@@ -3771,76 +3692,6 @@ export default function Admin() {
             </div>
           </div>
 
-          <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
-            <div style={S.metaFooterGrid}>
-              <div>
-                <div style={S.metaFooterLabel}>Repository</div>
-                {metaRepoUrl ? (
-                  <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaOwnerRepo || 'unknown'}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>{metaOwnerRepo || 'unknown'}</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Branch</div>
-                <span style={S.metaFooterValue}>{metaBranchLabel}</span>
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Commit</div>
-                {metaCommitLabel ? (
-                  metaCommitUrl ? (
-                    <a
-                      href={metaCommitUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={S.metaFooterLink}
-                      title={`Open commit ${metaCommitLabel}`}
-                    >
-                      #{metaCommitShort || metaCommitLabel}
-                    </a>
-                  ) : (
-                    <span style={S.metaFooterValue}>#{metaCommitShort || metaCommitLabel}</span>
-                  )
-                ) : (
-                  <span style={S.metaFooterValue}>—</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Deployment</div>
-                {metaDeploymentUrl ? (
-                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaDeploymentUrl.replace(/^https?:\/\//, '')}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>{metaDeploymentState || '—'}</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Vercel Project</div>
-                {metaVercelUrl ? (
-                  <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.metaFooterLink}>
-                    {metaVercelLabel || metaVercelUrl.replace(/^https?:\/\//, '')}
-                  </a>
-                ) : (
-                  <span style={S.metaFooterValue}>—</span>
-                )}
-              </div>
-              <div>
-                <div style={S.metaFooterLabel}>Snapshot Time</div>
-                <div style={S.metaFooterValue}>
-                  <div style={S.metaFooterTimeLine}>Fetched: {metaTimestampLabel || '—'}</div>
-                  <div style={S.metaFooterTimeLine}>Rendered: {metaNowLabel || '—'}</div>
-                </div>
-              </div>
-            </div>
-            <div style={S.metaFooterNote}>
-              Data refreshes every minute. Use this panel during QA to confirm the active branch, commit, and deployment.
-            </div>
-          </div>
-
           {adminMeta.error && (
             <div style={{ ...S.card, marginTop:16, ...S.metaErrorCard }}>
               <div style={{ ...S.metaBannerError, margin:0 }}>{adminMeta.error}</div>
@@ -3848,6 +3699,7 @@ export default function Admin() {
           )}
 
           <footer style={S.settingsFooter}>
+            <div style={S.settingsFooterHeading}>Repository Snapshot</div>
             <div style={S.settingsFooterRow}>
               <span style={S.settingsFooterItem}>
                 <strong>Repo:</strong>{' '}
@@ -4196,10 +4048,9 @@ export default function Admin() {
                   style={{
                     ...S.action3DButton,
                     ...(newGameBusy ? { opacity:0.7, cursor:'wait' } : {}),
-                    ...(publishingLocked ? { opacity:0.55, cursor:'not-allowed' } : {}),
                   }}
                   onClick={handleCreateNewGame}
-                  disabled={newGameBusy || publishingLocked}
+                  disabled={newGameBusy}
                 >
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
@@ -4369,6 +4220,13 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     gap: 6,
+  },
+  settingsFooterHeading: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   settingsFooterRow: {
     display: 'flex',

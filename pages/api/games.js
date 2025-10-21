@@ -40,7 +40,6 @@ function defaultConfig({ title, gameType, mode, slug, extras = {} }) {
       shortDescription: extras.shortDescription || '',
       longDescription: extras.longDescription || '',
       slug,
-      deployEnabled: false,
     },
     forms: { players },
     textRules: [],
