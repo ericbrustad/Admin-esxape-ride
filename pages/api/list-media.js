@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { readManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -152,6 +153,12 @@ function listFiles(absDir, prefix = '') {
         const nextPrefix = prefix ? path.posix.join(prefix, entry.name) : entry.name;
         files.push(...listFiles(path.join(absDir, entry.name), nextPrefix));
       } else if (entry.isFile()) {
+        const baseName = entry.name.toLowerCase();
+        if (baseName === '.gitkeep' || baseName === 'index.json' || baseName === '.ds_store') {
+          // Skip placeholder/metadata files so the Media Pool only surfaces real assets.
+          // eslint-disable-next-line no-continue
+          continue;
+        }
         const rel = prefix ? path.posix.join(prefix, entry.name) : entry.name;
         files.push(rel);
       }
@@ -160,6 +167,40 @@ function listFiles(absDir, prefix = '') {
   } catch {
     return [];
   }
+}
+
+function normalizeFolder(folder = '') {
+  return String(folder || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '')
+    || 'mediapool';
+}
+
+function folderMatchesTarget(folder = '', target = '') {
+  const normalizedFolder = normalizeFolder(folder).toLowerCase();
+  const normalizedTarget = normalizeFolder(target).toLowerCase();
+  if (!normalizedTarget || normalizedTarget === 'mediapool') return true;
+  if (normalizedFolder === normalizedTarget) return true;
+  return normalizedFolder.startsWith(`${normalizedTarget}/`);
+}
+
+function buildUrlFromPath(repoPath = '') {
+  const normalized = String(repoPath || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '');
+  if (!normalized) return '';
+  if (normalized.startsWith('public/')) {
+    return `/${normalized.replace(/^public\//, '')}`;
+  }
+  if (normalized.startsWith('public\\')) {
+    return `/${normalized.replace(/^public\\/, '')}`;
+  }
+  if (normalized.startsWith('media/')) {
+    return `/${normalized}`;
+  }
+  if (normalized.startsWith('/')) return normalized;
+  return `/${normalized}`;
 }
 
 function enrichMeta(relativePath = '') {
@@ -216,68 +257,110 @@ export default async function handler(req, res) {
     const dirParam = (req.query.dir || 'mediapool').toString();
     const dir = resolveDir(dirParam);
     const cwd = process.cwd();
-    const gameOrigin = GAME_ENABLED ? (process.env.NEXT_PUBLIC_GAME_ORIGIN || '') : '';
-
-    // Priority: 1) Admin public (canonical), 2) Game public (fallback if Admin missing)
-    const adminRoot = path.join(cwd, 'public', 'media', dir);
-    const gameRoot  = GAME_ENABLED ? path.join(cwd, 'game', 'public', 'media', dir) : null;
-
-    const adminNames = listFiles(adminRoot);
-    const gameNames  = gameRoot ? listFiles(gameRoot) : [];
-
-    const seenByName = new Set(); // case-insensitive path (within dir)
+    const { manifest, path: manifestPath } = readManifest();
+    const manifestItems = manifest.items || [];
+    const seenKeys = new Set();
     const out = [];
 
-    // 1) Admin (canonical)
-    for (const name of adminNames) {
-      const type = classify(name);
-      const key = path.posix.join(dir, name).toLowerCase();
-      if (seenByName.has(key)) continue;
-      seenByName.add(key);
-      const relativePath = path.posix.join('public', 'media', dir, name);
-      const encoded = name.split('/')
-        .map((segment) => encodeURIComponent(segment))
-        .join('/');
-      const meta = enrichMeta(path.posix.join(dir, name));
+    manifestItems
+      .filter((entry) => folderMatchesTarget(entry.folder || '', dir))
+      .forEach((entry) => {
+        const folder = normalizeFolder(entry.folder || dir);
+        const repoPath = entry.path
+          ? entry.path
+          : path.posix.join('public', 'media', folder, entry.fileName || '').replace(/\\/g, '/');
+        const meta = enrichMeta(path.posix.join(folder, entry.fileName || entry.name || ''));
+        const type = (entry.type || meta.type || classify(entry.fileName || entry.url || entry.name || '')).toLowerCase();
+        const url = entry.url || buildUrlFromPath(repoPath);
+        const key = (entry.id || repoPath || entry.url || `${folder}/${entry.fileName || entry.name || ''}`).toLowerCase();
+        if (seenKeys.has(key)) return;
+        seenKeys.add(key);
+        const absolute = repoPath ? path.join(cwd, repoPath) : '';
+        const existsOnDisk = absolute ? fs.existsSync(absolute) : false;
+        out.push({
+          id: entry.id || key,
+          name: entry.name || entry.fileName || entry.url,
+          fileName: entry.fileName || '',
+          url,
+          path: repoPath,
+          folder,
+          type,
+          source: 'manifest',
+          category: meta.category,
+          categoryLabel: meta.categoryLabel,
+          tags: Array.from(new Set([...(meta.tags || []), ...((entry.tags || []))])),
+          kind: type,
+          status: entry.status || (existsOnDisk ? 'available' : url ? 'external' : 'missing'),
+          notes: entry.notes || '',
+          existsOnDisk,
+        });
+      });
+
+    const adminRoot = path.join(cwd, 'public', 'media', dir);
+    const adminFiles = listFiles(adminRoot);
+    for (const name of adminFiles) {
+      const folder = dir;
+      const repoPath = path.posix.join('public', 'media', folder, name).replace(/\\/g, '/');
+      const key = repoPath.toLowerCase();
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      const meta = enrichMeta(path.posix.join(folder, name));
       out.push({
+        id: key,
         name,
-        url: `/media/${dir}/${encoded}`,
-        type,
-        source: 'admin',
-        path: relativePath,
+        fileName: name,
+        url: buildUrlFromPath(repoPath),
+        path: repoPath,
+        folder,
+        type: (meta.type || classify(name)).toLowerCase(),
+        source: 'filesystem',
         category: meta.category,
         categoryLabel: meta.categoryLabel,
         tags: meta.tags,
         kind: meta.type,
+        status: 'available',
+        notes: '',
+        existsOnDisk: true,
       });
     }
 
-    // 2) Game (fallback only for names not present in Admin)
-    if (GAME_ENABLED && gameOrigin) {
-      for (const name of gameNames) {
-        const type = classify(name);
-        const key = path.posix.join(dir, name).toLowerCase();
-        if (seenByName.has(key)) continue; // Admin has it → skip Game
-        seenByName.add(key);
-        const encoded = name.split('/')
-          .map((segment) => encodeURIComponent(segment))
-          .join('/');
-        const meta = enrichMeta(path.posix.join(dir, name));
+    if (GAME_ENABLED) {
+      const gameRoot = path.join(cwd, 'game', 'public', 'media', dir);
+      const gameFiles = listFiles(gameRoot);
+      for (const name of gameFiles) {
+        const folder = dir;
+        const relative = path.posix.join(folder, name);
+        const key = `game://${relative.toLowerCase()}`;
+        if (seenKeys.has(key)) continue;
+        const meta = enrichMeta(relative);
         out.push({
+          id: key,
           name,
-          url: `${gameOrigin}/media/${dir}/${encoded}`,
-          type,
-          source: 'game',
+          fileName: name,
+          url: `/media/${relative}`,
           path: '',
+          folder,
+          type: (meta.type || classify(name)).toLowerCase(),
+          source: 'game',
           category: meta.category,
           categoryLabel: meta.categoryLabel,
           tags: meta.tags,
           kind: meta.type,
+          status: 'game-fallback',
+          notes: 'Served from game bundle',
+          existsOnDisk: false,
         });
+        seenKeys.add(key);
       }
     }
 
-    return res.status(200).json({ ok: true, items: out });
+    out.sort((a, b) => {
+      return (a.name || '').toString().toLowerCase().localeCompare((b.name || '').toString().toLowerCase());
+    });
+
+    const debug = getManifestDebugInfo();
+
+    return res.status(200).json({ ok: true, dir, items: out, manifestPath, manifestDebug: debug });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }

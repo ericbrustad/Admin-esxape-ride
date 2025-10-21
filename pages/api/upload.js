@@ -1,57 +1,124 @@
 // pages/api/upload.js
-// JSON body: { path: "public/media/mediapool/Images/uploads/<filename>", contentBase64: "<base64>", message?: "commit msg" }
-// Writes into your GitHub repo via Contents API. Creates folders as needed.
+// JSON body: {
+//   fileName?: string,
+//   folder?: string,
+//   path?: string,
+//   contentBase64?: string,
+//   remoteUrl?: string,
+//   sizeBytes?: number
+// }
+// Registers media metadata in public/media/manifest.json. Binary payloads must
+// be hosted externally; this endpoint only records references so uploads remain
+// hidden from Git history.
+
+import { readManifest, writeManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
+
+const EXTS = {
+  image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
+  gif: /\.(gif)$/i,
+  video: /\.(mp4|webm|mov)$/i,
+  audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i,
+  ar: /\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i,
+};
+
+function classify(name = '') {
+  if (EXTS.gif.test(name)) return 'gif';
+  if (EXTS.image.test(name)) return 'image';
+  if (EXTS.video.test(name)) return 'video';
+  if (EXTS.audio.test(name)) return 'audio';
+  if (EXTS.ar.test(name)) return 'ar-overlay';
+  return 'other';
+}
+
+function resolveFolder(input = '') {
+  const trimmed = String(input || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\\/g, '/');
+  if (!trimmed) return 'mediapool/Other';
+  if (trimmed.toLowerCase() === 'mediapool') return 'mediapool';
+  if (trimmed.startsWith('mediapool/')) return trimmed;
+  return `mediapool/${trimmed}`;
+}
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'Use POST' });
+    if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Use POST' });
 
-    const { path, contentBase64, message } = req.body || {};
-    if (!path || !contentBase64) return res.status(400).json({ ok:false, error:'Missing path or contentBase64' });
+    const {
+      fileName,
+      folder,
+      path: explicitPath,
+      remoteUrl,
+      sizeBytes,
+      contentBase64,
+    } = req.body || {};
 
-    const owner  = process.env.REPO_OWNER || process.env.GH_OWNER;
-    const repo   = process.env.REPO_NAME  || process.env.GITHUB_REPO || 'Admin-esxape-ride';
-    const token  = process.env.GITHUB_TOKEN;
-    const branch = process.env.GITHUB_BRANCH || 'main';
-    const baseDir = (process.env.GITHUB_BASE_DIR || '').replace(/^\/+|\/+$/g,'');
+    const derivedNameFromPath = explicitPath ? explicitPath.split('/').pop() : '';
+    const safeName = (fileName || derivedNameFromPath || 'upload')
+      .toString()
+      .replace(/[^\w.\-]+/g, '_');
 
-    if (!owner || !repo || !token) {
-      return res.status(500).json({ ok:false, error:'Missing GitHub env (REPO_OWNER, REPO_NAME, GITHUB_TOKEN)' });
+    let derivedFolder = '';
+    if (typeof folder === 'string' && folder.trim()) {
+      derivedFolder = folder;
+    } else if (explicitPath) {
+      const normalizedPath = explicitPath.replace(/\\/g, '/');
+      const marker = 'public/media/';
+      const index = normalizedPath.indexOf(marker);
+      if (index >= 0) {
+        const afterMarker = normalizedPath.slice(index + marker.length);
+        derivedFolder = afterMarker.split('/').slice(0, -1).join('/');
+      }
     }
 
-    const fullPath = baseDir ? `${baseDir}/${path}` : path;
+    const resolvedFolder = resolveFolder(derivedFolder);
+    const { manifest } = readManifest();
 
-    // Lookup SHA if file exists
-    const headUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}?ref=${branch}`;
-    let sha;
-    const head = await fetch(headUrl, {
-      headers:{ Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json' }
+    const type = classify(safeName);
+    const repoPath = `public/media/${resolvedFolder}/${safeName}`.replace(/\\/g, '/');
+    const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+
+    const entry = {
+      id: entryId,
+      name: safeName.replace(/\.[^.]+$/, ''),
+      fileName: safeName,
+      folder: resolvedFolder,
+      path: repoPath,
+      type: type === 'ar' ? 'ar-overlay' : type,
+      url: remoteUrl || '',
+      status: remoteUrl ? 'external' : 'pending-external',
+      notes: remoteUrl
+        ? 'External media registered.'
+        : 'Upload recorded. Provide an external URL to activate this asset.',
+      sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    manifest.items = Array.isArray(manifest.items) ? manifest.items : [];
+    manifest.items.push(entry);
+    manifest.updatedAt = new Date().toISOString();
+
+    const writeResult = writeManifest(manifest);
+
+    if (contentBase64) {
+      console.warn('[upload] contentBase64 received but ignored; configure external storage to persist binaries.');
+    }
+
+    const debug = getManifestDebugInfo();
+
+    return res.status(200).json({
+      ok: true,
+      item: entry,
+      manifestPath: writeResult.path,
+      manifestFallback: writeResult.fallback,
+      storage: {
+        manifestPath: writeResult.path,
+        fallbackUsed: writeResult.fallback,
+        debug,
+      },
     });
-    if (head.ok) {
-      const j = await head.json();
-      sha = j.sha;
-    }
-
-    // PUT the file
-    const putUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(fullPath)}`;
-    const put = await fetch(putUrl, {
-      method:'PUT',
-      headers:{ Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json' },
-      body: JSON.stringify({
-        message: message || `upload ${path}`,
-        content: contentBase64,
-        branch,
-        sha
-      }),
-    });
-
-    const jr = await put.json();
-    if (!put.ok) {
-      return res.status(put.status).json({ ok:false, error: jr?.message || 'upload failed', response: jr });
-    }
-
-    return res.status(200).json({ ok:true, path, html_url: jr?.content?.html_url });
-  } catch (e) {
-    return res.status(500).json({ ok:false, error: String(e) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || String(error) });
   }
 }

@@ -76,10 +76,10 @@
     "textBgOpacity": 0.7,
     "screenBgColor": "#e0dcfa",
     "screenBgOpacity": 0.46,
-    "screenBgImage": "/media/skins/starfield-dawn.svg",
+    "screenBgImage": "",
     "textAlign": "center",
     "textVertical": "top",
-    "screenBgImageEnabled": true
+    "screenBgImageEnabled": false
   },
   "appearanceSkin": "starfield-dawn",
   "appearanceTone": "light",
