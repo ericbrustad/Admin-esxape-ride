@@ -8,7 +8,8 @@
     "type": "Mystery",
     "tags": [
       "default",
-      "default-game"
+      "default-game",
+      "starfield-station-break"
     ],
     "coverImage": "/media/covers/starfield-station-break.svg",
     "deployEnabled": true,
@@ -24,8 +25,52 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "hh",
+      "type": "smoke",
+      "iconKey": "chrono-switch",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": false,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.979735,
+      "lng": -93.266802
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "hh",
+      "type": "smoke",
+      "iconKey": "chrono-switch",
+      "pickupRadius": 100,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": false,
+        "actionType": "media",
+        "actionTarget": "",
+        "actionLabel": "",
+        "actionThumbnail": "",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.979735,
+      "lng": -93.266802
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -33,34 +78,31 @@
   "icons": {
     "missions": [
       {
-        "key": "aurora-beacon",
-        "name": "Aurora Beacon",
+        "key": "briefing-star",
+        "name": "Briefing Star",
         "url": "/media/icons/aurora-beacon.svg"
       },
       {
-        "key": "briefing-star",
-        "name": "Briefing Star",
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
         "url": "/media/icons/aurora-beacon.svg"
       },
       {
         "key": "decoy-glow",
         "name": "Decoy Glow",
         "url": "/media/icons/lumen-halo.svg"
+      }
+    ],
+    "devices": [
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
       },
       {
-        "key": "lantern-clue",
-        "name": "Lantern Clue",
+        "key": "lumen-halo",
+        "name": "Lumen Halo",
         "url": "/media/icons/lumen-halo.svg"
-      },
-      {
-        "key": "helm-brief",
-        "name": "Helm Brief",
-        "url": "/media/icons/voyager-dial.svg"
-      },
-      {
-        "key": "voyager-dial",
-        "name": "Voyager Dial",
-        "url": "/media/icons/voyager-dial.svg"
       },
       {
         "key": "quantum-anchor",
@@ -68,31 +110,14 @@
         "url": "/media/icons/quantum-anchor.svg"
       },
       {
-        "key": "missions-1",
-        "name": "Smoke Bomb",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
+        "key": "chrono-switch",
+        "name": "Chrono Switch",
+        "url": "/media/icons/chrono-switch.svg"
       },
       {
-        "key": "trivia",
-        "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
-      },
-      {
-        "key": "trivia-2",
-        "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
-      }
-    ],
-    "devices": [
-      {
-        "key": "smoke-shield",
-        "name": "Smoke Shield",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
-      },
-      {
-        "key": "roaming-robot",
-        "name": "Roaming Robot",
-        "url": "/media/bundles/ROBOT1small.png"
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/icons/voyager-dial.svg"
       }
     ],
     "rewards": [
