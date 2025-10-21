@@ -1227,14 +1227,22 @@ export default function Admin() {
     };
   }
   function defaultContentForType(t) {
-    const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
+    const fallbackLat = 44.9778;
+    const fallbackLng = -93.2650;
+    const rawLat = Number(config?.map?.centerLat);
+    const rawLng = Number(config?.map?.centerLng);
+    const resolvedLat = Number.isFinite(rawLat) ? rawLat : fallbackLat;
+    const resolvedLng = Number.isFinite(rawLng) ? rawLng : fallbackLng;
+    const latValue = Number(resolvedLat.toFixed(6));
+    const lngValue = Number(resolvedLng.toFixed(6));
+    const base = { geofenceEnabled:false, lat:latValue, lng:lngValue, radiusMeters:25, cooldownSeconds:30 };
     switch (t) {
       case 'multiple_choice': return { question:'', choices:[], correctIndex:undefined, mediaUrl:'', ...base };
       case 'short_answer':    return { question:'', answer:'', acceptable:'', mediaUrl:'', ...base };
       case 'statement':       return { text:'', mediaUrl:'', ...base };
       case 'video':           return { videoUrl:'', overlayText:'', ...base };
-      case 'geofence_image':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
-      case 'geofence_video':  return { lat:'', lng:'', radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
+      case 'geofence_image':  return { lat:latValue, lng:lngValue, radiusMeters:25, cooldownSeconds:30, imageUrl:'', overlayText:'' };
+      case 'geofence_video':  return { lat:latValue, lng:lngValue, radiusMeters:25, cooldownSeconds:30, videoUrl:'', overlayText:'' };
       case 'ar_image':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'ar_video':        return { markerUrl:'', assetUrl:'', overlayText:'', ...base };
       case 'stored_statement':return { template:'' };
@@ -4894,6 +4902,185 @@ const S = {
     boxShadow: '0 12px 24px rgba(14, 165, 233, 0.35)',
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
   },
+  mediaUploadHint: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    maxWidth: 420,
+  },
+  mediaSelectButton: {
+    padding: '10px 18px',
+    borderRadius: 14,
+    border: '1px solid rgba(59, 130, 246, 0.35)',
+    background: 'linear-gradient(102deg, #1d4ed8, #3b82f6)',
+    color: '#f8fafc',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    boxShadow: '0 12px 24px rgba(37, 99, 235, 0.28)',
+  },
+  pendingUploadsWrap: {
+    marginTop: 16,
+    display: 'grid',
+    gap: 12,
+  },
+  pendingUploadCard: {
+    display: 'grid',
+    gridTemplateColumns: '120px 1fr 160px',
+    gap: 12,
+    alignItems: 'center',
+    borderRadius: 16,
+    border: '1px solid rgba(148, 163, 184, 0.35)',
+    background: 'rgba(248, 250, 252, 0.82)',
+    boxShadow: '0 18px 32px rgba(15, 23, 42, 0.12)',
+    padding: 14,
+  },
+  pendingPreviewBox: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    display: 'grid',
+    placeItems: 'center',
+    overflow: 'hidden',
+  },
+  pendingPreviewImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  pendingPreviewVideo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  pendingPreviewFallback: {
+    fontSize: 18,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    color: '#1f2937',
+  },
+  pendingMeta: {
+    display: 'grid',
+    gap: 6,
+  },
+  pendingFilename: {
+    fontWeight: 600,
+    fontSize: 14,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  pendingFilesize: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingFolderLabel: {
+    display: 'grid',
+    gap: 4,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+  },
+  mediaFolderSelect: {
+    padding: '8px 10px',
+    borderRadius: 10,
+    border: 'var(--admin-input-border)',
+    background: 'var(--admin-input-bg)',
+    color: 'var(--admin-input-color)',
+    boxShadow: 'var(--admin-glass-sheen)',
+  },
+  mediaFolderPath: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  pendingError: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#f87171',
+  },
+  pendingActions: {
+    display: 'grid',
+    gap: 8,
+    justifyItems: 'stretch',
+  },
+  mediaSaveButton: {
+    padding: '10px 18px',
+    borderRadius: 14,
+    border: '1px solid rgba(34, 197, 94, 0.85)',
+    background: 'linear-gradient(158deg, #065f46, #22c55e)',
+    color: '#ecfdf5',
+    fontWeight: 800,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+    boxShadow: '0 16px 28px rgba(6, 95, 70, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.12)',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  },
+  mediaSaveButtonDisabled: {
+    opacity: 0.65,
+    cursor: 'wait',
+    boxShadow: '0 10px 18px rgba(6, 95, 70, 0.25)',
+  },
+  mediaCancelButton: {
+    padding: '8px 14px',
+    borderRadius: 12,
+    border: '1px solid rgba(148, 163, 184, 0.45)',
+    background: 'rgba(241, 245, 249, 0.85)',
+    color: 'var(--admin-muted)',
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    cursor: 'pointer',
+  },
+  mediaCard: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    padding: 12,
+    display: 'grid',
+    gap: 10,
+    background: 'var(--appearance-subpanel-bg, var(--admin-tab-bg))',
+    boxShadow: '0 12px 24px rgba(15, 23, 42, 0.12)',
+  },
+  mediaCardPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-input-bg)',
+    display: 'grid',
+    placeItems: 'center',
+  },
+  mediaCardPreviewImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  mediaCardInfo: {
+    display: 'grid',
+    gap: 4,
+  },
+  mediaCardTitle: {
+    fontWeight: 600,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  mediaCardUrl: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    wordBreak: 'break-word',
+  },
+  mediaFolderNote: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  recentUploadGlow: {
+    boxShadow: '0 0 0 2px rgba(34, 197, 94, 0.45), 0 18px 32px rgba(16, 185, 129, 0.35)',
+  },
   tab: {
     padding: '8px 12px',
     borderRadius: 12,
@@ -5383,36 +5570,64 @@ function MediaPoolTab({
 }) {
   const [inv, setInv] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [folder, setFolder] = useState('uploads');
-  const [addUrl, setAddUrl] = useState('');
+  const [pendingUploads, setPendingUploads] = useState([]);
   const [dropActive, setDropActive] = useState(false);
+  const [recentUploads, setRecentUploads] = useState([]);
   const fileInputRef = useRef(null);
+  const pendingPreviewUrls = useRef(new Set());
 
+  const MEDIA_FOLDERS = ['uploads', 'bundles', 'icons', 'covers', 'mediapool'];
 
-  
-  // Sub-tabs inside Media Pool. Default → 'audio' as requested.
   const subTabs = [
-    { key:'image', label:'Images' },
-    { key:'video', label:'Videos' },
-    { key:'audio', label:'Audio' },
-    { key:'gif',   label:'GIFs'  },
+    { key: 'all', label: 'All' },
+    { key: 'image', label: 'Images' },
+    { key: 'video', label: 'Videos' },
+    { key: 'audio', label: 'Audio' },
+    { key: 'gif', label: 'GIFs' },
+    { key: 'other', label: 'Other' },
   ];
-  const [subTab, setSubTab] = useState('image');
+  const tabKeys = subTabs.map((st) => st.key);
+  const [subTab, setSubTab] = useState('all');
 
   useEffect(() => { refreshInventory(); }, []);
 
+  useEffect(() => () => {
+    pendingPreviewUrls.current.forEach((url) => {
+      try { URL.revokeObjectURL(url); } catch {}
+    });
+    pendingPreviewUrls.current.clear();
+  }, []);
+
+  function registerPreview(url) {
+    if (url) pendingPreviewUrls.current.add(url);
+  }
+
+  function releasePreview(entry) {
+    if (!entry?.previewUrl) return;
+    if (!pendingPreviewUrls.current.has(entry.previewUrl)) return;
+    try { URL.revokeObjectURL(entry.previewUrl); } catch {}
+    pendingPreviewUrls.current.delete(entry.previewUrl);
+  }
+
   async function refreshInventory() {
     setBusy(true);
+    let items = [];
     try {
-      const items = await listInventory(['uploads','bundles','icons','covers','mediapool']);
-      setInv(items || []);
+      const result = await listInventory(['uploads', 'bundles', 'icons', 'covers', 'mediapool']);
+      items = Array.isArray(result) ? result : [];
+      setInv(items);
+      setRecentUploads((prev) =>
+        prev.filter((recent) => items.some((item) => toDirectMediaURL(item.url) === recent))
+      );
       if (typeof onInventoryRefresh === 'function') {
         try { await onInventoryRefresh(); } catch {}
       }
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
+    return items;
   }
 
-  // Per-file usage counts retained for backwards compatibility
   function usageCounts() {
     return {
       rewardsPool: 0,
@@ -5428,27 +5643,34 @@ function MediaPoolTab({
 
   function addPoolItem(kind, url) {
     const label = baseNameFromUrl(url);
-    setConfig(c => {
+    setConfig((c) => {
       if (!c) return c;
-      const m = { rewardsPool:[...(c.media?.rewardsPool||[])], penaltiesPool:[...(c.media?.penaltiesPool||[])] };
+      const m = {
+        rewardsPool: [...(c.media?.rewardsPool || [])],
+        penaltiesPool: [...(c.media?.penaltiesPool || [])],
+      };
       if (kind === 'rewards') m.rewardsPool.push({ url, label });
       if (kind === 'penalties') m.penaltiesPool.push({ url, label });
       return { ...c, media: m };
     });
   }
+
   function addIcon(kind, url) {
-    const key = baseNameFromUrl(url).toLowerCase().replace(/\s+/g,'-').slice(0,48) || `icon-${Date.now()}`;
+    const keyBase = baseNameFromUrl(url).toLowerCase().replace(/\s+/g, '-').slice(0, 48) || `icon-${Date.now()}`;
     const name = baseNameFromUrl(url);
-    setConfig(c => {
+    setConfig((c) => {
       if (!c) return c;
-      const icons = { missions:[...(c.icons?.missions||[])], devices:[...(c.icons?.devices||[])], rewards:[...(c.icons?.rewards||[])] };
+      const icons = {
+        missions: [...(c.icons?.missions || [])],
+        devices: [...(c.icons?.devices || [])],
+        rewards: [...(c.icons?.rewards || [])],
+      };
       const list = icons[kind] || [];
-      // allow duplicates (keys must be unique)
-      let finalKey = key;
+      let finalKey = keyBase;
       let suffix = 1;
-      while (list.find(i => i.key === finalKey)) {
+      while (list.find((i) => i.key === finalKey)) {
         suffix += 1;
-        finalKey = `${key}-${suffix}`;
+        finalKey = `${keyBase}-${suffix}`;
       }
       list.push({ key: finalKey, name, url });
       icons[kind] = list;
@@ -5456,30 +5678,108 @@ function MediaPoolTab({
     });
   }
 
+  function suggestFolderForFile(file, kind) {
+    const name = (file?.name || '').toLowerCase();
+    if (kind === 'audio' || kind === 'video' || kind === 'gif') return 'mediapool';
+    if (kind === 'image') {
+      if (name.endsWith('.svg') || name.includes('icon')) return 'icons';
+      if (name.includes('cover')) return 'covers';
+      return 'uploads';
+    }
+    if (name.endsWith('.zip')) return 'bundles';
+    return 'uploads';
+  }
+
+  function createPreviewUrl(file, kind) {
+    try {
+      if (['image', 'gif', 'video', 'audio'].includes(kind)) {
+        const url = URL.createObjectURL(file);
+        registerPreview(url);
+        return url;
+      }
+    } catch {}
+    return '';
+  }
+
+  function formatSize(file) {
+    const size = Number(file?.size || 0);
+    if (!size) return '—';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    return `${Math.max(1, Math.round(size / 1024))} KB`;
+  }
+
+  function updatePendingFolder(id, folder) {
+    const safe = MEDIA_FOLDERS.includes(folder) ? folder : 'uploads';
+    setPendingUploads((prev) => prev.map((entry) => (entry.id === id ? { ...entry, folder: safe } : entry)));
+  }
+
+  function removePending(id) {
+    setPendingUploads((prev) => {
+      const next = [];
+      prev.forEach((entry) => {
+        if (entry.id === id) {
+          releasePreview(entry);
+        } else {
+          next.push(entry);
+        }
+      });
+      return next;
+    });
+  }
+
+  async function commitUpload(id) {
+    const entry = pendingUploads.find((item) => item.id === id);
+    if (!entry) return;
+    setPendingUploads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'uploading', error: '' } : item)));
+    try {
+      const savedUrl = await uploadToRepo(entry.file, entry.folder);
+      if (!savedUrl) throw new Error('Upload failed');
+      releasePreview(entry);
+      setPendingUploads((prev) => prev.filter((item) => item.id !== id));
+      const normalizedUrl = toDirectMediaURL(savedUrl);
+      setRecentUploads((prev) => {
+        const next = [normalizedUrl, ...prev.filter((url) => url !== normalizedUrl)];
+        return next.slice(0, 5);
+      });
+      await refreshInventory();
+      const targetKind = classifyByExt(savedUrl);
+      const tabMap = { image: 'image', gif: 'gif', video: 'video', audio: 'audio', other: 'other' };
+      const preferred = tabMap[targetKind] && tabKeys.includes(tabMap[targetKind]) ? tabMap[targetKind] : 'all';
+      setSubTab(preferred);
+      const folderPath = `/public/media/${entry.folder}`;
+      setUploadStatus(`✅ Saved ${entry.file.name} to ${folderPath}`);
+    } catch (err) {
+      const message = err?.message || 'Upload failed';
+      setPendingUploads((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'error', error: message } : item)));
+      setUploadStatus(`❌ ${message}`);
+    }
+  }
+
   async function uploadFiles(fileList) {
     const files = Array.from(fileList || []).filter(Boolean);
     if (!files.length) return;
-    let success = 0;
-    let lastUrl = '';
-    for (const file of files) {
-      // eslint-disable-next-line no-await-in-loop
-      const uploaded = await uploadToRepo(file, folder);
-      if (uploaded) {
-        success += 1;
-        lastUrl = uploaded;
-      }
-    }
-    if (lastUrl) setAddUrl(lastUrl);
-    if (success) await refreshInventory();
-    if (files.length > 1) {
-      const prefix = success === files.length ? '✅' : '⚠️';
-      setUploadStatus(`${prefix} Uploaded ${success}/${files.length} files`);
-    }
+    const entries = files.map((file) => {
+      const kind = classifyByExt(file.name || file.type || '');
+      const folder = suggestFolderForFile(file, kind);
+      const previewUrl = createPreviewUrl(file, kind);
+      return {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        file,
+        folder,
+        kind,
+        status: 'pending',
+        error: '',
+        previewUrl,
+      };
+    });
+    setPendingUploads((prev) => [...prev, ...entries]);
+    setUploadStatus(entries.length === 1 ? `Ready to save ${files[0].name}` : `Ready to save ${entries.length} files`);
   }
 
   async function onUpload(e) {
     await uploadFiles(e.target.files);
     if (e.target) e.target.value = '';
+    setDropActive(false);
   }
 
   async function deleteOne(item) {
@@ -5509,51 +5809,48 @@ function MediaPoolTab({
       if (!path) continue;
       // eslint-disable-next-line no-await-in-loop
       const ok = await deleteMediaPath(path);
-      if (ok) okCount++;
+      if (ok) okCount += 1;
     }
     setUploadStatus(`✅ Deleted ${okCount}/${list.length}`);
     await refreshInventory();
   }
 
-  // Group by type
-  const itemsByType = (inv || []).reduce((acc, it) => {
+  const normalizedInv = inv || [];
+  const itemsByType = normalizedInv.reduce((acc, it) => {
     const t = classifyByExt(it.url);
     if (!acc[t]) acc[t] = [];
     acc[t].push(it);
     return acc;
   }, {});
   const sections = [
-    { key:'image', title:'Images (jpg/png)', items: itemsByType.image || [] },
-    { key:'video', title:'Video (mp4/mov)',  items: itemsByType.video || [] },
-    { key:'audio', title:'Audio (mp3/wav/aiff)', items: itemsByType.audio || [] },
-    { key:'gif',   title:'GIF',               items: itemsByType.gif   || [] },
+    { key: 'all', title: `All Media (${normalizedInv.length})`, items: normalizedInv },
+    { key: 'image', title: 'Images', items: itemsByType.image || [] },
+    { key: 'video', title: 'Videos', items: itemsByType.video || [] },
+    { key: 'audio', title: 'Audio', items: itemsByType.audio || [] },
+    { key: 'gif', title: 'GIFs', items: itemsByType.gif || [] },
+    { key: 'other', title: 'Other Files', items: itemsByType.other || [] },
   ];
-  const active = sections.find(s => s.key === subTab) || sections[2]; // default to 'audio'
+  const active = sections.find((s) => s.key === subTab) || sections[0];
+  const canBulkDelete = active.key !== 'all' && active.items.length > 0;
 
   return (
     <main style={S.wrap}>
-      {/* Upload */}
       <div style={S.card}>
-        <h3 style={{ marginTop:0 }}>Upload</h3>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:8, alignItems:'center' }}>
-          <input style={S.input} placeholder="(Optional) Paste URL to remember…" value={addUrl} onChange={(e)=>setAddUrl(e.target.value)} />
-          <select style={S.input} value={folder} onChange={(e)=>setFolder(e.target.value)}>
-            <option value="uploads">uploads</option>
-            <option value="bundles">bundles</option>
-            <option value="icons">icons</option>
-          </select>
+        <h3 style={{ marginTop: 0 }}>Upload</h3>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 12 }}>
           <button
             type="button"
-            style={{ ...S.button, display:'grid', placeItems:'center' }}
-            onClick={()=>fileInputRef.current?.click()}
+            style={{ ...S.button, ...S.mediaSelectButton }}
+            onClick={() => fileInputRef.current?.click()}
           >
-            Upload
+            Select Files
           </button>
+          <div style={S.mediaUploadHint}>Drop any media. We’ll choose a folder and you can adjust before saving.</div>
         </div>
         <div
-          onDragOver={(e)=>{ e.preventDefault(); setDropActive(true); }}
-          onDragLeave={(e)=>{ e.preventDefault(); setDropActive(false); }}
-          onDrop={(e)=>{
+          onDragOver={(e) => { e.preventDefault(); setDropActive(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDropActive(false); }}
+          onDrop={(e) => {
             e.preventDefault();
             setDropActive(false);
             uploadFiles(e.dataTransfer?.files);
@@ -5561,39 +5858,108 @@ function MediaPoolTab({
           style={{ ...S.mediaDropZone, ...(dropActive ? S.mediaDropZoneActive : {}) }}
         >
           <div>
-            <div style={S.mediaDropHeadline}>Drag & drop media</div>
-            <div style={S.mediaDropHint}>Drop multiple files at once or click Upload to browse.</div>
+            <div style={S.mediaDropHeadline}>Drag & drop media of any type</div>
+            <div style={S.mediaDropHint}>We’ll auto-place files in /public/media folders. Change it before saving if needed.</div>
           </div>
-          <button type="button" style={S.mediaDropBrowse} onClick={()=>fileInputRef.current?.click()}>Browse files</button>
+          <button type="button" style={S.mediaDropBrowse} onClick={() => fileInputRef.current?.click()}>Browse files</button>
         </div>
-        <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display:'none' }} />
-        {uploadStatus && <div style={{ marginTop:8, color:'var(--admin-muted)' }}>{uploadStatus}</div>}
-        <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-          Inventory {busy ? '(loading…)':''}: {inv.length} files
+        <input ref={fileInputRef} type="file" multiple onChange={onUpload} style={{ display: 'none' }} />
+
+        {pendingUploads.length > 0 && (
+          <div style={S.pendingUploadsWrap}>
+            {pendingUploads.map((entry) => {
+              const isUploading = entry.status === 'uploading';
+              const isError = entry.status === 'error';
+              const ext = (entry.file?.name || '').split('.').pop()?.toUpperCase() || entry.kind.toUpperCase();
+              return (
+                <div key={entry.id} style={S.pendingUploadCard}>
+                  <div style={S.pendingPreviewBox}>
+                    {entry.previewUrl && (entry.kind === 'image' || entry.kind === 'gif') && (
+                      <img src={entry.previewUrl} alt={entry.file?.name || 'preview'} style={S.pendingPreviewImage} />
+                    )}
+                    {entry.previewUrl && entry.kind === 'video' && (
+                      <video src={entry.previewUrl} style={S.pendingPreviewVideo} muted loop autoPlay />
+                    )}
+                    {entry.previewUrl && entry.kind === 'audio' && (
+                      <audio src={entry.previewUrl} controls style={{ width: '100%' }} />
+                    )}
+                    {!entry.previewUrl && (
+                      <div style={S.pendingPreviewFallback}>{ext}</div>
+                    )}
+                  </div>
+                  <div style={S.pendingMeta}>
+                    <div style={S.pendingFilename}>{entry.file?.name}</div>
+                    <div style={S.pendingFilesize}>{formatSize(entry.file)} • {entry.kind.toUpperCase()}</div>
+                    <label style={S.pendingFolderLabel}>
+                      Destination
+                      <select
+                        value={entry.folder}
+                        onChange={(e) => updatePendingFolder(entry.id, e.target.value)}
+                        style={S.mediaFolderSelect}
+                        disabled={isUploading}
+                      >
+                        {MEDIA_FOLDERS.map((folder) => (
+                          <option key={folder} value={folder}>
+                            /public/media/{folder}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div style={S.mediaFolderPath}>Saving to <code>/public/media/{entry.folder}</code></div>
+                    {isError && entry.error && <div style={S.pendingError}>{entry.error}</div>}
+                  </div>
+                  <div style={S.pendingActions}>
+                    <button
+                      type="button"
+                      style={{
+                        ...S.mediaSaveButton,
+                        ...(isUploading ? S.mediaSaveButtonDisabled : {}),
+                      }}
+                      onClick={() => { if (!isUploading) commitUpload(entry.id); }}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? 'Saving…' : 'Save Media'}
+                    </button>
+                    <button
+                      type="button"
+                      style={S.mediaCancelButton}
+                      onClick={() => removePending(entry.id)}
+                      disabled={isUploading}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {uploadStatus && <div style={{ marginTop: 8, color: 'var(--admin-muted)' }}>{uploadStatus}</div>}
+        <div style={{ color: 'var(--admin-muted)', marginTop: 8, fontSize: 12 }}>
+          Inventory {busy ? '(loading…)': ''}: {normalizedInv.length} files
         </div>
       </div>
 
-      {/* Sub-tabs: Images • Videos • Audio • GIFs (Audio default) */}
-      <div style={{ ...S.card, marginTop:16 }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
-          {subTabs.map(st => (
+      <div style={{ ...S.card, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          {subTabs.map((st) => (
             <button
               key={st.key}
-              onClick={()=>setSubTab(st.key)}
-              style={{ ...S.tab, ...(subTab===st.key?S.tabActive:{}) }}
+              onClick={() => setSubTab(st.key)}
+              style={{ ...S.tab, ...(subTab === st.key ? S.tabActive : {}) }}
             >
               {st.label.toUpperCase()}
             </button>
           ))}
         </div>
 
-        {/* Active section */}
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', margin: '4px 0 12px' }}>
-          <h3 style={{ margin:0 }}>{active.title}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '4px 0 12px' }}>
+          <h3 style={{ margin: 0 }}>{active.title}</h3>
           <button
             style={{ ...S.button, ...S.buttonDanger }}
-            onClick={()=>deleteAll(active.items)}
-            disabled={!active.items.length}
+            onClick={() => deleteAll(active.items)}
+            disabled={!canBulkDelete}
             title="Delete all files in this type"
           >
             Delete All
@@ -5601,50 +5967,48 @@ function MediaPoolTab({
         </div>
 
         {active.items.length === 0 ? (
-          <div style={{ color:'var(--admin-muted)' }}>No files.</div>
+          <div style={{ color: 'var(--admin-muted)' }}>No files.</div>
         ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
-            {active.items.map((it, idx)=>{
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px,1fr))', gap: 12 }}>
+            {active.items.map((it, idx) => {
               const url = toDirectMediaURL(it.url);
               const name = baseNameFromUrl(url);
+              const itemKind = classifyByExt(it.url);
               const previewCandidate = toDirectMediaURL(it.thumbUrl || it.url || '');
-              const looksImage = /\.(png|jpe?g|gif|webp|bmp|svg|tif|tiff|avif|heic|heif)(\?|#|$)/i.test(previewCandidate);
+              const looksImage = itemKind === 'image' || itemKind === 'gif';
+              const isRecent = recentUploads.includes(url);
+              const repoPath = it?.path || pathFromUrl(it?.url || it?.id || '');
+              const folderName = repoPath
+                ? repoPath.replace(/\\/g, '/').replace(/^public\/?media\/?/, '').split('/')[0] || ''
+                : '';
               return (
-                <div key={idx} style={{ border:'1px solid var(--admin-border-soft)', borderRadius:12, padding:12, display:'grid', gap:10 }}>
-                  {looksImage ? (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: 160,
-                        borderRadius: 12,
-                        overflow: 'hidden',
-                        border: '1px solid var(--admin-border-soft)',
-                        background: 'var(--admin-input-bg)',
-                        display: 'grid',
-                        placeItems: 'center',
-                      }}
-                    >
-                      <img src={previewCandidate} alt={name} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                <div key={idx} style={{ ...S.mediaCard, ...(isRecent ? S.recentUploadGlow : {}) }}>
+                  {looksImage && previewCandidate ? (
+                    <div style={S.mediaCardPreview}>
+                      <img src={previewCandidate} alt={name} style={S.mediaCardPreviewImage} />
                     </div>
                   ) : (
-                    <MediaPreview url={url} kind={active.key} />
+                    <MediaPreview url={url} kind={itemKind} />
                   )}
-                  <div>
-                    <div style={{ fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</div>
-                    <div style={{ fontSize:12, color:'var(--admin-muted)', wordBreak:'break-word' }}>{url}</div>
+                  <div style={S.mediaCardInfo}>
+                    <div style={S.mediaCardTitle}>{name}</div>
+                    <div style={S.mediaCardUrl}>{url}</div>
+                    {folderName && (
+                      <div style={S.mediaFolderNote}>Folder: <code>/public/media/{folderName}</code></div>
+                    )}
                   </div>
-                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <a
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ ...S.button, textDecoration:'none', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                      style={{ ...S.button, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       Open
                     </a>
                     <button
                       style={{ ...S.button, ...S.buttonDanger }}
-                      onClick={()=>deleteOne(it)}
+                      onClick={() => deleteOne(it)}
                     >
                       Delete
                     </button>
@@ -5658,7 +6022,6 @@ function MediaPoolTab({
     </main>
   );
 }
-
 /* ───────────────────────── ASSIGNED MEDIA (renamed Media tab) ───────────────────────── */
 function AssignedMediaPageTab({
   config,
