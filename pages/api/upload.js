@@ -22,6 +22,13 @@ const EXTS = {
   ar: /\.(glb|gltf|usdz|reality|vrm|fbx|obj)$/i,
 };
 
+function slugify(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function classify(name = '') {
   if (EXTS.gif.test(name)) return 'gif';
   if (EXTS.image.test(name)) return 'image';
@@ -29,6 +36,104 @@ function classify(name = '') {
   if (EXTS.audio.test(name)) return 'audio';
   if (EXTS.ar.test(name)) return 'ar-overlay';
   return 'other';
+}
+
+function deriveFolderMeta(folder = '', fallbackType = 'other') {
+  const normalized = String(folder || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+|\/+$/g, '');
+  const segments = normalized.split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  const defaultInfo = {
+    category: 'images',
+    categoryLabel: 'Images',
+    type: fallbackType,
+    tags: ['image'],
+  };
+
+  if (!segments.length) {
+    return { ...defaultInfo, type: fallbackType === 'ar' ? 'ar-overlay' : fallbackType };
+  }
+
+  let categoryKey = 'images';
+  if (segments[0].toLowerCase() === 'mediapool') {
+    const second = slugify(segments[1] || 'images');
+    if (['audio', 'video', 'gif', 'gifs', 'other', 'ar-target', 'ar-overlay', 'images'].includes(second)) {
+      categoryKey = second === 'gifs' ? 'gif' : second;
+    }
+  }
+
+  const baseTags = new Set(['category:' + categoryKey]);
+  let type = fallbackType;
+  switch (categoryKey) {
+    case 'audio':
+      type = 'audio';
+      baseTags.add('audio');
+      break;
+    case 'video':
+      type = 'video';
+      baseTags.add('video');
+      break;
+    case 'gif':
+      type = 'gif';
+      baseTags.add('gif');
+      break;
+    case 'ar-target':
+      type = 'ar-target';
+      baseTags.add('ar');
+      baseTags.add('ar-target');
+      break;
+    case 'ar-overlay':
+      type = 'ar-overlay';
+      baseTags.add('ar');
+      baseTags.add('ar-overlay');
+      break;
+    case 'other':
+      type = fallbackType;
+      baseTags.add('other');
+      break;
+    default:
+      type = fallbackType === 'ar' ? 'ar-overlay' : fallbackType;
+      baseTags.add('image');
+      break;
+  }
+
+  if (categoryKey === 'images') {
+    const third = slugify(segments[2] || '');
+    if (third === 'icons') baseTags.add('icon');
+    if (third === 'covers') baseTags.add('cover');
+    if (third === 'bundles') baseTags.add('bundle');
+    if (third === 'uploads') baseTags.add('upload');
+  }
+
+  const labelMap = {
+    audio: 'Audio',
+    video: 'Video',
+    gif: 'Gif',
+    'ar-target': 'AR Target',
+    'ar-overlay': 'AR Overlay',
+    other: 'Other',
+    images: 'Images',
+  };
+
+  return {
+    category: categoryKey,
+    categoryLabel: labelMap[categoryKey] || 'Images',
+    type,
+    tags: Array.from(baseTags),
+  };
+}
+
+function buildMediaSlug({ fileName = '', type = 'media', folder = '' }) {
+  const base = slugify(String(fileName || '').replace(/\.[^.]+$/, '')) || 'media';
+  const prefix = slugify(type) || 'media';
+  const folderHint = slugify(folder.split('/').slice(-1)[0] || '');
+  const parts = [prefix];
+  if (folderHint && folderHint !== prefix) parts.push(folderHint);
+  parts.push(base);
+  return parts.filter(Boolean).join('-').replace(/-+/g, '-').slice(0, 80);
 }
 
 function resolveFolder(input = '') {
@@ -79,6 +184,11 @@ export default async function handler(req, res) {
     const type = classify(safeName);
     const repoPath = `public/media/${resolvedFolder}/${safeName}`.replace(/\\/g, '/');
     const entryId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    const folderMeta = deriveFolderMeta(resolvedFolder, type);
+    const entryType = folderMeta.type || type;
+    const tagSet = new Set([entryType, ...folderMeta.tags, `folder:${slugify(resolvedFolder)}`]);
+    const entrySlug = buildMediaSlug({ fileName: safeName, type: entryType, folder: resolvedFolder });
+    if (entrySlug) tagSet.add(`slug:${entrySlug}`);
 
     const entry = {
       id: entryId,
@@ -86,7 +196,7 @@ export default async function handler(req, res) {
       fileName: safeName,
       folder: resolvedFolder,
       path: repoPath,
-      type: type === 'ar' ? 'ar-overlay' : type,
+      type: entryType,
       url: remoteUrl || '',
       status: remoteUrl ? 'external' : 'pending-external',
       notes: remoteUrl
@@ -94,6 +204,11 @@ export default async function handler(req, res) {
         : 'Upload recorded. Provide an external URL to activate this asset.',
       sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : undefined,
       createdAt: new Date().toISOString(),
+      tags: Array.from(tagSet),
+      category: folderMeta.category,
+      categoryLabel: folderMeta.categoryLabel,
+      kind: entryType,
+      slug: entrySlug,
     };
 
     let supabaseUpload = null;
