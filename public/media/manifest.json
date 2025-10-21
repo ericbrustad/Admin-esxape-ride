@@ -1,277 +1,396 @@
 {
-  "version": 1,
-  "updatedAt": "2025-10-21T15:30:00.000Z",
+  "version": 2,
+  "updatedAt": "2025-10-21T16:30:00.000Z",
   "items": [
     {
-      "id": "legacy-ar-overlay-erix-panda-complete",
+      "id": "supabase-ar-overlay-erix-panda-complete",
       "name": "eRIX ESCAPE RIDE PANDA COMPLETE",
       "fileName": "eRIX ESCAPE RIDE PANDA COMPLETE.png",
       "type": "ar-overlay",
       "folder": "mediapool/AR Overlay",
-      "url": "https://dummyimage.com/1024x1024/111827/ffffff.png&text=AR+Overlay",
-      "status": "legacy-placeholder",
-      "notes": "Legacy AR overlay removed from git to honor the zero-binary policy."
+      "status": "supabase",
+      "notes": "Stored in Supabase storage. Repo retains metadata only per zero-binary policy.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/AR Overlay/eRIX ESCAPE RIDE PANDA COMPLETE.png"
+      }
     },
     {
-      "id": "legacy-ar-overlay-erix-landscape",
+      "id": "supabase-ar-overlay-erix-landscape",
       "name": "Erix Escape ride overlay landscape",
       "fileName": "Erix Escape ride overlay landscape.png",
       "type": "ar-overlay",
       "folder": "mediapool/AR Overlay",
-      "url": "https://dummyimage.com/1024x1024/111827/ffffff.png&text=AR+Overlay",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/AR Overlay/Erix Escape ride overlay landscape.png"
+      }
     },
     {
-      "id": "legacy-ar-overlay-erix-landscape-small",
+      "id": "supabase-ar-overlay-erix-landscape-small",
       "name": "Erix Escape ride overlay landscapesmaller",
       "fileName": "Erix Escape ride overlay landscapesmaller.png",
       "type": "ar-overlay",
       "folder": "mediapool/AR Overlay",
-      "url": "https://dummyimage.com/1024x1024/111827/ffffff.png&text=AR+Overlay",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/AR Overlay/Erix Escape ride overlay landscapesmaller.png"
+      }
     },
     {
-      "id": "legacy-ar-overlay-erix-square",
+      "id": "supabase-ar-overlay-erix-square",
       "name": "erix square",
       "fileName": "erix square.png",
       "type": "ar-overlay",
       "folder": "mediapool/AR Overlay",
-      "url": "https://dummyimage.com/1024x1024/111827/ffffff.png&text=AR+Overlay",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/AR Overlay/erix square.png"
+      }
     },
     {
-      "id": "legacy-image-smoke-bomb-1759645884960",
+      "id": "supabase-image-smoke-bomb-a",
       "name": "SMOKE_BOMB",
       "fileName": "1759645884960-SMOKE_BOMB.png",
       "type": "image",
       "folder": "mediapool/Images",
-      "url": "https://dummyimage.com/512x512/312e81/f5f3ff.png&text=Smoke",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/1759645884960-SMOKE_BOMB.png"
+      }
     },
     {
-      "id": "legacy-image-smoke-bomb-1759645910730",
+      "id": "supabase-image-smoke-bomb-b",
       "name": "SMOKE_BOMB",
       "fileName": "1759645910730-SMOKE_BOMB.png",
       "type": "image",
       "folder": "mediapool/Images",
-      "url": "https://dummyimage.com/512x512/312e81/f5f3ff.png&text=Smoke",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/1759645910730-SMOKE_BOMB.png"
+      }
     },
     {
-      "id": "legacy-image-signal-jammer",
+      "id": "supabase-image-signal-jammer",
       "name": "sIGNAL_jAMMER",
       "fileName": "1759645755326-sIGNAL_jAMMER.jpg",
       "type": "image",
       "folder": "mediapool/Images",
-      "url": "https://dummyimage.com/512x512/052e16/d1fae5.png&text=Signal",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/1759645755326-sIGNAL_jAMMER.jpg"
+      }
     },
     {
-      "id": "legacy-upload-black-magic-book",
+      "id": "supabase-upload-black-magic-book",
       "name": "black_magic_book_-_Copy",
       "fileName": "1760531435763-black_magic_book_-_Copy.jpg",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1760531435763-black_magic_book_-_Copy.jpg"
+      }
     },
     {
-      "id": "legacy-upload-panda-cute",
+      "id": "supabase-upload-panda-cute",
       "name": "panda_cute",
       "fileName": "1759945867484-panda_cute.jpg",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1759945867484-panda_cute.jpg"
+      }
     },
     {
-      "id": "legacy-upload-casper",
+      "id": "supabase-upload-casper",
       "name": "casper",
       "fileName": "1759944234519-casper.jpg",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1759944234519-casper.jpg"
+      }
     },
     {
-      "id": "legacy-upload-diamond-complete-1",
+      "id": "supabase-upload-diamond-complete-a",
       "name": "Diamond_complete2",
       "fileName": "1759973022794-Diamond_complete2.jpg",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1759973022794-Diamond_complete2.jpg"
+      }
     },
     {
-      "id": "legacy-upload-diamond-complete-2",
+      "id": "supabase-upload-diamond-complete-b",
       "name": "Diamond_complete2",
       "fileName": "1759945844073-Diamond_complete2.jpg",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1759945844073-Diamond_complete2.jpg"
+      }
     },
     {
-      "id": "legacy-upload-map",
+      "id": "supabase-upload-map",
       "name": "MAP",
       "fileName": "1760528512543-MAP.PNG",
       "type": "image",
       "folder": "mediapool/Images/uploads",
-      "url": "https://dummyimage.com/512x512/4c1d95/f3e8ff.png&text=Upload",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/uploads/1760528512543-MAP.PNG"
+      }
     },
     {
-      "id": "legacy-icon-coach-fleet",
+      "id": "supabase-icon-coach-fleet",
       "name": "erix_coach_and_car_fleet_QR",
       "fileName": "1760231568080-erix_coach_and_car_fleet_QR.jpg",
       "type": "image",
       "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/1760231568080-erix_coach_and_car_fleet_QR.jpg"
+      }
     },
     {
-      "id": "legacy-icon-aurora-beacon",
-      "name": "aurora-beacon",
-      "fileName": "aurora-beacon.svg",
-      "type": "image",
-      "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
-    },
-    {
-      "id": "legacy-icon-chrono-switch",
-      "name": "chrono-switch",
-      "fileName": "chrono-switch.svg",
-      "type": "image",
-      "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
-    },
-    {
-      "id": "legacy-icon-map",
+      "id": "supabase-icon-map",
       "name": "Map",
       "fileName": "1760529588317-Map.png",
       "type": "image",
       "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/1760529588317-Map.png"
+      }
     },
     {
-      "id": "legacy-icon-lumen-halo",
+      "id": "supabase-icon-aurora-beacon",
+      "name": "aurora-beacon",
+      "fileName": "aurora-beacon.svg",
+      "type": "image",
+      "folder": "mediapool/Images/icons",
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/aurora-beacon.svg"
+      }
+    },
+    {
+      "id": "supabase-icon-chrono-switch",
+      "name": "chrono-switch",
+      "fileName": "chrono-switch.svg",
+      "type": "image",
+      "folder": "mediapool/Images/icons",
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/chrono-switch.svg"
+      }
+    },
+    {
+      "id": "supabase-icon-lumen-halo",
       "name": "lumen-halo",
       "fileName": "lumen-halo.svg",
       "type": "image",
       "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/lumen-halo.svg"
+      }
     },
     {
-      "id": "legacy-icon-quantum-anchor",
+      "id": "supabase-icon-quantum-anchor",
       "name": "quantum-anchor",
       "fileName": "quantum-anchor.svg",
       "type": "image",
       "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/quantum-anchor.svg"
+      }
     },
     {
-      "id": "legacy-icon-voyager-dial",
+      "id": "supabase-icon-voyager-dial",
       "name": "voyager-dial",
       "fileName": "voyager-dial.svg",
       "type": "image",
       "folder": "mediapool/Images/icons",
-      "url": "https://dummyimage.com/256x256/7c2d12/fef3c7.png&text=Icon",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/icons/voyager-dial.svg"
+      }
     },
     {
-      "id": "legacy-cover-neon-lantern-heist",
-      "name": "neon-lantern-heist",
-      "fileName": "neon-lantern-heist.svg",
-      "type": "image",
-      "folder": "mediapool/Images/covers",
-      "url": "https://dummyimage.com/600x800/0f172a/f8fafc.png&text=Cover",
-      "status": "legacy-placeholder"
-    },
-    {
-      "id": "legacy-cover-chronorift-cove",
-      "name": "chronorift-cove",
+      "id": "supabase-cover-chronorift-cove",
+      "name": "Chronorift Cove",
       "fileName": "chronorift-cove.svg",
       "type": "image",
       "folder": "mediapool/Images/covers",
-      "url": "https://dummyimage.com/600x800/0f172a/f8fafc.png&text=Cover",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/covers/chronorift-cove.svg"
+      }
     },
     {
-      "id": "legacy-cover-starfield-station-break",
-      "name": "starfield-station-break",
+      "id": "supabase-cover-neon-lantern-heist",
+      "name": "Neon Lantern Heist",
+      "fileName": "neon-lantern-heist.svg",
+      "type": "image",
+      "folder": "mediapool/Images/covers",
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/covers/neon-lantern-heist.svg"
+      }
+    },
+    {
+      "id": "supabase-cover-starfield-station-break",
+      "name": "Starfield Station Break",
       "fileName": "starfield-station-break.svg",
       "type": "image",
       "folder": "mediapool/Images/covers",
-      "url": "https://dummyimage.com/600x800/0f172a/f8fafc.png&text=Cover",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/covers/starfield-station-break.svg"
+      }
     },
     {
-      "id": "legacy-bundle-evidence",
-      "name": "evidence 2",
-      "fileName": "evidence 2.png",
-      "type": "image",
-      "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
-    },
-    {
-      "id": "legacy-bundle-golden-coin",
-      "name": "GOLDEN COIN",
-      "fileName": "GOLDEN COIN.png",
-      "type": "image",
-      "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
-    },
-    {
-      "id": "legacy-bundle-cluegreen",
+      "id": "supabase-bundle-clue-green",
       "name": "CLUEgreen",
       "fileName": "CLUEgreen.png",
       "type": "image",
       "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/CLUEgreen.png"
+      }
     },
     {
-      "id": "legacy-bundle-trivia-icon",
-      "name": "trivia icon",
-      "fileName": "trivia icon.png",
+      "id": "supabase-bundle-golden-coin",
+      "name": "GOLDEN COIN",
+      "fileName": "GOLDEN COIN.png",
       "type": "image",
       "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/GOLDEN COIN.png"
+      }
     },
     {
-      "id": "legacy-bundle-robot1small",
+      "id": "supabase-bundle-robot",
       "name": "ROBOT1small",
       "fileName": "ROBOT1small.png",
       "type": "image",
       "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/ROBOT1small.png"
+      }
     },
     {
-      "id": "legacy-bundle-smoke-bomb",
+      "id": "supabase-bundle-smoke-bomb",
       "name": "SMOKE BOMB",
       "fileName": "SMOKE BOMB.png",
       "type": "image",
       "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/SMOKE BOMB.png"
+      }
     },
     {
-      "id": "legacy-bundle-trivia-yellow",
+      "id": "supabase-bundle-evidence",
+      "name": "evidence 2",
+      "fileName": "evidence 2.png",
+      "type": "image",
+      "folder": "mediapool/Images/bundles",
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/evidence 2.png"
+      }
+    },
+    {
+      "id": "supabase-bundle-trivia-icon",
+      "name": "trivia icon",
+      "fileName": "trivia icon.png",
+      "type": "image",
+      "folder": "mediapool/Images/bundles",
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/trivia icon.png"
+      }
+    },
+    {
+      "id": "supabase-bundle-trivia-yellow",
       "name": "trivia yellow",
       "fileName": "trivia yellow.png",
       "type": "image",
       "folder": "mediapool/Images/bundles",
-      "url": "https://dummyimage.com/400x400/1f2937/f8fafc.png&text=Bundle",
-      "status": "legacy-placeholder"
+      "status": "supabase",
+      "notes": "Stored in Supabase storage.",
+      "supabase": {
+        "bucket": "admin-media",
+        "path": "mediapool/Images/bundles/trivia yellow.png"
+      }
     }
   ]
 }

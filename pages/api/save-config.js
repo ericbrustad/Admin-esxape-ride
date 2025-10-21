@@ -2,6 +2,7 @@
 // Save draft config to Admin root + mirror to Game draft (for TEST channel).
 // No extra Basic-Auth check — middleware already protects everything.
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { syncSupabaseJson } from '../../lib/supabase-storage.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'POST only' });
@@ -50,7 +51,21 @@ export default async function handler(req, res) {
       wrote.push(rel);
     }
 
-    return res.json({ ok:true, slug, wrote });
+    const supabase = {};
+    try {
+      supabase.settings = await syncSupabaseJson('settings', slug || 'default', config);
+    } catch (error) {
+      supabase.settings = { ok: false, error: error?.message || String(error), kind: 'settings', slug: slug || 'default' };
+    }
+
+    try {
+      const devicesPayload = Array.isArray(config?.devices) ? config.devices : (config?.powerups || []);
+      supabase.devices = await syncSupabaseJson('devices', slug || 'default', devicesPayload);
+    } catch (error) {
+      supabase.devices = { ok: false, error: error?.message || String(error), kind: 'devices', slug: slug || 'default' };
+    }
+
+    return res.json({ ok:true, slug, wrote, supabase });
   } catch (e) {
     return res.status(500).send(String(e));
   }

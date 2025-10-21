@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
 import { readManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
+import { listSupabaseMedia, isSupabaseMediaEnabled } from '../../lib/supabase-storage.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -275,6 +276,8 @@ export default async function handler(req, res) {
         const key = (entry.id || repoPath || entry.url || `${folder}/${entry.fileName || entry.name || ''}`).toLowerCase();
         if (seenKeys.has(key)) return;
         seenKeys.add(key);
+        if (repoPath) seenKeys.add(repoPath.toLowerCase());
+        if (url) seenKeys.add(url.toLowerCase());
         const absolute = repoPath ? path.join(cwd, repoPath) : '';
         const existsOnDisk = absolute ? fs.existsSync(absolute) : false;
         out.push({
@@ -293,8 +296,66 @@ export default async function handler(req, res) {
           status: entry.status || (existsOnDisk ? 'available' : url ? 'external' : 'missing'),
           notes: entry.notes || '',
           existsOnDisk,
+          supabase: entry.supabase || null,
         });
       });
+
+    if (isSupabaseMediaEnabled()) {
+      try {
+        const supabaseItems = await listSupabaseMedia(dir);
+        for (const item of supabaseItems) {
+          const name = item.name || item.supabasePath?.split('/')?.pop() || '';
+          const supabaseKeySource = item.supabasePath || item.publicUrl || name;
+          const key = `supabase://${(supabaseKeySource || '').toLowerCase()}`;
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          if (item.publicUrl) seenKeys.add(item.publicUrl.toLowerCase());
+          const relative = path.posix.join(dir, name || '');
+          const meta = enrichMeta(relative);
+          out.push({
+            id: key,
+            name: name || item.supabasePath,
+            fileName: name,
+            url: item.publicUrl || '',
+            path: '',
+            folder: dir,
+            type: (meta.type || classify(name || item.supabasePath)).toLowerCase(),
+            source: 'supabase',
+            category: meta.category,
+            categoryLabel: meta.categoryLabel,
+            tags: meta.tags,
+            kind: meta.type,
+            status: 'available',
+            notes: 'Supabase storage object',
+            existsOnDisk: false,
+            supabase: {
+              bucket: item.bucket,
+              path: item.supabasePath,
+              size: item.size,
+              updatedAt: item.updatedAt,
+            },
+          });
+        }
+      } catch (error) {
+        out.push({
+          id: `supabase-error-${dir}`,
+          name: 'Supabase listing failed',
+          fileName: '',
+          url: '',
+          path: '',
+          folder: dir,
+          type: 'other',
+          source: 'supabase-error',
+          category: 'other',
+          categoryLabel: 'Other',
+          tags: ['error'],
+          kind: 'other',
+          status: 'error',
+          notes: error?.message || 'Unable to list Supabase storage objects.',
+          existsOnDisk: false,
+        });
+      }
+    }
 
     const adminRoot = path.join(cwd, 'public', 'media', dir);
     const adminFiles = listFiles(adminRoot);
@@ -304,12 +365,14 @@ export default async function handler(req, res) {
       const key = repoPath.toLowerCase();
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);
+      const publicUrl = buildUrlFromPath(repoPath);
+      if (publicUrl) seenKeys.add(publicUrl.toLowerCase());
       const meta = enrichMeta(path.posix.join(folder, name));
       out.push({
         id: key,
         name,
         fileName: name,
-        url: buildUrlFromPath(repoPath),
+        url: publicUrl,
         path: repoPath,
         folder,
         type: (meta.type || classify(name)).toLowerCase(),

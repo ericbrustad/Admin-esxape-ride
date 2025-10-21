@@ -1,5 +1,6 @@
 // pages/api/save-publish.js
 import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { syncSupabaseJson } from '../../lib/supabase-storage.js';
 
 export const config = { api: { bodyParser: true } };
 
@@ -88,6 +89,10 @@ export default async function handler(req, res) {
 
     const missionsText = typeof missions === 'string' ? missions : JSON.stringify(missions, null, 2);
     const configText = typeof configObj === 'string' ? configObj : JSON.stringify(configObj, null, 2);
+    let missionsPayload;
+    let configPayload;
+    try { missionsPayload = typeof missions === 'string' ? JSON.parse(missions) : missions; } catch { missionsPayload = null; }
+    try { configPayload = typeof configObj === 'string' ? JSON.parse(configObj) : configObj; } catch { configPayload = null; }
 
     const wrote = [];
     const isDefault = slug === 'default';
@@ -154,7 +159,39 @@ export default async function handler(req, res) {
     let version = '';
     try { version = JSON.parse(missionsText)?.version || ''; } catch {}
 
-    res.json({ ok: true, slug, wrote, version });
+    const supabase = {};
+    try {
+      if (missionsPayload) {
+        supabase.missions = await syncSupabaseJson('missions', slug || 'default', missionsPayload);
+      } else {
+        supabase.missions = { ok: false, error: 'Unable to parse missions payload', kind: 'missions', slug: slug || 'default' };
+      }
+    } catch (error) {
+      supabase.missions = { ok: false, error: error?.message || String(error), kind: 'missions', slug: slug || 'default' };
+    }
+
+    try {
+      if (configPayload) {
+        supabase.settings = await syncSupabaseJson('settings', slug || 'default', configPayload);
+      } else {
+        supabase.settings = { ok: false, error: 'Unable to parse config payload', kind: 'settings', slug: slug || 'default' };
+      }
+    } catch (error) {
+      supabase.settings = { ok: false, error: error?.message || String(error), kind: 'settings', slug: slug || 'default' };
+    }
+
+    try {
+      const devicesPayload = Array.isArray(configPayload?.devices)
+        ? configPayload.devices
+        : Array.isArray(configPayload?.powerups)
+          ? configPayload.powerups
+          : [];
+      supabase.devices = await syncSupabaseJson('devices', slug || 'default', devicesPayload);
+    } catch (error) {
+      supabase.devices = { ok: false, error: error?.message || String(error), kind: 'devices', slug: slug || 'default' };
+    }
+
+    res.json({ ok: true, slug, wrote, version, supabase });
   } catch (e) {
     res.status(500).send(String(e?.message || e));
   }
