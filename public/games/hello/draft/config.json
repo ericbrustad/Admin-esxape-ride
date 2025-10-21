@@ -1,0 +1,129 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Hello",
+    "type": "Mystery",
+    "tags": [
+      "hello"
+    ],
+    "coverImage": "/media/covers/1761017327804-3_ring_answer_02.JPG",
+    "deployEnabled": true,
+    "shortDescription": "",
+    "longDescription": "",
+    "slug": "hello"
+  },
+  "forms": {
+    "players": 1
+  },
+  "timer": {
+    "durationMinutes": 0,
+    "alertMinutes": 10
+  },
+  "textRules": [],
+  "devices": [],
+  "powerups": [],
+  "media": {
+    "rewardsPool": [],
+    "penaltiesPool": []
+  },
+  "icons": {
+    "missions": [
+      {
+        "key": "briefing-star",
+        "name": "Briefing Star",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "decoy-glow",
+        "name": "Decoy Glow",
+        "url": "/media/icons/lumen-halo.svg"
+      }
+    ],
+    "devices": [
+      {
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "lumen-halo",
+        "name": "Lumen Halo",
+        "url": "/media/icons/lumen-halo.svg"
+      },
+      {
+        "key": "quantum-anchor",
+        "name": "Quantum Anchor",
+        "url": "/media/icons/quantum-anchor.svg"
+      },
+      {
+        "key": "chrono-switch",
+        "name": "Chrono Switch",
+        "url": "/media/icons/chrono-switch.svg"
+      },
+      {
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/icons/voyager-dial.svg"
+      }
+    ],
+    "rewards": [
+      {
+        "key": "evidence",
+        "name": "Evidence",
+        "url": "/media/bundles/evidence%202.png"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "/media/bundles/CLUEgreen.png"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "/media/bundles/GOLDEN%20COIN.png"
+      }
+    ]
+  },
+  "appearanceSkin": "default",
+  "appearance": {
+    "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 23,
+    "fontColor": "#262a58",
+    "textBgColor": "#f4f0ff",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#e0dcfa",
+    "screenBgOpacity": 0.46,
+    "screenBgImage": "/media/skins/starfield-dawn.svg",
+    "textAlign": "center",
+    "textVertical": "top",
+    "screenBgImageEnabled": true
+  },
+  "appearanceTone": "light",
+  "mediaTriggers": {
+    "enabled": false,
+    "actionType": "media",
+    "actionTarget": "",
+    "actionLabel": "",
+    "actionThumbnail": "",
+    "triggerDeviceId": "",
+    "triggerDeviceLabel": "",
+    "triggeredResponseKey": "",
+    "triggeredMissionId": ""
+  },
+  "map": {
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
+  },
+  "geofence": {
+    "mode": "test"
+  }
+}
