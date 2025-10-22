@@ -398,10 +398,17 @@ export default function Game() {
         onZip={() => setBackpackOpen(false)}
         backpack={backpack}
         onDrop={async (item) => {
-          await dropPocketItem(slug, 'finds', item.id, playerLocation);
+          const result = await dropPocketItem(slug, 'finds', item.id, playerLocation);
           refreshBackpack();
-          const items = await listDroppedItems(slug);
-          setDrops(items);
+          if (result?.entry) {
+            setDrops((prev) => {
+              const next = [result.entry, ...(Array.isArray(prev) ? prev : [])];
+              return next.slice(0, 200);
+            });
+          } else {
+            const items = await listDroppedItems(slug);
+            setDrops(items);
+          }
           setBackpackOpen(false);
         }}
         onDiscard={(item) => {

@@ -5,6 +5,31 @@ const SYNC_DELAY_MS = 400;
 
 const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
+function readDropCache(slug) {
+  if (!isBrowser()) return [];
+  try {
+    const raw = localStorage.getItem(DROP_CACHE_KEY(slug));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeCoordinate(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function writeDropCache(slug, entries) {
+  if (!isBrowser()) return;
+  try {
+    const list = Array.isArray(entries) ? entries.slice(0, 50) : [];
+    localStorage.setItem(DROP_CACHE_KEY(slug), JSON.stringify(list));
+  } catch {}
+}
+
 function baseState() {
   return {
     points: 0,
@@ -243,34 +268,48 @@ export async function dropPocketItem(slug, pocket, id, location = null) {
   if (index === -1) return null;
   const [removed] = arr.splice(index, 1);
   persist(slug, s);
-  await logDrop(slug, pocket, removed, location);
-  return removed;
+  const entry = await logDrop(slug, pocket, removed, location);
+  return { removed, entry };
 }
 
 async function logDrop(slug, pocket, item, location) {
   if (!slug || typeof fetch === 'undefined') return null;
+  const fallbackEntry = {
+    id: `drop_${Date.now()}`,
+    slug,
+    pocket: String(pocket || ''),
+    item,
+    lat: normalizeCoordinate(location?.lat),
+    lng: normalizeCoordinate(location?.lng),
+    accuracy: normalizeCoordinate(location?.accuracy),
+    dropped_at: new Date().toISOString(),
+  };
   try {
     const res = await fetch('/api/backpack/drop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug, pocket, item, location }),
     });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => null);
-    if (json?.entry && isBrowser()) {
-      const cacheKey = DROP_CACHE_KEY(slug);
-      const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
-      cached.unshift(json.entry);
-      localStorage.setItem(cacheKey, JSON.stringify(cached.slice(0, 50)));
+    if (!res.ok) {
+      const cached = readDropCache(slug);
+      writeDropCache(slug, [fallbackEntry, ...cached]);
+      return fallbackEntry;
     }
-    return json?.entry || null;
+    const json = await res.json().catch(() => null);
+    const entry = json?.entry || fallbackEntry;
+    const cached = readDropCache(slug);
+    writeDropCache(slug, [entry, ...cached]);
+    return entry;
   } catch {
-    return null;
+    const cached = readDropCache(slug);
+    writeDropCache(slug, [fallbackEntry, ...cached]);
+    return fallbackEntry;
   }
 }
 
 export async function listDroppedItems(slug) {
   if (!slug || typeof fetch === 'undefined') return [];
+  const cached = readDropCache(slug);
   try {
     const res = await fetch(`/api/backpack/drops?slug=${encodeURIComponent(slug)}`, {
       method: 'GET',
@@ -278,23 +317,22 @@ export async function listDroppedItems(slug) {
       cache: 'no-store',
     });
     if (!res.ok) {
-      if (isBrowser()) {
-        const cacheKey = DROP_CACHE_KEY(slug);
-        try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
-      }
-      return [];
+      return cached;
     }
     const json = await res.json().catch(() => null);
-    const list = Array.isArray(json?.items) ? json.items : [];
-    if (isBrowser()) {
-      localStorage.setItem(DROP_CACHE_KEY(slug), JSON.stringify(list.slice(0, 50)));
+    let list = Array.isArray(json?.items) ? json.items : [];
+    if (!list.length && json?.ok === false) {
+      list = cached;
     }
+    if (!Array.isArray(list) || !list.length) {
+      list = cached;
+    }
+    if (!Array.isArray(list)) {
+      list = [];
+    }
+    writeDropCache(slug, list);
     return list;
   } catch {
-    if (isBrowser()) {
-      const cacheKey = DROP_CACHE_KEY(slug);
-      try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
-    }
-    return [];
+    return cached;
   }
 }
