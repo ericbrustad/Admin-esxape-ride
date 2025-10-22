@@ -705,6 +705,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
+  const pnpmFixLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -714,6 +715,13 @@ export default function Admin() {
       return next.slice(-20);
     });
   }, []);
+
+  useEffect(() => {
+    if (pnpmFixLoggedRef.current) return;
+    logConversation('You', 'Pinned Node 20.18.x and pnpm 9.12.0 to resolve pnpm ERR_INVALID_THIS registry failures.');
+    logConversation('GPT', 'Set registry=https://registry.npmjs.org/ and refresh caches so pnpm installs stay stable.');
+    pnpmFixLoggedRef.current = true;
+  }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
     setNewGameStatus(message);
