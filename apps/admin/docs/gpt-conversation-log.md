@@ -8,6 +8,12 @@
 
 ---
 
+**Timestamp:** 2025-10-22T11:00:00Z
+
+**You:** Can you restructure the repo into a pnpm/turbo monorepo so Vercel can deploy `apps/admin` and `apps/game-web` separately, keep shared helpers in a workspace package, and make sure the settings footer still shows the repo snapshot once everything builds cleanly?
+
+**GPT:** Moved the existing Next.js admin into `apps/admin`, elevated the game bundle to `apps/game-web`, introduced root pnpm/turbo config plus a `packages/shared` stub, updated GitHub/media paths to the new locations, and reran `npm run build` for both apps to confirm everything compiles after the layout shift.
+
 **Timestamp:** 2025-10-21T09:52:41Z
 
 **You:** Can you locate every binary file in the project and give me a GitHub-friendly workaround for managing them?

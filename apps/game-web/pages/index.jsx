@@ -26,8 +26,15 @@ export default function Game() {
   const [backpackOpen, setBackpackOpen] = useState(false);
 
   const { slug, channel } = useMemo(() => {
-    const u = new URL(window.location.href);
-    return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
+    if (typeof window === 'undefined') {
+      return { slug: '', channel: 'published' };
+    }
+    try {
+      const u = new URL(window.location.href);
+      return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
+    } catch {
+      return { slug: '', channel: 'published' };
+    }
   }, []);
 
   useEffect(() => { initBackpack(slug); }, [slug]);

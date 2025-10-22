@@ -106,16 +106,17 @@ export default async function handler(req, res) {
     wrote.push(rootDraftC);
 
     // Draft (Game) for TEST channel + PUBLISHED (Game live) — only when GAME_ENABLED
+    const gameRepoBase = 'apps/game-web/public';
     if (GAME_ENABLED) {
-      const gameDraftM = joinPath(`game/public/games/${slug}/draft/missions.json`);
-      const gameDraftC = joinPath(`game/public/games/${slug}/draft/config.json`);
+      const gameDraftM = joinPath(`${gameRepoBase}/games/${slug}/draft/missions.json`);
+      const gameDraftC = joinPath(`${gameRepoBase}/games/${slug}/draft/config.json`);
       await putFileWithRetry(gameDraftM, missionsText, `save+publish(game draft missions): ${slug}`);
       wrote.push(gameDraftM);
       await putFileWithRetry(gameDraftC, configText, `save+publish(game draft config): ${slug}`);
       wrote.push(gameDraftC);
 
-      const gamePubM = joinPath(`game/public/games/${slug}/missions.json`);
-      const gamePubC = joinPath(`game/public/games/${slug}/config.json`);
+      const gamePubM = joinPath(`${gameRepoBase}/games/${slug}/missions.json`);
+      const gamePubC = joinPath(`${gameRepoBase}/games/${slug}/config.json`);
       await putFileWithRetry(gamePubM, missionsText, `publish(${slug}): game missions.json`);
       wrote.push(gamePubM);
       await putFileWithRetry(gamePubC, configText, `publish(${slug}): game config.json`);
@@ -140,10 +141,10 @@ export default async function handler(req, res) {
       wrote.push(legacyPubC);
 
       if (GAME_ENABLED) {
-        const legacyGameDraftM = joinPath('game/public/draft/missions.json');
-        const legacyGameDraftC = joinPath('game/public/draft/config.json');
-        const legacyGamePubM = joinPath('game/public/missions.json');
-        const legacyGamePubC = joinPath('game/public/config.json');
+        const legacyGameDraftM = joinPath(`${gameRepoBase}/draft/missions.json`);
+        const legacyGameDraftC = joinPath(`${gameRepoBase}/draft/config.json`);
+        const legacyGamePubM = joinPath(`${gameRepoBase}/missions.json`);
+        const legacyGamePubC = joinPath(`${gameRepoBase}/config.json`);
 
         await putFileWithRetry(legacyGameDraftM, missionsText, 'save+publish(legacy game draft missions): default');
         wrote.push(legacyGameDraftM);

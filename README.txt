@@ -4,6 +4,10 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
+  - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
+  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added
+    workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
 - 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
   - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
   - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.

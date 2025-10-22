@@ -16,7 +16,7 @@
   public/games/<slug>/draft/{missions.json, config.json}
 - Publish -> makes live + writes to Game:
   Admin: public/games/<slug>/{missions.json, config.json}
-  Game:  game/public/games/<slug>/{missions.json, config.json}
+  Game:  apps/game-web/public/games/<slug>/{missions.json, config.json}
 - Handles 409 with retry; shows "Saving…" and redeploy notes
 
 ## Media (global pool)

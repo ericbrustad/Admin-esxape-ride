@@ -1,0 +1,16 @@
+{
+  "name": "game-web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "next": "15.5.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "swr": "2.2.5"
+  }
+}

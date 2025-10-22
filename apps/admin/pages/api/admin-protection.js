@@ -5,7 +5,7 @@ import crypto from 'crypto';
 const ADMIN_PROTECTION_PATH = path.join(process.cwd(), 'public', 'admin-protection.json');
 const GAME_PROTECTION_PATHS = [
   path.join(process.cwd(), 'public', 'game', 'public', 'admin-protection.json'),
-  path.join(process.cwd(), 'game', 'public', 'admin-protection.json'),
+  path.join(process.cwd(), '..', 'game-web', 'public', 'admin-protection.json'),
 ];
 
 const hasGitHub = Boolean(
