@@ -45,6 +45,8 @@ export default function SettingsMenu({
   mapOptions,
   onMapOptionsChange,
   theme = {},
+  meta,
+  metaError,
 }) {
   const [soundOpen, setSoundOpen] = useState(true);
   const [mapOpen, setMapOpen] = useState(false);
@@ -153,6 +155,8 @@ export default function SettingsMenu({
               accent={surface.accent}
             />
           </Section>
+
+          <Footer meta={meta} error={metaError} theme={surface} />
         </div>
       )}
     </div>
@@ -183,6 +187,46 @@ function Section({ title, open, onToggle, children, muted }) {
         <span style={{ fontSize: 18 }}>{open ? '▾' : '▸'}</span>
       </button>
       {open ? <div style={{ display: 'grid', gap: 14 }}>{children}</div> : <div style={{ fontSize: 12, color: muted }}>Collapsed</div>}
+    </div>
+  );
+}
+
+function Footer({ meta, error, theme }) {
+  const hasMeta = meta?.ok !== false && (meta?.repo || meta?.branch || meta?.commit || meta?.vercelUrl);
+  const ownerRepo = meta?.owner ? `${meta.owner}/${meta?.repo || ''}`.replace(/\/+/g, '/') : meta?.repo || '';
+  const commit = meta?.commit ? meta.commit.slice(0, 7) : '';
+  const timestamp = meta?.fetchedAt ? new Date(meta.fetchedAt) : null;
+  const formatted = timestamp ? timestamp.toLocaleString(undefined, { hour12: false }) : '';
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        paddingTop: 12,
+        borderTop: `1px solid ${theme?.borderColor || 'rgba(68,92,116,0.35)'}`,
+        fontSize: 11,
+        lineHeight: 1.5,
+        color: theme?.muted || 'rgba(198,212,236,0.78)',
+        display: 'grid',
+        gap: 4,
+      }}
+    >
+      {error && <div style={{ color: '#ff8282' }}>Meta failed: {error}</div>}
+      {hasMeta ? (
+        <>
+          {ownerRepo && <div>Repository: {ownerRepo}</div>}
+          {meta?.branch && <div>Branch: {meta.branch}</div>}
+          {commit && <div>Commit: {commit}</div>}
+          {meta?.vercelUrl && (
+            <div>
+              Deployment: <a href={meta.vercelUrl} style={{ color: theme?.accent || '#5cc8ff' }}>{meta.vercelUrl}</a>
+            </div>
+          )}
+          {formatted && <div>Snapshot: {formatted}</div>}
+        </>
+      ) : (
+        <div>Deployment snapshot unavailable.</div>
+      )}
     </div>
   );
 }

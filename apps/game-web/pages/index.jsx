@@ -90,6 +90,9 @@ export default function Game() {
   const [geoStatus, setGeoStatus] = useState('locating');
   const [missionStatus, setMissionStatus] = useState('');
 
+  const [meta, setMeta] = useState(null);
+  const [metaError, setMetaError] = useState('');
+
   const [showPhoto, setShowPhoto] = useState(null);
   const [outcome, setOutcome] = useState(null);
   const themeAudioRef = useRef(null);
@@ -115,6 +118,29 @@ export default function Game() {
     });
     listDroppedItems(slug).then((items) => setDrops(items));
   }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/meta', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const data = await response.json();
+        if (!cancelled) {
+          setMeta(data);
+          setMetaError('');
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMeta(null);
+          setMetaError(error?.message || 'meta request failed');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -428,11 +454,14 @@ export default function Game() {
         mapOptions={mapOptions}
         onMapOptionsChange={(value) => {
           setMapOptions(value);
+          writeLocal(MAP_KEY, value);
           if (value.showDrops) {
             listDroppedItems(slug).then((items) => setDrops(items));
           }
         }}
         theme={theme}
+        meta={meta}
+        metaError={metaError}
       />
 
       {showPhoto && (
