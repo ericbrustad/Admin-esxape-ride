@@ -1,19 +1,17 @@
 {
-  "name": "esx-admin-control-panel-map",
-  "version": "1.2.1",
+  "name": "esxape-ride",
   "private": true,
-  "packageManager": "pnpm@8.15.5",
   "engines": {
-    "node": "20.x"
+    "node": "20.18.x"
   },
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start -p 3000"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start"
   },
-  "dependencies": {
-    "next": "^15.5.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+  "devDependencies": {
+    "turbo": "^2.1.0"
   }
 }
