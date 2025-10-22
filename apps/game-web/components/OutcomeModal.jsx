@@ -1,14 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function OutcomeModal({ open, outcome, onClose }) {
+export default function OutcomeModal({ open, outcome, onClose, sound = {} }) {
   const audioRef = useRef(null);
   const o = outcome || {};
   useEffect(() => {
-    if (open && o.audioUrl && audioRef.current) {
+    if (open && o.audioUrl && audioRef.current && sound.fxEnabled !== false) {
       audioRef.current.currentTime = 0;
+      audioRef.current.volume = Math.max(0, Math.min(1, sound.fxVolume ?? 1));
       audioRef.current.play().catch(()=>{});
     }
-  }, [open, o.audioUrl]);
+  }, [open, o.audioUrl, sound.fxEnabled, sound.fxVolume]);
 
   if (!open) return null;
   const isVideo = /\.(mp4|webm|mov)(\?|#|$)/i.test(o.mediaUrl || '');

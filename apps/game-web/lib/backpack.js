@@ -1,70 +1,300 @@
-// Simple localStorage-based backpack & progress, namespaced by slug.
+// Backpack persistence with Supabase sync support.
 const SKEY = (slug) => `esx.backpack.${slug || 'default'}`;
+const DROP_CACHE_KEY = (slug) => `esx.backpack.${slug || 'default'}.drops`;
+const SYNC_DELAY_MS = 400;
+
+const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
+function baseState() {
+  return {
+    points: 0,
+    pockets: {
+      photos: [],
+      videos: [],
+      audios: [],
+      rewards: [],
+      utilities: [],
+      clues: [],
+      finds: [], // geo-finds collected via geofences
+    },
+    answers: {},
+    visits: {
+      geofences: {}, // { [geofenceId]: timestamp }
+    },
+  };
+}
+
+function normalizeState(state = {}) {
+  const base = baseState();
+  const pockets = { ...base.pockets, ...(state.pockets || {}) };
+  pockets.photos = pockets.photos || [];
+  pockets.rewards = pockets.rewards || [];
+  pockets.utilities = pockets.utilities || [];
+  pockets.clues = pockets.clues || [];
+  pockets.finds = pockets.finds || [];
+  return {
+    ...base,
+    ...state,
+    pockets,
+    visits: {
+      ...base.visits,
+      ...(state.visits || {}),
+      geofences: {
+        ...(base.visits.geofences || {}),
+        ...((state.visits && state.visits.geofences) || {}),
+      },
+    },
+  };
+}
 
 function read(slug) {
-  try { return JSON.parse(localStorage.getItem(SKEY(slug))) || {}; } catch { return {}; }
+  if (!isBrowser()) return baseState();
+  try {
+    const raw = localStorage.getItem(SKEY(slug));
+    if (!raw) return baseState();
+    return normalizeState(JSON.parse(raw));
+  } catch {
+    return baseState();
+  }
 }
+
 function write(slug, data) {
-  localStorage.setItem(SKEY(slug), JSON.stringify(data || {}));
+  if (!isBrowser()) return;
+  const next = normalizeState(data);
+  localStorage.setItem(SKEY(slug), JSON.stringify(next));
+  return next;
+}
+
+const pendingSync = new Map();
+
+function scheduleSync(slug) {
+  if (!isBrowser() || typeof fetch === 'undefined') return;
+  if (pendingSync.has(slug)) {
+    clearTimeout(pendingSync.get(slug));
+  }
+  const handle = setTimeout(() => {
+    pendingSync.delete(slug);
+    const state = read(slug);
+    pushToSupabase(slug, state).catch(() => {});
+  }, SYNC_DELAY_MS);
+  pendingSync.set(slug, handle);
+}
+
+async function pushToSupabase(slug, state) {
+  if (!slug || typeof fetch === 'undefined') return null;
+  try {
+    const res = await fetch('/api/backpack', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, state }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    return json;
+  } catch {
+    return null;
+  }
+}
+
+async function pullFromSupabase(slug) {
+  if (!slug || typeof fetch === 'undefined') return null;
+  try {
+    const res = await fetch(`/api/backpack?slug=${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    if (json && json.state) {
+      write(slug, json.state);
+      return normalizeState(json.state);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function persist(slug, next) {
+  write(slug, next);
+  scheduleSync(slug);
+  return next;
 }
 
 export function initBackpack(slug) {
-  const cur = read(slug);
-  const base = {
-    points: 0,
-    pockets: {
-      photos: [],   // {id, url, title, ts}
-      videos: [],   // future
-      audios: [],   // future
-      rewards: [],  // {id, key, name, thumbUrl, ts}
-      utilities: [],// {id, key, name, thumbUrl, ts}
-      clues: [],    // {id, text, ts}
-    },
-    answers: {},    // { [missionId]: { correct, value, ts } }
-  };
-  write(slug, { ...base, ...cur, pockets: { ...base.pockets, ...(cur.pockets || {}) } });
+  const current = read(slug);
+  return write(slug, current);
 }
 
-export function getBackpack(slug) { return read(slug); }
-export function addPoints(slug, n) {
-  const s = read(slug); s.points = (s.points || 0) + (Number(n)||0); write(slug, s); return s.points;
+export function getBackpack(slug) {
+  return read(slug);
 }
-export function getPoints(slug) { return (read(slug).points || 0); }
+
+export function addPoints(slug, n) {
+  const s = read(slug);
+  s.points = (s.points || 0) + (Number(n) || 0);
+  persist(slug, s);
+  return s.points;
+}
+
+export function getPoints(slug) {
+  return read(slug).points || 0;
+}
 
 export function addPhoto(slug, { dataUrl, title }) {
-  const s = read(slug); const id = `ph_${Date.now()}`;
-  s.pockets = s.pockets || {}; s.pockets.photos = s.pockets.photos || [];
+  const s = read(slug);
+  const id = `ph_${Date.now()}`;
   s.pockets.photos.unshift({ id, url: dataUrl, title: title || 'Photo', ts: Date.now() });
-  write(slug, s);
+  persist(slug, s);
   return id;
 }
+
 export function addReward(slug, { key, name, thumbUrl }) {
-  const s = read(slug); const id = `rw_${Date.now()}`;
-  s.pockets.rewards = s.pockets.rewards || [];
+  const s = read(slug);
+  const id = `rw_${Date.now()}`;
   s.pockets.rewards.unshift({ id, key, name, thumbUrl, ts: Date.now() });
-  write(slug, s);
+  persist(slug, s);
   return id;
 }
+
 export function addUtility(slug, { key, name, thumbUrl }) {
-  const s = read(slug); const id = `ut_${Date.now()}`;
-  (s.pockets.utilities = s.pockets.utilities || []).unshift({ id, key, name, thumbUrl, ts: Date.now() });
-  write(slug, s);
+  const s = read(slug);
+  const id = `ut_${Date.now()}`;
+  s.pockets.utilities.unshift({ id, key, name, thumbUrl, ts: Date.now() });
+  persist(slug, s);
   return id;
 }
+
 export function addClue(slug, text) {
-  const s = read(slug); const id = `cl_${Date.now()}`;
-  (s.pockets.clues = s.pockets.clues || []).unshift({ id, text: String(text || ''), ts: Date.now() });
-  write(slug, s);
+  const s = read(slug);
+  const id = `cl_${Date.now()}`;
+  s.pockets.clues.unshift({ id, text: String(text || ''), ts: Date.now() });
+  persist(slug, s);
   return id;
 }
+
+export function addFind(slug, item) {
+  const s = read(slug);
+  const id = item?.id || `gf_${Date.now()}`;
+  s.pockets.finds.unshift({
+    id,
+    name: item?.name || 'Geo Find',
+    description: item?.description || '',
+    iconUrl: item?.iconUrl || '',
+    originId: item?.originId || '',
+    originType: item?.originType || '',
+    lat: item?.lat ?? null,
+    lng: item?.lng ?? null,
+    collectedAt: item?.collectedAt || Date.now(),
+  });
+  persist(slug, s);
+  return id;
+}
+
+export function markGeofenceVisit(slug, geofenceId) {
+  if (!geofenceId) return;
+  const s = read(slug);
+  s.visits.geofences[geofenceId] = Date.now();
+  persist(slug, s);
+}
+
+export function hasVisitedGeofence(slug, geofenceId) {
+  const s = read(slug);
+  return Boolean(s.visits.geofences[geofenceId]);
+}
+
 export function removePocketItem(slug, pocket, id) {
-  const s = read(slug); const arr = (s.pockets && s.pockets[pocket]) || [];
-  const i = arr.findIndex(x => x.id === id); if (i >= 0) arr.splice(i, 1);
-  write(slug, s);
+  if (!pocket || !id) return;
+  const s = read(slug);
+  const arr = s.pockets[pocket] || [];
+  const index = arr.findIndex((item) => item.id === id);
+  if (index >= 0) {
+    arr.splice(index, 1);
+    persist(slug, s);
+  }
 }
+
 export function recordAnswer(slug, missionId, { correct, value }) {
-  const s = read(slug); s.answers = s.answers || {};
+  const s = read(slug);
   s.answers[String(missionId)] = { correct: !!correct, value, ts: Date.now() };
-  write(slug, s);
+  persist(slug, s);
 }
-export function getProgress(slug) { const s = read(slug); return { points: s.points||0, answers: s.answers||{}, pockets: s.pockets||{} }; }
+
+export function getProgress(slug) {
+  const s = read(slug);
+  return { points: s.points || 0, answers: s.answers || {}, pockets: s.pockets || {} };
+}
+
+export async function loadBackpackFromSupabase(slug) {
+  return pullFromSupabase(slug);
+}
+
+export async function syncBackpack(slug) {
+  const state = read(slug);
+  await pushToSupabase(slug, state);
+  return state;
+}
+
+export async function dropPocketItem(slug, pocket, id, location = null) {
+  const s = read(slug);
+  const arr = s.pockets[pocket] || [];
+  const index = arr.findIndex((item) => item.id === id);
+  if (index === -1) return null;
+  const [removed] = arr.splice(index, 1);
+  persist(slug, s);
+  await logDrop(slug, pocket, removed, location);
+  return removed;
+}
+
+async function logDrop(slug, pocket, item, location) {
+  if (!slug || typeof fetch === 'undefined') return null;
+  try {
+    const res = await fetch('/api/backpack/drop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug, pocket, item, location }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    if (json?.entry && isBrowser()) {
+      const cacheKey = DROP_CACHE_KEY(slug);
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || '[]');
+      cached.unshift(json.entry);
+      localStorage.setItem(cacheKey, JSON.stringify(cached.slice(0, 50)));
+    }
+    return json?.entry || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function listDroppedItems(slug) {
+  if (!slug || typeof fetch === 'undefined') return [];
+  try {
+    const res = await fetch(`/api/backpack/drops?slug=${encodeURIComponent(slug)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      if (isBrowser()) {
+        const cacheKey = DROP_CACHE_KEY(slug);
+        try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
+      }
+      return [];
+    }
+    const json = await res.json().catch(() => null);
+    const list = Array.isArray(json?.items) ? json.items : [];
+    if (isBrowser()) {
+      localStorage.setItem(DROP_CACHE_KEY(slug), JSON.stringify(list.slice(0, 50)));
+    }
+    return list;
+  } catch {
+    if (isBrowser()) {
+      const cacheKey = DROP_CACHE_KEY(slug);
+      try { return JSON.parse(localStorage.getItem(cacheKey) || '[]'); } catch { return []; }
+    }
+    return [];
+  }
+}
