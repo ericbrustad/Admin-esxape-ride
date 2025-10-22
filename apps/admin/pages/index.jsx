@@ -13,6 +13,7 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
+import { nextMissionId, nextDeviceId } from '../lib/ids.js';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -705,7 +706,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmFixLoggedRef = useRef(false);
+  const pnpmShimLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -717,10 +718,12 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (pnpmFixLoggedRef.current) return;
-    logConversation('You', 'Pinned Node 20.18.x and pnpm 9.12.0 to resolve pnpm ERR_INVALID_THIS registry failures.');
-    logConversation('GPT', 'Set registry=https://registry.npmjs.org/ and refresh caches so pnpm installs stay stable.');
-    pnpmFixLoggedRef.current = true;
+    if (pnpmShimLoggedRef.current) return;
+    logConversation('You', 'Added an offline pnpm shim so builds work without registry access.');
+    logConversation('GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.');
+    logConversation('You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.');
+    logConversation('GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.');
+    pnpmShimLoggedRef.current = true;
   }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
@@ -1512,10 +1515,7 @@ export default function Admin() {
 
   /* Missions CRUD */
   function suggestId() {
-    const base='m'; let i=1;
-    const ids = new Set((suite?.missions||[]).map(m=>m.id));
-    while (ids.has(String(base + String(i).padStart(2,'0')))) i++;
-    return base + String(i).padStart(2,'0');
+    return nextMissionId(suite?.missions || []);
   }
   function startNew() {
     if (missionButtonTimeout.current) {
@@ -1698,10 +1698,7 @@ export default function Admin() {
     return { media: mediaOptions, devices: deviceOptions, missions: missionOptions, responses: responseOptions };
   }, [inventory, devices, suite?.missions, config?.icons?.devices, config?.icons?.missions]);
   function suggestDeviceId(existing = devices) {
-    const ids = new Set((existing || []).map(d => String(d?.id || '').toLowerCase()));
-    let i = 1;
-    while (ids.has(`d${String(i).padStart(2, '0')}`)) i += 1;
-    return `d${String(i).padStart(2, '0')}`;
+    return nextDeviceId(existing || []);
   }
   function addDevice() {
     if (deviceButtonTimeout.current) {

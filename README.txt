@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-22 — Offline pnpm shim & TypeScript-free previews. Commit: (pending HEAD)
+  - Direct links: `tools/offline-pnpm.mjs`, `apps/admin/pages/preview/[slug].jsx`, `apps/game-web/pages/index-supabase.jsx`, `package.json`, `apps/admin/pages/index.jsx`, `apps/admin/pages/api/admin-meta.js`
+  - Notes: Added a local pnpm shim that routes `--filter` commands to the Next.js binaries for admin and game builds, dropped TypeScript-only entry points so offline builds stop downloading `@types/*`, refreshed the settings footer snapshot, and logged the GPT pairing that validated the fix.
 - 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
   - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
   - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added

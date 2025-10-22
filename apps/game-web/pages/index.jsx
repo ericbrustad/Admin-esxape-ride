@@ -7,6 +7,12 @@ import {
   initBackpack, getBackpack, addPhoto, addReward, addUtility, addClue,
   addPoints, recordAnswer
 } from '../lib/backpack';
+import { fetchGameBundle } from '../lib/supabase/client.js';
+
+const SUPABASE_ENABLED = Boolean(
+  (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) &&
+  (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)
+);
 
 function toDirect(u){ try{
   const url=new URL(u); const host=url.host.toLowerCase();
@@ -39,16 +45,59 @@ export default function Game() {
 
   useEffect(() => { initBackpack(slug); }, [slug]);
 
-  useEffect(() => { (async () => {
-    try {
-      const base = channel === 'published' ? 'published' : 'draft';
-      const ms = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache:'no-store' }).then(r=>r.json());
-      const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`,   { cache:'no-store' }).then(r=>r.json()).catch(()=> ({}));
-      setSuite(ms); setConfig(cfg); setStatus('');
-    } catch (e) {
-      setStatus('Failed to load game.');
-    }
-  })(); }, [slug, channel]);
+  useEffect(() => {
+    let cancelled = false;
+    setSuite(null);
+    setConfig(null);
+    setStatus('Loading…');
+
+    (async () => {
+      if (!slug) {
+        setStatus('Missing game slug.');
+        return;
+      }
+
+      try {
+        if (SUPABASE_ENABLED) {
+          const bundle = await fetchGameBundle({ slug, channel });
+          if (cancelled) return;
+          const missions = Array.isArray(bundle?.missions) ? bundle.missions : [];
+          const devices = Array.isArray(bundle?.devices) ? bundle.devices : [];
+          const configFromSupabase = bundle?.config && typeof bundle.config === 'object'
+            ? { ...bundle.config }
+            : {};
+          if (!Array.isArray(configFromSupabase.devices)) {
+            configFromSupabase.devices = devices;
+          }
+          if (!Array.isArray(configFromSupabase.powerups) && Array.isArray(devices)) {
+            configFromSupabase.powerups = configFromSupabase.powerups || [];
+          }
+          setSuite({ missions });
+          setConfig(configFromSupabase);
+          setStatus('');
+          return;
+        }
+
+        const base = channel === 'published' ? 'published' : 'draft';
+        const missionsRes = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache: 'no-store' });
+        if (!missionsRes.ok) throw new Error(`missions ${missionsRes.status}`);
+        const ms = await missionsRes.json();
+        const cfg = await fetch(`/games/${encodeURIComponent(slug)}/${base}/config.json`, { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : {}))
+          .catch(() => ({}));
+        if (cancelled) return;
+        setSuite(ms);
+        setConfig(cfg);
+        setStatus('');
+      } catch (e) {
+        if (cancelled) return;
+        console.error('Failed to load game bundle', e);
+        setStatus('Failed to load game.');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [slug, channel]);
 
   if (!suite || !config) {
     return <main style={outer}><div style={card}>{status}</div></main>;
