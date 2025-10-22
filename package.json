@@ -2,12 +2,13 @@
   "name": "esxape-ride",
   "private": true,
   "engines": {
-    "node": ">=20.19.0 <21.0.0"
+    "node": ">=20.18 <21"
   },
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@9.11.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "turbo run dev",
+    "vercel:info": "node -v && corepack --version || true && pnpm -v || true",
     "build": "turbo run build",
     "start": "turbo run start",
     "build:game": "node tools/offline-pnpm.mjs --filter game-web build"
