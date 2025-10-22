@@ -706,7 +706,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmFixLoggedRef = useRef(false);
+  const pnpmShimLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -718,10 +718,12 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (pnpmFixLoggedRef.current) return;
-    logConversation('You', 'Pinned Node 20.18.x and pnpm 9.12.0 to resolve pnpm ERR_INVALID_THIS registry failures.');
-    logConversation('GPT', 'Set registry=https://registry.npmjs.org/ and refresh caches so pnpm installs stay stable.');
-    pnpmFixLoggedRef.current = true;
+    if (pnpmShimLoggedRef.current) return;
+    logConversation('You', 'Added an offline pnpm shim so builds work without registry access.');
+    logConversation('GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.');
+    logConversation('You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.');
+    logConversation('GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.');
+    pnpmShimLoggedRef.current = true;
   }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {

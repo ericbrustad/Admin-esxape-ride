@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "build:game": "node tools/offline-pnpm.mjs --filter game-web build"
   },
   "devDependencies": {
     "turbo": "^2.1.0"

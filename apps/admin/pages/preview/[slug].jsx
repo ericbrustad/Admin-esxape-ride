@@ -1,14 +1,6 @@
-import type { GetServerSideProps } from 'next';
 import Head from 'next/head';
 
-interface PreviewPageProps {
-  slug: string;
-  channel: string;
-  gameOrigin: string;
-  iframeUrl: string | null;
-}
-
-export const getServerSideProps: GetServerSideProps<PreviewPageProps> = async ({ params, query }) => {
+export const getServerSideProps = async ({ params, query }) => {
   const slug = String(params?.slug || '').trim();
   const channel = String(query?.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
   const originEnv = process.env.NEXT_PUBLIC_GAME_ORIGIN || process.env.GAME_ORIGIN || '';
@@ -17,7 +9,7 @@ export const getServerSideProps: GetServerSideProps<PreviewPageProps> = async ({
   const hasSlug = Boolean(slug);
   const hasOrigin = Boolean(gameOrigin);
 
-  let iframeUrl: string | null = null;
+  let iframeUrl = null;
   if (hasSlug && hasOrigin) {
     const search = new URLSearchParams({ slug, channel, preview: '1' });
     iframeUrl = `${gameOrigin}/?${search.toString()}`;
@@ -33,7 +25,7 @@ export const getServerSideProps: GetServerSideProps<PreviewPageProps> = async ({
   };
 };
 
-export default function PreviewPage({ slug, channel, gameOrigin, iframeUrl }: PreviewPageProps) {
+export default function PreviewPage({ slug, channel, gameOrigin, iframeUrl }) {
   const hasSlug = Boolean(slug);
   const hasOrigin = Boolean(gameOrigin);
 
