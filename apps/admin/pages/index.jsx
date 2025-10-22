@@ -724,6 +724,10 @@ export default function Admin() {
     logConversation('GPT', 'Run node scripts/install-offline-pnpm.mjs after pulling to refresh the shim across local Node versions.');
     logConversation('You', 'Swapped the bundled pnpm tarball for an npm pack step so no binary blobs live in git.');
     logConversation('GPT', 'Confirmed: install script now generates pnpm-9.12.0.tgz on demand before wiring the Corepack shim.');
+    logConversation('You', 'Added a preinstall guard so installs halt unless Node 20.18.x and pnpm 9.12.0 are active.');
+    logConversation('GPT', 'Toolchain check now prints Corepack enable + prepare guidance before pnpm can throw ERR_INVALID_THIS.');
+    logConversation('You', 'Taught the offline pnpm shim to trash the generated tarball immediately so binaries never linger in git.');
+    logConversation('GPT', 'README tooling checklist now walks through Node pinning, Corepack activation, and the shim refresh routine.');
     pnpmFixLoggedRef.current = true;
   }, [logConversation]);
 

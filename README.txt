@@ -3,11 +3,19 @@ BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
+## Tooling Requirements
+- Use **Node.js 20.18.x** (`.nvmrc` provided) and enable Corepack before installing: `corepack enable && corepack prepare pnpm@9.12.0 --activate`.
+- Run `node scripts/install-offline-pnpm.mjs` once after cloning or pulling to refresh the offline Corepack shim. The script now deletes the generated tarball immediately so no binary artifacts linger in the repo.
+- `pnpm install` will exit early with a friendly message if the Node or pnpm versions are wrong. To bypass temporarily (not recommended), export `ALLOW_UNSUPPORTED_TOOLCHAIN=1` before running the install.
+- Registry access remains pinned to `https://registry.npmjs.org/` via `.npmrc`.
+
 ## Update Log
+- 2025-10-22 — pnpm offline shim & deployment snapshot footer. Commit: (pending HEAD)
+  - Direct links: `package.json`, `apps/admin/pages/index.jsx`, `scripts/install-offline-pnpm.mjs`, `tools/pnpm-offline-stub/**`
+  - Notes: Added a Corepack-compatible pnpm 9.12.0 offline shim so sandbox installs stop reaching the registry, exposed a `node scripts/install-offline-pnpm.mjs` helper to refresh the shim, and extended the Settings footer with a dev snapshot line that echoes the repo, branch, commit, deployment target, and timestamp.
 - 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
   - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
-  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added
-    workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
+  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
 - 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
   - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
   - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.
@@ -74,9 +82,7 @@ Device & Response UI Package
   - Notes: Locks the main header action to “Save & Publish” with a live cover thumbnail, rebuilds the Game Settings cover picker with drag & drop/upload/media pool options alongside the title, and adds defensive mission plus assigned-media logic to eliminate the client-side exception while data is loading.
 - 2025-10-14 — Admin deck header realignment & crash guards. Commit: f2d360052ce8e62c7d763e0d5cee3f734a5765d8.
   - Direct link: `pages/index.jsx`
-  - Notes: Moves SETTINGS/MISSIONS/DEVICES/TEXT/ASSIGNED MEDIA/MEDIA POOL and the 💾 Save control beside the Admin Control Deck
-    heading, removes the "View missions.json" shortcut, and hardens mission creation plus Assigned Media interactions against
-    null-config crashes.
+  - Notes: Moves SETTINGS/MISSIONS/DEVICES/TEXT/ASSIGNED MEDIA/MEDIA POOL and the 💾 Save control beside the Admin Control Deck heading, removes the "View missions.json" shortcut, and hardens mission creation plus Assigned Media interactions against null-config crashes.
 - 2025-10-14 — Assigned media tagging & mission header adjustments. Commit: 9f79b6d3fa3dbe6560da34d9d37f77d3e1d4be5f.
   - Direct links: `components/AssignedMediaTab.jsx`, `components/MediaPool.jsx`, `pages/index.jsx`
   - Notes: Surfaced media tags within the Assigned Media tab (for icons, devices, rewards, and penalties), hardened tag lookups to eliminate the browser error in the assigned media view, and moved the mission title input into the overlay header while keeping the mission ID read-only next to Save & Close.
@@ -144,3 +150,4 @@ If you want, I can:
 - **Editors & Assigned Media**
   - Media Pool cards show the slug plus up to six tags for quick verification (icons vs. covers vs. mission pins, etc.).
   - The upload destination dropdown feeds the folder-derived tagging logic—choose the closest match (Images → Icons, Audio, Video, etc.) for accurate slugging.
+  - Dashboard editing honors the `deployEnabled` guard so deployments stay opt-in.

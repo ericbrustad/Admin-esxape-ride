@@ -1,4 +1,13 @@
-import { chmodSync, mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -13,8 +22,13 @@ const stubPackageDir = join(stubRoot, 'package');
 
 function ensureTarball() {
   const expectedName = `pnpm-${VERSION}.tgz`;
-  const existingPath = join(stubRoot, expectedName);
-  if (existsSync(existingPath)) return existingPath;
+  const destination = join(stubRoot, expectedName);
+
+  if (existsSync(destination)) {
+    try {
+      rmSync(destination);
+    } catch {}
+  }
 
   const packResult = spawnSync('npm', ['pack', '--pack-destination', stubRoot], {
     cwd: stubPackageDir,
@@ -25,10 +39,16 @@ function ensureTarball() {
   if (packResult.status !== 0) {
     const stdout = (packResult.stdout || '').trim();
     const stderr = (packResult.stderr || '').trim();
-    throw new Error(`npm pack failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ''}`);
+    throw new Error(
+      `npm pack failed${stderr ? `: ${stderr}` : stdout ? `: ${stdout}` : ''}`,
+    );
   }
 
-  const output = (packResult.stdout || '').trim().split(/\r?\n/).filter(Boolean).pop();
+  const output = (packResult.stdout || '')
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .pop();
   const tarballName = output || expectedName;
   return join(stubRoot, tarballName);
 }
@@ -42,6 +62,10 @@ function ensureOfflineBundle() {
 
   const tarballPath = ensureTarball();
   copyFileSync(tarballPath, targetFile);
+
+  try {
+    rmSync(tarballPath);
+  } catch {}
 
   const shimDir = join(corepackHome, 'shims');
   mkdirSync(shimDir, { recursive: true });
