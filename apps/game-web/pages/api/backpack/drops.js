@@ -1,4 +1,4 @@
-import { supaService } from '../../../../lib/supabase/server.js';
+import { supaService } from '../../../lib/supabase/server.js';
 
 const TABLE = 'game_backpack_drops';
 
