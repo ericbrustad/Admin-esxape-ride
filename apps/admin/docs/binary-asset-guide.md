@@ -32,7 +32,7 @@ Each directory ships with a `.gitkeep` placeholder only. When you upload media
 the API streams the file to Supabase and records the object path, leaving Git
 untouched.
 
-Game-specific mirrors (`game/lib/media/overlays`, `lib/media/overlays`,
+Game-specific mirrors (`apps/game-web/lib/media/overlays`, `lib/media/overlays`,
 `public/game/public/media/*`) also contain `.gitkeep` files so the runtime can
 resolve relative paths while assets reside in Supabase.
 

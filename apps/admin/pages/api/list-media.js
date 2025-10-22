@@ -546,7 +546,7 @@ export default async function handler(req, res) {
     }
 
     if (GAME_ENABLED) {
-      const gameRoot = path.join(cwd, 'game', 'public', 'media', dir);
+      const gameRoot = path.join(cwd, '..', 'game-web', 'public', 'media', dir);
       const gameFiles = listFiles(gameRoot);
       for (const name of gameFiles) {
         const folder = dir;

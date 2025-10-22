@@ -7,9 +7,10 @@
 
 export default async function handler(req, res) {
   try {
-    const { project = 'game' } = req.query || {};
+    const { project = 'game-web' } = req.query || {};
     const token = process.env.VERCEL_TOKEN;
     const map = {
+      'game-web': process.env.VERCEL_PROJECT_ID_GAME_WEB || process.env.VERCEL_PROJECT_ID_GAME,
       game:  process.env.VERCEL_PROJECT_ID_GAME,
       admin: process.env.VERCEL_PROJECT_ID_ADMIN,
     };
