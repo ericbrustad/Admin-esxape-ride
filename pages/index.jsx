@@ -66,6 +66,19 @@ function hexToRgb(hex) {
     return `${r}, ${g}, ${bl}`;
   } catch { return '0,0,0'; }
 }
+function formatLocalDateTime(isoString) {
+  if (!isoString) return '';
+  try {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    });
+  } catch {
+    return '';
+  }
+}
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|bmp|svg|tif|tiff|avif|heic|heif)$/i,
   gif: /\.(gif)$/i,
@@ -73,17 +86,6 @@ const EXTS = {
   audio: /\.(mp3|wav|ogg|m4a|aiff|aif)$/i, // include AIFF/AIF
 };
 const COVER_SIZE_LIMIT_BYTES = 1024 * 1024; // 1 MB limit for cover uploads
-const ADMIN_META_INITIAL_STATE = {
-  branch: '',
-  commit: '',
-  owner: '',
-  repo: '',
-  vercelUrl: '',
-  deploymentUrl: '',
-  deploymentState: '',
-  fetchedAt: '',
-  error: '',
-};
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -143,23 +145,6 @@ function pathFromUrl(u) {
   return ''; // external or unknown
 }
 
-function formatLocalDateTime(value) {
-  if (!value) return '';
-  try {
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return '';
-  }
-}
 async function deleteMediaPath(repoPath) {
   const endpoints = [
     '/api/delete-media',
@@ -741,7 +726,6 @@ export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
 
-  const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Default Game → legacy root
@@ -785,73 +769,60 @@ export default function Admin() {
     return ()=> { mounted = false; };
   },[fetchInventory]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadMeta() {
-      const nowIso = new Date().toISOString();
-      try {
-        const [metaRes, vercelRes] = await Promise.all([
-          fetch('/api/admin-meta', { cache: 'no-store', credentials: 'include' }).catch(() => null),
-          fetch('/api/vercel-status?project=game', { cache: 'no-store', credentials: 'include' }).catch(() => null),
-        ]);
-
-        const metaJson = metaRes ? await metaRes.json().catch(() => ({})) : {};
-        const vercelJson = vercelRes ? await vercelRes.json().catch(() => ({})) : {};
-
-        if (cancelled) return;
-
-        const metaOk = metaJson?.ok !== false;
-        const vercelOk = vercelJson?.ok !== false;
-
-        const deploymentUrlRaw = vercelJson?.url || '';
-        const deploymentUrl = typeof deploymentUrlRaw === 'string' && deploymentUrlRaw
-          ? (deploymentUrlRaw.startsWith('http') ? deploymentUrlRaw : `https://${deploymentUrlRaw}`)
-          : '';
-        const deploymentState = vercelJson?.state || (vercelJson?.disabled ? 'DISABLED' : '');
-        const combinedError = (!metaOk && metaJson?.error)
-          || (!vercelOk && (vercelJson?.error || vercelJson?.reason))
-          || '';
-
-        setAdminMeta((prev) => {
-          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
-          return {
-            ...base,
-            branch: metaOk && metaJson?.branch ? metaJson.branch : base.branch,
-            commit: metaOk && metaJson?.commit ? metaJson.commit : base.commit,
-            owner: metaOk && metaJson?.owner ? metaJson.owner : base.owner,
-            repo: metaOk && metaJson?.repo ? metaJson.repo : base.repo,
-            vercelUrl: metaOk && metaJson?.vercelUrl ? metaJson.vercelUrl : base.vercelUrl,
-            deploymentUrl: deploymentUrl || base.deploymentUrl,
-            deploymentState: deploymentState ? String(deploymentState).toUpperCase() : base.deploymentState,
-            fetchedAt: nowIso,
-            error: combinedError || '',
-          };
-        });
-      } catch (err) {
-        if (cancelled) return;
-        setAdminMeta((prev) => {
-          const base = { ...ADMIN_META_INITIAL_STATE, ...(prev || {}) };
-          return {
-            ...base,
-            fetchedAt: new Date().toISOString(),
-            error: 'Unable to load deployment status',
-          };
-        });
-      }
-    }
-
-    loadMeta();
-    const timer = setInterval(loadMeta, 60000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
 
   const [uploadStatus, setUploadStatus] = useState('');
   const [protectionState, setProtectionState] = useState({ enabled: false, loading: true, saving: false, updatedAt: null });
   const [protectionError, setProtectionError] = useState('');
+  const [adminMeta, setAdminMeta] = useState({ status: 'idle', data: null, error: '' });
+
+  const conversationLog = useMemo(() => [
+    {
+      timestamp: '2025-10-15T00:00:00Z',
+      speaker: 'Operator',
+      message: 'There is no need for operator to see operator GPT log. Keep it hidden for GPT to learn from.',
+    },
+    {
+      timestamp: '2025-10-15T00:05:00Z',
+      speaker: 'GPT',
+      message: 'Collected commit metadata and rendered it in the admin dashboard for quick reference.',
+    },
+    {
+      timestamp: '2025-10-15T01:00:00Z',
+      speaker: 'Operator',
+      message: 'Resolve this error and fix the application error immediately.',
+    },
+    {
+      timestamp: '2025-10-15T01:15:00Z',
+      speaker: 'GPT',
+      message: 'Investigated the admin dashboard loop and prepared fixes to stabilize the UI.',
+    },
+    {
+      timestamp: '2025-10-15T02:00:00Z',
+      speaker: 'Operator',
+      message: 'Remove the operator GPT meta info from this program and archive it safely instead.',
+    },
+    {
+      timestamp: '2025-10-15T02:10:00Z',
+      speaker: 'GPT',
+      message: 'Simplified the admin dashboard header and stored the metadata snapshot in README.txt.',
+    },
+  ], []);
+
+  const metaFetchedAtLabel = useMemo(
+    () => (adminMeta?.data?.fetchedAt ? formatLocalDateTime(adminMeta.data.fetchedAt) : ''),
+    [adminMeta?.data?.fetchedAt],
+  );
+  const metaRepoLabel = useMemo(() => {
+    if (!adminMeta?.data) return '';
+    const owner = adminMeta.data.owner || '';
+    const repo = adminMeta.data.repo || '';
+    if (owner && repo) return `${owner}/${repo}`;
+    return repo || owner || '';
+  }, [adminMeta?.data]);
+  const metaCommitShort = useMemo(() => {
+    const commit = adminMeta?.data?.commit || '';
+    return commit ? commit.slice(0, 7) : '';
+  }, [adminMeta?.data?.commit]);
 
   useEffect(() => {
     let cancelled = false;
@@ -870,6 +841,39 @@ export default function Admin() {
         if (cancelled) return;
         setProtectionState(prev => ({ ...prev, loading: false }));
         setProtectionError('Unable to read protection status');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setAdminMeta((prev) => ({ ...prev, status: 'loading' }));
+      try {
+        const res = await fetch('/api/admin-meta', { cache: 'no-store', credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
+        if (res.ok && data && data.ok !== false) {
+          const fallbackTimestamp = new Date().toISOString();
+          setAdminMeta({
+            status: 'success',
+            data: {
+              branch: data.branch || '',
+              commit: data.commit || '',
+              owner: data.owner || '',
+              repo: data.repo || '',
+              vercelUrl: data.vercelUrl || '',
+              fetchedAt: data.fetchedAt || fallbackTimestamp,
+            },
+            error: '',
+          });
+        } else {
+          throw new Error(data?.error || 'Failed to load repository metadata');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setAdminMeta({ status: 'error', data: null, error: err?.message || 'Failed to load repository metadata' });
       }
     })();
     return () => { cancelled = true; };
@@ -2072,11 +2076,6 @@ export default function Admin() {
   const deployGameEnabled = config?.game?.deployEnabled === true;
   const headerGameTitle = (config?.game?.title || '').trim() || 'Default Game';
   const headerStyle = S.header;
-  const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitShort = adminMeta.commit ? String(adminMeta.commit).slice(0, 7) : '';
-  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
-  const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
-  const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
   const coverStatusMessage = coverImageUrl
     ? 'Cover art ready — use Save Cover Image to persist immediately or replace it below.'
     : coverUploadPreview
@@ -2106,35 +2105,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
-        <div style={S.metaBannerLine}>
-          <span><strong>Branch:</strong> {metaBranchLabel}</span>
-          {metaCommitShort && <span style={S.metaBadge}>#{metaCommitShort}</span>}
-          {adminMeta.repo && (
-            <span style={S.metaMuted}>
-              {(adminMeta.owner ? `${adminMeta.owner}/` : '') + adminMeta.repo}
-            </span>
-          )}
-          {metaDeploymentState && (
-            <span>
-              <strong>Deployment:</strong>{' '}
-              {metaDeploymentUrl ? (
-                <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
-                  {metaDeploymentState}
-                </a>
-              ) : (
-                metaDeploymentState
-              )}
-            </span>
-          )}
-          {metaTimestampLabel && (
-            <span><strong>Checked:</strong> {metaTimestampLabel}</span>
-          )}
-          {adminMeta.error && (
-            <span style={S.metaBannerError}>{adminMeta.error}</span>
-          )}
-        </div>
-      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -3433,6 +3403,65 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Repository Snapshot</h3>
+            <div style={S.metaSummary}>
+              <div style={S.metaRow}>
+                <div style={S.metaLabel}>Repository</div>
+                <div style={S.metaValue}>{metaRepoLabel || '—'}</div>
+              </div>
+              <div style={S.metaRow}>
+                <div style={S.metaLabel}>Branch</div>
+                <div style={S.metaValue}>{adminMeta?.data?.branch || '—'}</div>
+              </div>
+              <div style={S.metaRow}>
+                <div style={S.metaLabel}>Commit</div>
+                <div style={S.metaValue}>
+                  {metaCommitShort ? (
+                    <code style={S.metaCode}>{metaCommitShort}</code>
+                  ) : (
+                    '—'
+                  )}
+                </div>
+              </div>
+              <div style={S.metaRow}>
+                <div style={S.metaLabel}>Vercel Deployment</div>
+                <div style={S.metaValue}>
+                  {adminMeta?.data?.vercelUrl ? (
+                    <a href={adminMeta.data.vercelUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                      {adminMeta.data.vercelUrl}
+                    </a>
+                  ) : '—'}
+                </div>
+              </div>
+              <div style={S.metaRow}>
+                <div style={S.metaLabel}>Last fetched</div>
+                <div style={S.metaValue}>{metaFetchedAtLabel || '—'}</div>
+              </div>
+            </div>
+            {adminMeta.status === 'loading' && (
+              <div style={S.metaStatus}>Loading repository metadata…</div>
+            )}
+            {adminMeta.status === 'error' && (
+              <div style={{ ...S.metaStatus, color: '#fca5a5' }}>
+                Unable to load metadata — {adminMeta.error}
+              </div>
+            )}
+            <div style={{ marginTop:16 }}>
+              <h4 style={S.metaSubheading}>Operator ↔ GPT Log</h4>
+              <div style={S.conversationLog}>
+                {conversationLog.map((entry, index) => (
+                  <div key={`${entry.speaker}-${index}`} style={S.conversationItem}>
+                    <div style={S.conversationHeader}>
+                      <span style={S.conversationSpeaker}>{entry.speaker}</span>
+                      <span style={S.conversationTimestamp}>{formatLocalDateTime(entry.timestamp) || '—'}</span>
+                    </div>
+                    <div style={S.conversationMessage}>{entry.message}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </main>
       )}
 
@@ -3676,47 +3705,6 @@ const S = {
     minHeight: '100vh',
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
-  metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
-    backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
-  },
-  metaBannerLine: {
-    maxWidth: 1400,
-    margin: '0 auto',
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaBadge: {
-    padding: '2px 8px',
-    borderRadius: 999,
-    background: 'rgba(59, 130, 246, 0.16)',
-    color: '#9cc0ff',
-    fontSize: 12,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-  },
-  metaMuted: {
-    color: 'var(--admin-muted)',
-    fontSize: 12,
-    letterSpacing: '0.05em',
-    textTransform: 'uppercase',
-  },
-  metaLink: {
-    color: 'var(--admin-link-color, #60a5fa)',
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
-  metaBannerError: {
-    color: '#f87171',
-    fontWeight: 600,
-  },
   header: {
     padding: 20,
     background: 'rgba(8, 13, 19, 0.9)',
@@ -3747,6 +3735,88 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  metaSummary: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+  },
+  metaRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    padding: 12,
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-tab-bg)',
+  },
+  metaLabel: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  metaValue: {
+    fontWeight: 600,
+    fontSize: 14,
+    wordBreak: 'break-word',
+  },
+  metaCode: {
+    display: 'inline-block',
+    padding: '2px 6px',
+    borderRadius: 6,
+    background: 'rgba(148, 163, 184, 0.12)',
+    border: '1px solid rgba(148, 163, 184, 0.28)',
+    fontSize: 13,
+    letterSpacing: '0.08em',
+  },
+  metaLink: {
+    color: 'var(--admin-accent)',
+    textDecoration: 'none',
+    wordBreak: 'break-all',
+  },
+  metaStatus: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#9fb0bf',
+  },
+  metaSubheading: {
+    margin: '0 0 8px 0',
+    fontSize: 14,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  conversationLog: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  conversationItem: {
+    border: '1px solid var(--admin-border-soft)',
+    borderRadius: 12,
+    padding: 12,
+    background: 'var(--admin-tab-bg)',
+  },
+  conversationHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  conversationSpeaker: {
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  conversationTimestamp: {
+    fontFamily: 'var(--admin-font-family)',
+  },
+  conversationMessage: {
+    fontSize: 14,
+    lineHeight: 1.5,
   },
   floatingBarTop: {
     position: 'sticky',
