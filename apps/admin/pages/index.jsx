@@ -466,49 +466,562 @@ function createDeviceDraft(overrides = {}) {
   merged.trigger = { ...DEFAULT_TRIGGER_CONFIG, ...(overrides.trigger || merged.trigger || {}) };
   return merged;
 }
-const STARFIELD_DAWN_APPEARANCE = {
-  ...defaultAppearance(),
-  fontFamily: '"Exo 2", "Segoe UI", sans-serif',
-  fontSizePx: 23,
-  fontColor: '#262a58',
-  textBgColor: '#f4f0ff',
-  textBgOpacity: 0.7,
-  screenBgColor: '#e0dcfa',
-  screenBgOpacity: 0.46,
-  screenBgImage: '',
-  screenBgImageEnabled: false,
-  textAlign: 'center',
-  textVertical: 'top',
+const BASE_UI_THEME = {
+  headerBg: 'linear-gradient(135deg, rgba(226, 234, 247, 0.92), rgba(197, 210, 232, 0.88))',
+  headerBorder: '1px solid rgba(99, 127, 170, 0.38)',
+  headerShadow: '0 32px 64px rgba(28, 52, 84, 0.35)',
+  headerBlur: 'blur(18px)',
+  headerFrameBg: 'linear-gradient(145deg, rgba(236, 243, 255, 0.9), rgba(206, 218, 240, 0.85))',
+  headerFrameBorder: '1px solid rgba(120, 150, 190, 0.4)',
+  headerFrameShadow: '0 18px 32px rgba(62, 99, 149, 0.35)',
+  tabBg: 'linear-gradient(135deg, rgba(228, 236, 250, 0.82), rgba(203, 214, 236, 0.78))',
+  tabActiveBg: 'linear-gradient(140deg, #2563eb, #60a5fa)',
+  buttonBg: 'linear-gradient(135deg, rgba(217, 228, 245, 0.9), rgba(188, 205, 232, 0.86))',
+  buttonBorder: '1px solid rgba(99, 127, 170, 0.45)',
+  glassSheen: '0 14px 30px rgba(54, 83, 137, 0.25)',
+  borderSoft: 'rgba(120, 150, 190, 0.38)',
+  chipBg: 'rgba(120, 150, 190, 0.2)',
+  chipBorder: '1px solid rgba(120, 150, 190, 0.35)',
+  linkColor: '#2563eb',
+  accent: '#2563eb',
+  dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+  dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+  successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+  successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+  saveGradient: 'linear-gradient(95deg, #2563eb, #38bdf8)',
+  saveBorder: '1px solid rgba(59, 130, 246, 0.6)',
+  saveShadow: '0 20px 36px rgba(37, 99, 235, 0.45)',
 };
 
-const STARFIELD_DAWN_SKIN_BASE = {
-  label: 'Starfield Dawn',
-  description: 'Unified Starfield Dawn admin skin.',
-  uiKey: 'starfield-dawn',
-};
+function createUiTheme(overrides = {}) {
+  return { ...BASE_UI_THEME, ...overrides };
+}
 
-const APPEARANCE_SKIN_KEYS = [
-  'default',
-  'space-military',
-  'military-desert',
-  'forest-outpost',
-  'starfield',
-  'cartoon-bubbles',
-  'chrome-luminous',
-  'desert-horizon',
-  'forest-meadow',
-  'starfield-dawn',
-  'cartoon-parade',
-  'arctic-lab',
+const DEFAULT_UI_THEME = createUiTheme();
+
+const APPEARANCE_SKINS = [
+  {
+    key: 'default',
+    label: 'Aurora Control',
+    description: 'Glassmorphism baseline with woven carbon fibre overlays.',
+    uiKey: 'default',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Inter", "Segoe UI", sans-serif',
+      fontSizePx: 23,
+      fontColor: '#1f2a35',
+      textBgColor: '#f4f8fb',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dbe4f1',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/control-fabric.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+    ui: createUiTheme(),
+  },
+  {
+    key: 'space-military',
+    label: 'Orbital Command',
+    description: 'Deep space HUD chrome with teal radar lighting.',
+    uiKey: 'space-military',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Orbitron", "Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 26,
+      fontColor: '#14253a',
+      textBgColor: '#f3f8ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#d6e2f2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/space-metal.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(9, 18, 32, 0.96), rgba(26, 48, 74, 0.88))',
+      headerBorder: '1px solid rgba(68, 112, 178, 0.55)',
+      headerShadow: '0 42px 72px rgba(5, 12, 24, 0.68)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(12, 26, 44, 0.96), rgba(32, 60, 96, 0.88))',
+      headerFrameBorder: '1px solid rgba(82, 140, 210, 0.65)',
+      headerFrameShadow: '0 24px 36px rgba(10, 24, 48, 0.62)',
+      tabBg: 'linear-gradient(135deg, rgba(16, 32, 54, 0.86), rgba(34, 60, 94, 0.86))',
+      tabActiveBg: 'linear-gradient(145deg, #0ea5e9, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(12, 28, 48, 0.92), rgba(28, 52, 86, 0.88))',
+      buttonBorder: '1px solid rgba(64, 116, 188, 0.62)',
+      glassSheen: '0 18px 40px rgba(6, 20, 36, 0.6)',
+      borderSoft: 'rgba(64, 100, 148, 0.5)',
+      chipBg: 'rgba(56, 101, 162, 0.28)',
+      chipBorder: '1px solid rgba(66, 118, 188, 0.48)',
+      linkColor: '#7dd3fc',
+      accent: '#38bdf8',
+      dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.82)',
+      successBg: 'linear-gradient(135deg, rgba(17, 94, 89, 0.94), rgba(45, 212, 191, 0.94))',
+      successBorder: '1px solid rgba(45, 212, 191, 0.78)',
+      saveGradient: 'linear-gradient(115deg, #0ea5e9, #38bdf8)',
+      saveBorder: '1px solid rgba(64, 130, 200, 0.7)',
+      saveShadow: '0 24px 40px rgba(12, 40, 78, 0.6)',
+    }),
+  },
+  {
+    key: 'military-desert',
+    label: 'Sahara Vanguard',
+    description: 'Copper desert ops deck with sunrise shimmer.',
+    uiKey: 'military-desert',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Copperplate", "Trebuchet MS", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#3b2a16',
+      textBgColor: '#fff4de',
+      textBgOpacity: 0.76,
+      screenBgColor: '#f1ddbc',
+      screenBgOpacity: 0.55,
+      screenBgImage: '/media/skins/desert-canvas.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(130deg, rgba(248, 231, 196, 0.94), rgba(224, 193, 141, 0.9))',
+      headerBorder: '1px solid rgba(148, 110, 68, 0.52)',
+      headerShadow: '0 38px 68px rgba(107, 82, 45, 0.4)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(245, 220, 180, 0.92), rgba(229, 197, 152, 0.86))',
+      headerFrameBorder: '1px solid rgba(168, 128, 72, 0.55)',
+      headerFrameShadow: '0 20px 32px rgba(122, 82, 40, 0.42)',
+      tabBg: 'linear-gradient(135deg, rgba(242, 214, 168, 0.86), rgba(228, 190, 132, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #d97706, #fbbf24)',
+      buttonBg: 'linear-gradient(135deg, rgba(243, 215, 170, 0.9), rgba(227, 189, 128, 0.86))',
+      buttonBorder: '1px solid rgba(182, 134, 72, 0.55)',
+      glassSheen: '0 16px 34px rgba(182, 121, 54, 0.32)',
+      borderSoft: 'rgba(182, 134, 72, 0.42)',
+      chipBg: 'rgba(214, 162, 90, 0.24)',
+      chipBorder: '1px solid rgba(184, 132, 68, 0.45)',
+      linkColor: '#b45309',
+      accent: '#d97706',
+      dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(110deg, #b45309, #f97316)',
+      saveBorder: '1px solid rgba(210, 140, 80, 0.55)',
+      saveShadow: '0 20px 32px rgba(182, 120, 58, 0.4)',
+    }),
+  },
+  {
+    key: 'forest-outpost',
+    label: 'Evergreen Outpost',
+    description: 'Field-kit interface with canopy glass and bark piping.',
+    uiKey: 'forest-outpost',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#1f2d1f',
+      textBgColor: '#edf8e6',
+      textBgOpacity: 0.74,
+      screenBgColor: '#d4ebcc',
+      screenBgOpacity: 0.54,
+      screenBgImage: '/media/skins/forest-foliage.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(135deg, rgba(36, 64, 46, 0.92), rgba(20, 42, 28, 0.9))',
+      headerBorder: '1px solid rgba(56, 102, 74, 0.48)',
+      headerShadow: '0 40px 70px rgba(12, 30, 20, 0.55)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(32, 58, 42, 0.94), rgba(18, 40, 28, 0.88))',
+      headerFrameBorder: '1px solid rgba(72, 122, 92, 0.55)',
+      headerFrameShadow: '0 22px 34px rgba(12, 30, 20, 0.5)',
+      tabBg: 'linear-gradient(135deg, rgba(44, 80, 56, 0.86), rgba(28, 60, 38, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #16a34a, #4ade80)',
+      buttonBg: 'linear-gradient(135deg, rgba(38, 74, 48, 0.9), rgba(24, 52, 32, 0.88))',
+      buttonBorder: '1px solid rgba(66, 122, 88, 0.55)',
+      glassSheen: '0 18px 36px rgba(12, 36, 22, 0.5)',
+      borderSoft: 'rgba(76, 128, 96, 0.46)',
+      chipBg: 'rgba(74, 122, 94, 0.28)',
+      chipBorder: '1px solid rgba(74, 122, 94, 0.45)',
+      linkColor: '#34d399',
+      accent: '#22c55e',
+      dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(120deg, #16a34a, #4ade80)',
+      saveBorder: '1px solid rgba(52, 140, 96, 0.6)',
+      saveShadow: '0 24px 38px rgba(14, 44, 24, 0.55)',
+    }),
+  },
+  {
+    key: 'starfield',
+    label: 'Nebula Relay',
+    description: 'Star-kissed observatory deck with midnight chrome.',
+    uiKey: 'starfield',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 22,
+      fontColor: '#1f2648',
+      textBgColor: '#eef1ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#d7def6',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/starfield-soft.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(150deg, rgba(27, 33, 68, 0.94), rgba(18, 26, 58, 0.9))',
+      headerBorder: '1px solid rgba(90, 112, 198, 0.55)',
+      headerShadow: '0 42px 74px rgba(10, 14, 38, 0.58)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(36, 44, 88, 0.96), rgba(24, 30, 64, 0.92))',
+      headerFrameBorder: '1px solid rgba(108, 132, 220, 0.58)',
+      headerFrameShadow: '0 24px 38px rgba(14, 18, 48, 0.54)',
+      tabBg: 'linear-gradient(135deg, rgba(34, 44, 88, 0.85), rgba(22, 30, 68, 0.83))',
+      tabActiveBg: 'linear-gradient(145deg, #6366f1, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(28, 36, 78, 0.92), rgba(18, 26, 62, 0.9))',
+      buttonBorder: '1px solid rgba(104, 132, 220, 0.58)',
+      glassSheen: '0 18px 38px rgba(12, 16, 42, 0.55)',
+      borderSoft: 'rgba(104, 132, 220, 0.46)',
+      chipBg: 'rgba(104, 132, 220, 0.26)',
+      chipBorder: '1px solid rgba(104, 132, 220, 0.45)',
+      linkColor: '#93c5fd',
+      accent: '#6366f1',
+      dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(115deg, #4c51bf, #38bdf8)',
+      saveBorder: '1px solid rgba(108, 132, 220, 0.6)',
+      saveShadow: '0 24px 40px rgba(18, 24, 68, 0.58)',
+    }),
+  },
+  {
+    key: 'cartoon-bubbles',
+    label: 'Bubble Arcade',
+    description: 'Arcade-grade candy gloss and balloon gradients.',
+    uiKey: 'cartoon-bubbles',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 28,
+      fontColor: '#4b2c6c',
+      textBgColor: '#fff1ff',
+      textBgOpacity: 0.68,
+      screenBgColor: '#f2dfff',
+      screenBgOpacity: 0.55,
+      screenBgImage: '/media/skins/cartoon-balloons.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(255, 229, 255, 0.94), rgba(240, 205, 255, 0.9))',
+      headerBorder: '1px solid rgba(171, 119, 206, 0.5)',
+      headerShadow: '0 34px 64px rgba(120, 64, 160, 0.32)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(255, 235, 255, 0.95), rgba(245, 210, 255, 0.88))',
+      headerFrameBorder: '1px solid rgba(190, 132, 220, 0.5)',
+      headerFrameShadow: '0 22px 34px rgba(140, 82, 190, 0.32)',
+      tabBg: 'linear-gradient(135deg, rgba(250, 228, 255, 0.88), rgba(238, 206, 255, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #d946ef, #f472b6)',
+      buttonBg: 'linear-gradient(135deg, rgba(250, 226, 255, 0.92), rgba(236, 200, 255, 0.88))',
+      buttonBorder: '1px solid rgba(200, 144, 220, 0.48)',
+      glassSheen: '0 14px 34px rgba(184, 104, 204, 0.28)',
+      borderSoft: 'rgba(200, 150, 220, 0.42)',
+      chipBg: 'rgba(214, 162, 230, 0.28)',
+      chipBorder: '1px solid rgba(200, 150, 220, 0.42)',
+      linkColor: '#f472b6',
+      accent: '#d946ef',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 134, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(244, 114, 182, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(30, 136, 229, 0.92), rgba(59, 130, 246, 0.92))',
+      successBorder: '1px solid rgba(96, 165, 250, 0.76)',
+      saveGradient: 'linear-gradient(120deg, #d946ef, #f472b6)',
+      saveBorder: '1px solid rgba(208, 128, 220, 0.58)',
+      saveShadow: '0 20px 34px rgba(184, 96, 204, 0.32)',
+    }),
+  },
+  {
+    key: 'chrome-luminous',
+    label: 'Chromatic Flux',
+    description: 'Polished chrome deck with gradient sky reflections.',
+    uiKey: 'chrome-luminous',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Rajdhani", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#1a2335',
+      textBgColor: '#f5f9ff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#dde6f5',
+      screenBgOpacity: 0.42,
+      screenBgImage: '/media/skins/chrome-luminous.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(145deg, rgba(226, 238, 255, 0.94), rgba(198, 210, 230, 0.9))',
+      headerBorder: '1px solid rgba(126, 152, 190, 0.45)',
+      headerShadow: '0 36px 66px rgba(45, 70, 110, 0.32)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(236, 244, 255, 0.96), rgba(204, 216, 236, 0.9))',
+      headerFrameBorder: '1px solid rgba(142, 170, 210, 0.45)',
+      headerFrameShadow: '0 22px 36px rgba(52, 82, 128, 0.34)',
+      tabBg: 'linear-gradient(135deg, rgba(228, 238, 252, 0.86), rgba(206, 218, 236, 0.82))',
+      tabActiveBg: 'linear-gradient(145deg, #38bdf8, #818cf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(220, 232, 248, 0.92), rgba(198, 210, 234, 0.88))',
+      buttonBorder: '1px solid rgba(136, 162, 202, 0.48)',
+      glassSheen: '0 18px 38px rgba(68, 98, 140, 0.3)',
+      borderSoft: 'rgba(140, 170, 210, 0.42)',
+      chipBg: 'rgba(168, 190, 226, 0.24)',
+      chipBorder: '1px solid rgba(140, 170, 210, 0.42)',
+      linkColor: '#60a5fa',
+      accent: '#38bdf8',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 72, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(52, 211, 153, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(115deg, #38bdf8, #818cf8)',
+      saveBorder: '1px solid rgba(148, 170, 210, 0.55)',
+      saveShadow: '0 22px 38px rgba(72, 102, 148, 0.3)',
+    }),
+  },
+  {
+    key: 'desert-horizon',
+    label: 'Sundown Mirage',
+    description: 'Desert dusk palette with mirage-lit instrumentation.',
+    uiKey: 'desert-horizon',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Montserrat", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#3f2d18',
+      textBgColor: '#fff6e6',
+      textBgOpacity: 0.74,
+      screenBgColor: '#f3dfc1',
+      screenBgOpacity: 0.48,
+      screenBgImage: '/media/skins/desert-horizon.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(135deg, rgba(255, 225, 196, 0.94), rgba(246, 196, 160, 0.9))',
+      headerBorder: '1px solid rgba(196, 124, 92, 0.5)',
+      headerShadow: '0 36px 62px rgba(158, 96, 62, 0.35)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(255, 232, 210, 0.95), rgba(244, 204, 170, 0.88))',
+      headerFrameBorder: '1px solid rgba(210, 140, 100, 0.5)',
+      headerFrameShadow: '0 20px 32px rgba(162, 102, 68, 0.35)',
+      tabBg: 'linear-gradient(135deg, rgba(252, 222, 192, 0.86), rgba(242, 198, 160, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #f97316, #facc15)',
+      buttonBg: 'linear-gradient(135deg, rgba(250, 220, 192, 0.9), rgba(240, 196, 156, 0.86))',
+      buttonBorder: '1px solid rgba(210, 144, 102, 0.52)',
+      glassSheen: '0 16px 34px rgba(210, 132, 84, 0.3)',
+      borderSoft: 'rgba(210, 144, 102, 0.42)',
+      chipBg: 'rgba(222, 162, 110, 0.26)',
+      chipBorder: '1px solid rgba(210, 144, 102, 0.44)',
+      linkColor: '#f97316',
+      accent: '#f97316',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 72, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(52, 211, 153, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(120deg, #f97316, #facc15)',
+      saveBorder: '1px solid rgba(232, 146, 104, 0.55)',
+      saveShadow: '0 20px 34px rgba(210, 128, 82, 0.32)',
+    }),
+  },
+  {
+    key: 'forest-meadow',
+    label: 'Canopy Meadow',
+    description: 'Sun-dappled canopy glass with moss undertones.',
+    uiKey: 'forest-meadow',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Merriweather Sans", "Gill Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#20331e',
+      textBgColor: '#f2faed',
+      textBgOpacity: 0.76,
+      screenBgColor: '#dcedd2',
+      screenBgOpacity: 0.5,
+      screenBgImage: '/media/skins/forest-meadow.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'left',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(54, 84, 44, 0.92), rgba(34, 58, 30, 0.9))',
+      headerBorder: '1px solid rgba(74, 122, 64, 0.48)',
+      headerShadow: '0 40px 70px rgba(20, 36, 18, 0.52)',
+      headerFrameBg: 'linear-gradient(150deg, rgba(48, 78, 38, 0.94), rgba(32, 58, 28, 0.9))',
+      headerFrameBorder: '1px solid rgba(96, 146, 84, 0.52)',
+      headerFrameShadow: '0 22px 34px rgba(20, 36, 18, 0.48)',
+      tabBg: 'linear-gradient(135deg, rgba(64, 100, 52, 0.86), rgba(42, 74, 38, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #22c55e, #a3e635)',
+      buttonBg: 'linear-gradient(135deg, rgba(58, 92, 48, 0.9), rgba(38, 62, 34, 0.88))',
+      buttonBorder: '1px solid rgba(88, 138, 70, 0.52)',
+      glassSheen: '0 18px 36px rgba(18, 34, 18, 0.48)',
+      borderSoft: 'rgba(102, 152, 86, 0.42)',
+      chipBg: 'rgba(108, 160, 90, 0.26)',
+      chipBorder: '1px solid rgba(98, 148, 84, 0.44)',
+      linkColor: '#4ade80',
+      accent: '#22c55e',
+      dangerBg: 'linear-gradient(135deg, rgba(190, 41, 41, 0.9), rgba(239, 68, 68, 0.9))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(20, 122, 75, 0.95), rgba(34, 197, 94, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(120deg, #22c55e, #a3e635)',
+      saveBorder: '1px solid rgba(118, 168, 94, 0.55)',
+      saveShadow: '0 24px 36px rgba(26, 52, 24, 0.5)',
+    }),
+  },
+  {
+    key: 'starfield-dawn',
+    label: 'Starfield Dawn',
+    description: 'Lavender sunrise filtered through nebula glass rails.',
+    uiKey: 'starfield-dawn',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Exo 2", "Segoe UI", sans-serif',
+      fontSizePx: 23,
+      fontColor: '#262a58',
+      textBgColor: '#f4f0ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#e0dcfa',
+      screenBgOpacity: 0.46,
+      screenBgImage: '/media/skins/starfield-dawn.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(150deg, rgba(222, 209, 255, 0.94), rgba(192, 178, 246, 0.9))',
+      headerBorder: '1px solid rgba(142, 116, 208, 0.5)',
+      headerShadow: '0 40px 68px rgba(94, 72, 168, 0.38)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(232, 220, 255, 0.95), rgba(204, 190, 248, 0.9))',
+      headerFrameBorder: '1px solid rgba(156, 132, 216, 0.5)',
+      headerFrameShadow: '0 22px 36px rgba(104, 82, 176, 0.38)',
+      tabBg: 'linear-gradient(135deg, rgba(230, 218, 255, 0.88), rgba(204, 190, 246, 0.84))',
+      tabActiveBg: 'linear-gradient(140deg, #7c3aed, #f472b6)',
+      buttonBg: 'linear-gradient(135deg, rgba(226, 214, 255, 0.92), rgba(202, 188, 246, 0.88))',
+      buttonBorder: '1px solid rgba(156, 132, 216, 0.5)',
+      glassSheen: '0 18px 38px rgba(128, 96, 198, 0.32)',
+      borderSoft: 'rgba(156, 132, 216, 0.42)',
+      chipBg: 'rgba(176, 150, 224, 0.26)',
+      chipBorder: '1px solid rgba(156, 132, 216, 0.44)',
+      linkColor: '#a855f7',
+      accent: '#7c3aed',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 134, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(244, 114, 182, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(52, 211, 153, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(120deg, #7c3aed, #f472b6)',
+      saveBorder: '1px solid rgba(162, 132, 224, 0.55)',
+      saveShadow: '0 22px 36px rgba(118, 88, 196, 0.36)',
+    }),
+  },
+  {
+    key: 'cartoon-parade',
+    label: 'Parade Pop',
+    description: 'Festival-ready confetti stripes with carnival gloss.',
+    uiKey: 'cartoon-parade',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif',
+      fontSizePx: 30,
+      fontColor: '#4a256a',
+      textBgColor: '#fff4ff',
+      textBgOpacity: 0.7,
+      screenBgColor: '#f7e4ff',
+      screenBgOpacity: 0.52,
+      screenBgImage: '/media/skins/cartoon-parade.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(140deg, rgba(255, 224, 244, 0.94), rgba(255, 200, 214, 0.9))',
+      headerBorder: '1px solid rgba(220, 110, 150, 0.5)',
+      headerShadow: '0 34px 60px rgba(200, 80, 130, 0.32)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(255, 232, 248, 0.95), rgba(252, 208, 220, 0.88))',
+      headerFrameBorder: '1px solid rgba(224, 126, 160, 0.48)',
+      headerFrameShadow: '0 20px 32px rgba(210, 90, 148, 0.3)',
+      tabBg: 'linear-gradient(135deg, rgba(255, 226, 242, 0.86), rgba(253, 204, 220, 0.82))',
+      tabActiveBg: 'linear-gradient(145deg, #f97316, #ec4899)',
+      buttonBg: 'linear-gradient(135deg, rgba(255, 224, 240, 0.92), rgba(250, 200, 216, 0.88))',
+      buttonBorder: '1px solid rgba(232, 132, 168, 0.48)',
+      glassSheen: '0 16px 34px rgba(232, 96, 160, 0.28)',
+      borderSoft: 'rgba(232, 140, 170, 0.42)',
+      chipBg: 'rgba(238, 162, 186, 0.26)',
+      chipBorder: '1px solid rgba(232, 140, 170, 0.42)',
+      linkColor: '#ec4899',
+      accent: '#f97316',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 134, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(244, 114, 182, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(29, 78, 216, 0.92), rgba(59, 130, 246, 0.92))',
+      successBorder: '1px solid rgba(96, 165, 250, 0.76)',
+      saveGradient: 'linear-gradient(120deg, #f97316, #ec4899)',
+      saveBorder: '1px solid rgba(236, 134, 170, 0.55)',
+      saveShadow: '0 20px 34px rgba(220, 96, 146, 0.32)',
+    }),
+  },
+  {
+    key: 'arctic-lab',
+    label: 'Polar Research',
+    description: 'Frosted glacial glass with aqua instrumentation.',
+    uiKey: 'arctic-lab',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Titillium Web", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#133246',
+      textBgColor: '#f2fbff',
+      textBgOpacity: 0.72,
+      screenBgColor: '#d5eef5',
+      screenBgOpacity: 0.45,
+      screenBgImage: '/media/skins/arctic-lab.svg',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(145deg, rgba(210, 240, 252, 0.94), rgba(178, 224, 244, 0.9))',
+      headerBorder: '1px solid rgba(88, 150, 190, 0.48)',
+      headerShadow: '0 36px 64px rgba(46, 100, 132, 0.32)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(220, 244, 255, 0.95), rgba(190, 230, 246, 0.9))',
+      headerFrameBorder: '1px solid rgba(104, 170, 206, 0.48)',
+      headerFrameShadow: '0 22px 34px rgba(52, 112, 146, 0.34)',
+      tabBg: 'linear-gradient(135deg, rgba(214, 240, 252, 0.86), rgba(184, 226, 244, 0.82))',
+      tabActiveBg: 'linear-gradient(140deg, #06b6d4, #38bdf8)',
+      buttonBg: 'linear-gradient(135deg, rgba(210, 236, 250, 0.92), rgba(184, 220, 240, 0.88))',
+      buttonBorder: '1px solid rgba(108, 180, 214, 0.48)',
+      glassSheen: '0 18px 36px rgba(46, 120, 152, 0.3)',
+      borderSoft: 'rgba(108, 180, 214, 0.42)',
+      chipBg: 'rgba(124, 192, 220, 0.24)',
+      chipBorder: '1px solid rgba(108, 180, 214, 0.42)',
+      linkColor: '#06b6d4',
+      accent: '#06b6d4',
+      dangerBg: 'linear-gradient(135deg, rgba(220, 72, 72, 0.92), rgba(239, 68, 68, 0.92))',
+      dangerBorder: '1px solid rgba(248, 113, 113, 0.78)',
+      successBg: 'linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(52, 211, 153, 0.95))',
+      successBorder: '1px solid rgba(52, 211, 153, 0.78)',
+      saveGradient: 'linear-gradient(120deg, #06b6d4, #38bdf8)',
+      saveBorder: '1px solid rgba(116, 188, 220, 0.55)',
+      saveShadow: '0 22px 36px rgba(64, 132, 168, 0.32)',
+    }),
+  },
 ];
-
-const APPEARANCE_SKINS = APPEARANCE_SKIN_KEYS.map((key) => ({
-  key,
-  ...STARFIELD_DAWN_SKIN_BASE,
-  appearance: { ...STARFIELD_DAWN_APPEARANCE },
-}));
 const APPEARANCE_SKIN_MAP = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin]));
 const ADMIN_SKIN_TO_UI = new Map(APPEARANCE_SKINS.map((skin) => [skin.key, skin.uiKey || skin.key]));
+const UI_THEME_MAP = new Map(
+  APPEARANCE_SKINS.map((skin) => [skin.uiKey || skin.key, skin.ui || DEFAULT_UI_THEME]),
+);
 const DEFAULT_SKIN_PRESET = APPEARANCE_SKIN_MAP.get(DEFAULT_APPEARANCE_SKIN);
 const DEFAULT_UI_SKIN = ADMIN_SKIN_TO_UI.get(DEFAULT_APPEARANCE_SKIN) || DEFAULT_APPEARANCE_SKIN;
 
@@ -538,6 +1051,40 @@ function applyAdminUiThemeForDocument(skinKey, appearance, tone = 'light') {
     ? '1px solid rgba(132, 176, 226, 0.42)'
     : '1px solid rgba(128, 156, 204, 0.42)';
   const buttonColor = normalizedTone === 'dark' ? '#f4f7ff' : '#0e1c2e';
+  const uiTheme = UI_THEME_MAP.get(uiKey) || DEFAULT_UI_THEME;
+  const themeVariables = {
+    '--admin-header-bg': uiTheme.headerBg,
+    '--admin-header-border': uiTheme.headerBorder,
+    '--admin-header-shadow': uiTheme.headerShadow,
+    '--admin-header-blur': uiTheme.headerBlur,
+    '--admin-header-frame-bg': uiTheme.headerFrameBg,
+    '--admin-header-frame-border': uiTheme.headerFrameBorder,
+    '--admin-header-frame-shadow': uiTheme.headerFrameShadow,
+    '--admin-tab-bg': uiTheme.tabBg,
+    '--admin-tab-active-bg': uiTheme.tabActiveBg,
+    '--admin-button-bg': uiTheme.buttonBg,
+    '--admin-button-border': uiTheme.buttonBorder,
+    '--admin-glass-sheen': uiTheme.glassSheen,
+    '--admin-border-soft': uiTheme.borderSoft,
+    '--admin-chip-bg': uiTheme.chipBg,
+    '--admin-chip-border': uiTheme.chipBorder,
+    '--admin-link-color': uiTheme.linkColor,
+    '--admin-accent': uiTheme.accent,
+    '--admin-danger-bg': uiTheme.dangerBg,
+    '--admin-danger-border': uiTheme.dangerBorder,
+    '--admin-success-bg': uiTheme.successBg,
+    '--admin-success-border': uiTheme.successBorder,
+    '--admin-save-gradient': uiTheme.saveGradient,
+    '--admin-save-border': uiTheme.saveBorder,
+    '--admin-save-shadow': uiTheme.saveShadow,
+  };
+  Object.entries(themeVariables).forEach(([cssVar, value]) => {
+    if (value) {
+      body.style.setProperty(cssVar, value);
+    } else {
+      body.style.removeProperty(cssVar);
+    }
+  });
   body.dataset.skin = uiKey;
   body.dataset.tone = normalizedTone;
   body.style.backgroundColor = background.backgroundColor || '';
@@ -705,6 +1252,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
+  const themeLogLoadedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -713,6 +1261,40 @@ export default function Admin() {
       const next = [...prev, entry];
       return next.slice(-20);
     });
+  }, []);
+
+  useEffect(() => {
+    if (themeLogLoadedRef.current) return;
+    themeLogLoadedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const bootstrap = await fetchJsonSafe('/meta/theme-research-log.json', []);
+      if (cancelled) return;
+      if (Array.isArray(bootstrap) && bootstrap.length) {
+        setStatusLog((prev) => {
+          const combined = [...prev];
+          bootstrap.forEach((entry) => {
+            if (!entry || typeof entry !== 'object') return;
+            const speaker = typeof entry.speaker === 'string' ? entry.speaker.trim() : '';
+            const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+            if (!speaker || !text) return;
+            const timestampIso = (() => {
+              const raw = entry.timestamp;
+              if (typeof raw === 'string' && raw.trim()) {
+                const ms = Date.parse(raw);
+                if (!Number.isNaN(ms)) return new Date(ms).toISOString();
+              }
+              return new Date().toISOString();
+            })();
+            combined.push({ speaker, text, timestamp: timestampIso });
+          });
+          return combined.slice(-40);
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function updateNewGameStatus(message, tone = 'info') {
@@ -2382,6 +2964,14 @@ export default function Admin() {
   const metaVercelUrl = adminMeta.vercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
+  const devSnapshotLine = [
+    `Repo: ${metaOwnerRepo || '—'}`,
+    `Branch: ${metaBranchLabel || '—'}`,
+    `Commit: ${metaCommitShort || metaCommitLabel || '—'}`,
+    `Deployment: ${metaDeploymentLabel || '—'}`,
+    `Vercel: ${metaVercelLabel || metaDeploymentLabel || '—'}`,
+    `Timestamp: ${metaNowLabel || '—'}`,
+  ].join(' | ');
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3772,9 +4362,7 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
-            <div style={S.settingsFooterTime}>
-              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
-            </div>
+            <code style={S.settingsFooterDevLine}>{devSnapshotLine}</code>
           </footer>
         </main>
       )}
@@ -4265,15 +4853,26 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
+  settingsFooterDevLine: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    fontFamily: '"JetBrains Mono", "SFMono-Regular", "Fira Mono", monospace',
+    background: 'rgba(15, 23, 42, 0.08)',
+    borderRadius: 8,
+    padding: '6px 8px',
+    marginTop: 4,
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+  },
   header: {
     padding: 20,
-    background: 'rgba(248, 250, 252, 0.72)',
-    backdropFilter: 'blur(18px)',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.28)',
+    background: 'var(--admin-header-bg, rgba(248, 250, 252, 0.72))',
+    backdropFilter: 'var(--admin-header-blur, blur(18px))',
+    borderBottom: 'var(--admin-header-border, 1px solid rgba(148, 163, 184, 0.28))',
     position: 'sticky',
     top: 0,
     zIndex: 40,
-    boxShadow: '0 18px 30px rgba(15, 23, 42, 0.18)',
+    boxShadow: 'var(--admin-header-shadow, 0 18px 30px rgba(15, 23, 42, 0.18))',
     color: 'var(--admin-body-color)',
   },
   conversationLog: {
