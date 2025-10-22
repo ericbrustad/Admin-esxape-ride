@@ -1,18 +1,19 @@
-work — 2025-10-17 09:46:06Z
+work — 2025-10-16 02:15:00Z
 BANNER, COVER, MEDIA COUNT — 2025-10-15 11:58:45Z
 Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
-- 2025-10-17 — Admin protection GitHub fallback & unlocked game tools. Commit: 409c8f245a2f682dfb7a231d7fffdb6851bf59d2
-  - Direct links: `pages/api/admin-protection.js`, `lib/secureStore.js`, `pages/api/save-publish.js`, `pages/api/games.js`, `pages/api/delete-game.js`, `pages/index.jsx`
-  - Notes: Routes password saves through GitHub when the filesystem is read-only, points all GitHub commits at the active work branch, unlocks game creation & deletion while keeping the game mirror off, refreshes the admin banner with repo/commit/deployment details, and updates device actions to close after saving. Note to review @ 2025-10-17 09:46:06Z.
-- 2025-10-17 — Admin header theming & unique skin palettes. Commit: (pending HEAD)
-  - Direct links: `pages/index.jsx`, `styles/globals.css`
-  - Notes: Syncs the dashboard header chrome and Save & Publish controls with each appearance preset using theme-specific CSS variables, gives every skin a bespoke palette that matches its name so presets no longer share the same look, and ships default fallbacks to keep server renders aligned. Note to review @ 2025-10-17 05:17:32Z.
-- 2025-10-16 — Hook order guard & local config fallback. Commit: (pending HEAD)
-  - Direct links: `pages/index.jsx`, `pages/api/config.js`, `.gitignore`
-  - Notes: Ensures the admin dashboard always calls its hooks in a stable order so React no longer crashes on load, adds a filesystem fallback for `/api/config` when GitHub env vars are missing so development stays functional, and reintroduces a `.gitignore` for node_modules/. Note to review @ 2025-10-16 21:15:54Z.
+- 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
+  - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
+  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added
+    workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
+- 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
+  - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
+  - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.
+- 2025-10-20 — Settings log relocation & repository snapshot panel. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Moved the Operator ↔ GPT conversation history into the Settings tab with status copy, removed it from the global header, and added a repository snapshot card that surfaces the repo, branch, commit, Vercel target, and timestamp for quick QA reference.
 - 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
   - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
@@ -82,9 +83,8 @@ Device & Response UI Package
 - 2025-10-14 — Mission/device editors and assigned media summary refresh. Commit: 1ef03a49facc444ce13b37412e076e9dd2e585d9.
   - Direct links: `pages/index.jsx`, `components/AssignedMediaTab.jsx`
   - Notes: Added floating Save/Cancel controls to mission and device editors, introduced a header cover-image window with drag/drop/import options, and moved media usage counts into the Assigned Media tab with per-type summaries.
-- 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc.
+- 2025-10-17 — Set Starfield Dawn as default admin skin and bump package version. Commit: 4fb54669263a320fa227306c4bf9b25e35f910dc. *(Legacy skin art deprecated in favor of external storage; see 2025-10-20 entry.)*
   - Direct links: `pages/index.jsx`, `lib/admin-shared.js`, `package.json`
-  - Notes: Aligns default UI loadout with the Starfield Dawn preset from branch codex/update-admin-ui-skins-with-textures-huhqvs and increments the package version to 1.2.1 so downstream bundles catch the theme refresh.
 - 2025-10-16 — Device editor map controls realignment. Commit: 974ddf67a4a52d773578de28d015c9ff6f455f64.
   - Direct link: `pages/index.jsx`
   - Notes: Keeps the device radius slider and ring selector anchored above the map while grouping Save, Cancel, and Close in the editor header.
@@ -125,3 +125,19 @@ If you want, I can:
 - Integrate these components into your actual pages/index.jsx and wire up your existing state/handlers.
 - Convert styles to your project's theme or CSS modules.
 - Add accessible keyboard support for reordering and selection.
+
+## Supabase Lookup Cheatsheet
+
+- **Games & Configs**
+  - Slugs are generated automatically as `<title-slug>-<seed>` (example: `escape-ride-a1b2c3`) and stored in `games.slug` plus each `config.game.slug` payload.
+  - Mission IDs auto-increment from `m01`, `m02`, … while device IDs start at `d01`, `d02`, … so Supabase JSON lookups stay predictable.
+  - Publishing protection uses `config.game.deployEnabled`. When `true`, the admin shows “🟢 Protected” and blocks edits; when `false`, the admin shows “🔴 Editing unlocked”.
+
+- **Media Pool (Supabase Storage `media` bucket)**
+  - Objects save under `mediapool/<Category>/...` with tags noting the type (e.g., `image`, `audio`), folder (`folder:mediapool-images-icons`), and a `slug:<type>-<folder>-<filename>` identifier.
+  - API responses surface `supabase.bucket` and `supabase.path` so deletions and mission/device bindings can recall the exact asset.
+  - Dashboard deletions remove the Supabase object (when available) and prune the manifest entry so Assigned Media updates immediately.
+
+- **Editors & Assigned Media**
+  - Media Pool cards show the slug plus up to six tags for quick verification (icons vs. covers vs. mission pins, etc.).
+  - The upload destination dropdown feeds the folder-derived tagging logic—choose the closest match (Images → Icons, Audio, Video, etc.) for accurate slugging.
