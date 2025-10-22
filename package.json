@@ -1,12 +1,17 @@
 {
   "name": "esxape-ride",
   "private": true,
-  "packageManager": "pnpm@9.12.1",
+  "engines": {
+    "node": "20.18.x"
+  },
+  "packageManager": "pnpm@9.12.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "setup:pnpm-offline": "node scripts/install-offline-pnpm.mjs",
+    "postinstall": "node scripts/install-offline-pnpm.mjs"
   },
   "devDependencies": {
     "turbo": "^2.1.0"

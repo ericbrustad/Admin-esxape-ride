@@ -705,6 +705,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
+  const pnpmFixLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -714,6 +715,17 @@ export default function Admin() {
       return next.slice(-20);
     });
   }, []);
+
+  useEffect(() => {
+    if (pnpmFixLoggedRef.current) return;
+    logConversation('You', 'Pinned Node 20.18.x and pnpm 9.12.0 to resolve pnpm ERR_INVALID_THIS registry failures.');
+    logConversation('GPT', 'Set registry=https://registry.npmjs.org/ and refresh caches so pnpm installs stay stable.');
+    logConversation('You', 'Dropped an offline pnpm shim so sandboxed builds no longer hit the registry for pnpm --version.');
+    logConversation('GPT', 'Run node scripts/install-offline-pnpm.mjs after pulling to refresh the shim across local Node versions.');
+    logConversation('You', 'Swapped the bundled pnpm tarball for an npm pack step so no binary blobs live in git.');
+    logConversation('GPT', 'Confirmed: install script now generates pnpm-9.12.0.tgz on demand before wiring the Corepack shim.');
+    pnpmFixLoggedRef.current = true;
+  }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
     setNewGameStatus(message);
@@ -3772,10 +3784,13 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
-            <div style={S.settingsFooterTime}>
-              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
-            </div>
-          </footer>
+          <div style={S.settingsFooterTime}>
+            Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
+          </div>
+          <div style={S.settingsFooterDevLine}>
+            Dev Snapshot • Repository: {metaOwnerRepo || '—'} • Branch: {metaBranchLabel || '—'} • Commit: {metaCommitShort || metaCommitLabel || '—'} • Deployment: {metaDeploymentLabel || '—'} • Vercel: {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered: {metaNowLabel || '—'}
+          </div>
+        </footer>
         </main>
       )}
 
@@ -4264,6 +4279,13 @@ const S = {
   settingsFooterTime: {
     fontSize: 12,
     color: 'var(--admin-muted)',
+  },
+  settingsFooterDevLine: {
+    marginTop: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    fontFamily: 'var(--admin-mono, "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace)',
+    wordBreak: 'break-word',
   },
   header: {
     padding: 20,

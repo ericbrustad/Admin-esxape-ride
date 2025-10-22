@@ -2,6 +2,10 @@ node_modules/
 .next/
 public/game/node_modules/
 game/node_modules/
+.npm/
+.corepack/
+.pnpm-store/
+tools/pnpm-offline-stub/pnpm-*.tgz
 .env.local
 .vercel
 .DS_Store
