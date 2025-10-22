@@ -13,6 +13,7 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
+import { nextMissionId, nextDeviceId } from '../lib/ids.js';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -1512,10 +1513,7 @@ export default function Admin() {
 
   /* Missions CRUD */
   function suggestId() {
-    const base='m'; let i=1;
-    const ids = new Set((suite?.missions||[]).map(m=>m.id));
-    while (ids.has(String(base + String(i).padStart(2,'0')))) i++;
-    return base + String(i).padStart(2,'0');
+    return nextMissionId(suite?.missions || []);
   }
   function startNew() {
     if (missionButtonTimeout.current) {
@@ -1698,10 +1696,7 @@ export default function Admin() {
     return { media: mediaOptions, devices: deviceOptions, missions: missionOptions, responses: responseOptions };
   }, [inventory, devices, suite?.missions, config?.icons?.devices, config?.icons?.missions]);
   function suggestDeviceId(existing = devices) {
-    const ids = new Set((existing || []).map(d => String(d?.id || '').toLowerCase()));
-    let i = 1;
-    while (ids.has(`d${String(i).padStart(2, '0')}`)) i += 1;
-    return `d${String(i).padStart(2, '0')}`;
+    return nextDeviceId(existing || []);
   }
   function addDevice() {
     if (deviceButtonTimeout.current) {
