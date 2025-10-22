@@ -8,7 +8,7 @@
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "turbo run dev",
-    "vercel:info": "node -v && corepack --version || true && pnpm -v || true",
+    "vercel:info": "node -v && (corepack --version || true) && (pnpm -v || true)",
     "build": "turbo run build",
     "start": "turbo run start",
     "build:game": "node tools/offline-pnpm.mjs --filter game-web build"
