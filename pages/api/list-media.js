@@ -7,7 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
 import { readManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
-import { listSupabaseMedia, isSupabaseMediaEnabled } from '../../lib/supabase-storage.js';
+import {
+  listSupabaseMedia,
+  isSupabaseMediaEnabled,
+  buildSupabasePublicUrl,
+} from '../../lib/supabase-storage.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -389,8 +393,14 @@ export default async function handler(req, res) {
         seenKeys.add(key);
         if (repoPath) seenKeys.add(repoPath.toLowerCase());
         if (url) seenKeys.add(url.toLowerCase());
+        if (supabaseUrl) seenKeys.add(supabaseUrl.toLowerCase());
         const absolute = repoPath ? path.join(cwd, repoPath) : '';
         const existsOnDisk = absolute ? fs.existsSync(absolute) : false;
+        let status = entry.status
+          || (existsOnDisk ? 'available' : supabaseUrl ? 'supabase' : url ? 'external' : 'missing');
+        if ((status === 'pending' || status === 'pending-external') && supabaseUrl) {
+          status = 'supabase';
+        }
         out.push({
           id: entry.id || key,
           name: entry.name || entry.fileName || entry.url,
@@ -404,7 +414,7 @@ export default async function handler(req, res) {
           categoryLabel: meta.categoryLabel,
           tags: Array.from(mergedTags),
           kind: type,
-          status: entry.status || (existsOnDisk ? 'available' : url ? 'external' : 'missing'),
+          status,
           notes: entry.notes || '',
           existsOnDisk,
           supabase: entry.supabase || null,
