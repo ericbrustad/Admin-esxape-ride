@@ -89,6 +89,16 @@ export async function getServerSideProps() {
       message:
         'Promoted the offline shim to the default npm build script, kept a build:standard alias for pnpm/Corepack diagnostics, documented the workflow in the README, refreshed safeguards to stress the non-Corepack path, reran the shim build, and archived the change log.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel rejects the build unless Node 22.x is declared. Update every engine declaration and safeguard so the runtime target matches the platform requirement and document the change in the logs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shifted the game workspace to Node 22.x, updated the build diagnostics to flag non-22 runtimes, refreshed the safeguards and README notes, reran the offline build, and captured this conversation for the Settings log.',
+    },
   ];
 
   return {
