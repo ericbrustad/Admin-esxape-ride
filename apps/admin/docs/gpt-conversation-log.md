@@ -106,3 +106,11 @@
 **You:** Vercel still complains about a "&gt;=19 &lt;20" Node range hidden somewhere. Hunt it down and make sure every package we own explicitly targets Node 22 with the same pnpm pin.
 
 **GPT:** Added Node 22.x engine metadata and pnpm 9.11.0 package manager declarations to the shared workspace package and the embedded game stub so Vercel no longer sees the old "&gt;=19 &lt;20" range.
+
+---
+
+**Timestamp:** 2025-10-23T21:30:00Z
+
+**You:** Vercel still errors with "&gt;=19 &lt;20" because some toolchain file must be drifting. Track it down and align the runtime pins with Node 22.11.0 everywhere.
+
+**GPT:** Updated `.node-version` to `22.11.0` to match the rest of the toolchain metadata so Vercel no longer reads the stale Node 20 pointer, then reran the offline build helper to confirm the workspace compiles under Node 22.
