@@ -744,22 +744,6 @@ export default function Admin() {
         speaker: 'GPT',
         text: 'Tightened the sandbox guard to read the Volta pin, short-circuit on mismatched runtimes, and surface the fix-it tip.',
       },
-      {
-        speaker: 'You',
-        text: 'QA asked for a footer snapshot that calls out repo, branch, commit, deployment, plus timestamps for quick checks.',
-      },
-      {
-        speaker: 'GPT',
-        text: 'Pulled owner/repo metadata from admin-meta and appended a Dev Snapshot footer line with render + fetch times.',
-      },
-      {
-        speaker: 'You',
-        text: 'Ran the sandbox guard before hand-off to confirm Node 20 mismatches fail fast during testing.',
-      },
-      {
-        speaker: 'GPT',
-        text: 'Guard logs Volta/Corepack/pnpm details after the runtime matches the pinned Node 20.18.x toolchain.',
-      },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
   }, [logConversation]);
@@ -2434,8 +2418,6 @@ export default function Admin() {
   const metaRuntimePnpmLabel = metaRuntimePnpmRaw || '';
   const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
   const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
-  const metaRuntimeVoltaRaw = adminMeta.runtime?.volta ? String(adminMeta.runtime.volta) : '';
-  const metaRuntimeVoltaLabel = metaRuntimeVoltaRaw || '';
   const metaRuntimeEnv = adminMeta.runtime?.environment || '';
   const metaRuntimeEnvLabel = metaRuntimeEnv
     ? (metaRuntimeEnv === 'vercel' ? 'Vercel' : metaRuntimeEnv)
@@ -3840,7 +3822,7 @@ export default function Admin() {
               Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''}{metaRuntimeVoltaLabel ? ` • Volta ${metaRuntimeVoltaLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>
