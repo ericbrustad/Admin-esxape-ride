@@ -706,7 +706,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmShimLoggedRef = useRef(false);
+  const initialConversationLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -718,13 +718,32 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (pnpmShimLoggedRef.current) return;
-    logConversation('You', 'Added an offline pnpm shim so builds work without registry access.');
-    logConversation('GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.');
-    logConversation('You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.');
-    logConversation('GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.');
-    pnpmShimLoggedRef.current = true;
-  }, [logConversation]);
+    if (initialConversationLoggedRef.current) return;
+    const conversationSeed = [
+      ['You', 'Added an offline pnpm shim so builds work without registry access.'],
+      ['GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.'],
+      ['You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.'],
+      ['GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.'],
+      ['You', 'Pinned Node.js 20.18.x and pnpm 9.11.0 with Volta plus engine-strict npmrc guards to block Node 22 sandboxes.'],
+      ['GPT', 'If the sandbox boots Node 22, run `nvm use 20.19.4` so installs obey the guard before testing.'],
+      ['You', 'Recorded the settings footer with repo, branch, commit, deployment, and render timestamps for QA.'],
+      ['GPT', 'Use tools/vercel-info.mjs to verify the Volta pin, Corepack, and pnpm version before deployments.'],
+      ['You', 'Requested scoped pnpm installs so Vercel only touches the admin or game app at a time.'],
+      ['GPT', 'Run `node tools/vercel-info.mjs --scope admin` or `--scope game-web` to print the filtered install/build commands and required env vars.'],
+    ];
+
+    setStatusLog((prev) => {
+      const timestamped = conversationSeed.map(([speaker, text], index) => ({
+        speaker,
+        text,
+        timestamp: new Date(Date.now() + index).toISOString(),
+      }));
+      const next = [...prev, ...timestamped];
+      return next.slice(-20);
+    });
+
+    initialConversationLoggedRef.current = true;
+  }, []);
 
   function updateNewGameStatus(message, tone = 'info') {
     setNewGameStatus(message);
@@ -3778,7 +3797,7 @@ export default function Admin() {
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
+              Dev Snapshot — Repo {metaOwnerRepo || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
