@@ -716,7 +716,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const initialConversationLoggedRef = useRef(false);
+  const pnpmShimLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -761,6 +761,22 @@ export default function Admin() {
       {
         speaker: 'GPT',
         text: 'Rendered the footer snapshot with local timestamps so QA can verify deployments at a glance.',
+      },
+      {
+        speaker: 'You',
+        text: 'Removed the disabled publishing banner from the New Game modal and streamlined the launch button.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Confirmed the New Game dialog now relies on inline status updates without redundant warning chrome.',
+      },
+      {
+        speaker: 'You',
+        text: 'Pinned the workspace to Node 22.x so Vercel stops rejecting builds.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime.',
       },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
@@ -2514,10 +2530,7 @@ export default function Admin() {
                 onClick={openNewGameModal}
                 style={{ ...S.button, ...S.headerNewGameButton }}
               >
-                <span style={S.newGameLabel}>
-                  <span aria-hidden="true" style={S.headerNewGameLight} />
-                  <span>+ New Game</span>
-                </span>
+                <span style={S.newGameLabel}>+ New Game</span>
               </button>
               <button
                 onClick={async ()=>{
@@ -3980,11 +3993,6 @@ export default function Admin() {
               <button style={S.modalCloseButton} onClick={handleNewGameModalClose} aria-label="Close new game dialog">×</button>
             </div>
             <div style={S.modalContent}>
-              {!gameEnabled && (
-                <div style={S.modalStatusError}>
-                  Game project publishing is currently disabled. Enable it in settings before creating a new game.
-                </div>
-              )}
               <Field label="Game Title">
                 <input
                   style={S.input}
@@ -4612,13 +4620,6 @@ const S = {
     alignItems: 'center',
     gap: 8,
   },
-  headerNewGameLight: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    background: '#ef4444',
-    boxShadow: '0 0 12px rgba(239, 68, 68, 0.65)',
-  },
   headerTopRow: {
     display: 'flex',
     flexDirection: 'column',
@@ -5122,11 +5123,6 @@ const S = {
     fontWeight: 600,
   },
   modalStatusDanger: {
-    color: '#ef4444',
-    fontWeight: 600,
-  },
-  modalStatusError: {
-    fontSize: 13,
     color: '#ef4444',
     fontWeight: 600,
   },
