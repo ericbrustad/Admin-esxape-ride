@@ -49,6 +49,16 @@ export async function getServerSideProps() {
       message:
         'Captured the Corepack diagnostics guidance, reiterated the offline pnpm workflow, and confirmed the repository snapshot renders with branch, commit, deployment URL, and refreshed timestamp.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Rerun pnpm directly and make sure it tests clean—document the outcome and keep the GPT ↔ operator transcript visible.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Attempted pnpm --filter game-web build through Corepack, recorded the proxy/tunneling failure, then validated the project with the offline pnpm shim to ensure builds continue succeeding inside the Node >=19 <20 target.',
+    },
   ];
 
   return {
@@ -86,6 +96,9 @@ export default function Settings({ metadata, conversationLog }) {
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
               Enable Corepack explicitly with <code>ENABLE_EXPERIMENTAL_COREPACK=1</code> when diagnosing provisioning issues, then retry the install to capture the exact error signal.
+            </li>
+            <li>
+              Re-run <code>pnpm --filter game-web build</code> (and <code>dev</code> when needed) so the direct Corepack path gets exercised and its logs stay current for proxy debugging.
             </li>
             <li>
               Use the local shim with <code>node tools/offline-pnpm.mjs --filter game-web build</code> (or <code>dev</code>) so no environment depends on Corepack provisioning pnpm.
