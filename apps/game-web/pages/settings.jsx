@@ -31,12 +31,32 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
-        'Fix the game-web black screen: pin Node 22, add a smoke-test home page, surface a health endpoint, and ensure Supabase uses NEXT_PUBLIC env vars only.',
+        'Research whatever it takes to keep pnpm from failing, forbid Corepack from installing it, and surface the repo/branch/commit snapshot at the bottom of settings.',
     },
     {
       speaker: 'GPT',
       message:
-        'Aligned game-web with Node 22.x, added /api/health, replaced the index route with a smoke renderer + crash logger, and restricted Supabase configs to NEXT_PUBLIC keys.',
+        'Documented the offline pnpm shim workflow, emphasised keeping a local mirror, and retained the live repository metadata footer for QA reference.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel installs are failing because apps/admin still requires Node <20. Fix the engine constraint (line 6) and resolve any conflicts.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Reconciled the admin engine constraint with the workspace runtime and captured the troubleshooting recap here for traceability.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Lock the player build to Node versions greater than 19 but still under 20, add the workspace pnpm lockfile, and clean up anything fighting those settings.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shifted every engine hint to the >=19 <20 range, rewired the workspace scripts to filter builds through pnpm directly, and staged the root pnpm lockfile so Vercel headless installs succeed.',
     },
   ];
 
@@ -68,19 +88,19 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 22.x Active</span>
+          <span className="badge">Node target: &gt;=19 &lt;20 Active</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
-              Enable Corepack and run <code>corepack use pnpm@9</code> so the runner matches the enforced package manager version.
+              Use the local shim with <code>node tools/offline-pnpm.mjs --filter game-web build</code> (or <code>dev</code>) so no environment depends on Corepack provisioning pnpm.
             </li>
             <li>
-              Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.
+              Maintain an offline copy of <code>pnpm-lock.yaml</code> plus <code>node_modules</code> so dependency restores never invoke Corepack or remote registries mid-build.
             </li>
             <li>
-              Pin Node to <code>22.11.0</code> (22.x) across Vercel, CI, and local development to align with the deployment runtime.
+              Pin Node within the <code>&gt;=19 &lt;20</code> window across Vercel, CI, and local development to align with the deployment runtime.
             </li>
           </ul>
         </div>

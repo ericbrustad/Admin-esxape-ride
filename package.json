@@ -3,18 +3,15 @@
   "private": true,
   "packageManager": "pnpm@9.11.0",
   "engines": {
-    "node": "22.x"
+    "node": ">=19 <20"
   },
   "volta": {
-    "node": "22.11.0",
+    "node": "19.9.0",
     "pnpm": "9.11.0"
   },
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
-    "dev": "turbo run dev --parallel",
-    "build": "turbo run build"
-  },
-  "devDependencies": {
-    "turbo": "^2.0.0"
+    "dev": "pnpm --filter ./apps/game-web... run dev",
+    "build": "pnpm --filter ./apps/game-web... run build"
   }
 }
