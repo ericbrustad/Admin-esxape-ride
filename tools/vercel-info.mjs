@@ -48,12 +48,6 @@ function ensureNode20(version) {
   const runtime = parseVersion(version);
   const pinnedNodeRaw = packageJson?.volta?.node || '';
   const pinned = parseVersion(pinnedNodeRaw);
-  const status = {
-    ok: true,
-    runtime,
-    pinned,
-    pinnedNodeRaw,
-  };
 
   if (Number.isNaN(runtime.major)) {
     logError(`Unable to parse Node.js version "${version}"`);
@@ -75,48 +69,29 @@ function ensureNode20(version) {
     if (pinned.major !== 20) {
       logError(`package.json pins Node ${pinnedNodeRaw}, expected a 20.x entry.`);
       process.exitCode = 1;
-      status.ok = false;
-      return status;
+      return;
     }
 
     const comparison = compareVersions(runtime, pinned);
     if (Number.isNaN(comparison)) {
       logError(`Unable to compare runtime Node version against pinned ${pinnedNodeRaw}.`);
       process.exitCode = 1;
-      status.ok = false;
     } else if (comparison < 0) {
       logError(`Node runtime ${runtime.clean} is older than pinned ${pinnedNodeRaw}.`);
       process.exitCode = 1;
-      status.ok = false;
     }
   } else if (runtime.minor < 18) {
     logError('Node.js 20 detected, but version must be at least 20.18.0.');
     process.exitCode = 1;
-    status.ok = false;
   }
-
-  return status;
 }
 
 function main() {
   const nodeVersion = process.version;
-  const nodeStatus = ensureNode20(nodeVersion);
+  ensureNode20(nodeVersion);
   const environment = process.env.VERCEL ? 'Vercel sandbox' : (process.env.NODE_ENV || 'local runtime');
-  const pinnedNodeRaw = packageJson?.volta?.node || '20.x';
-  const pinnedPnpmRaw = packageJson?.volta?.pnpm || (typeof packageJson?.packageManager === 'string'
-    ? packageJson.packageManager.split('@')[1] || ''
-    : '');
   log(`environment: ${environment}`);
-  log(`expected sandbox toolchain: Node.js ${pinnedNodeRaw} + pnpm ${pinnedPnpmRaw || '9.11.0'} (Volta pinned)`);
-
-  if (!nodeStatus?.ok) {
-    const tip = pinnedNodeRaw ? `volta run --node ${pinnedNodeRaw} node tools/vercel-info.mjs` : 'volta run node tools/vercel-info.mjs';
-    logError(`Resolve the Node.js runtime mismatch, then rerun this script (hint: ${tip}).`);
-    runCommand('volta', 'volta --version');
-    return;
-  }
-
-  runCommand('volta', 'volta --version');
+  log('expected sandbox toolchain: Node.js 20.18.1 + pnpm 9.11.0 (Volta pinned)');
   runCommand('corepack', 'corepack --version');
   const pnpmResult = runCommand('pnpm', 'pnpm -v');
   if (pnpmResult.ok && pinnedPnpmRaw && pnpmResult.output !== pinnedPnpmRaw) {
