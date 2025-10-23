@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,52 +114,75 @@ function runCommand(label, command) {
   }
 }
 
-function ensureNode20(version, expectedVersion) {
-  const { major, minor, raw } = parseSemver(version);
-  if (Number.isNaN(major) || Number.isNaN(minor)) {
+function parseVersion(input = '') {
+  if (!input) return { major: NaN, minor: NaN, patch: NaN };
+  const clean = input.startsWith('v') ? input.slice(1) : input;
+  const [major, minor, patch] = clean.split('.').map((value) => Number.parseInt(value, 10));
+  return { clean, major, minor, patch: Number.isNaN(patch) ? 0 : patch };
+}
+
+function compareVersions(a, b) {
+  if (Number.isNaN(a.major) || Number.isNaN(b.major)) return NaN;
+  if (a.major !== b.major) return a.major > b.major ? 1 : -1;
+  if (a.minor !== b.minor) return a.minor > b.minor ? 1 : -1;
+  if (a.patch !== b.patch) return a.patch > b.patch ? 1 : -1;
+  return 0;
+}
+
+function ensureNode20(version) {
+  const runtime = parseVersion(version);
+  const pinnedNodeRaw = packageJson?.volta?.node || '';
+  const pinned = parseVersion(pinnedNodeRaw);
+
+  if (Number.isNaN(runtime.major)) {
     logError(`Unable to parse Node.js version "${version}"`);
     process.exitCode = 1;
-    return;
+    status.ok = false;
+    return status;
   }
 
-  log(`node runtime: v${raw}`);
-  if (expectedVersion) {
-    log(`expected via Volta/engines: v${cleanVersion(expectedVersion)}`);
-  }
-  if (pinnedPnpmVersion) {
-    log(`expected pnpm: v${cleanVersion(pinnedPnpmVersion)}`);
-  }
+  log(`node: v${runtime.clean}`);
 
-  if (major !== 20) {
-    logError('Expected Node.js 20.x runtime. Run `nvm use 20.19.4` (or install the Volta pin) before continuing.');
+  if (runtime.major !== 20) {
+    logError('Expected Node.js 20.x runtime.');
     process.exitCode = 1;
-    return;
+    status.ok = false;
+    return status;
   }
 
-  const minimumMinor = 18;
-  if (minor < minimumMinor) {
+  if (!Number.isNaN(pinned.major)) {
+    if (pinned.major !== 20) {
+      logError(`package.json pins Node ${pinnedNodeRaw}, expected a 20.x entry.`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const comparison = compareVersions(runtime, pinned);
+    if (Number.isNaN(comparison)) {
+      logError(`Unable to compare runtime Node version against pinned ${pinnedNodeRaw}.`);
+      process.exitCode = 1;
+    } else if (comparison < 0) {
+      logError(`Node runtime ${runtime.clean} is older than pinned ${pinnedNodeRaw}.`);
+      process.exitCode = 1;
+    }
+  } else if (runtime.minor < 18) {
     logError('Node.js 20 detected, but version must be at least 20.18.0.');
     process.exitCode = 1;
-  }
-
-  if (expectedVersion) {
-    const { major: expectedMajor, minor: expectedMinor } = parseSemver(expectedVersion);
-    if (!Number.isNaN(expectedMajor) && expectedMajor !== major) {
-      logError(`Volta pin expects Node.js ${expectedMajor}.x but runtime is ${major}.x.`);
-      process.exitCode = 1;
-    }
-    if (!Number.isNaN(expectedMinor) && expectedMinor > minor) {
-      logError(`Volta pin expects Node.js >= ${expectedMajor}.${expectedMinor}.x but runtime is ${major}.${minor}.x.`);
-      process.exitCode = 1;
-    }
   }
 }
 
 function main() {
   const nodeVersion = process.version;
-  ensureNode20(nodeVersion, pinnedNodeVersion);
+  ensureNode20(nodeVersion);
+  const environment = process.env.VERCEL ? 'Vercel sandbox' : (process.env.NODE_ENV || 'local runtime');
+  log(`environment: ${environment}`);
+  log('expected sandbox toolchain: Node.js 20.18.1 + pnpm 9.11.0 (Volta pinned)');
   runCommand('corepack', 'corepack --version');
-  runCommand('pnpm', 'pnpm -v');
+  const pnpmResult = runCommand('pnpm', 'pnpm -v');
+  if (pnpmResult.ok && pinnedPnpmRaw && pnpmResult.output !== pinnedPnpmRaw) {
+    logError(`pnpm version mismatch — expected ${pinnedPnpmRaw}, received ${pnpmResult.output}`);
+    process.exitCode = 1;
+  }
 }
 
 main();
