@@ -38,16 +38,6 @@ export async function getServerSideProps() {
       message:
         'Aligned game-web with Node 22.x, added /api/health, replaced the index route with a smoke renderer + crash logger, and restricted Supabase configs to NEXT_PUBLIC keys.',
     },
-    {
-      speaker: 'Operator',
-      message:
-        'Vercel build still fails — admin package demands Node < 20. Keep the focus on apps/game-web and adjust deployment so installs/builds no longer touch the admin workspace.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Scoped Vercel install/build commands to the game-web workspace so deployments skip admin’s legacy engine pin while keeping the player app on Node 22.',
-    },
   ];
 
   return {
