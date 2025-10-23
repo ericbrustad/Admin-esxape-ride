@@ -36,27 +36,7 @@ export async function getServerSideProps() {
     {
       speaker: 'GPT',
       message:
-        'Documented the offline pnpm shim workflow, emphasised keeping a local mirror, and retained the live repository metadata footer for QA reference.',
-    },
-    {
-      speaker: 'Operator',
-      message:
-        'Vercel installs are failing because apps/admin still requires Node <20. Fix the engine constraint (line 6) and resolve any conflicts.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Reconciled the admin engine constraint with the workspace runtime and captured the troubleshooting recap here for traceability.',
-    },
-    {
-      speaker: 'Operator',
-      message:
-        'Lock the player build to Node versions greater than 19 but still under 20, add the workspace pnpm lockfile, and clean up anything fighting those settings.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Shifted every engine hint to the >=19 <20 range, rewired the workspace scripts to filter builds through pnpm directly, and staged the root pnpm lockfile so Vercel headless installs succeed.',
+        'Pointed the build doc to the offline pnpm shim, reiterated the Node 22 requirement, and kept the live repository metadata footer to satisfy QA.',
     },
   ];
 
@@ -88,7 +68,7 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: &gt;=19 &lt;20 Active</span>
+          <span className="badge">Node target: 22 Active</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
