@@ -53,7 +53,6 @@ function buildRuntimeMetadata() {
   const nodeVersion = process.version || '';
   const pnpmVersion = safeExec('pnpm --version');
   const corepackVersion = safeExec('corepack --version');
-  const voltaVersion = safeExec('volta --version');
   const pinnedNode = packageJson?.volta?.node || '';
   const pinnedPnpm = packageJson?.volta?.pnpm || (
     typeof packageJson?.packageManager === 'string'
@@ -65,7 +64,6 @@ function buildRuntimeMetadata() {
     node: nodeVersion,
     pnpm: pnpmVersion,
     corepack: corepackVersion,
-    volta: voltaVersion,
     pinnedNode,
     pinnedPnpm,
     packageManager: packageJson?.packageManager || '',

@@ -88,12 +88,8 @@ function main() {
   const nodeVersion = process.version;
   ensureNode20(nodeVersion);
   const environment = process.env.VERCEL ? 'Vercel sandbox' : (process.env.NODE_ENV || 'local runtime');
-  const pinnedNodeRaw = packageJson?.volta?.node || '20.x';
-  const pinnedPnpmRaw = packageJson?.volta?.pnpm || (typeof packageJson?.packageManager === 'string'
-    ? packageJson.packageManager.split('@')[1] || ''
-    : '');
   log(`environment: ${environment}`);
-  log(`expected sandbox toolchain: Node.js ${pinnedNodeRaw} + pnpm ${pinnedPnpmRaw || '9.11.0'} (Volta pinned)`);
+  log('expected sandbox toolchain: Node.js 20.18.1 + pnpm 9.11.0 (Volta pinned)');
   runCommand('corepack', 'corepack --version');
   const pnpmResult = runCommand('pnpm', 'pnpm -v');
   if (pnpmResult.ok && pinnedPnpmRaw && pnpmResult.output !== pinnedPnpmRaw) {

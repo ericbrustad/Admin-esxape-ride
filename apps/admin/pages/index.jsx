@@ -2395,8 +2395,6 @@ export default function Admin() {
   const metaRuntimePnpmLabel = metaRuntimePnpmRaw || '';
   const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
   const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
-  const metaRuntimeVoltaRaw = adminMeta.runtime?.volta ? String(adminMeta.runtime.volta) : '';
-  const metaRuntimeVoltaLabel = metaRuntimeVoltaRaw || '';
   const metaRuntimeEnv = adminMeta.runtime?.environment || '';
   const metaRuntimeEnvLabel = metaRuntimeEnv
     ? (metaRuntimeEnv === 'vercel' ? 'Vercel' : metaRuntimeEnv)
@@ -3801,7 +3799,7 @@ export default function Admin() {
               Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''}{metaRuntimeVoltaLabel ? ` • Volta ${metaRuntimeVoltaLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>
