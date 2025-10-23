@@ -30,12 +30,18 @@ export async function getServerSideProps() {
   const conversationLog = [
     {
       speaker: 'Operator',
-      message: 'Work only with the current copy (scope apps/game-web) and repair the Node 22 + pnpm registry failures by pinning Node 20, locking pnpm, hardening installs, and ensuring the Settings page shows repo metadata.',
+      message:
+        'Focus on apps/game-web, pin Node 20, lock pnpm, harden installs, and surface the repository snapshot so QA can trace builds.',
+    },
+    {
+      speaker: 'Operator',
+      message: 'try corepack use pnpm@latest',
     },
     {
       speaker: 'GPT',
-      message: 'Pinned Node 20.18.x with pnpm 9, added resilient install defaults, and refreshed the Settings snapshot so the repository, branch, commit, deployment, and timestamp remain visible for QA.'
-    }
+      message:
+        'Kept the Node 20.18.x target, documented Corepack usage with pnpm@latest, and refreshed the Settings footer snapshot to include repo, branch, commit, deployment, and timestamps.',
+    },
   ];
 
   return {
@@ -71,9 +77,15 @@ export default function Settings({ metadata, conversationLog }) {
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-            <li>Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.</li>
-            <li>Pin Node to <code>20.18.x</code> and pnpm to <code>9.11.0</code> across Vercel, CI, and local development.</li>
-            <li>Force the npm registry to <code>https://registry.npmjs.org/</code> and prefer IPv4 to avoid undici URLSearchParams crashes.</li>
+            <li>
+              Enable Corepack and run <code>corepack use pnpm@latest</code> before installs so the runner activates a compatible pnpm release.
+            </li>
+            <li>
+              Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.
+            </li>
+            <li>
+              Pin Node to <code>20.18.x</code> across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
+            </li>
           </ul>
         </div>
       </section>
@@ -112,6 +124,26 @@ export default function Settings({ metadata, conversationLog }) {
           <dd style={{ margin: 0 }}>{metadata?.nodeVersion}</dd>
         </dl>
       </section>
+
+      <footer
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 13,
+          color: 'var(--muted)',
+          marginTop: 16,
+        }}
+      >
+        <span>
+          {metadata?.repoName} @ {metadata?.branchName} • {metadata?.commitShaShort}
+        </span>
+        <span>
+          {metadata?.deploymentUrl} • {timestamp}
+        </span>
+      </footer>
     </main>
   );
 }
