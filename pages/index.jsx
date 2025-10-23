@@ -4152,6 +4152,82 @@ export default function Admin() {
               Tip: keep vertical alignment on <b>Top</b> so text doesn’t cover the backpack.
             </div>
           </div>
+          <div style={{ ...S.card, marginTop:16 }}>
+            <h3 style={{ marginTop:0 }}>Repository Diagnostics</h3>
+            <div style={S.settingsMetaGrid}>
+              <div style={S.settingsMetaRow}>
+                <div style={S.settingsMetaLabel}>Repository</div>
+                <div style={S.settingsMetaValue}>
+                  {metaRepoLabel ? (
+                    metaRepoUrl ? (
+                      <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                        {metaRepoLabel}
+                      </a>
+                    ) : (
+                      metaRepoLabel
+                    )
+                  ) : (
+                    <span style={S.metaBannerError}>Unavailable</span>
+                  )}
+                </div>
+              </div>
+              <div style={S.settingsMetaRow}>
+                <div style={S.settingsMetaLabel}>Branch</div>
+                <div style={S.settingsMetaValue}>
+                  {metaBranchLabel ? (
+                    metaBranchUrl ? (
+                      <a href={metaBranchUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                        {metaBranchLabel}
+                      </a>
+                    ) : (
+                      metaBranchLabel
+                    )
+                  ) : (
+                    <span style={S.metaBannerError}>Unavailable</span>
+                  )}
+                </div>
+              </div>
+              <div style={S.settingsMetaRow}>
+                <div style={S.settingsMetaLabel}>Commit</div>
+                <div style={S.settingsMetaValue}>
+                  {metaCommitFull ? (
+                    metaCommitUrl ? (
+                      <a
+                        href={metaCommitUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={S.metaLink}
+                        title={metaCommitFull}
+                      >
+                        {metaCommitShort || metaCommitFull.slice(0, 7)}
+                      </a>
+                    ) : (
+                      <code title={metaCommitFull}>{metaCommitFull}</code>
+                    )
+                  ) : (
+                    <span style={S.metaBannerError}>Unavailable</span>
+                  )}
+                </div>
+              </div>
+              <div style={S.settingsMetaRow}>
+                <div style={S.settingsMetaLabel}>Vercel Deployment</div>
+                <div style={S.settingsMetaValue}>
+                  {metaDeploymentUrl ? (
+                    <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                      {metaDeploymentLinkLabel || metaDeploymentState || metaDeploymentUrl}
+                    </a>
+                  ) : metaDeploymentState ? (
+                    metaDeploymentState
+                  ) : (
+                    <span style={S.metaBannerError}>Unavailable</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div style={S.settingsMetaTimestamp}>
+              Last checked: {metaTimestampLabel || '—'}
+            </div>
+          </div>
         </main>
       )}
 
@@ -4680,6 +4756,33 @@ const S = {
     borderRadius: 18,
     padding: 18,
     boxShadow: 'var(--appearance-panel-shadow, var(--admin-panel-shadow))',
+  },
+  settingsMetaGrid: {
+    display: 'grid',
+    gap: 12,
+    marginTop: 12,
+  },
+  settingsMetaRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(120px, 180px) 1fr',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsMetaLabel: {
+    fontSize: 11,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  settingsMetaValue: {
+    fontSize: 14,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    wordBreak: 'break-word',
+  },
+  settingsMetaTimestamp: {
+    marginTop: 12,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   floatingBarTop: {
     position: 'sticky',
