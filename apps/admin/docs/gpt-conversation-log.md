@@ -98,3 +98,11 @@
 **You:** Vercel rejected the old runtime—move the workspace to Node 22.x everywhere while keeping the Settings audit strip intact.
 
 **GPT:** Bumped every engine pin to `22.x`, refreshed the Volta/.nvmrc guidance to `22.11.0`, updated the build helper to warn when the runtime drifts, and verified the Settings footer still reports repo, branch, commit, deployment, and timestamps.
+
+---
+
+**Timestamp:** 2025-10-23T20:55:00Z
+
+**You:** Vercel still complains about a "&gt;=19 &lt;20" Node range hidden somewhere. Hunt it down and make sure every package we own explicitly targets Node 22 with the same pnpm pin.
+
+**GPT:** Added Node 22.x engine metadata and pnpm 9.11.0 package manager declarations to the shared workspace package and the embedded game stub so Vercel no longer sees the old "&gt;=19 &lt;20" range.
