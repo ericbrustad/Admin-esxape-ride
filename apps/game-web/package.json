@@ -2,6 +2,10 @@
   "name": "game-web",
   "private": true,
   "version": "0.1.0",
+  "engines": {
+    "node": ">=20.18 <21"
+  },
+  "packageManager": "pnpm@latest",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
