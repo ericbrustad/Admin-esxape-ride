@@ -1,12 +1,12 @@
 {
   "name": "admin-esxape-ride",
   "private": true,
-  "packageManager": "pnpm",
+  "packageManager": "pnpm@9.11.0",
   "engines": {
-    "node": ">19 20<"
+    "node": ">=20.0.0"
   },
   "volta": {
-    "node": ">=19 <20",
+    "node": "20",
     "pnpm": "9.11.0"
   },
   "scripts": {
