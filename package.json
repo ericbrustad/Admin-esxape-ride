@@ -1,6 +1,10 @@
 {
   "name": "esxape-ride",
   "private": true,
+  "volta": {
+    "node": "20.18.1",
+    "pnpm": "9.11.0"
+  },
   "engines": {
     "node": ">=20.18 <21"
   },
