@@ -706,7 +706,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmShimLoggedRef = useRef(false);
+  const initialConversationLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -718,12 +718,16 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (pnpmShimLoggedRef.current) return;
+    if (initialConversationLoggedRef.current) return;
     logConversation('You', 'Added an offline pnpm shim so builds work without registry access.');
     logConversation('GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.');
     logConversation('You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.');
     logConversation('GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.');
-    pnpmShimLoggedRef.current = true;
+    logConversation('You', 'Pinned Node.js 20.18.x and pnpm 9.11.0 with Volta plus engine-strict npmrc guards to block Node 22 sandboxes.');
+    logConversation('GPT', 'If the sandbox boots Node 22, run `nvm use 20.19.4` so installs obey the guard before testing.');
+    logConversation('You', 'Recorded the settings footer with repo, branch, commit, deployment, and render timestamps for QA.');
+    logConversation('GPT', 'Use tools/vercel-info.mjs to verify the Volta pin, Corepack, and pnpm version before deployments.');
+    initialConversationLoggedRef.current = true;
   }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
@@ -3778,7 +3782,7 @@ export default function Admin() {
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
+              Dev Snapshot — Repo {metaOwnerRepo || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
