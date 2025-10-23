@@ -40,7 +40,7 @@ export async function getServerSideProps() {
     {
       speaker: 'GPT',
       message:
-        'Kept the Node 20.18.x target, documented Corepack usage with pnpm@latest, and refreshed the Settings footer snapshot to include repo, branch, commit, deployment, and timestamps.',
+        'Kept the Node 20.18.1 target, documented Corepack usage with pnpm@latest, and refreshed the Settings footer snapshot to include repo, branch, commit, deployment, and timestamps.',
     },
   ];
 
@@ -72,7 +72,7 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 20.x LTS</span>
+          <span className="badge">Node target: 20.18.1 LTS</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
@@ -84,7 +84,7 @@ export default function Settings({ metadata, conversationLog }) {
               Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.
             </li>
             <li>
-              Pin Node to <code>20.18.x</code> across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
+              Pin Node to <code>20.18.1</code> across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
             </li>
           </ul>
         </div>
