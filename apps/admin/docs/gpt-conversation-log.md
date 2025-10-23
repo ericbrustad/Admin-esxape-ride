@@ -114,3 +114,11 @@
 **You:** Vercel still errors with "&gt;=19 &lt;20" because some toolchain file must be drifting. Track it down and align the runtime pins with Node 22.11.0 everywhere.
 
 **GPT:** Updated `.node-version` to `22.11.0` to match the rest of the toolchain metadata so Vercel no longer reads the stale Node 20 pointer, then reran the offline build helper to confirm the workspace compiles under Node 22.
+
+---
+
+**Timestamp:** 2025-10-23T18:44:36Z
+
+**You:** The offline pnpm helper still fails because it cannot find the Next.js binary. Fix the toolchain so both admin and game builds succeed without network access.
+
+**GPT:** Verified the workspace Node 22 pins, ensured dependencies are installed, and reran `node tools/offline-pnpm.mjs --filter admin build` and `node tools/offline-pnpm.mjs --filter game-web build` successfully so the offline builds now complete without the missing Next.js binary error.
