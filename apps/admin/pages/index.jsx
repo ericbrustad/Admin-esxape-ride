@@ -716,7 +716,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const initialConversationLoggedRef = useRef(false);
+  const pnpmShimLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -761,6 +761,22 @@ export default function Admin() {
       {
         speaker: 'GPT',
         text: 'Rendered the footer snapshot with local timestamps so QA can verify deployments at a glance.',
+      },
+      {
+        speaker: 'You',
+        text: 'Removed the disabled publishing banner from the New Game modal and streamlined the launch button.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Confirmed the New Game dialog now relies on inline status updates without redundant warning chrome.',
+      },
+      {
+        speaker: 'You',
+        text: 'Pinned the workspace to Node 22.x so Vercel stops rejecting builds.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime.',
       },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
