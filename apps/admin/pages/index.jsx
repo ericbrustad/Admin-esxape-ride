@@ -706,7 +706,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmShimLoggedRef = useRef(false);
+  const initialConversationLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
