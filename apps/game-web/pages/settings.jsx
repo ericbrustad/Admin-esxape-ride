@@ -31,16 +31,12 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
-        'Focus on apps/game-web, pin Node 20, lock pnpm, harden installs, and surface the repository snapshot so QA can trace builds.',
-    },
-    {
-      speaker: 'Operator',
-      message: 'try corepack use pnpm@latest',
+        'Fix the game-web black screen: pin Node 22, add a smoke-test home page, surface a health endpoint, and ensure Supabase uses NEXT_PUBLIC env vars only.',
     },
     {
       speaker: 'GPT',
       message:
-        'Kept the Node 20.18.1 target, documented Corepack usage with pnpm@latest, and refreshed the Settings footer snapshot to include repo, branch, commit, deployment, and timestamps.',
+        'Aligned game-web with Node 22.x, added /api/health, replaced the index route with a smoke renderer + crash logger, and restricted Supabase configs to NEXT_PUBLIC keys.',
     },
   ];
 
@@ -72,19 +68,19 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 20.18.1 LTS</span>
+          <span className="badge">Node target: 22.x Active</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
-              Enable Corepack and run <code>corepack use pnpm@latest</code> before installs so the runner activates a compatible pnpm release.
+              Enable Corepack and run <code>corepack use pnpm@9</code> so the runner matches the enforced package manager version.
             </li>
             <li>
               Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.
             </li>
             <li>
-              Pin Node to <code>20.18.1</code> across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
+              Pin Node to <code>22.11.0</code> (22.x) across Vercel, CI, and local development to align with the deployment runtime.
             </li>
           </ul>
         </div>
