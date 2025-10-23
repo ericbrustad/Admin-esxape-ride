@@ -53,19 +53,28 @@ const WORKSPACES = new Map([
   }],
 ]);
 
-function resolveBin(binName) {
-  const binDir = path.join(repoRoot, 'node_modules', '.bin');
+function resolveBin(binName, workspaceCwd) {
+  // Try workspace's node_modules first, then root
+  const candidates = [
+    path.join(workspaceCwd, 'node_modules', '.bin'),
+    path.join(repoRoot, 'node_modules', '.bin'),
+  ];
+  
   const exe = process.platform === 'win32' ? `${binName}.cmd` : binName;
-  const fullPath = path.join(binDir, exe);
-  if (!fs.existsSync(fullPath)) {
-    throw new Error(`Cannot find executable: ${fullPath}. Install dependencies locally to continue.`);
+  
+  for (const binDir of candidates) {
+    const fullPath = path.join(binDir, exe);
+    if (fs.existsSync(fullPath)) {
+      return fullPath;
+    }
   }
-  return fullPath;
+  
+  throw new Error(`Cannot find executable "${binName}" in workspace or root node_modules/.bin. Install dependencies locally to continue.`);
 }
 
-function runCommand(binName, argv, options = {}) {
-  const executable = resolveBin(binName);
-  const child = spawn(executable, argv, { stdio: 'inherit', ...options });
+function runCommand(binName, argv, workspaceCwd, options = {}) {
+  const executable = resolveBin(binName, workspaceCwd);
+  const child = spawn(executable, argv, { stdio: 'inherit', cwd: workspaceCwd, ...options });
   child.on('exit', (code, signal) => {
     if (signal) {
       process.kill(process.pid, signal);
@@ -100,7 +109,7 @@ if (!mapped) {
   process.exit(1);
 }
 try {
-  runCommand(mapped[0], mapped.slice(1).concat(commandArgs), { cwd: workspace.cwd });
+  runCommand(mapped[0], mapped.slice(1).concat(commandArgs), workspace.cwd);
 } catch (err) {
   console.error(`Offline pnpm shim error: ${err?.message || err}`);
   process.exit(1);

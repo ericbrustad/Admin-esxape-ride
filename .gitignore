@@ -5,3 +5,4 @@ game/node_modules/
 .env.local
 .vercel
 .DS_Store
+.turbo/
