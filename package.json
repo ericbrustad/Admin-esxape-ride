@@ -12,7 +12,9 @@
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
     "dev": "turbo run dev --parallel",
-    "build": "turbo run build"
+    "build": "node tools/offline-pnpm.mjs --filter game-web build",
+    "build:standard": "pnpm --filter game-web build",
+    "build:turbo": "turbo run build"
   },
   "devDependencies": {
     "turbo": "^2.0.0"

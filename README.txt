@@ -4,6 +4,10 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
+  - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
+  - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
+    documented the workflow so teammates skip Corepack downloads, and refreshed the Settings safeguards/log transcript.
 - 2025-10-22 — Offline pnpm shim & TypeScript-free previews. Commit: (pending HEAD)
   - Direct links: `tools/offline-pnpm.mjs`, `apps/admin/pages/preview/[slug].jsx`, `apps/game-web/pages/index-supabase.jsx`, `package.json`, `apps/admin/pages/index.jsx`, `apps/admin/pages/api/admin-meta.js`
   - Notes: Added a local pnpm shim that routes `--filter` commands to the Next.js binaries for admin and game builds, dropped TypeScript-only entry points so offline builds stop downloading `@types/*`, refreshed the settings footer snapshot, and logged the GPT pairing that validated the fix.
@@ -101,6 +105,20 @@ Device & Response UI Package
 - 2025-10-15 — Admin basic auth obeys toggle. Commit: b9d9bbffb5254cbd710aa5545454370d4ec1cb48.
   - Direct link: `middleware.js`
   - Notes: Middleware now checks `/admin-protection.json` before challenging, allowing the password switch to disable prompts while keeping caching for quick reads.
+
+## Offline pnpm workflow
+
+- **Primary build** — `npm run build` now calls `node tools/offline-pnpm.mjs --filter game-web build`, ensuring the proxy never
+  interferes with pnpm downloads. The shim executes the existing Next.js binaries from `node_modules/.bin` and mirrors pnpm's
+  `--filter` semantics for the `game-web` workspace.
+- **Standard checkups** — `npm run build:standard` still runs `pnpm --filter game-web build` so operators can purposely exercise
+  the Corepack path when debugging the proxy tunnel. Expect it to fail in restricted environments; keep the logs for reference.
+- **Turbo aggregate** — `npm run build:turbo` retains the original `turbo run build` orchestration should you need to build both
+  apps locally without the shim.
+- Ensure dependencies are installed locally (`npm install` or mirror the existing `node_modules`) so the offline shim can locate
+  `next` inside `node_modules/.bin`.
+- Update `tools/offline-pnpm.mjs` whenever workspace commands change so the shim continues to track Next.js entry points without
+  touching Corepack.
 
 Files included (drop into your Next.js project or use as reference):
 
