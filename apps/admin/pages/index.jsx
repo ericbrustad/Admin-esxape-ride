@@ -730,6 +730,8 @@ export default function Admin() {
       ['GPT', 'Use tools/vercel-info.mjs to verify the Volta pin, Corepack, and pnpm version before deployments.'],
       ['You', 'Requested scoped pnpm installs so Vercel only touches the admin or game app at a time.'],
       ['GPT', 'Run `node tools/vercel-info.mjs --scope admin` or `--scope game-web` to print the filtered install/build commands and required env vars.'],
+      ['You', 'Flagged the missing `initialConversationLoggedRef` assignment that blanked the settings page.'],
+      ['GPT', 'Patched the effect to write to `initialConversationLoggedRef.current` so the log renders without crashing.'],
     ];
 
     setStatusLog((prev) => {
@@ -3797,7 +3799,7 @@ export default function Admin() {
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Dev Snapshot — Repo {metaOwnerRepo || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
+              Settings Snapshot — Repo {metaOwnerRepo || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
           </footer>
         </main>
