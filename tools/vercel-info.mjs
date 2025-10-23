@@ -52,7 +52,8 @@ function ensureNode20(version) {
   if (Number.isNaN(runtime.major)) {
     logError(`Unable to parse Node.js version "${version}"`);
     process.exitCode = 1;
-    return;
+    status.ok = false;
+    return status;
   }
 
   log(`node: v${runtime.clean}`);
@@ -60,7 +61,8 @@ function ensureNode20(version) {
   if (runtime.major !== 20) {
     logError('Expected Node.js 20.x runtime.');
     process.exitCode = 1;
-    return;
+    status.ok = false;
+    return status;
   }
 
   if (!Number.isNaN(pinned.major)) {
