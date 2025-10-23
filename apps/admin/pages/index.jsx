@@ -748,11 +748,19 @@ export default function Admin() {
       },
       {
         speaker: 'You',
-        text: 'Pinned Volta to Node 20.18.1 and pnpm 9.11.0 so every sandbox step uses the same toolchain.',
+        text: 'Repinned Volta to Node 22.11.0 and pnpm 9.11.0 so every sandbox step uses the Node 22 toolchain.',
       },
       {
         speaker: 'GPT',
-        text: 'Tightened the sandbox guard to read the Volta pin, short-circuit on mismatched runtimes, and surface the fix-it tip.',
+        text: 'Updated the sandbox guard to insist on a Node 22.x runtime and keep the fix-it tip handy for mismatches.',
+      },
+      {
+        speaker: 'You',
+        text: 'Captured repo, branch, commit, and Vercel metadata for the settings footer audit strip.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Rendered the footer snapshot with local timestamps so QA can verify deployments at a glance.',
       },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
@@ -3842,6 +3850,9 @@ export default function Admin() {
                 Package manager manifest — {metaRuntimePackageManager}
               </div>
             )}
+            <div style={S.settingsFooterTime}>
+              Footer Audit — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Snapshot {metaTimestampLabel || '—'} • Local {metaNowLabel || '—'}
+            </div>
           </footer>
         </main>
       )}

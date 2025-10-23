@@ -31,16 +31,12 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
-        'Focus on apps/game-web, pin Node 20, lock pnpm, harden installs, and surface the repository snapshot so QA can trace builds.',
-    },
-    {
-      speaker: 'Operator',
-      message: 'try corepack use pnpm@latest',
+        'Rebaseline the game web app on Node 22.x, keep pnpm pinned, and confirm the repository snapshot still renders at the footer.',
     },
     {
       speaker: 'GPT',
       message:
-        'Kept the Node 20.18.x target, documented Corepack usage with pnpm@latest, and refreshed the Settings footer snapshot to include repo, branch, commit, deployment, and timestamps.',
+        'Updated engines.node to 22.x, reiterated the Corepack + pnpm workflow, and confirmed the footer still surfaces repo, branch, commit, deployment, and timestamps.',
     },
   ];
 
@@ -72,7 +68,7 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 20.x LTS</span>
+          <span className="badge">Node target: 22.x LTS</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
@@ -84,7 +80,7 @@ export default function Settings({ metadata, conversationLog }) {
               Install with <code>pnpm install --fetch-retries=5 --fetch-timeout=60000 --network-concurrency=1</code> to steady flaky registry hops.
             </li>
             <li>
-              Pin Node to <code>20.18.x</code> across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
+              Pin Node to <code>22.11.0</code> (or <code>22.x</code> on managed platforms) across Vercel, CI, and local development, forcing the registry to <code>https://registry.npmjs.org/</code> and preferring IPv4 to avoid undici URLSearchParams crashes.
             </li>
           </ul>
         </div>

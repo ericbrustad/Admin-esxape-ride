@@ -74,3 +74,27 @@
 **You:** Uploading new media still fails with `ENOENT: no such file or directory, mkdir '/var/task/next/cache/admin-media'`. Keep the Supabase workflow, but make sure manifest updates land somewhere writable so cards appear again.
 
 **GPT:** Pointed the manifest fallback to the runtime temp directory (`/tmp/admin-media/manifest.json`) so serverless environments can persist updates, and extended the binary asset guide with the new troubleshooting step while re-running the build.
+
+---
+
+**Timestamp:** 2025-10-23T18:20:00Z
+
+**You:** Reapply the Node.js 20 requirement everywhere so our toolchain stays on the supported LTS version.
+
+**GPT:** Updated the workspace, admin app, and game web app `engines.node` fields to `20.x` so installs and CI runs all target Node.js 20, matching the existing Volta pin.
+
+---
+
+**Timestamp:** 2025-10-23T19:45:00Z
+
+**You:** Lock every engine entry to Node 20.18.1 exactly—no wildcard ranges allowed.
+
+**GPT:** Replaced each `20.x` engine range with `20.18.1`, refreshed the drop-in docs, and synced the Settings UI badges so QA sees the precise LTS build we require.
+
+---
+
+**Timestamp:** 2025-10-23T17:52:29Z
+
+**You:** Vercel rejected the old runtime—move the workspace to Node 22.x everywhere while keeping the Settings audit strip intact.
+
+**GPT:** Bumped every engine pin to `22.x`, refreshed the Volta/.nvmrc guidance to `22.11.0`, updated the build helper to warn when the runtime drifts, and verified the Settings footer still reports repo, branch, commit, deployment, and timestamps.

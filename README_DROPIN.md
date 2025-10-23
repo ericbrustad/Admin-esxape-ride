@@ -1,12 +1,12 @@
-# Toolchain Drop-in (Node 20 + pnpm 9) — 2025-10-23T02:06:04.083562Z
+# Toolchain Drop-in (Node 22 + pnpm 9) — 2025-10-23T17:52:29.148809Z
 
 Place **all files** at the **repo root** (same folder as `pnpm-workspace.yaml` / `turbo.json`).
 
 Files included:
 - `.npmrc` — hardened registry/timeouts and engine strictness
-- `.nvmrc` — pins Node 20.18.1
+- `.nvmrc` — pins Node 22.11.0
 - `package.json` (root) — adds engines, packageManager, Volta pins, and `vercel:info`
-- `tools/vercel-info.mjs` — prints Node/Corepack/pnpm during build (non-fatal if Node 22)
+- `tools/vercel-info.mjs` — prints Node/Corepack/pnpm during build (warns if Node < 22)
 
 ## Vercel settings (both Admin & Game projects)
 Install Command:
@@ -18,7 +18,7 @@ Env vars:
 NPM_CONFIG_REGISTRY = https://registry.npmjs.org/
 NODE_OPTIONS        = --dns-result-order=ipv4first
 ```
-Node.js Version: **20.x (LTS)**
+Node.js Version: **22.x (LTS)**
 Root Directory:
 - Admin → `apps/admin`
 - Game  → `apps/game-web`
