@@ -86,6 +86,16 @@ const ADMIN_META_INITIAL_STATE = {
   deploymentState: '',
   fetchedAt: '',
   error: '',
+  runtime: {
+    node: '',
+    pnpm: '',
+    corepack: '',
+    pinnedNode: '',
+    pinnedPnpm: '',
+    packageManager: '',
+    environment: '',
+    platform: '',
+  },
 };
 function classifyByExt(u) {
   if (!u) return 'other';
@@ -1033,6 +1043,9 @@ export default function Admin() {
             deploymentState: deploymentState ? String(deploymentState).toUpperCase() : base.deploymentState,
             fetchedAt: nowIso,
             error: combinedError || '',
+            runtime: metaOk && metaJson?.runtime
+              ? { ...(base.runtime || {}), ...metaJson.runtime }
+              : base.runtime,
           };
         });
       } catch (err) {
