@@ -719,10 +719,32 @@ export default function Admin() {
 
   useEffect(() => {
     if (pnpmShimLoggedRef.current) return;
-    logConversation('You', 'Added an offline pnpm shim so builds work without registry access.');
-    logConversation('GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.');
-    logConversation('You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.');
-    logConversation('GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.');
+    [
+      {
+        speaker: 'You',
+        text: 'Added an offline pnpm shim so builds work without registry access.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.',
+      },
+      {
+        speaker: 'You',
+        text: 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.',
+      },
+      {
+        speaker: 'You',
+        text: 'Pinned Volta to Node 20.18.1 and pnpm 9.11.0 so every sandbox step uses the same toolchain.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Tightened the sandbox guard to read the Volta pin, short-circuit on mismatched runtimes, and surface the fix-it tip.',
+      },
+    ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
   }, [logConversation]);
 
@@ -2387,6 +2409,26 @@ export default function Admin() {
   const metaVercelUrl = adminMeta.vercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
+  const metaRuntimeNodeRaw = adminMeta.runtime?.node ? String(adminMeta.runtime.node) : '';
+  const metaRuntimeNodeLabel = metaRuntimeNodeRaw
+    ? (metaRuntimeNodeRaw.startsWith('v') ? metaRuntimeNodeRaw : `v${metaRuntimeNodeRaw}`)
+    : '';
+  const metaRuntimePnpmRaw = adminMeta.runtime?.pnpm ? String(adminMeta.runtime.pnpm) : '';
+  const metaRuntimePnpmLabel = metaRuntimePnpmRaw || '';
+  const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
+  const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
+  const metaRuntimeVoltaRaw = adminMeta.runtime?.volta ? String(adminMeta.runtime.volta) : '';
+  const metaRuntimeVoltaLabel = metaRuntimeVoltaRaw || '';
+  const metaRuntimeEnv = adminMeta.runtime?.environment || '';
+  const metaRuntimeEnvLabel = metaRuntimeEnv
+    ? (metaRuntimeEnv === 'vercel' ? 'Vercel' : metaRuntimeEnv)
+    : '';
+  const metaRuntimePlatform = adminMeta.runtime?.platform || '';
+  const metaPinnedNodeRaw = adminMeta.runtime?.pinnedNode ? String(adminMeta.runtime.pinnedNode) : '';
+  const metaPinnedNodeLabel = metaPinnedNodeRaw || '';
+  const metaPinnedPnpmRaw = adminMeta.runtime?.pinnedPnpm ? String(adminMeta.runtime.pinnedPnpm) : '';
+  const metaPinnedPnpmLabel = metaPinnedPnpmRaw || '';
+  const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3780,6 +3822,14 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Repo Snapshot — {metaOwnerRepo || '—'} @ {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • {metaNowLabel || '—'}
             </div>
+            <div style={S.settingsFooterTime}>
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''}{metaRuntimeVoltaLabel ? ` • Volta ${metaRuntimeVoltaLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
+            </div>
+            {metaRuntimePackageManager && (
+              <div style={S.settingsFooterTime}>
+                Package manager manifest — {metaRuntimePackageManager}
+              </div>
+            )}
           </footer>
         </main>
       )}
