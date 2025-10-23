@@ -18,7 +18,7 @@ Env vars:
 NPM_CONFIG_REGISTRY = https://registry.npmjs.org/
 NODE_OPTIONS        = --dns-result-order=ipv4first
 ```
-Node.js Version: **20.x (LTS)**
+Node.js Version: **20.18.1 (LTS)**
 Root Directory:
 - Admin → `apps/admin`
 - Game  → `apps/game-web`
