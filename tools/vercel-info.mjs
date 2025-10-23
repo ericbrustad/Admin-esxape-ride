@@ -4,6 +4,122 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const packageJson = require('../package.json');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '..');
+
+function loadPackageManifest() {
+  const manifestPath = path.join(repoRoot, 'package.json');
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    process.stderr.write(`Unable to read package.json at ${manifestPath}: ${error?.message || error}\n`);
+    return {};
+  }
+}
+
+const manifest = loadPackageManifest();
+
+function cleanVersion(version = '') {
+  if (!version) return '';
+  return version.startsWith('v') ? version.slice(1) : version;
+}
+
+function parseSemver(version = '') {
+  const clean = cleanVersion(version);
+  const [major, minor, patch] = clean.split('.').map((part) => Number.parseInt(part, 10));
+  return {
+    major: Number.isNaN(major) ? NaN : major,
+    minor: Number.isNaN(minor) ? NaN : minor,
+    patch: Number.isNaN(patch) ? NaN : patch,
+    raw: clean,
+  };
+}
+
+function resolvePinnedNodeVersion(pkg = {}) {
+  if (pkg?.volta?.node && typeof pkg.volta.node === 'string') {
+    return pkg.volta.node;
+  }
+  if (pkg?.engines?.node && typeof pkg.engines.node === 'string') {
+    const match = pkg.engines.node.match(/(\d+\.\d+\.\d+)/);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+const pinnedNodeVersion = resolvePinnedNodeVersion(manifest);
+const pinnedPnpmVersion = (() => {
+  if (manifest?.volta?.pnpm && typeof manifest.volta.pnpm === 'string') {
+    return manifest.volta.pnpm;
+  }
+  if (typeof manifest?.packageManager === 'string') {
+    const [, version] = manifest.packageManager.split('@');
+    return version || '';
+  }
+  return '';
+})();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '..');
+
+function loadPackageManifest() {
+  const manifestPath = path.join(repoRoot, 'package.json');
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    process.stderr.write(`Unable to read package.json at ${manifestPath}: ${error?.message || error}\n`);
+    return {};
+  }
+}
+
+const manifest = loadPackageManifest();
+
+function cleanVersion(version = '') {
+  if (!version) return '';
+  return version.startsWith('v') ? version.slice(1) : version;
+}
+
+function parseSemver(version = '') {
+  const clean = cleanVersion(version);
+  const [major, minor, patch] = clean.split('.').map((part) => Number.parseInt(part, 10));
+  return {
+    major: Number.isNaN(major) ? NaN : major,
+    minor: Number.isNaN(minor) ? NaN : minor,
+    patch: Number.isNaN(patch) ? NaN : patch,
+    raw: clean,
+  };
+}
+
+function resolvePinnedNodeVersion(pkg = {}) {
+  if (pkg?.volta?.node && typeof pkg.volta.node === 'string') {
+    return pkg.volta.node;
+  }
+  if (pkg?.engines?.node && typeof pkg.engines.node === 'string') {
+    const match = pkg.engines.node.match(/(\d+\.\d+\.\d+)/);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+const pinnedNodeVersion = resolvePinnedNodeVersion(manifest);
+const pinnedPnpmVersion = (() => {
+  if (manifest?.volta?.pnpm && typeof manifest.volta.pnpm === 'string') {
+    return manifest.volta.pnpm;
+  }
+  if (typeof manifest?.packageManager === 'string') {
+    const [, version] = manifest.packageManager.split('@');
+    return version || '';
+  }
+  return '';
+})();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,93 +226,60 @@ function runCommand(label, command) {
   }
 }
 
-function ensureNode20(version, expectedVersion) {
-  const { major, minor, raw } = parseSemver(version);
-  if (Number.isNaN(major) || Number.isNaN(minor)) {
-    logError(`Unable to parse Node.js version "${version}"`);
-    process.exitCode = 1;
-    return;
-  }
-
-  log(`node runtime: v${raw}`);
-  if (expectedVersion) {
-    log(`expected via Volta/engines: v${cleanVersion(expectedVersion)}`);
-  }
-  if (pinnedPnpmVersion) {
-    log(`expected pnpm: v${cleanVersion(pinnedPnpmVersion)}`);
-  }
-
-  if (major !== 20) {
-    logError('Expected Node.js 20.x runtime. Run `nvm use 20.19.4` (or install the Volta pin) before continuing.');
-    process.exitCode = 1;
-    return;
-  }
-
-  const minimumMinor = 18;
-  if (minor < minimumMinor) {
-    logError('Node.js 20 detected, but version must be at least 20.18.0.');
-    process.exitCode = 1;
-  }
-
-  if (expectedVersion) {
-    const { major: expectedMajor, minor: expectedMinor } = parseSemver(expectedVersion);
-    if (!Number.isNaN(expectedMajor) && expectedMajor !== major) {
-      logError(`Volta pin expects Node.js ${expectedMajor}.x but runtime is ${major}.x.`);
-      process.exitCode = 1;
-    }
-    if (!Number.isNaN(expectedMinor) && expectedMinor > minor) {
-      logError(`Volta pin expects Node.js >= ${expectedMajor}.${expectedMinor}.x but runtime is ${major}.${minor}.x.`);
-      process.exitCode = 1;
-    }
-  }
+function parseVersion(input = '') {
+  if (!input) return { major: NaN, minor: NaN, patch: NaN };
+  const clean = input.startsWith('v') ? input.slice(1) : input;
+  const [major, minor, patch] = clean.split('.').map((value) => Number.parseInt(value, 10));
+  return { clean, major, minor, patch: Number.isNaN(patch) ? 0 : patch };
 }
 
-const knownScopes = new Map([
-  [
-    'admin',
-    {
-      root: 'apps/admin',
-      filters: ['--filter ./apps/admin'],
-      build: 'pnpm -r --filter ./apps/admin build',
-    },
-  ],
-  [
-    'game-web',
-    {
-      root: 'apps/game-web',
-      filters: ['--filter ./apps/game-web'],
-      build: 'pnpm -r --filter ./apps/game-web build',
-    },
-  ],
-]);
+function compareVersions(a, b) {
+  if (Number.isNaN(a.major) || Number.isNaN(b.major)) return NaN;
+  if (a.major !== b.major) return a.major > b.major ? 1 : -1;
+  if (a.minor !== b.minor) return a.minor > b.minor ? 1 : -1;
+  if (a.patch !== b.patch) return a.patch > b.patch ? 1 : -1;
+  return 0;
+}
 
-function parseCliScopes(argv) {
-  const scopes = [];
-  for (let i = 0; i < argv.length; i += 1) {
-    const token = argv[i];
-    if (token === '--scope') {
-      const next = argv[i + 1];
-      if (!next) {
-        logError('Missing value for --scope option.');
-        process.exitCode = 1;
-        break;
-      }
-      if (knownScopes.has(next)) {
-        scopes.push(next);
-      } else {
-        logError(
-          `Unknown scope "${next}". Known scopes: ${Array.from(knownScopes.keys()).join(', ')}`,
-        );
-        process.exitCode = 1;
-      }
-      i += 1;
-    } else if (token === '--all-scopes') {
-      knownScopes.forEach((_, key) => scopes.push(key));
-    } else if (token === '--help') {
-      log('Usage: node tools/vercel-info.mjs [--scope admin] [--scope game-web]');
-      log('       node tools/vercel-info.mjs --all-scopes');
-      process.exit(0);
+function ensureNode20(version) {
+  const runtime = parseVersion(version);
+  const pinnedNodeRaw = packageJson?.volta?.node || '';
+  const pinned = parseVersion(pinnedNodeRaw);
+
+  if (Number.isNaN(runtime.major)) {
+    logError(`Unable to parse Node.js version "${version}"`);
+    process.exitCode = 1;
+    status.ok = false;
+    return status;
+  }
+
+  log(`node: v${runtime.clean}`);
+
+  if (runtime.major !== 20) {
+    logError('Expected Node.js 20.x runtime.');
+    process.exitCode = 1;
+    status.ok = false;
+    return status;
+  }
+
+  if (!Number.isNaN(pinned.major)) {
+    if (pinned.major !== 20) {
+      logError(`package.json pins Node ${pinnedNodeRaw}, expected a 20.x entry.`);
+      process.exitCode = 1;
+      return;
     }
+
+    const comparison = compareVersions(runtime, pinned);
+    if (Number.isNaN(comparison)) {
+      logError(`Unable to compare runtime Node version against pinned ${pinnedNodeRaw}.`);
+      process.exitCode = 1;
+    } else if (comparison < 0) {
+      logError(`Node runtime ${runtime.clean} is older than pinned ${pinnedNodeRaw}.`);
+      process.exitCode = 1;
+    }
+  } else if (runtime.minor < 18) {
+    logError('Node.js 20 detected, but version must be at least 20.18.0.');
+    process.exitCode = 1;
   }
   return Array.from(new Set(scopes));
 }
@@ -256,10 +339,16 @@ function main() {
   const argv = process.argv.slice(2);
   const scopes = parseCliScopes(argv);
   const nodeVersion = process.version;
-  ensureNode20(nodeVersion, pinnedNodeVersion);
+  ensureNode20(nodeVersion);
+  const environment = process.env.VERCEL ? 'Vercel sandbox' : (process.env.NODE_ENV || 'local runtime');
+  log(`environment: ${environment}`);
+  log('expected sandbox toolchain: Node.js 20.18.1 + pnpm 9.11.0 (Volta pinned)');
   runCommand('corepack', 'corepack --version');
-  runCommand('pnpm', 'pnpm -v');
-  renderScopeGuidance(scopes);
+  const pnpmResult = runCommand('pnpm', 'pnpm -v');
+  if (pnpmResult.ok && pinnedPnpmRaw && pnpmResult.output !== pinnedPnpmRaw) {
+    logError(`pnpm version mismatch — expected ${pinnedPnpmRaw}, received ${pnpmResult.output}`);
+    process.exitCode = 1;
+  }
 }
 
 main();
