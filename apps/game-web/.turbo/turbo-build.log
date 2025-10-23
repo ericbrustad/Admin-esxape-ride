@@ -1,37 +1,0 @@
-
-
-> game-web@0.1.0 build /home/runner/work/Admin-esxape-ride/Admin-esxape-ride/apps/game-web
-> next build
-
-⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
-Attention: Next.js now collects completely anonymous telemetry regarding usage.
-This information is used to shape Next.js' roadmap and prioritize features.
-You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
-https://nextjs.org/telemetry
-
-   ▲ Next.js 15.5.5
-
-   Linting and checking validity of types     ✓ Linting and checking validity of types 
-   Creating an optimized production build ...
- ✓ Compiled successfully in 4.5s
-   Collecting page data     ✓ Collecting page data 
- ✓ Generating static pages (4/4)
-   Collecting build traces     ✓ Collecting build traces 
-   Finalizing page optimization     ✓ Finalizing page optimization 
-
-Route (pages)                                Size  First Load JS
-┌ ○ /                                       179 B        88.8 kB
-├   /_app                                     0 B        81.9 kB
-├ ƒ /[slug]                                 243 B        82.2 kB
-├ ○ /404                                    180 B        82.1 kB
-├ ƒ /api/content                              0 B        81.9 kB
-├ ○ /index-supabase                         239 B        88.9 kB
-└ ƒ /settings                             1.47 kB        83.4 kB
-+ First Load JS shared by all             82.5 kB
-  ├ chunks/framework-9e074fc6354bf2b8.js  44.9 kB
-  ├ chunks/main-667a748da29cb9fe.js         36 kB
-  └ other shared chunks (total)           1.66 kB
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
