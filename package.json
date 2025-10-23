@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@9.11.0",
   "engines": {
-    "node": "22.x"
+    "node": ">19 20<"
   },
   "volta": {
     "node": "22.11.0",
