@@ -39,6 +39,16 @@ export async function getServerSideProps() {
       message:
         'Updated the Settings view and package engines to enforce the Node 19.x target, double-checked metadata rendering, and logged this exchange for QA reference.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Corepack keeps failing to provision pnpm. Enable Corepack with ENABLE_EXPERIMENTAL_COREPACK=1, verify any proxy limits, prefer the node tools/offline-pnpm.mjs helper, and document the troubleshooting steps alongside the deployment metadata.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Captured the Corepack diagnostics guidance, reiterated the offline pnpm workflow, and confirmed the repository snapshot renders with branch, commit, deployment URL, and refreshed timestamp.',
+    },
   ];
 
   return {
@@ -74,6 +84,9 @@ export default function Settings({ metadata, conversationLog }) {
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+            <li>
+              Enable Corepack explicitly with <code>ENABLE_EXPERIMENTAL_COREPACK=1</code> when diagnosing provisioning issues, then retry the install to capture the exact error signal.
+            </li>
             <li>
               Use the local shim with <code>node tools/offline-pnpm.mjs --filter game-web build</code> (or <code>dev</code>) so no environment depends on Corepack provisioning pnpm.
             </li>
