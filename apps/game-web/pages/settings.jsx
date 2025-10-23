@@ -80,7 +80,7 @@ export default function Settings({ metadata, conversationLog }) {
               Maintain an offline copy of <code>pnpm-lock.yaml</code> plus <code>node_modules</code> so dependency restores never invoke Corepack or remote registries mid-build.
             </li>
             <li>
-              Pin Node to <code>22</code> across Vercel, CI, and local development to align with the deployment runtime.
+              Pin Node within the <code>&gt;=19 &lt;20</code> window across Vercel, CI, and local development to align with the deployment runtime.
             </li>
           </ul>
         </div>
