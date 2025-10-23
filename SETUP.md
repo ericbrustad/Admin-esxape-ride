@@ -61,8 +61,17 @@ pnpm --filter game-web dev
 ```
 
 The servers will start on:
-- Admin: http://localhost:3000
-- Game: http://localhost:3000 (if running separately)
+- Default: http://localhost:3000
+
+**Note:** Both admin and game-web apps are configured to use port 3000 by default. When running them separately, they will use this port. If you need to run both simultaneously, you can specify different ports:
+
+```bash
+# Admin on port 3000
+pnpm --filter esx-admin-control-panel-map dev
+
+# Game on port 3001 (in a separate terminal)
+PORT=3001 pnpm --filter game-web dev
+```
 
 ### 5. Building
 
