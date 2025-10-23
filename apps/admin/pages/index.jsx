@@ -718,36 +718,35 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (initialConversationLoggedRef.current) return;
-    const conversationSeed = [
-      ['You', 'Added an offline pnpm shim so builds work without registry access.'],
-      ['GPT', 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.'],
-      ['You', 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.'],
-      ['GPT', 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.'],
-      ['You', 'Pinned Node.js 20.18.x and pnpm 4.0.0 with Volta plus engine-strict npmrc guards to block Node 22 sandboxes.'],
-      ['GPT', 'If the sandbox boots Node 22, run `nvm use 20.19.4` so installs obey the guard before testing.'],
-      ['You', 'Recorded the settings footer with repo, branch, commit, deployment, and render timestamps for QA.'],
-      ['GPT', 'Use tools/vercel-info.mjs to verify the Volta pin, Corepack, and pnpm version before deployments.'],
-      ['You', 'Requested scoped pnpm installs so Vercel only touches the admin or game app at a time.'],
-      ['GPT', 'Run `node tools/vercel-info.mjs --scope admin` or `--scope game-web` to print the filtered install/build commands and required env vars.'],
-      ['You', 'Flagged the missing `initialConversationLoggedRef` assignment that blanked the settings page.'],
-      ['GPT', 'Patched the effect to write to `initialConversationLoggedRef.current` so the log renders without crashing.'],
-      ['You', 'Requested the pnpm toolchain move to v4 to isolate sandbox install issues.'],
-      ['GPT', 'Updated the Volta pin, package manager, and Vercel guidance to reference pnpm 4.0.0 across the repo.'],
-    ];
-
-    setStatusLog((prev) => {
-      const timestamped = conversationSeed.map(([speaker, text], index) => ({
-        speaker,
-        text,
-        timestamp: new Date(Date.now() + index).toISOString(),
-      }));
-      const next = [...prev, ...timestamped];
-      return next.slice(-20);
-    });
-
-    initialConversationLoggedRef.current = true;
-  }, []);
+    if (pnpmShimLoggedRef.current) return;
+    [
+      {
+        speaker: 'You',
+        text: 'Added an offline pnpm shim so builds work without registry access.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.',
+      },
+      {
+        speaker: 'You',
+        text: 'Converted the Supabase entry point to JSX so Next.js stops auto-installing TypeScript packages.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.',
+      },
+      {
+        speaker: 'You',
+        text: 'Pinned Volta to Node 20.18.1 and pnpm 9.11.0 so every sandbox step uses the same toolchain.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Tightened the sandbox guard to read the Volta pin, short-circuit on mismatched runtimes, and surface the fix-it tip.',
+      },
+    ].forEach(({ speaker, text }) => logConversation(speaker, text));
+    pnpmShimLoggedRef.current = true;
+  }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
     setNewGameStatus(message);
@@ -2392,6 +2391,7 @@ export default function Admin() {
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
+  const metaRepoName = adminMeta.repo ? String(adminMeta.repo) : '';
   const metaOwnerRepo = adminMeta.repo
     ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
     : '';
@@ -2410,6 +2410,24 @@ export default function Admin() {
   const metaVercelUrl = adminMeta.vercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
+  const metaRuntimeNodeRaw = adminMeta.runtime?.node ? String(adminMeta.runtime.node) : '';
+  const metaRuntimeNodeLabel = metaRuntimeNodeRaw
+    ? (metaRuntimeNodeRaw.startsWith('v') ? metaRuntimeNodeRaw : `v${metaRuntimeNodeRaw}`)
+    : '';
+  const metaRuntimePnpmRaw = adminMeta.runtime?.pnpm ? String(adminMeta.runtime.pnpm) : '';
+  const metaRuntimePnpmLabel = metaRuntimePnpmRaw || '';
+  const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
+  const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
+  const metaRuntimeEnv = adminMeta.runtime?.environment || '';
+  const metaRuntimeEnvLabel = metaRuntimeEnv
+    ? (metaRuntimeEnv === 'vercel' ? 'Vercel' : metaRuntimeEnv)
+    : '';
+  const metaRuntimePlatform = adminMeta.runtime?.platform || '';
+  const metaPinnedNodeRaw = adminMeta.runtime?.pinnedNode ? String(adminMeta.runtime.pinnedNode) : '';
+  const metaPinnedNodeLabel = metaPinnedNodeRaw || '';
+  const metaPinnedPnpmRaw = adminMeta.runtime?.pinnedPnpm ? String(adminMeta.runtime.pinnedPnpm) : '';
+  const metaPinnedPnpmLabel = metaPinnedPnpmRaw || '';
+  const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3801,8 +3819,16 @@ export default function Admin() {
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Settings Snapshot — Repo {metaOwnerRepo || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
+              Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
+            <div style={S.settingsFooterTime}>
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
+            </div>
+            {metaRuntimePackageManager && (
+              <div style={S.settingsFooterTime}>
+                Package manager manifest — {metaRuntimePackageManager}
+              </div>
+            )}
           </footer>
         </main>
       )}
