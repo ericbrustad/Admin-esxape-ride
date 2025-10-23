@@ -24,7 +24,7 @@ export async function getServerSideProps() {
     commitShaShort: commitSha ? commitSha.slice(0, 8) : (commitSha || 'unknown').slice(0, 8),
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
-    nodeTarget: '>=19 <20',
+    nodeTarget: '22.x',
     generatedAt: new Date().toISOString(),
   };
 
@@ -89,6 +89,16 @@ export async function getServerSideProps() {
       message:
         'Promoted the offline shim to the default npm build script, kept a build:standard alias for pnpm/Corepack diagnostics, documented the workflow in the README, refreshed safeguards to stress the non-Corepack path, reran the shim build, and archived the change log.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel rejects the build unless Node 22.x is declared. Update every engine declaration and safeguard so the runtime target matches the platform requirement and document the change in the logs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shifted the game workspace to Node 22.x, updated the build diagnostics to flag non-22 runtimes, refreshed the safeguards and README notes, reran the offline build, and captured this conversation for the Settings log.',
+    },
   ];
 
   return {
@@ -124,6 +134,10 @@ export default function Settings({ metadata, conversationLog }) {
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+            <li>
+              Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the
+              runtime declaration.
+            </li>
             <li>
               Prefer <code>npm run build</code>, which routes through <code>node tools/offline-pnpm.mjs --filter game-web build</code>, so no workflow relies on Corepack downloading pnpm through a proxy tunnel.
             </li>
