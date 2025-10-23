@@ -4,9 +4,6 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
-- 2025-10-25 — Vercel Node 22.x alignment & safeguard refresh. Commit: (pending HEAD)
-  - Direct links: `apps/game-web/package.json`, `tools/vercel-info.mjs`, `apps/game-web/pages/settings.jsx`, `README.txt`
-  - Notes: Raised the game workspace engines to Node 22.x for Vercel compatibility, updated the build diagnostics to warn when the runtime drifts, refreshed the Settings safeguards/log, and reconfirmed the offline build after the upgrade.
 - 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
   - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
@@ -111,7 +108,6 @@ Device & Response UI Package
 
 ## Offline pnpm workflow
 
-- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running any of the builds below.
 - **Primary build** — `npm run build` now calls `node tools/offline-pnpm.mjs --filter game-web build`, ensuring the proxy never
   interferes with pnpm downloads. The shim executes the existing Next.js binaries from `node_modules/.bin` and mirrors pnpm's
   `--filter` semantics for the `game-web` workspace.

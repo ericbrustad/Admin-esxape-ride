@@ -24,7 +24,7 @@ export async function getServerSideProps() {
     commitShaShort: commitSha ? commitSha.slice(0, 8) : (commitSha || 'unknown').slice(0, 8),
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
-    nodeTarget: '22.x',
+    nodeTarget: '>=19 <20',
     generatedAt: new Date().toISOString(),
   };
 
@@ -134,10 +134,6 @@ export default function Settings({ metadata, conversationLog }) {
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-            <li>
-              Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the
-              runtime declaration.
-            </li>
             <li>
               Prefer <code>npm run build</code>, which routes through <code>node tools/offline-pnpm.mjs --filter game-web build</code>, so no workflow relies on Corepack downloading pnpm through a proxy tunnel.
             </li>
