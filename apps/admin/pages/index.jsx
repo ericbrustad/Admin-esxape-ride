@@ -754,6 +754,14 @@ export default function Admin() {
         speaker: 'GPT',
         text: 'Tightened the sandbox guard to read the Volta pin, short-circuit on mismatched runtimes, and surface the fix-it tip.',
       },
+      {
+        speaker: 'You',
+        text: 'Captured repo, branch, commit, and Vercel metadata for the settings footer audit strip.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Rendered the footer snapshot with local timestamps so QA can verify deployments at a glance.',
+      },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     pnpmShimLoggedRef.current = true;
   }, [logConversation]);
@@ -3842,6 +3850,9 @@ export default function Admin() {
                 Package manager manifest — {metaRuntimePackageManager}
               </div>
             )}
+            <div style={S.settingsFooterTime}>
+              Footer Audit — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Snapshot {metaTimestampLabel || '—'} • Local {metaNowLabel || '—'}
+            </div>
           </footer>
         </main>
       )}
