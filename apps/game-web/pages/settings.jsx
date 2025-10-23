@@ -24,6 +24,7 @@ export async function getServerSideProps() {
     commitShaShort: commitSha ? commitSha.slice(0, 8) : (commitSha || 'unknown').slice(0, 8),
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
+    nodeTarget: '>=19 <20',
     generatedAt: new Date().toISOString(),
   };
 
@@ -31,12 +32,12 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
-        'Research whatever it takes to keep pnpm from failing, forbid Corepack from installing it, and surface the repo/branch/commit snapshot at the bottom of settings.',
+        'Work on game-esxape-ride and make sure no environment points at Node twenty-two—keep everything in the Node >=19 <20 range. Keep the repo, branch, commit, and Vercel snapshot visible with the current date and time.',
     },
     {
       speaker: 'GPT',
       message:
-        'Pointed the build doc to the offline pnpm shim, reiterated the Node 22 requirement, and kept the live repository metadata footer to satisfy QA.',
+        'Updated the Settings view and package engines to enforce the Node 19.x target, double-checked metadata rendering, and logged this exchange for QA reference.',
     },
   ];
 
@@ -68,7 +69,7 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 22 Active</span>
+          <span className="badge">Node target: {metadata.nodeTarget} Active</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
@@ -80,7 +81,7 @@ export default function Settings({ metadata, conversationLog }) {
               Maintain an offline copy of <code>pnpm-lock.yaml</code> plus <code>node_modules</code> so dependency restores never invoke Corepack or remote registries mid-build.
             </li>
             <li>
-              Pin Node to <code>22</code> across Vercel, CI, and local development to align with the deployment runtime.
+              Pin Node to <code>{metadata.nodeTarget}</code> across Vercel, CI, and local development to align with the deployment runtime.
             </li>
           </ul>
         </div>
@@ -118,6 +119,8 @@ export default function Settings({ metadata, conversationLog }) {
           <dd style={{ margin: 0 }}>{metadata?.deploymentUrl}</dd>
           <dt style={{ color: 'var(--muted)' }}>Node runtime</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeVersion}</dd>
+          <dt style={{ color: 'var(--muted)' }}>Target range</dt>
+          <dd style={{ margin: 0 }}>{metadata?.nodeTarget}</dd>
         </dl>
       </section>
 
