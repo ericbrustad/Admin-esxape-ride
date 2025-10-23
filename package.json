@@ -1,7 +1,7 @@
 {
   "name": "admin-esxape-ride",
   "private": true,
-  "packageManager": "pnpm@9.11.0",
+  "packageManager": "pnpm",
   "engines": {
     "node": ">19 20<"
   },
