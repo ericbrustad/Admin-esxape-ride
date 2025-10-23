@@ -38,16 +38,6 @@ export async function getServerSideProps() {
       message:
         'Pointed the build doc to the offline pnpm shim, reiterated the Node 22 requirement, and kept the live repository metadata footer to satisfy QA.',
     },
-    {
-      speaker: 'Operator',
-      message:
-        'Vercel installs are failing because apps/admin still requires Node <20. Fix the engine constraint (line 6) and resolve any conflicts.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Aligned the admin panel engine field to Node 22 so workspace installs succeed under the unified runtime expectation.',
-    },
   ];
 
   return {
