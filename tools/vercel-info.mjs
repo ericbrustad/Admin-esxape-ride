@@ -56,6 +56,9 @@ function ensureNode20(version) {
 function main() {
   const nodeVersion = process.version;
   ensureNode20(nodeVersion);
+  const environment = process.env.VERCEL ? 'Vercel sandbox' : (process.env.NODE_ENV || 'local runtime');
+  log(`environment: ${environment}`);
+  log('expected sandbox toolchain: Node.js 20.18.1 + pnpm 9.11.0 (Volta pinned)');
   runCommand('corepack', 'corepack --version');
   runCommand('pnpm', 'pnpm -v');
 }

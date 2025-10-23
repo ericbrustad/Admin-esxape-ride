@@ -1,25 +1,105 @@
 // pages/api/admin-meta.js
-// Surface repo + deployment metadata for the admin banner.
+// Surface repo + deployment metadata for the admin banner. During local
+// development we also attempt to pull the active git branch/commit so the
+// Settings footer can always render an accurate snapshot even without Vercel
+// provided environment variables.
+
+import { execSync } from 'node:child_process';
+import process from 'node:process';
+
+import packageJson from '../../../../package.json' assert { type: 'json' };
+
+function safeExec(command) {
+  try {
+    return execSync(command, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+    }).trim();
+  } catch (error) {
+    return '';
+  }
+}
+
+function parseRemote(remoteUrl = '') {
+  if (!remoteUrl) return { owner: '', repo: '' };
+  const cleaned = remoteUrl.replace(/\.git$/, '');
+  try {
+    if (/^git@/i.test(cleaned)) {
+      const [, path = ''] = cleaned.split(':');
+      const [owner = '', repo = ''] = path.split('/');
+      return { owner, repo };
+    }
+    if (/^https?:\/\//i.test(cleaned)) {
+      const url = new URL(cleaned);
+      const parts = url.pathname.replace(/^\/+/, '').split('/');
+      const [owner = '', repo = ''] = parts;
+      return { owner, repo };
+    }
+  } catch (error) {
+    // fall through to default empty owner/repo
+  }
+  return { owner: '', repo: '' };
+}
+
+function detectGitMetadata() {
+  const branch = safeExec('git rev-parse --abbrev-ref HEAD');
+  const commit = safeExec('git rev-parse HEAD');
+  const remote = safeExec('git config --get remote.origin.url');
+  const { owner, repo } = parseRemote(remote);
+  return { branch, commit, owner, repo };
+}
+
+function buildRuntimeMetadata() {
+  const nodeVersion = process.version || '';
+  const pnpmVersion = safeExec('pnpm --version');
+  const corepackVersion = safeExec('corepack --version');
+  const pinnedNode = packageJson?.volta?.node || '';
+  const pinnedPnpm = packageJson?.volta?.pnpm || (
+    typeof packageJson?.packageManager === 'string'
+      ? packageJson.packageManager.split('@')[1] || ''
+      : ''
+  );
+
+  return {
+    node: nodeVersion,
+    pnpm: pnpmVersion,
+    corepack: corepackVersion,
+    pinnedNode,
+    pinnedPnpm,
+    packageManager: packageJson?.packageManager || '',
+    environment: process.env.VERCEL ? 'vercel' : (process.env.NODE_ENV || 'development'),
+    platform: `${process.platform} ${process.arch}`,
+  };
+}
 
 export default async function handler(req, res) {
   try {
+    const gitMeta = detectGitMetadata();
     const branch = (
       process.env.REPO_BRANCH ||
       process.env.GITHUB_BRANCH ||
       process.env.VERCEL_GIT_COMMIT_REF ||
       process.env.COMMIT_REF ||
+      gitMeta.branch ||
       'main'
     );
     const commit = (
       process.env.VERCEL_GIT_COMMIT_SHA ||
       process.env.GITHUB_SHA ||
       process.env.COMMIT_SHA ||
+      gitMeta.commit ||
       ''
     );
-    const owner = process.env.REPO_OWNER || process.env.VERCEL_GIT_REPO_OWNER || '';
+    const owner = (
+      process.env.REPO_OWNER ||
+      process.env.VERCEL_GIT_REPO_OWNER ||
+      gitMeta.owner ||
+      ''
+    );
     const repo = (
       process.env.REPO_NAME ||
       process.env.VERCEL_GIT_REPO_SLUG ||
+      gitMeta.repo ||
       process.env.npm_package_name ||
       ''
     );
@@ -42,6 +122,7 @@ export default async function handler(req, res) {
       vercelUrl,
       deploymentUrl,
       deploymentState,
+      runtime: buildRuntimeMetadata(),
       fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
