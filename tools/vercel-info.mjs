@@ -121,6 +121,62 @@ const pinnedPnpmVersion = (() => {
   return '';
 })();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '..');
+
+function loadPackageManifest() {
+  const manifestPath = path.join(repoRoot, 'package.json');
+  try {
+    const raw = fs.readFileSync(manifestPath, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    process.stderr.write(`Unable to read package.json at ${manifestPath}: ${error?.message || error}\n`);
+    return {};
+  }
+}
+
+const manifest = loadPackageManifest();
+
+function cleanVersion(version = '') {
+  if (!version) return '';
+  return version.startsWith('v') ? version.slice(1) : version;
+}
+
+function parseSemver(version = '') {
+  const clean = cleanVersion(version);
+  const [major, minor, patch] = clean.split('.').map((part) => Number.parseInt(part, 10));
+  return {
+    major: Number.isNaN(major) ? NaN : major,
+    minor: Number.isNaN(minor) ? NaN : minor,
+    patch: Number.isNaN(patch) ? NaN : patch,
+    raw: clean,
+  };
+}
+
+function resolvePinnedNodeVersion(pkg = {}) {
+  if (pkg?.volta?.node && typeof pkg.volta.node === 'string') {
+    return pkg.volta.node;
+  }
+  if (pkg?.engines?.node && typeof pkg.engines.node === 'string') {
+    const match = pkg.engines.node.match(/(\d+\.\d+\.\d+)/);
+    if (match) return match[1];
+  }
+  return '';
+}
+
+const pinnedNodeVersion = resolvePinnedNodeVersion(manifest);
+const pinnedPnpmVersion = (() => {
+  if (manifest?.volta?.pnpm && typeof manifest.volta.pnpm === 'string') {
+    return manifest.volta.pnpm;
+  }
+  if (typeof manifest?.packageManager === 'string') {
+    const [, version] = manifest.packageManager.split('@');
+    return version || '';
+  }
+  return '';
+})();
+
 function log(message = '') {
   process.stdout.write(`${message}\n`);
 }
