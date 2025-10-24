@@ -159,6 +159,16 @@ export async function getServerSideProps() {
       message:
         'Repointed vercel.json at yarn build so turbo compiles the game and admin workspaces under Node 22, updated scripts and docs, and verified each Next.js build locally while keeping the Yarn proxy caveats documented.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Resolve the Node 22 warning about project settings being ignored and ensure the apps/admin routes manifest is generated so Vercel builds succeed.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Updated the checked-in Node version to 22.11.0, rewired yarn build to run the admin and game workspaces sequentially so the routes manifest exists, expanded the Yarn lockfile, refreshed the safeguards, and reran both Next.js builds to verify outputs.',
+    },
   ];
 
   return {
@@ -208,13 +218,13 @@ export default function Settings({ metadata, conversationLog }) {
               Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
             </li>
             <li>
-              Primary builds run through <code>yarn build</code>, which invokes <code>turbo run build --filter=game-web --filter=esx-admin-control-panel-map</code>. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any Yarn proxy errors alongside the logs.
+              Primary builds run through <code>yarn build</code>, which now executes the admin workspace first (<code>yarn workspace esx-admin-control-panel-map run build</code>) and then the game workspace (<code>yarn workspace game-web run build</code>) so both <code>.next</code> outputs exist for deployment. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any Yarn proxy errors alongside the logs.
             </li>
             <li>
-              Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally.
+              Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally, or <code>yarn build:game</code> for a focused game rebuild.
             </li>
             <li>
-              Keep <code>yarn build:turbo</code> available for aggregate builds; it still invokes <code>turbo run build</code> across workspaces.
+              Keep <code>yarn build:turbo</code> available for aggregate builds; it still invokes <code>turbo run build</code> across workspaces when that package is installed.
             </li>
             <li>
               Manage Yarn settings through <code>.yarnrc.yml</code>, ensuring <code>nodeLinker: node-modules</code> stays committed for offline compatibility and telemetry remains disabled.

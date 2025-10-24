@@ -1,4 +1,4 @@
 {
   "installCommand": "yarn install --immutable",
-  "buildCommand": "yarn workspace game-web run build"
+  "buildCommand": "yarn build"
 }
