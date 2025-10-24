@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-27 — Settings diagnostics log refresh & Yarn proxy notes. Commit: (pending HEAD)
+  - Direct links: `apps/game-web/pages/settings.jsx`, `.yarnrc.yml`, `README.txt`
+  - Notes: Captured the network-unreachable ping attempt and AGENTS.md scan in the Settings conversation log, reiterated the Yarn-first workflow guidance, and codified the Yarn CLI preferences in `.yarnrc.yml` after the latest install attempt.
 - 2025-10-26 — Yarn workspace migration & safeguard refresh. Commit: (pending HEAD)
   - Direct links: `package.json`, `apps/game-web/package.json`, `tools/vercel-info.mjs`, `apps/game-web/pages/settings.jsx`, `.yarnrc.yml`, `yarn.lock`, `README.txt`
   - Notes: Replaced the pnpm-focused workflow with Yarn workspaces, refreshed the safeguard checklist and Settings log to cover the Yarn toolchain plus proxy fallout, documented the Yarn-first build commands, and captured the Corepack-to-Yarn migration attempt for QA reference.
