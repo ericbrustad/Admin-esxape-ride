@@ -16,6 +16,7 @@ export async function getServerSideProps() {
   const branchName = env.VERCEL_GIT_COMMIT_REF || safeExec('git rev-parse --abbrev-ref HEAD');
   const commitSha = env.VERCEL_GIT_COMMIT_SHA || safeExec('git rev-parse HEAD');
   const deploymentUrl = env.VERCEL_URL ? `https://${env.VERCEL_URL}` : env.DEPLOYMENT_URL || '';
+  const yarnVersion = safeExec('yarn --version');
 
   const metadata = {
     repoName: repoName || 'unknown-repo',
@@ -24,7 +25,8 @@ export async function getServerSideProps() {
     commitShaShort: commitSha ? commitSha.slice(0, 8) : (commitSha || 'unknown').slice(0, 8),
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
-    nodeTarget: '>=19 <20',
+    nodeTarget: '22.x',
+    yarnVersion: yarnVersion || '(unavailable)',
     generatedAt: new Date().toISOString(),
   };
 
@@ -135,49 +137,38 @@ export default function Settings({ metadata, conversationLog }) {
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
-              Prefer <code>npm run build</code>, which routes through <code>node tools/offline-pnpm.mjs --filter game-web build</code>, so no workflow relies on Corepack downloading pnpm through a proxy tunnel.
+              Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the runtime declaration.
             </li>
             <li>
-              When you need to observe the direct pnpm path, use <code>npm run build:standard</code> to call <code>pnpm --filter game-web build</code> intentionally and capture the exact proxy failure logs.
+              Distinguish Codex shell proxy failures from Vercel deployment issues by checking where the errors appear, running
+              <code>env | grep -i _proxy</code>, <code>npm config get https-proxy</code>, and <code>curl -I</code> diagnostics inside Codex, and recording the findings here for comparison with Vercel build logs.
             </li>
             <li>
-              Keep <code>npm run build:turbo</code> available for multi-app aggregates, but expect it to require local pnpm installs or a mirror of <code>node_modules</code> when Corepack is blocked.
+              Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
             </li>
             <li>
-              Update <code>tools/offline-pnpm.mjs</code> whenever workspace commands change so the shim continues to map <code>build</code>, <code>dev</code>, and <code>start</code> without Corepack involvement.
+              Primary builds run through <code>yarn build</code>, which delegates to <code>yarn workspace game-web run build</code>. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and archive the Yarn lock errors alongside the proxy logs.
             </li>
             <li>
-              Enable Corepack with <code>ENABLE_EXPERIMENTAL_COREPACK=1</code> only for diagnostics and keep it from auto-installing pnpm by relying on the offline shim for regular builds.
+              Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally.
             </li>
             <li>
-              Mirror proxy details in <code>.npmrc</code> and <code>HTTP(S)_PROXY</code> variables so both npm and the shimmed workflows share the same network path when troubleshooting.
+              Keep <code>yarn build:turbo</code> available for aggregate builds; it still invokes <code>turbo run build</code> across workspaces.
             </li>
             <li>
-              Add explicit <code>proxy=</code> and <code>https-proxy=</code> entries to <code>.npmrc</code> (including credentials when required) so npm honors the tunnel configuration uniformly.
+              Manage Yarn settings through <code>.yarnrc.yml</code>, ensuring <code>nodeLinker: node-modules</code> stays committed for offline compatibility and telemetry remains disabled.
             </li>
             <li>
-              Prime the dependency cache and prefer <code>pnpm install --offline</code> on hosts without external registry access.
+              Mirror proxy host/credential details in <code>.npmrc</code>, <code>HTTP(S)_PROXY</code>, and Yarn's <code>npmRegistryServer</code> configuration so installs behave consistently regardless of the CLI in use.
             </li>
             <li>
-              Maintain an offline copy of <code>pnpm-lock.yaml</code> plus <code>node_modules</code> so dependency restores never invoke Corepack or remote registries mid-build.
+              Retain the existing <code>node_modules</code> snapshot alongside Yarn logs when installs fail so on-call engineers can reproduce the environment without Corepack.
             </li>
             <li>
-              Review security policies that forbid package versions and, in tightly controlled troubleshooting sessions, relax them temporarily (for example by setting <code>strict-ssl=false</code> in <code>.npmrc</code>).
+              Continue reviewing security policies and SSL enforcement settings if registry access is denied, documenting any temporary overrides applied during troubleshooting.
             </li>
             <li>
-              Point npm at an approved mirror or alternative registry when the primary endpoint is filtered, then revert to the canonical registry after validation.
-            </li>
-            <li>
-              Download the pnpm standalone binary from official releases when registry access fails and add the extracted binary to <code>PATH</code> for builds.
-            </li>
-            <li>
-              Clear the npm cache with <code>npm cache clean --force</code> if stale artifacts keep surfacing 403 responses before repeating installation attempts.
-            </li>
-            <li>
-              Inspect the referenced <code>~/.npm/_logs</code> entries to pinpoint whether proxy policy, SSL enforcement, or package rules stopped the install.
-            </li>
-            <li>
-              Pin Node to <code>{metadata.nodeTarget}</code> across Vercel, CI, and local development to align with the deployment runtime.
+              Record all Yarn ↔ proxy remediation attempts (including telemetry prompts and Corepack bootstrap messages) in the conversation log below for QA traceability.
             </li>
           </ul>
         </div>
@@ -215,6 +206,8 @@ export default function Settings({ metadata, conversationLog }) {
           <dd style={{ margin: 0 }}>{metadata?.deploymentUrl}</dd>
           <dt style={{ color: 'var(--muted)' }}>Node runtime</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeVersion}</dd>
+          <dt style={{ color: 'var(--muted)' }}>Yarn version</dt>
+          <dd style={{ margin: 0 }}>{metadata?.yarnVersion}</dd>
           <dt style={{ color: 'var(--muted)' }}>Target range</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeTarget}</dd>
         </dl>

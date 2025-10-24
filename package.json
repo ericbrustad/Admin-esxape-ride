@@ -1,19 +1,23 @@
 {
   "name": "admin-esxape-ride",
   "private": true,
-  "packageManager": "pnpm",
+  "packageManager": "yarn@4.9.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "engines": {
     "node": ">19 20<"
   },
   "volta": {
-    "node": ">=19 <20",
-    "pnpm": "9.11.0"
+    "node": "22.11.0",
+    "yarn": "4.9.4"
   },
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
     "dev": "turbo run dev --parallel",
-    "build": "node tools/offline-pnpm.mjs --filter game-web build",
-    "build:standard": "pnpm --filter game-web build",
+    "build": "yarn workspace game-web run build",
+    "build:admin": "yarn workspace admin run build",
     "build:turbo": "turbo run build"
   },
   "devDependencies": {
