@@ -101,44 +101,6 @@ export async function getServerSideProps() {
       message:
         'Shifted the game workspace to Node 22.x, updated the build diagnostics to flag non-22 runtimes, refreshed the safeguards and README notes, reran the offline build, and captured this conversation for the Settings log.',
     },
-    {
-      speaker: 'Operator',
-      message:
-        'Drop pnpm entirely in favor of Yarn, wire the build scripts to Yarn workspaces, and make sure the documentation and safeguards show the new commands.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Converted the repo to Yarn workspaces with node-modules linking, added .yarnrc.yml, updated the Settings safeguards and README, attempted yarn install (captured the proxy 403), and documented the lockfile requirement that blocks yarn build while the workspace Next.js build continues to succeed via the existing binaries.',
-    },
-    {
-      speaker: 'Operator',
-      message: 'Ping 192.0.78.24 and confirm whether it responds.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Executed ping -c 4 192.0.78.24 inside the container; the command returned “Network is unreachable,” indicating outbound ICMP is blocked from this environment.',
-    },
-    {
-      speaker: 'Operator',
-      message: 'Locate any AGENTS.md instruction files with find .. -name AGENTS.md -print.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Ran the find .. -name AGENTS.md -print scan; no AGENTS.md files were present in the repository or parent workspace, so no additional scoped instructions applied.',
-    },
-    {
-      speaker: 'Operator',
-      message:
-        'Codex proxy failures are separate from Vercel. Document how to prove which network is blocking installs, audit the proxy variables, and capture curl diagnostics so the team can compare Codex shell output with Vercel build logs.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Recorded the proxy environment variables, npm/pnpm config, and curl -I results that show 403 responses within Codex while reiterating that Vercel builds succeed independently. Updated safeguards to highlight the Codex vs. Vercel distinction for future debugging.',
-    },
   ];
 
   return {

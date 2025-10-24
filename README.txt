@@ -4,15 +4,6 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
-- 2025-10-27 — Codex proxy audit vs. Vercel builds. Commit: (pending HEAD)
-  - Direct links: `apps/game-web/pages/settings.jsx`, `README.txt`
-  - Notes: Logged the new operator request to distinguish Codex shell proxy failures from Vercel builds, recorded the proxy env/config outputs plus curl diagnostics in the Settings conversation log, and extended the safeguards with a reminder to capture those checks alongside Yarn workflow notes.
-- 2025-10-26 — Yarn workspace migration & safeguard refresh. Commit: (pending HEAD)
-  - Direct links: `package.json`, `apps/game-web/package.json`, `tools/vercel-info.mjs`, `apps/game-web/pages/settings.jsx`, `.yarnrc.yml`, `yarn.lock`, `README.txt`
-  - Notes: Replaced the pnpm-focused workflow with Yarn workspaces, refreshed the safeguard checklist and Settings log to cover the Yarn toolchain plus proxy fallout, documented the Yarn-first build commands, and captured the Corepack-to-Yarn migration attempt for QA reference.
-- 2025-10-25 — Vercel Node 22.x alignment & safeguard refresh. Commit: (pending HEAD)
-  - Direct links: `apps/game-web/package.json`, `tools/vercel-info.mjs`, `apps/game-web/pages/settings.jsx`, `README.txt`
-  - Notes: Raised the game workspace engines to Node 22.x for Vercel compatibility, updated the build diagnostics to warn when the runtime drifts, refreshed the Settings safeguards/log, and reconfirmed the offline build after the upgrade.
 - 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
   - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
@@ -129,6 +120,20 @@ Device & Response UI Package
   de_modules` layout during offline work.
 - Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
   future operators understand the mitigation path.
+
+## Offline pnpm workflow
+
+- **Primary build** — `npm run build` now calls `node tools/offline-pnpm.mjs --filter game-web build`, ensuring the proxy never
+  interferes with pnpm downloads. The shim executes the existing Next.js binaries from `node_modules/.bin` and mirrors pnpm's
+  `--filter` semantics for the `game-web` workspace.
+- **Standard checkups** — `npm run build:standard` still runs `pnpm --filter game-web build` so operators can purposely exercise
+  the Corepack path when debugging the proxy tunnel. Expect it to fail in restricted environments; keep the logs for reference.
+- **Turbo aggregate** — `npm run build:turbo` retains the original `turbo run build` orchestration should you need to build both
+  apps locally without the shim.
+- Ensure dependencies are installed locally (`npm install` or mirror the existing `node_modules`) so the offline shim can locate
+  `next` inside `node_modules/.bin`.
+- Update `tools/offline-pnpm.mjs` whenever workspace commands change so the shim continues to track Next.js entry points without
+  touching Corepack.
 
 Files included (drop into your Next.js project or use as reference):
 

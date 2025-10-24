@@ -3,7 +3,7 @@
   "version": "1.2.1",
   "private": true,
   "engines": {
-    "node": "22"
+    "node": ">=19 <20"
   },
   "scripts": {
     "dev": "next dev --turbopack",
@@ -18,3 +18,4 @@
     "react-dom": "18.2.0"
   }
 }
+
