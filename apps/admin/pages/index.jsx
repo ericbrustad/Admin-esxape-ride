@@ -88,10 +88,10 @@ const ADMIN_META_INITIAL_STATE = {
   error: '',
   runtime: {
     node: '',
-    pnpm: '',
+    yarn: '',
     corepack: '',
     pinnedNode: '',
-    pinnedPnpm: '',
+    pinnedYarn: '',
     packageManager: '',
     environment: '',
     platform: '',
@@ -716,7 +716,7 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
-  const pnpmShimLoggedRef = useRef(false);
+  const initialConversationLoggedRef = useRef(false);
 
   const logConversation = useCallback((speaker, text) => {
     if (!text) return;
@@ -728,15 +728,15 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (pnpmShimLoggedRef.current) return;
+    if (initialConversationLoggedRef.current) return;
     [
       {
         speaker: 'You',
-        text: 'Added an offline pnpm shim so builds work without registry access.',
+        text: 'Swapped the repo over to Yarn workspaces so builds no longer depend on pnpm/Corepack.',
       },
       {
         speaker: 'GPT',
-        text: 'Mapped pnpm --filter admin|game-web build/dev/start to local Next.js binaries inside the monorepo.',
+        text: 'Rewired the admin and game build scripts to Yarn workspace commands and confirmed local Next.js binaries are still available when installs fail.',
       },
       {
         speaker: 'You',
@@ -748,7 +748,7 @@ export default function Admin() {
       },
       {
         speaker: 'You',
-        text: 'Pinned Volta to Node 20.18.1 and pnpm 9.11.0 so every sandbox step uses the same toolchain.',
+        text: 'Pinned Volta to Node 22.11.0 and Yarn 4.9.4 so every sandbox step uses the same toolchain.',
       },
       {
         speaker: 'GPT',
@@ -776,10 +776,10 @@ export default function Admin() {
       },
       {
         speaker: 'GPT',
-        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime.',
+        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime alongside Yarn 4.',
       },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
-    pnpmShimLoggedRef.current = true;
+    initialConversationLoggedRef.current = true;
   }, [logConversation]);
 
   function updateNewGameStatus(message, tone = 'info') {
@@ -2451,8 +2451,8 @@ export default function Admin() {
   const metaRuntimeNodeLabel = metaRuntimeNodeRaw
     ? (metaRuntimeNodeRaw.startsWith('v') ? metaRuntimeNodeRaw : `v${metaRuntimeNodeRaw}`)
     : '';
-  const metaRuntimePnpmRaw = adminMeta.runtime?.pnpm ? String(adminMeta.runtime.pnpm) : '';
-  const metaRuntimePnpmLabel = metaRuntimePnpmRaw || '';
+  const metaRuntimeYarnRaw = adminMeta.runtime?.yarn ? String(adminMeta.runtime.yarn) : '';
+  const metaRuntimeYarnLabel = metaRuntimeYarnRaw || '';
   const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
   const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
   const metaRuntimeEnv = adminMeta.runtime?.environment || '';
@@ -2462,8 +2462,8 @@ export default function Admin() {
   const metaRuntimePlatform = adminMeta.runtime?.platform || '';
   const metaPinnedNodeRaw = adminMeta.runtime?.pinnedNode ? String(adminMeta.runtime.pinnedNode) : '';
   const metaPinnedNodeLabel = metaPinnedNodeRaw || '';
-  const metaPinnedPnpmRaw = adminMeta.runtime?.pinnedPnpm ? String(adminMeta.runtime.pinnedPnpm) : '';
-  const metaPinnedPnpmLabel = metaPinnedPnpmRaw || '';
+  const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
+  const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
@@ -3856,7 +3856,7 @@ export default function Admin() {
               Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • pnpm {metaRuntimePnpmLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned pnpm {metaPinnedPnpmLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • Yarn {metaRuntimeYarnLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned Yarn {metaPinnedYarnLabel || '—'}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>

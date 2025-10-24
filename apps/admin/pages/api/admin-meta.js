@@ -51,10 +51,10 @@ function detectGitMetadata() {
 
 function buildRuntimeMetadata() {
   const nodeVersion = process.version || '';
-  const pnpmVersion = safeExec('pnpm --version');
+  const yarnVersion = safeExec('yarn --version');
   const corepackVersion = safeExec('corepack --version');
   const pinnedNode = packageJson?.volta?.node || '';
-  const pinnedPnpm = packageJson?.volta?.pnpm || (
+  const pinnedYarn = packageJson?.volta?.yarn || (
     typeof packageJson?.packageManager === 'string'
       ? packageJson.packageManager.split('@')[1] || ''
       : ''
@@ -62,10 +62,10 @@ function buildRuntimeMetadata() {
 
   return {
     node: nodeVersion,
-    pnpm: pnpmVersion,
+    yarn: yarnVersion,
     corepack: corepackVersion,
     pinnedNode,
-    pinnedPnpm,
+    pinnedYarn,
     packageManager: packageJson?.packageManager || '',
     environment: process.env.VERCEL ? 'vercel' : (process.env.NODE_ENV || 'development'),
     platform: `${process.platform} ${process.arch}`,
