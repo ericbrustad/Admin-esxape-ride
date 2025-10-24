@@ -8,7 +8,7 @@ mission, device, media, and event persistence.
 
 1. Copy `.env.local.example` to `.env.local` and fill in the Supabase project
    URL plus anon/service keys.
-2. Install dependencies with `pnpm install` from the repository root.
+2. Install dependencies with `yarn install` from the repository root.
 3. Apply the SQL migrations:
 
    ```bash
@@ -32,7 +32,7 @@ mission, device, media, and event persistence.
 6. Start the Admin dashboard:
 
    ```bash
-   pnpm --filter apps/admin dev
+   yarn workspace admin dev
    ```
 
 ## API Surfaces
