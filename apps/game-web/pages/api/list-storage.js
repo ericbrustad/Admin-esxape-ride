@@ -7,39 +7,53 @@ export default async function handler(req, res) {
     }
 
     const url = process.env.SUPABASE_URL;
-    const key =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_ANON_KEY;
-
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
     if (!url || !key) {
-      return res.status(500).json({
-        ok: false,
-        error: 'Missing SUPABASE_URL or SERVICE_ROLE/ANON key in Preview env.',
-      });
+      return res.status(500).json({ ok: false, error: 'Missing SUPABASE env vars' });
     }
 
     const supabase = createClient(url, key);
 
-    // Optional: list buckets with ?action=buckets
-    if ((req.query.action || '').toString() === 'buckets') {
-      const { data, error } = await supabase.storage.listBuckets?.();
-      if (error) return res.status(500).json({ ok: false, error: error.message });
-      if (!data) return res.status(500).json({ ok: false, error: 'listBuckets not available in this supabase-js version' });
-      return res.status(200).json({ ok: true, buckets: data });
+    const bucket = (req.query.bucket || 'media').toString();
+    const prefix = (req.query.prefix || '').toString().replace(/^\/+|\/+$/g, '');
+    const limit = Number(req.query.limit) || 1000;
+    const recursive = (req.query.recursive || req.query.tree) === '1';
+
+    // Validate bucket name first
+    const { data: buckets, error: bucketsErr } = await supabase.storage.listBuckets();
+    if (bucketsErr) {
+      return res.status(500).json({ ok: false, error: bucketsErr.message });
+    }
+    const names = (buckets || []).map(b => b.name);
+    if (!names.includes(bucket)) {
+      return res.status(404).json({ ok: false, error: `Bucket '${bucket}' not found`, available: names });
     }
 
-    const bucket = (req.query.bucket || 'media').toString(); // change if your bucket name is different
-    const prefix = (req.query.prefix || '').toString();
-    const limit = Number(req.query.limit) || 100;
+    async function listDir(dir) {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .list(dir || '', { limit, sortBy: { column: 'name', order: 'asc' } });
+      if (error) throw error;
 
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(prefix, { limit, sortBy: { column: 'name', order: 'asc' } });
+      if (!recursive) {
+        return (data || []).map(it => ({ ...it, path: (dir ? dir + '/' : '') + it.name }));
+      }
 
-    if (error) {
-      return res.status(500).json({ ok: false, bucket, prefix, error: error.message });
+      const out = [];
+      for (const it of data || []) {
+        const path = (dir ? dir + '/' : '') + it.name;
+        out.push({ ...it, path });
+        // Folders have no metadata
+        if (!it.metadata) {
+          const kids = await listDir(path);
+          out.push(...kids);
+        }
+      }
+      return out;
     }
-    return res.status(200).json({ ok: true, bucket, prefix, files: data ?? [] });
+
+    const files = await listDir(prefix);
+    return res.status(200).json({ ok: true, bucket, prefix, count: files.length, files });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e) });
   }
