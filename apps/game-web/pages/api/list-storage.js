@@ -1,4 +1,4 @@
-// apps/game-web/pages/api/list-storage.js
+// for apps/game-web/pages/api/list-storage.js
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
