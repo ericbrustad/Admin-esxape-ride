@@ -129,6 +129,16 @@ export async function getServerSideProps() {
       message:
         'Ran the find .. -name AGENTS.md -print scan; no AGENTS.md files were present in the repository or parent workspace, so no additional scoped instructions applied.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Codex proxy failures are separate from Vercel. Document how to prove which network is blocking installs, audit the proxy variables, and capture curl diagnostics so the team can compare Codex shell output with Vercel build logs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Recorded the proxy environment variables, npm/pnpm config, and curl -I results that show 403 responses within Codex while reiterating that Vercel builds succeed independently. Updated safeguards to highlight the Codex vs. Vercel distinction for future debugging.',
+    },
   ];
 
   return {
@@ -166,6 +176,10 @@ export default function Settings({ metadata, conversationLog }) {
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
               Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the runtime declaration.
+            </li>
+            <li>
+              Distinguish Codex shell proxy failures from Vercel deployment issues by checking where the errors appear, running
+              <code>env | grep -i _proxy</code>, <code>npm config get https-proxy</code>, and <code>curl -I</code> diagnostics inside Codex, and recording the findings here for comparison with Vercel build logs.
             </li>
             <li>
               Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
