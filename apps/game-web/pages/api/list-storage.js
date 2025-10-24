@@ -1,23 +1,29 @@
+// apps/game-web/pages/api/list-storage.js
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
-  const url  = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return res.status(500).json({ ok:false, error:'Missing envs' });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  }
 
-  const s = createClient(url, anon);
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    // Use SERVICE_ROLE here because this is server-side only.
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
 
   const bucket = (req.query.bucket || 'media').toString();
-  // prefix = folder path; example: 'mediapool' (no leading slash)
-  const prefix = (req.query.prefix || 'mediapool').toString();
-  const limit  = Number(req.query.limit || 100);
-  const token  = req.query.token || undefined; // for pagination
+  const prefix = (req.query.prefix || '').toString();
 
-  // One-level listing (folders + files under prefix)
-  const { data, error } = await s.storage.from(bucket).list(prefix, {
-    limit,
-    token,      // pass back `response.token` to fetch next page
-  });
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .list(prefix, {
+      limit: Number(req.query.limit) || 100,
+      sortBy: { column: 'name', order: 'asc' },
+    });
 
-  res.status(error ? 500 : 200).json({ ok: !error, bucket, prefix, items: data || [], error });
+  if (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+  return res.status(200).json({ ok: true, bucket, prefix, files: data ?? [] });
 }
