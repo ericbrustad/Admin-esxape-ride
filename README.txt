@@ -36,6 +36,27 @@ Device & Response UI Package
 - 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
   - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
   - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
+## Update Log
+- 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
+  - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
+  - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
+    documented the workflow so teammates skip Corepack downloads, and refreshed the Settings safeguards/log transcript.
+- 2025-10-22 — Offline pnpm shim & TypeScript-free previews. Commit: (pending HEAD)
+  - Direct links: `tools/offline-pnpm.mjs`, `apps/admin/pages/preview/[slug].jsx`, `apps/game-web/pages/index-supabase.jsx`, `package.json`, `apps/admin/pages/index.jsx`, `apps/admin/pages/api/admin-meta.js`
+  - Notes: Added a local pnpm shim that routes `--filter` commands to the Next.js binaries for admin and game builds, dropped TypeScript-only entry points so offline builds stop downloading `@types/*`, refreshed the settings footer snapshot, and logged the GPT pairing that validated the fix.
+- 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
+  - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
+  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added
+    workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
+- 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
+  - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
+  - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.
+- 2025-10-20 — Settings log relocation & repository snapshot panel. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`
+  - Notes: Moved the Operator ↔ GPT conversation history into the Settings tab with status copy, removed it from the global header, and added a repository snapshot card that surfaces the repo, branch, commit, Vercel target, and timestamp for quick QA reference.
+- 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
+  - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
+  - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
 - 2025-10-16 — Admin protection toggle parsing & Next build verification. Commit: (pending HEAD)
   - Direct links: `pages/api/admin-protection.js`
   - Notes: Accepts "false"/"true" strings from the dashboard toggle so the password stays off by default, keeps the admin and game JSON copies synchronized, and reran `npm run build` to confirm the Next.js admin bundle succeeds after restoring the game stylesheet. Note to review @ 2025-10-16 00:46:47Z.
@@ -132,6 +153,35 @@ Device & Response UI Package
   de_modules` layout during offline work.
 - Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
   future operators understand the mitigation path.
+
+## Yarn workspace workflow
+
+- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
+- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
+  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
+  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
+  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
+- **Primary build** — `yarn build` delegates to `yarn workspace game-web run build`. When the missing lockfile blocks Yarn, execute `node apps/game-web/node_modules/.bin/next build` and attach the Yarn error output for continuity.
+- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
+- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds.
+- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
+  de_modules` layout during offline work.
+- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
+  future operators understand the mitigation path.
+
+## Offline pnpm workflow
+
+- **Primary build** — `npm run build` now calls `node tools/offline-pnpm.mjs --filter game-web build`, ensuring the proxy never
+  interferes with pnpm downloads. The shim executes the existing Next.js binaries from `node_modules/.bin` and mirrors pnpm's
+  `--filter` semantics for the `game-web` workspace.
+- **Standard checkups** — `npm run build:standard` still runs `pnpm --filter game-web build` so operators can purposely exercise
+  the Corepack path when debugging the proxy tunnel. Expect it to fail in restricted environments; keep the logs for reference.
+- **Turbo aggregate** — `npm run build:turbo` retains the original `turbo run build` orchestration should you need to build both
+  apps locally without the shim.
+- Ensure dependencies are installed locally (`npm install` or mirror the existing `node_modules`) so the offline shim can locate
+  `next` inside `node_modules/.bin`.
+- Update `tools/offline-pnpm.mjs` whenever workspace commands change so the shim continues to track Next.js entry points without
+  touching Corepack.
 
 Files included (drop into your Next.js project or use as reference):
 
