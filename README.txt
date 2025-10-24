@@ -5,8 +5,8 @@ Device & Response UI Package
 ----------------------------
 ## Update Log
 - 2025-10-28 — Yarn-only Vercel build alignment & Node 22 verification. Commit: (pending HEAD)
-  - Direct links: `vercel.json`, `package.json`, `apps/admin/package.json`, `apps/admin/pages/api/admin-meta.js`, `apps/admin/pages/index.jsx`, `apps/game-web/pages/settings.jsx`, `README-ENGINE-API.md`, `README_DROPIN.md`
-  - Notes: Removed the pnpm workspace manifest so Vercel stops invoking pnpm, switched Vercel commands to Yarn install/build, refreshed admin metadata to surface Yarn versions, synchronized Node 22.x engines across workspaces, expanded the Settings safeguards/log for the Yarn toolchain, and updated the quickstart docs.
+  - Direct links: `vercel.json`, `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
+  - Notes: Routed the Vercel build through <code>yarn build</code> so turbo compiles both apps under Node 22, updated root scripts/docs to describe the turbo filtered build, refreshed the Settings safeguards/log with the latest operator request, and kept the Yarn-only workflow guidance current.
 - 2025-10-27 — Codex proxy audit vs. Vercel builds. Commit: (pending HEAD)
   - Direct links: `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Logged the new operator request to distinguish Codex shell proxy failures from Vercel builds, recorded the proxy env/config outputs plus curl diagnostics in the Settings conversation log, and extended the safeguards with a reminder to capture those checks alongside Yarn workflow notes.
@@ -16,27 +16,6 @@ Device & Response UI Package
 - 2025-10-25 — Vercel Node 22.x alignment & safeguard refresh. Commit: (pending HEAD)
   - Direct links: `apps/game-web/package.json`, `tools/vercel-info.mjs`, `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Raised the game workspace engines to Node 22.x for Vercel compatibility, updated the build diagnostics to warn when the runtime drifts, refreshed the Settings safeguards/log, and reconfirmed the offline build after the upgrade.
-- 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
-  - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
-  - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
-    documented the workflow so teammates skip Corepack downloads, and refreshed the Settings safeguards/log transcript.
-- 2025-10-22 — Offline pnpm shim & TypeScript-free previews. Commit: (pending HEAD)
-  - Direct links: `tools/offline-pnpm.mjs`, `apps/admin/pages/preview/[slug].jsx`, `apps/game-web/pages/index-supabase.jsx`, `package.json`, `apps/admin/pages/index.jsx`, `apps/admin/pages/api/admin-meta.js`
-  - Notes: Added a local pnpm shim that routes `--filter` commands to the Next.js binaries for admin and game builds, dropped TypeScript-only entry points so offline builds stop downloading `@types/*`, refreshed the settings footer snapshot, and logged the GPT pairing that validated the fix.
-- 2025-10-20 — Monorepo workspace bootstrap & shared package scaffold. Commit: (pending HEAD)
-  - Direct links: `package.json`, `pnpm-workspace.yaml`, `turbo.json`, `apps/admin/**`, `apps/game-web/**`, `packages/shared/**`
-  - Notes: Migrated the repo into a pnpm/turbo monorepo with Next.js apps relocated to `apps/admin` and `apps/game-web`, added
-    workspace-aware GitHub paths plus Supabase/media mirroring, and introduced a starter shared workspace for cross-app types.
-- 2025-10-20 — Supabase media upload repair & auto slugging workflow. Commit: (pending HEAD)
-  - Direct links: `pages/api/upload.js`, `pages/api/list-media.js`, `pages/api/media/delete.js`, `lib/supabase-storage.js`, `components/MediaPool.jsx`, `pages/index.jsx`
-  - Notes: Restored Supabase Storage uploads with POST semantics, added media slugs/tags surfaced in the Media Pool, introduced Supabase deletions that clean manifest records, and refreshed the New Game modal to auto-assign slugs while reflecting the publishing protection state.
-- 2025-10-20 — Settings log relocation & repository snapshot panel. Commit: (pending HEAD)
-  - Direct links: `pages/index.jsx`
-  - Notes: Moved the Operator ↔ GPT conversation history into the Settings tab with status copy, removed it from the global header, and added a repository snapshot card that surfaces the repo, branch, commit, Vercel target, and timestamp for quick QA reference.
-- 2025-10-16 — Game settings deck restructure & protection prompt modal. Commit: (pending HEAD)
-  - Direct links: `pages/index.jsx`, `pages/api/admin-protection.js`, `pages/api/games.js`
-  - Notes: Refreshed the Settings tab with a read-only title + slug, relocated the saved-games selector alongside a modal New Game launcher, added the cover thumbnail beside the admin header, delivered the password enable/disable prompt with required confirmation, and polished mission/device 3D controls plus modal styling. Note to review @ 2025-10-16 02:15:00Z.
-## Update Log
 - 2025-10-24 — Offline pnpm primary workflow & build script aliases. Commit: (pending HEAD)
   - Direct links: `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Promoted the offline pnpm shim to the default build command, added an opt-in standard pnpm script for proxy testing,
@@ -138,6 +117,21 @@ Device & Response UI Package
 - 2025-10-15 — Admin basic auth obeys toggle. Commit: b9d9bbffb5254cbd710aa5545454370d4ec1cb48.
   - Direct link: `middleware.js`
   - Notes: Middleware now checks `/admin-protection.json` before challenging, allowing the password switch to disable prompts while keeping caching for quick reads.
+
+## Yarn workspace workflow
+
+- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
+- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
+  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
+  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
+  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
+- **Primary build** — `yarn build` executes `turbo run build --filter=game-web --filter=esx-admin-control-panel-map` so both apps compile together. When the missing lockfile blocks Yarn, run `node apps/game-web/node_modules/.bin/next build` and `node apps/admin/node_modules/.bin/next build`, then attach the Yarn error output for continuity.
+- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
+- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds when you need every workspace’s pipeline.
+- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
+  de_modules` layout during offline work.
+- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
+  future operators understand the mitigation path.
 
 ## Yarn workspace workflow
 

@@ -16,8 +16,8 @@
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
     "dev": "turbo run dev --parallel",
-    "build": "yarn workspace game-web run build",
-    "build:admin": "yarn workspace admin run build",
+    "build": "turbo run build --filter=game-web --filter=esx-admin-control-panel-map",
+    "build:admin": "yarn workspace esx-admin-control-panel-map run build",
     "build:turbo": "turbo run build"
   },
   "devDependencies": {

@@ -149,6 +149,16 @@ export async function getServerSideProps() {
       message:
         'Removed the pnpm workspace manifest so Vercel stops choosing pnpm, switched vercel.json to Yarn install/build commands, refreshed the docs and safeguards for Yarn + Node 22, reran the Next.js builds directly, and captured this conversation with the updated repository snapshot metadata.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel build logs still show pnpm and fail to produce the admin routes manifest. Debug the Yarn migration, make sure Node 22 is the enforced runtime, and verify both apps build cleanly.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Repointed vercel.json at yarn build so turbo compiles the game and admin workspaces under Node 22, updated scripts and docs, and verified each Next.js build locally while keeping the Yarn proxy caveats documented.',
+    },
   ];
 
   return {
@@ -188,7 +198,7 @@ export default function Settings({ metadata, conversationLog }) {
               Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the runtime declaration.
             </li>
             <li>
-              Keep <code>vercel.json</code> pointed at <code>yarn install --immutable</code> and <code>yarn workspace game-web run build</code>, and ensure no stray <code>pnpm</code> manifests remain so Vercel stays on the Yarn toolchain.
+              Keep <code>vercel.json</code> pointed at <code>yarn install --immutable</code> and <code>yarn build</code> so both admin and game workspaces compile under Yarn, and ensure no stray <code>pnpm</code> manifests remain so Vercel stays on the Yarn toolchain.
             </li>
             <li>
               Distinguish Codex shell proxy failures from Vercel deployment issues by checking where the errors appear, running
@@ -198,7 +208,7 @@ export default function Settings({ metadata, conversationLog }) {
               Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
             </li>
             <li>
-              Primary builds run through <code>yarn build</code>, which delegates to <code>yarn workspace game-web run build</code>. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and archive the Yarn lock errors alongside the proxy logs.
+              Primary builds run through <code>yarn build</code>, which invokes <code>turbo run build --filter=game-web --filter=esx-admin-control-panel-map</code>. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any Yarn proxy errors alongside the logs.
             </li>
             <li>
               Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally.
