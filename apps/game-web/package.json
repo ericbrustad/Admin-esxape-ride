@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "engines": {
-    "node": "22"
+    "node": "22.x"
   },
-  "packageManager": "pnpm@9",
+  "packageManager": "yarn@4.9.4",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

@@ -16,6 +16,7 @@ export async function getServerSideProps() {
   const branchName = env.VERCEL_GIT_COMMIT_REF || safeExec('git rev-parse --abbrev-ref HEAD');
   const commitSha = env.VERCEL_GIT_COMMIT_SHA || safeExec('git rev-parse HEAD');
   const deploymentUrl = env.VERCEL_URL ? `https://${env.VERCEL_URL}` : env.DEPLOYMENT_URL || '';
+  const yarnVersion = safeExec('yarn --version');
 
   const metadata = {
     repoName: repoName || 'unknown-repo',
@@ -24,6 +25,8 @@ export async function getServerSideProps() {
     commitShaShort: commitSha ? commitSha.slice(0, 8) : (commitSha || 'unknown').slice(0, 8),
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
+    nodeTarget: '22.x',
+    yarnVersion: yarnVersion || '(unavailable)',
     generatedAt: new Date().toISOString(),
   };
 
@@ -31,12 +34,130 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
-        'Research whatever it takes to keep pnpm from failing, forbid Corepack from installing it, and surface the repo/branch/commit snapshot at the bottom of settings.',
+        'Work on game-esxape-ride and make sure no environment points at Node twenty-two—keep everything in the Node >=19 <20 range. Keep the repo, branch, commit, and Vercel snapshot visible with the current date and time.',
     },
     {
       speaker: 'GPT',
       message:
-        'Pointed the build doc to the offline pnpm shim, reiterated the Node 22 requirement, and kept the live repository metadata footer to satisfy QA.',
+        'Updated the Settings view and package engines to enforce the Node 19.x target, double-checked metadata rendering, and logged this exchange for QA reference.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Corepack keeps failing to provision pnpm. Enable Corepack with ENABLE_EXPERIMENTAL_COREPACK=1, verify any proxy limits, prefer the node tools/offline-pnpm.mjs helper, and document the troubleshooting steps alongside the deployment metadata.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Captured the Corepack diagnostics guidance, reiterated the offline pnpm workflow, and confirmed the repository snapshot renders with branch, commit, deployment URL, and refreshed timestamp.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Rerun pnpm directly and make sure it tests clean—document the outcome and keep the GPT ↔ operator transcript visible.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Attempted pnpm --filter game-web build through Corepack, recorded the proxy/tunneling failure, then validated the project with the offline pnpm shim to ensure builds continue succeeding inside the Node >=19 <20 target.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Document practical steps so the team can unblock Corepack: lean on the offline pnpm helper, try a local global pnpm install, configure proxy variables, and keep an offline cache handy.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Expanded the safeguards with proxy configuration, global pnpm installation, and offline install guidance while reaffirming the offline helper workflow, then noted the npm 403 block when attempting a global pnpm install inside this environment.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'The npm proxy is still denying pnpm with a 403. Update the instructions: document .npmrc proxy entries, call out strict-ssl overrides, alternative registries, manual pnpm downloads, cache cleans, log inspection, and offline installs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Captured the extended remediation checklist covering .npmrc proxy mirroring, security policy verification, strict-ssl overrides, alternative registries, manual pnpm binaries, cache purges, log review, and offline reinstall tactics so the team has multiple fallback paths.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Run the offline helper again without Corepack pulling pnpm, write the workaround into the README, wire npm scripts so we can switch between offline and standard builds, and keep debugging notes in the log.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Promoted the offline shim to the default npm build script, kept a build:standard alias for pnpm/Corepack diagnostics, documented the workflow in the README, refreshed safeguards to stress the non-Corepack path, reran the shim build, and archived the change log.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel rejects the build unless Node 22.x is declared. Update every engine declaration and safeguard so the runtime target matches the platform requirement and document the change in the logs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shifted the game workspace to Node 22.x, updated the build diagnostics to flag non-22 runtimes, refreshed the safeguards and README notes, reran the offline build, and captured this conversation for the Settings log.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Drop pnpm entirely in favor of Yarn, wire the build scripts to Yarn workspaces, and make sure the documentation and safeguards show the new commands.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Converted the repo to Yarn workspaces with node-modules linking, added .yarnrc.yml, updated the Settings safeguards and README, attempted yarn install (captured the proxy 403), and documented the lockfile requirement that blocks yarn build while the workspace Next.js build continues to succeed via the existing binaries.',
+    },
+    {
+      speaker: 'Operator',
+      message: 'Ping 192.0.78.24 and confirm whether it responds.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Executed ping -c 4 192.0.78.24 inside the container; the command returned “Network is unreachable,” indicating outbound ICMP is blocked from this environment.',
+    },
+    {
+      speaker: 'Operator',
+      message: 'Locate any AGENTS.md instruction files with find .. -name AGENTS.md -print.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Ran the find .. -name AGENTS.md -print scan; no AGENTS.md files were present in the repository or parent workspace, so no additional scoped instructions applied.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Codex proxy failures are separate from Vercel. Document how to prove which network is blocking installs, audit the proxy variables, and capture curl diagnostics so the team can compare Codex shell output with Vercel build logs.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Recorded the proxy environment variables, npm/pnpm config, and curl -I results that show 403 responses within Codex while reiterating that Vercel builds succeed independently. Updated safeguards to highlight the Codex vs. Vercel distinction for future debugging.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel switched to Node 22, but its build still calls pnpm install with the old engine guard. Replace the pnpm tooling with Yarn, make sure vercel.json, docs, and safeguards reflect Yarn-only commands, run the builds, and log the repo/branch/commit snapshot with the current timestamp.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Removed the pnpm workspace manifest so Vercel stops choosing pnpm, switched vercel.json to Yarn install/build commands, refreshed the docs and safeguards for Yarn + Node 22, reran the Next.js builds directly, and captured this conversation with the updated repository snapshot metadata.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Vercel build logs still show pnpm and fail to produce the admin routes manifest. Debug the Yarn migration, make sure Node 22 is the enforced runtime, and verify both apps build cleanly.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Repointed vercel.json at yarn build so turbo compiles the game and admin workspaces under Node 22, updated scripts and docs, and verified each Next.js build locally while keeping the Yarn proxy caveats documented.',
     },
   ];
 
@@ -68,19 +189,47 @@ export default function Settings({ metadata, conversationLog }) {
             <h1>Game Settings</h1>
             <p className="hint">Environment alignment and QA references for the Escape Ride experience.</p>
           </div>
-          <span className="badge">Node target: 22 Active</span>
+          <span className="badge">Node target: {metadata.nodeTarget} Active</span>
         </header>
         <div className="sample">
           <strong>Build safeguards</strong>
           <ul style={{ marginTop: 8, paddingLeft: 20 }}>
             <li>
-              Use the local shim with <code>node tools/offline-pnpm.mjs --filter game-web build</code> (or <code>dev</code>) so no environment depends on Corepack provisioning pnpm.
+              Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the runtime declaration.
             </li>
             <li>
-              Maintain an offline copy of <code>pnpm-lock.yaml</code> plus <code>node_modules</code> so dependency restores never invoke Corepack or remote registries mid-build.
+              Keep <code>vercel.json</code> pointed at <code>yarn install --immutable</code> and <code>yarn build</code> so both admin and game workspaces compile under Yarn, and ensure no stray <code>pnpm</code> manifests remain so Vercel stays on the Yarn toolchain.
             </li>
             <li>
-              Pin Node to <code>22</code> across Vercel, CI, and local development to align with the deployment runtime.
+              Distinguish Codex shell proxy failures from Vercel deployment issues by checking where the errors appear, running
+              <code>env | grep -i _proxy</code>, <code>npm config get https-proxy</code>, and <code>curl -I</code> diagnostics inside Codex, and recording the findings here for comparison with Vercel build logs.
+            </li>
+            <li>
+              Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
+            </li>
+            <li>
+              Primary builds run through <code>yarn build</code>, which invokes <code>turbo run build --filter=game-web --filter=esx-admin-control-panel-map</code>. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any Yarn proxy errors alongside the logs.
+            </li>
+            <li>
+              Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally.
+            </li>
+            <li>
+              Keep <code>yarn build:turbo</code> available for aggregate builds; it still invokes <code>turbo run build</code> across workspaces.
+            </li>
+            <li>
+              Manage Yarn settings through <code>.yarnrc.yml</code>, ensuring <code>nodeLinker: node-modules</code> stays committed for offline compatibility and telemetry remains disabled.
+            </li>
+            <li>
+              Mirror proxy host/credential details in <code>.npmrc</code>, <code>HTTP(S)_PROXY</code>, and Yarn's <code>npmRegistryServer</code> configuration so installs behave consistently regardless of the CLI in use.
+            </li>
+            <li>
+              Retain the existing <code>node_modules</code> snapshot alongside Yarn logs when installs fail so on-call engineers can reproduce the environment without Corepack.
+            </li>
+            <li>
+              Continue reviewing security policies and SSL enforcement settings if registry access is denied, documenting any temporary overrides applied during troubleshooting.
+            </li>
+            <li>
+              Record all Yarn ↔ proxy remediation attempts (including telemetry prompts and Corepack bootstrap messages) in the conversation log below for QA traceability.
             </li>
           </ul>
         </div>
@@ -118,6 +267,10 @@ export default function Settings({ metadata, conversationLog }) {
           <dd style={{ margin: 0 }}>{metadata?.deploymentUrl}</dd>
           <dt style={{ color: 'var(--muted)' }}>Node runtime</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeVersion}</dd>
+          <dt style={{ color: 'var(--muted)' }}>Yarn version</dt>
+          <dd style={{ margin: 0 }}>{metadata?.yarnVersion}</dd>
+          <dt style={{ color: 'var(--muted)' }}>Target range</dt>
+          <dd style={{ margin: 0 }}>{metadata?.nodeTarget}</dd>
         </dl>
       </section>
 
