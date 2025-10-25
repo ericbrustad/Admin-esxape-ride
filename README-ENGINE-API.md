@@ -32,7 +32,7 @@ mission, device, media, and event persistence.
 6. Start the Admin dashboard:
 
    ```bash
-   yarn workspace admin dev
+   npm --prefix apps/admin run dev
    ```
 
 ## API Surfaces

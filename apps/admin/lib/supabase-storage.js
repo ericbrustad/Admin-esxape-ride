@@ -5,13 +5,22 @@ const {
   SUPABASE_ANON_KEY = '',
   SUPABASE_SERVICE_ROLE_KEY = '',
   SUPABASE_MEDIA_BUCKET = 'media',
-  SUPABASE_MEDIA_PREFIX = 'mediapool',
+  SUPABASE_MEDIA_PREFIX = 'media',
   SUPABASE_DATA_BUCKET,
   SUPABASE_DATA_PREFIX = 'admin-data',
 } = process.env;
 
 const supabaseBaseUrl = (SUPABASE_URL || '').replace(/\/+$/, '');
 const storageBaseUrl = supabaseBaseUrl ? `${supabaseBaseUrl}/storage/v1` : '';
+
+function sanitizeFolderSegment(value = '') {
+  return String(value || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/\\/g, '/');
+}
+
+const canonicalMediaPrefix = sanitizeFolderSegment(SUPABASE_MEDIA_PREFIX) || 'media';
 
 function hasSupabaseUrl() {
   return Boolean(storageBaseUrl);
@@ -46,11 +55,65 @@ function normalizePath(...segments) {
     .join('/');
 }
 
+function remapLegacyMediaFolder(folder = '') {
+  let normalized = sanitizeFolderSegment(folder);
+  if (!normalized) return normalized;
+  const fallback = canonicalMediaPrefix;
+  normalized = normalized.replace(/^(mediapool|media)(?=\/|$)/i, fallback);
+  return normalized;
+}
+
+export function normalizeMediaFolderForSupabase(folder = '') {
+  const normalized = remapLegacyMediaFolder(folder);
+  if (!normalized) return canonicalMediaPrefix;
+  if (normalized.toLowerCase().startsWith(canonicalMediaPrefix.toLowerCase())) {
+    return normalized;
+  }
+  return normalizePath(canonicalMediaPrefix, normalized);
+}
+
+function collectMediaFolderCandidates(folder = '') {
+  const candidates = [];
+  const seen = new Set();
+
+  const pushCandidate = (value) => {
+    const normalized = sanitizeFolderSegment(value);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(normalized);
+  };
+
+  const canonical = normalizeMediaFolderForSupabase(folder);
+  const raw = sanitizeFolderSegment(folder);
+  const stripped = raw.replace(/^(media|mediapool)(?=\/|$)/i, '').replace(/^\/+/, '');
+
+  pushCandidate(canonical);
+  pushCandidate(raw);
+
+  if (raw) {
+    pushCandidate(normalizePath(canonicalMediaPrefix, raw));
+    pushCandidate(normalizePath('mediapool', raw));
+  }
+
+  if (stripped && stripped !== raw) {
+    pushCandidate(normalizePath(canonicalMediaPrefix, stripped));
+    pushCandidate(normalizePath('mediapool', stripped));
+  }
+
+  if (!candidates.length) {
+    pushCandidate(canonicalMediaPrefix);
+  }
+
+  return candidates;
+}
+
 function buildMediaPath(folder = '', fileName = '') {
-  const prefix = (SUPABASE_MEDIA_PREFIX || '').replace(/^\/+|\/+$/g, '');
-  const normalizedFolder = String(folder || '').replace(/^\/+|\/+$/g, '');
-  const startsWithPrefix = prefix && normalizedFolder.toLowerCase().startsWith(prefix.toLowerCase());
-  if (startsWithPrefix) {
+  const prefix = canonicalMediaPrefix;
+  const normalizedFolder = remapLegacyMediaFolder(folder);
+  const hasPrefix = normalizedFolder && normalizedFolder.toLowerCase().startsWith(prefix.toLowerCase());
+  if (hasPrefix) {
     return normalizePath(normalizedFolder, fileName);
   }
   return normalizePath(prefix, normalizedFolder, fileName);
@@ -252,14 +315,36 @@ export async function uploadSupabaseMedia({ folder, fileName, contentBase64, siz
 
 export async function listSupabaseMedia(dir) {
   if (!isSupabaseMediaEnabled()) return [];
-  const objectPrefix = buildMediaPath(dir, '');
-  const listResult = await listObjects(SUPABASE_MEDIA_BUCKET, objectPrefix, { recursive: true });
-  if (!listResult.ok) return [];
-  return listResult.items.map((item) => ({
+
+  const prefixes = collectMediaFolderCandidates(dir);
+  const seenPaths = new Set();
+  const aggregated = [];
+  let lastError = null;
+
+  for (const prefix of prefixes) {
+    const listResult = await listObjects(SUPABASE_MEDIA_BUCKET, prefix, { recursive: true });
+    if (!listResult.ok) {
+      lastError = listResult.error || `Supabase list failed for ${prefix}`;
+      continue;
+    }
+
+    for (const item of listResult.items) {
+      const key = (item.path || '').toLowerCase();
+      if (key && seenPaths.has(key)) continue;
+      if (key) seenPaths.add(key);
+      aggregated.push(item);
+    }
+  }
+
+  if (!aggregated.length && lastError) {
+    throw new Error(lastError);
+  }
+
+  return aggregated.map((item) => ({
     name: item.name,
     supabasePath: item.path,
-    bucket: SUPABASE_MEDIA_BUCKET,
-    publicUrl: buildObjectUrl(SUPABASE_MEDIA_BUCKET, item.path, { isPublic: true }),
+    bucket: item.bucket || SUPABASE_MEDIA_BUCKET,
+    publicUrl: buildObjectUrl(item.bucket || SUPABASE_MEDIA_BUCKET, item.path, { isPublic: true }),
     size: item.size,
     updatedAt: item.updatedAt,
   }));

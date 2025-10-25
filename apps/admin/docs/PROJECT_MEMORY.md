@@ -1,6 +1,6 @@
 # Esxape Ride — Project Memory
 
-(Last updated: <replace with date>)
+(Last updated: 2025-10-29)
 
 ## Architecture
 - Repo: Admin-esxape-ride
@@ -29,6 +29,9 @@
   - public/media/mediapool/Gif/
   - public/media/mediapool/Other/
   - Legacy backups live in public/media/*_bak for reference
+- Supabase objects live under `admin-media/media/**` even though the UI keeps the
+  `mediapool/` label for backwards compatibility; API helpers normalize folders so
+  legacy manifests keep working during the migration.
 - Pick from media reads /media/mediapool/** with type + tag metadata
 - Drag & drop + chooser supported for pool & icon lists
 - Re-apply defaults seeds default entries (does not delete custom)

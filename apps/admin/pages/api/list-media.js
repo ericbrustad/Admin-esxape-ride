@@ -7,7 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { GAME_ENABLED } from '../../lib/game-switch.js';
 import { readManifest, getManifestDebugInfo } from '../../lib/media-manifest.js';
-import { listSupabaseMedia, isSupabaseMediaEnabled } from '../../lib/supabase-storage.js';
+import {
+  listSupabaseMedia,
+  isSupabaseMediaEnabled,
+  normalizeMediaFolderForSupabase,
+} from '../../lib/supabase-storage.js';
 
 const EXTS = {
   image: /\.(png|jpg|jpeg|webp|svg|bmp|tif|tiff|avif|heic|heif)$/i,
@@ -417,6 +421,7 @@ export default async function handler(req, res) {
     if (isSupabaseMediaEnabled()) {
       try {
         const supabaseItems = await listSupabaseMedia(dir);
+        const supabaseFolder = normalizeMediaFolderForSupabase(dir);
         for (const item of supabaseItems) {
           const name = item.name || item.supabasePath?.split('/')?.pop() || '';
           const supabaseKeySource = item.supabasePath || item.publicUrl || name;
@@ -435,6 +440,7 @@ export default async function handler(req, res) {
             type,
             `folder:${slugify(dir)}`,
             item.supabasePath ? `supabase:${slugify(item.supabasePath)}` : null,
+            supabaseFolder ? `supabase-folder:${slugify(supabaseFolder)}` : null,
           ].filter(Boolean));
           if (slug) tags.add(`slug:${slug}`);
           out.push({
@@ -458,6 +464,7 @@ export default async function handler(req, res) {
               path: item.supabasePath,
               size: item.size,
               updatedAt: item.updatedAt,
+              folder: supabaseFolder,
             },
             thumbUrl: item.publicUrl || placeholderUrl,
             placeholder,

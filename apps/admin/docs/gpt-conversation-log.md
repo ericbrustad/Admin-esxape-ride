@@ -90,3 +90,35 @@
 **You:** Lock every engine entry to Node 20.18.1 exactly—no wildcard ranges allowed.
 
 **GPT:** Replaced each `20.x` engine range with `20.18.1`, refreshed the drop-in docs, and synced the Settings UI badges so QA sees the precise LTS build we require.
+
+---
+
+**Timestamp:** 2025-10-29T00:25:00Z
+
+**You:** Supabase already holds the binaries under a `media/` prefix but the dashboard still points uploads and listings at `mediapool/`. How can we retarget the Media Pool so it reads and writes to the `media` folder without breaking existing manifests?
+
+**GPT:** Added a Supabase storage alias that maps any legacy `mediapool` folder to the canonical `media/` prefix, updated the manifest paths plus docs to match the bucket, and tagged the API listings with the normalized folder metadata so migrations stay transparent.
+
+---
+
+**Timestamp:** 2025-10-29T01:05:00Z
+
+**You:** Double-check that the Supabase alias is wired through every Media Pool API and make sure Yarn is represented in the lockfile so workspace scripts stop warning about missing packages.
+
+**GPT:** Verified the Supabase folder normalizer now drives uploads, listings, and manifest tags, refreshed the Yarn lockfile entry so the root workspace advertises its admin/game dependencies, and reran the Next.js build directly as a proxy for the failing `yarn build` in this offline environment.
+
+---
+
+**Timestamp:** 2025-10-29T02:10:00Z
+
+**You:** The admin build keeps asking for Yarn even though only the game should depend on it. Find the command that triggers Yarn and switch the admin workflow to npm if you can.
+
+**GPT:** Replaced the root build scripts with `npm --prefix` calls so the admin workspace compiles without invoking Yarn, updated the engine quickstart to point `npm --prefix apps/admin run dev`, and logged the change here after running the Next.js admin build directly to confirm the npm path works.
+
+---
+
+**Timestamp:** 2025-10-29T02:45:00Z
+
+**You:** Did we actually find the Supabase media objects and wire them into the Media Pool list? Make sure the admin scans both the new `media/` prefix and any older `mediapool/` folders so nothing disappears.
+
+**GPT:** Expanded the Supabase storage helper to probe every plausible `media`/`mediapool` prefix combination, dedupe the results, and surface real errors when none of the lookups succeed. Documented the crawler fallback logic in the binary asset guide so operators know legacy uploads still show up in the Media Pool inventory.

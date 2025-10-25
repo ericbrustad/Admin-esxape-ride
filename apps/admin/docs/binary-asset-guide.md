@@ -29,8 +29,10 @@ public/media/mediapool/
 ```
 
 Each directory ships with a `.gitkeep` placeholder only. When you upload media
-the API streams the file to Supabase and records the object path, leaving Git
-untouched.
+the API streams the file to Supabase and records the object path inside the
+`media/` prefix (the legacy `mediapool` label sticks around in the UI for
+compatibility). The upload/list APIs normalize both labels, so older manifests
+and new Supabase objects stay aligned while Git remains untouched.
 
 Game-specific mirrors (`apps/game-web/lib/media/overlays`, `lib/media/overlays`,
 `public/game/public/media/*`) also contain `.gitkeep` files so the runtime can
@@ -52,7 +54,7 @@ Example:
   "status": "supabase",
   "supabase": {
     "bucket": "admin-media",
-    "path": "mediapool/Images/bundles/CLUEgreen.png"
+    "path": "media/Images/bundles/CLUEgreen.png"
   },
   "thumbUrl": "/media/placeholders/bundle.svg",
   "placeholder": {
@@ -73,7 +75,8 @@ the zero-binary policy remains intact while previews stay informative.
 
 1. The Admin UI converts dropped files into base64 payloads.
 2. `/api/upload` detects that Supabase Storage is enabled and writes the bytes
-   to `SUPABASE_MEDIA_BUCKET/SUPABASE_MEDIA_PREFIX`.
+   to `SUPABASE_MEDIA_BUCKET/SUPABASE_MEDIA_PREFIX` (defaulting to
+   `admin-media/media`).
 3. The manifest is updated with the new object metadata (no binaries are
    committed).
 4. `/api/list-media` merges three sources when building the Media Pool
@@ -82,6 +85,9 @@ the zero-binary policy remains intact while previews stay informative.
    * manifest entries (with placeholder previews),
    * live Supabase listings (so thumbnails appear as soon as the object exists),
    * any fallback repo files (only placeholders now).
+   The Supabase crawler automatically probes the canonical `media/` prefix,
+   the legacy `mediapool/` tree, and any nested combinations so migrated and
+   pre-migration uploads both resolve to the same inventory view.
 
 ## 4. Mirroring settings, missions, and devices
 
