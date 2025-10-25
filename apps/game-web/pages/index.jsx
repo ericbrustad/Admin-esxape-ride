@@ -77,6 +77,8 @@ function GameApp() {
   const [answers, setAnswers] = useState(() => new Map());
   const [backpackSummary, setBackpackSummary] = useState({});
   const [answerDraft, setAnswerDraft] = useState('');
+  const [location, setLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('pending');
 
   const slugParam = firstString(router?.query?.slug);
   const gameParam = firstString(router?.query?.game);
@@ -150,6 +152,71 @@ function GameApp() {
     update();
     return onBackpackChange(slug, update);
   }, [slug]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      setLocationStatus('unsupported');
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const handleSuccess = (position) => {
+      if (cancelled) return;
+      const { coords, timestamp } = position || {};
+      if (!coords) return;
+      setLocation({
+        lat: Number(coords.latitude),
+        lng: Number(coords.longitude),
+        accuracy: Number(coords.accuracy ?? 0),
+        timestamp: timestamp || Date.now(),
+      });
+      setLocationStatus('ready');
+    };
+
+    const handleError = (error) => {
+      if (cancelled) return;
+      if (error && error.code === error.PERMISSION_DENIED) {
+        setLocationStatus('denied');
+      } else {
+        setLocationStatus('error');
+      }
+    };
+
+    try {
+      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 1000,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+
+    let watchId;
+    try {
+      watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 2000,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+
+    return () => {
+      cancelled = true;
+      if (
+        watchId != null &&
+        typeof navigator !== 'undefined' &&
+        navigator.geolocation &&
+        typeof navigator.geolocation.clearWatch === 'function'
+      ) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,7 +328,11 @@ function GameApp() {
   );
 
   if (!suite || !config) {
-    return <main style={outer}><div style={card}>{status}</div></main>;
+    return (
+      <main style={outer}>
+        <div style={loadingState}>{status}</div>
+      </main>
+    );
   }
 
   function next() { setIdx((i) => Math.min(i + 1, Math.max(missionOrder.length - 1, 0))); }
@@ -396,12 +467,17 @@ function GameApp() {
   const missionsForMap = useMemo(() => {
     return missionOrder.map((id, index) => {
       const row = missionMap.get(id) || {};
+      const content = row?.content || {};
       return {
         id,
         index,
         indexLabel: String(index + 1).padStart(2, '0'),
         title: row.title || row.name || `Mission ${index + 1}`,
         subtitle: row.type ? row.type.replace(/_/g, ' ') : 'mission',
+        lat: Number(content.lat),
+        lng: Number(content.lng),
+        radiusMeters: Number(content.radiusMeters),
+        type: row.type,
       };
     });
   }, [missionOrder, missionMap]);
@@ -410,48 +486,155 @@ function GameApp() {
     return Object.values(backpackSummary || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
   }, [backpackSummary]);
 
+  const summaryEntries = useMemo(() => {
+    return Object.entries(backpackSummary || {}).filter(([, count]) => Number(count) > 0);
+  }, [backpackSummary]);
+
+  const completedCount = useMemo(() => {
+    return missionOrder.reduce((sum, id) => {
+      const entry =
+        answers instanceof Map
+          ? answers.get(id)
+          : answers && typeof answers === 'object'
+          ? answers[id]
+          : null;
+      return sum + (entry && entry.correct ? 1 : 0);
+    }, 0);
+  }, [missionOrder, answers]);
+
+  const missionTypeLabel = mission?.type
+    ? mission.type.replace(/_/g, ' ')
+    : mission
+    ? 'mission'
+    : 'complete';
+  const missionTitleText = mission?.title || (missionCount ? config.game?.title || 'Mission' : 'Game complete');
+  const missionMediaUrl = mission?.content?.mediaUrl ? toDirect(mission.content.mediaUrl) : '';
+
+  const missionHint = useMemo(() => {
+    if (!mission) return '';
+    const content = mission.content || {};
+    if (mission.type === 'statement') return '';
+    if (mission.type === 'photo_opportunity') {
+      return content.text || content.hint || '';
+    }
+    return content.hint || '';
+  }, [mission]);
+
+  const missionStatusLabel = useMemo(() => {
+    if (!mission?.id) {
+      if (!missionCount) return 'Pending';
+      return idx >= missionCount ? 'Complete' : 'Pending';
+    }
+    const entry =
+      answers instanceof Map
+        ? answers.get(mission.id)
+        : answers && typeof answers === 'object'
+        ? answers[mission.id]
+        : null;
+    if (!entry) return 'Pending';
+    return entry.correct ? 'Complete' : 'Attempted';
+  }, [mission, answers, missionCount, idx]);
+
+  const locationMessage = useMemo(() => {
+    switch (locationStatus) {
+      case 'pending':
+        return 'Locating…';
+      case 'unsupported':
+        return 'Location unavailable on this device';
+      case 'denied':
+        return 'Enable location to show your position';
+      case 'error':
+        return 'Unable to determine location';
+      case 'ready':
+      default:
+        return '';
+    }
+  }, [locationStatus]);
+
   return (
     <main style={outer}>
-
-      <BackpackButton onClick={()=>setBackpackOpen(true)} itemCount={totalBackpackItems} />
-      <BackpackDrawer slug={slug} open={backpackOpen} onClose={()=>setBackpackOpen(false)} />
-
-      <div style={layout}>
-        <MissionMap
-          missions={missionsForMap}
-          currentId={missionId}
-          answers={answers}
-          onSelect={(id) => {
-            if (!missionIndexMap.has(id)) return;
-            setIdx(missionIndexMap.get(id));
-          }}
-          points={points}
-          backpackSummary={backpackSummary}
-        />
-
-        <div style={card}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9fb0bf' }}>Mission {missionCount ? idx+1 : 0} / {missionCount}</span></div>
-            <div style={{ color:'#9fb0bf' }}>Points: {points}</div>
+      <MissionMap
+        missions={missionsForMap}
+        currentId={missionId}
+        answers={answers}
+        onSelect={(id) => {
+          if (!missionIndexMap.has(id)) return;
+          setIdx(missionIndexMap.get(id));
+        }}
+        currentLocation={location}
+      >
+        <div style={mapTopBar}>
+          <div style={progressCardStyle}>
+            <div style={cardHeadingStyle}>Progress</div>
+            <div style={progressValues}>
+              <span style={progressPrimary}>{completedCount}</span>
+              <span style={progressSecondary}>/ {missionCount}</span>
+            </div>
+            {summaryEntries.length > 0 && (
+              <div style={summaryChipRow}>
+                {summaryEntries.map(([key, count]) => (
+                  <span key={key} style={summaryChip}>
+                    <strong>{count}</strong>
+                    <span style={summaryLabel}>{key}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-          {renderMission()}
+          <div style={pointsCardStyle}>
+            <div style={cardHeadingStyle}>Points</div>
+            <div style={pointsValueStyle}>{points}</div>
+            <div style={pointsMetaStyle}>
+              {totalBackpackItems} item{totalBackpackItems === 1 ? '' : 's'} in backpack
+            </div>
+          </div>
         </div>
-      </div>
+
+        {locationMessage ? <div style={locationBadgeStyle}>{locationMessage}</div> : null}
+
+        <section style={missionSheetStyle}>
+          <header style={missionSheetHeader}>
+            <div style={missionHeadingStyle}>
+              <span style={missionMetaLabelStyle}>
+                Mission {missionCount ? idx + 1 : 0} / {missionCount}
+              </span>
+              <span style={missionTitleStyle}>{missionTitleText}</span>
+            </div>
+            <div style={missionMetaRowStyle}>
+              <span style={missionMetaValueStyle}>{missionTypeLabel}</span>
+              <span style={missionMetaValueStyle}>{missionStatusLabel}</span>
+            </div>
+          </header>
+
+          {missionHint ? <p style={missionHintStyle}>{missionHint}</p> : null}
+
+          {missionMediaUrl ? (
+            <div style={missionMediaBox}>
+              <img alt="" src={missionMediaUrl} style={missionMediaImage} />
+            </div>
+          ) : null}
+
+          <div style={missionContentWrap}>{renderMission()}</div>
+        </section>
+      </MissionMap>
+
+      <BackpackButton onClick={() => setBackpackOpen(true)} itemCount={totalBackpackItems} />
+      <BackpackDrawer slug={slug} open={backpackOpen} onClose={() => setBackpackOpen(false)} />
 
       {showPhoto && (
         <PhotoCapture
           overlayUrl={showPhoto.overlayUrl}
-          onCancel={()=>setShowPhoto(null)}
-          onSave={(dataUrl)=>{
-            addPhoto(slug, { dataUrl, title:'Captured' });
+          onCancel={() => setShowPhoto(null)}
+          onSave={(dataUrl) => {
+            addPhoto(slug, { dataUrl, title: 'Captured' });
             setShowPhoto(null);
-            recordAnswer(slug, mission?.id, { correct:true, value:'photo' });
+            recordAnswer(slug, mission?.id, { correct: true, value: 'photo' });
             applyOutcome(mission?.onCorrect, true);
           }}
         />
       )}
 
-      <OutcomeModal open={!!outcome} outcome={outcome} onClose={()=>{ setOutcome(null); next(); }} />
+      <OutcomeModal open={!!outcome} outcome={outcome} onClose={() => { setOutcome(null); next(); }} />
     </main>
   );
 }
@@ -482,9 +665,249 @@ function missionBodyStyle(a) {
 
 function hex(h){try{const s=h.replace('#','');const b=s.length===3?s.split('').map(c=>c+c).join(''):s;return `${parseInt(b.slice(0,2),16)}, ${parseInt(b.slice(2,4),16)}, ${parseInt(b.slice(4,6),16)}`;}catch{return'0,0,0';}}
 
-const outer = { maxWidth: 1120, margin:'0 auto', padding:12, minHeight:'100vh', background:'#0b0c10', color:'#e9eef2', fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif' };
-const layout = { display:'grid', gap:16, alignItems:'start', gridTemplateColumns:'minmax(260px, 1fr) minmax(0, 2fr)', marginTop:12 };
-const card  = { background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12 };
-const labelStyle = { background:'rgba(0,0,0,.25)', padding:'6px 10px', borderRadius:8, marginBottom:8 };
-const btn   = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' };
-const input = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
+const outer = {
+  position: 'relative',
+  minHeight: '100vh',
+  width: '100%',
+  color: '#e9eef2',
+  background: '#020b12',
+  fontFamily: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif',
+  overflow: 'hidden',
+};
+
+const loadingState = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  background: 'rgba(15, 23, 42, 0.85)',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
+  borderRadius: 16,
+  padding: '18px 26px',
+  fontSize: 16,
+  boxShadow: '0 24px 48px rgba(2, 6, 23, 0.5)',
+};
+
+const mapTopBar = {
+  position: 'absolute',
+  top: 16,
+  left: 16,
+  right: 16,
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 12,
+  justifyContent: 'space-between',
+  alignItems: 'stretch',
+  zIndex: 30,
+  pointerEvents: 'none',
+};
+
+const overlayCardBase = {
+  pointerEvents: 'auto',
+  background: 'rgba(9, 16, 24, 0.82)',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
+  borderRadius: 18,
+  padding: '14px 16px',
+  boxShadow: '0 18px 36px rgba(2, 6, 23, 0.45)',
+  backdropFilter: 'blur(10px)',
+};
+
+const progressCardStyle = {
+  ...overlayCardBase,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  minWidth: 240,
+  flex: '1 1 280px',
+};
+
+const pointsCardStyle = {
+  ...overlayCardBase,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-end',
+  gap: 6,
+  minWidth: 180,
+  maxWidth: 240,
+};
+
+const cardHeadingStyle = {
+  fontSize: 12,
+  letterSpacing: 1.1,
+  textTransform: 'uppercase',
+  color: '#94a3b8',
+};
+
+const progressValues = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 6,
+};
+
+const progressPrimary = {
+  fontSize: 28,
+  fontWeight: 700,
+};
+
+const progressSecondary = {
+  fontSize: 16,
+  color: '#94a3b8',
+};
+
+const summaryChipRow = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+};
+
+const summaryChip = {
+  display: 'inline-flex',
+  alignItems: 'baseline',
+  gap: 4,
+  padding: '4px 10px',
+  borderRadius: 999,
+  background: 'rgba(79, 209, 197, 0.12)',
+  border: '1px solid rgba(79, 209, 197, 0.35)',
+  fontSize: 12,
+};
+
+const summaryLabel = {
+  opacity: 0.75,
+  textTransform: 'capitalize',
+};
+
+const pointsValueStyle = {
+  fontSize: 28,
+  fontWeight: 700,
+};
+
+const pointsMetaStyle = {
+  fontSize: 12,
+  color: '#94a3b8',
+};
+
+const locationBadgeStyle = {
+  position: 'absolute',
+  top: 16,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  padding: '6px 16px',
+  borderRadius: 999,
+  background: 'rgba(9, 16, 24, 0.88)',
+  border: '1px solid rgba(148, 163, 184, 0.3)',
+  fontSize: 13,
+  zIndex: 35,
+  backdropFilter: 'blur(8px)',
+};
+
+const missionSheetStyle = {
+  position: 'absolute',
+  left: '50%',
+  bottom: 24,
+  transform: 'translateX(-50%)',
+  width: 'min(680px, 94vw)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+  background: 'rgba(8, 15, 23, 0.9)',
+  border: '1px solid rgba(148, 163, 184, 0.3)',
+  borderRadius: 24,
+  padding: 20,
+  boxShadow: '0 24px 48px rgba(2, 6, 23, 0.5)',
+  backdropFilter: 'blur(12px)',
+  zIndex: 40,
+  pointerEvents: 'auto',
+};
+
+const missionSheetHeader = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 16,
+  flexWrap: 'wrap',
+};
+
+const missionHeadingStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  minWidth: 220,
+};
+
+const missionMetaLabelStyle = {
+  fontSize: 12,
+  letterSpacing: 0.8,
+  textTransform: 'uppercase',
+  color: '#94a3b8',
+};
+
+const missionTitleStyle = {
+  fontSize: 22,
+  fontWeight: 700,
+  lineHeight: 1.2,
+};
+
+const missionMetaRowStyle = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'center',
+  fontSize: 12,
+  color: '#9fb0bf',
+  textTransform: 'capitalize',
+};
+
+const missionMetaValueStyle = {
+  background: 'rgba(15, 23, 42, 0.6)',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
+  borderRadius: 999,
+  padding: '4px 10px',
+  textTransform: 'uppercase',
+  letterSpacing: 0.7,
+  fontWeight: 600,
+};
+
+const missionHintStyle = {
+  margin: 0,
+  fontSize: 14,
+  color: '#d1def8',
+  lineHeight: 1.5,
+};
+
+const missionMediaBox = {
+  borderRadius: 18,
+  overflow: 'hidden',
+  border: '1px solid rgba(148, 163, 184, 0.25)',
+  maxHeight: 260,
+  boxShadow: '0 20px 40px rgba(2, 6, 23, 0.45)',
+};
+
+const missionMediaImage = {
+  display: 'block',
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+};
+
+const missionContentWrap = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 12,
+};
+
+const labelStyle = { background: 'rgba(0,0,0,.25)', padding: '6px 10px', borderRadius: 8, marginBottom: 8 };
+const btn = {
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #2a323b',
+  background: '#1a2027',
+  color: '#e9eef2',
+  cursor: 'pointer',
+};
+const input = {
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #2a323b',
+  background: '#0b0c10',
+  color: '#e9eef2',
+  width: '100%',
+};
