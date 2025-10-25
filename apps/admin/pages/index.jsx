@@ -3940,6 +3940,9 @@ export default function Admin() {
               )}{' '}
               • Timestamp {metaFooterTimestamp}
             </div>
+            <div style={S.settingsFooterTime}>
+              Repository Snapshot — {metaRepoDisplay} • Branch {metaBranchDisplay} • Commit {metaCommitDisplay} • Vercel {metaVercelLabel || metaDeploymentDisplay} • Recorded {metaFooterTimestamp}
+            </div>
           </footer>
         </main>
       )}
