@@ -52,6 +52,10 @@ function detectGitMetadata() {
 function buildRuntimeMetadata() {
   const nodeVersion = process.version || '';
   const yarnVersion = safeExec('yarn --version');
+  const yarnPathRaw = process.platform === 'win32'
+    ? safeExec('where yarn')
+    : safeExec('command -v yarn');
+  const yarnPath = yarnPathRaw.split(/\r?\n/).find(Boolean) || '';
   const corepackVersion = safeExec('corepack --version');
   const pinnedNode = packageJson?.volta?.node || '';
   const pinnedYarn = packageJson?.volta?.yarn || (
@@ -63,6 +67,7 @@ function buildRuntimeMetadata() {
   return {
     node: nodeVersion,
     yarn: yarnVersion,
+    yarnPath,
     corepack: corepackVersion,
     pinnedNode,
     pinnedYarn,
