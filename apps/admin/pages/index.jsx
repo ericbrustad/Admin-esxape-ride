@@ -789,6 +789,14 @@ export default function Admin() {
         speaker: 'GPT',
         text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime alongside Yarn 4.',
       },
+      {
+        speaker: 'You',
+        text: 'Asked for the Supabase storage list API to surface better debug context when requests fail.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Hardened the storage list handler with guarded JSON parsing and optional base URL echoing when debug mode is toggled.',
+      },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     initialConversationLoggedRef.current = true;
   }, [logConversation]);
