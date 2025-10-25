@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const STATUS_STYLES = {
   complete: {
@@ -12,241 +12,729 @@ const STATUS_STYLES = {
     label: 'Attempted',
   },
   pending: {
-    fill: 'rgba(15, 23, 42, 0.92)',
-    stroke: 'rgba(59, 130, 246, 0.9)',
+    fill: 'rgba(59, 130, 246, 0.92)',
+    stroke: 'rgba(96, 165, 250, 1)',
     label: 'Pending',
   },
 };
 
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const DEVICE_TYPE_STYLES = {
+  signal: { fill: 'rgba(14, 165, 233, 0.95)', stroke: '#0ea5e9' },
+  decoy: { fill: 'rgba(249, 115, 22, 0.95)', stroke: '#ea580c' },
+  timer: { fill: 'rgba(192, 132, 252, 0.95)', stroke: '#a855f7' },
+  lockdown: { fill: 'rgba(248, 113, 113, 0.95)', stroke: '#ef4444' },
+  relay: { fill: 'rgba(250, 204, 21, 0.95)', stroke: '#facc15' },
+  default: { fill: 'rgba(148, 163, 184, 0.95)', stroke: '#94a3b8' },
+};
 
-function normalizeMissions(missions, answers, currentId, currentLocation) {
-  const sanitized = [];
-  const latitudes = [];
-  const longitudes = [];
-  const radiusValues = [];
+const MAPBOX_VERSION = 'v3.2.0';
+const MAPBOX_STYLE = process.env.NEXT_PUBLIC_MAPBOX_STYLE || 'mapbox://styles/mapbox/streets-v12';
 
-  missions.forEach((mission) => {
-    if (!mission) return;
-    const lat = Number(mission.lat ?? mission?.content?.lat);
-    const lng = Number(mission.lng ?? mission?.content?.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return;
-    }
-    const radiusMetersRaw = Number(
-      mission.radiusMeters ?? mission?.content?.radiusMeters ?? mission?.radius ?? 0,
-    );
-    const radiusMeters = Number.isFinite(radiusMetersRaw) ? Math.abs(radiusMetersRaw) : 0;
-    sanitized.push({
-      ...mission,
-      lat,
-      lng,
-      radiusMeters,
-    });
-    latitudes.push(lat);
-    longitudes.push(lng);
-    if (radiusMeters > 0) {
-      radiusValues.push(radiusMeters);
-    }
-  });
+const EMPTY_COLLECTION = { type: 'FeatureCollection', features: [] };
 
-  const hasLocation =
-    currentLocation &&
-    Number.isFinite(currentLocation.lat) &&
-    Number.isFinite(currentLocation.lng);
-
-  if (hasLocation) {
-    latitudes.push(Number(currentLocation.lat));
-    longitudes.push(Number(currentLocation.lng));
-    const accuracy = Number(currentLocation.accuracy);
-    if (Number.isFinite(accuracy) && accuracy > 0) {
-      radiusValues.push(Math.abs(accuracy));
-    }
+function getAnswerEntry(answers, id) {
+  if (!id) return null;
+  if (answers instanceof Map) {
+    return answers.get(id) || null;
   }
-
-  if (!latitudes.length || !longitudes.length) {
-    return { missions: [], location: null };
+  if (answers && typeof answers === 'object') {
+    return answers[id] || null;
   }
+  return null;
+}
 
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
+function sanitizeCoordinate(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
-  const latSpanRaw = maxLat - minLat;
-  const lngSpanRaw = maxLng - minLng;
-  const padLat = (latSpanRaw || 0.01) * 0.1;
-  const padLng = (lngSpanRaw || 0.01) * 0.1;
+function sanitizeRadius(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.abs(n) : 0;
+}
 
-  const bounds = {
-    minLat: minLat - padLat,
-    maxLat: maxLat + padLat,
-    minLng: minLng - padLng,
-    maxLng: maxLng + padLng,
-  };
+function clampAccuracy(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(Math.max(Math.abs(n), 5), 1500);
+}
 
-  const latSpan = bounds.maxLat - bounds.minLat || 0.01;
-  const lngSpan = bounds.maxLng - bounds.minLng || 0.01;
-
-  const scale = radiusValues.length ? 120 / Math.max(...radiusValues) : 0.5;
-
-  const getAnswer = (id) => {
-    if (!id) return null;
-    if (answers instanceof Map) {
-      return answers.get(id);
-    }
-    if (answers && typeof answers === 'object') {
-      return answers[id];
-    }
+function circleFeature({ lat, lng }, radiusMeters, properties = {}) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters) || radiusMeters <= 0) {
     return null;
-  };
-
-  const normalizedMissions = sanitized.map((mission) => {
-    const x = (mission.lng - bounds.minLng) / lngSpan;
-    const y = (bounds.maxLat - mission.lat) / latSpan;
-    const entry = getAnswer(mission.id);
-    const statusKey = entry ? (entry.correct ? 'complete' : 'attempted') : 'pending';
-    const palette = STATUS_STYLES[statusKey] || STATUS_STYLES.pending;
-    return {
-      ...mission,
-      x: clamp(x, 0, 1),
-      y: clamp(y, 0, 1),
-      status: statusKey,
-      palette,
-      isCurrent: mission.id === currentId,
-      radiusPx: mission.radiusMeters > 0 ? clamp(mission.radiusMeters * scale, 24, 220) : 0,
-    };
-  });
-
-  let normalizedLocation = null;
-  if (hasLocation) {
-    const x = (Number(currentLocation.lng) - bounds.minLng) / lngSpan;
-    const y = (bounds.maxLat - Number(currentLocation.lat)) / latSpan;
-    const accuracy = Number(currentLocation.accuracy);
-    normalizedLocation = {
-      ...currentLocation,
-      x: clamp(x, 0, 1),
-      y: clamp(y, 0, 1),
-      accuracySize:
-        Number.isFinite(accuracy) && accuracy > 0 ? clamp(Math.abs(accuracy) * scale, 24, 260) : 0,
-    };
   }
 
-  return { missions: normalizedMissions, location: normalizedLocation };
+  const steps = 48;
+  const coordinates = [];
+  const earthRadius = 6378137;
+  const centerLat = (lat * Math.PI) / 180;
+  const centerLng = (lng * Math.PI) / 180;
+  const distance = radiusMeters / earthRadius;
+
+  for (let step = 0; step <= steps; step += 1) {
+    const bearing = (step / steps) * 2 * Math.PI;
+    const latRadians = Math.asin(
+      Math.sin(centerLat) * Math.cos(distance) + Math.cos(centerLat) * Math.sin(distance) * Math.cos(bearing),
+    );
+    const lngRadians =
+      centerLng +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(distance) * Math.cos(centerLat),
+        Math.cos(distance) - Math.sin(centerLat) * Math.sin(latRadians),
+      );
+    coordinates.push([(lngRadians * 180) / Math.PI, (latRadians * 180) / Math.PI]);
+  }
+
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coordinates] },
+    properties: { ...properties },
+  };
+}
+
+function ensureMapLayers(map) {
+  if (!map.getSource('mission-rings')) {
+    map.addSource('mission-rings', { type: 'geojson', data: EMPTY_COLLECTION });
+    map.addLayer({
+      id: 'mission-rings-fill',
+      type: 'fill',
+      source: 'mission-rings',
+      paint: {
+        'fill-color': ['get', 'fillColor'],
+        'fill-opacity': 0.18,
+      },
+    });
+    map.addLayer({
+      id: 'mission-rings-outline',
+      type: 'line',
+      source: 'mission-rings',
+      paint: {
+        'line-color': ['get', 'strokeColor'],
+        'line-width': 2,
+        'line-opacity': 0.65,
+      },
+    });
+  }
+
+  if (!map.getSource('device-rings')) {
+    map.addSource('device-rings', { type: 'geojson', data: EMPTY_COLLECTION });
+    map.addLayer({
+      id: 'device-rings-fill',
+      type: 'fill',
+      source: 'device-rings',
+      paint: {
+        'fill-color': ['get', 'fillColor'],
+        'fill-opacity': 0.12,
+      },
+    });
+    map.addLayer({
+      id: 'device-rings-outline',
+      type: 'line',
+      source: 'device-rings',
+      paint: {
+        'line-color': ['get', 'strokeColor'],
+        'line-width': 1.5,
+        'line-opacity': 0.5,
+      },
+    });
+  }
+
+  if (!map.getSource('player-accuracy')) {
+    map.addSource('player-accuracy', { type: 'geojson', data: EMPTY_COLLECTION });
+    map.addLayer({
+      id: 'player-accuracy-fill',
+      type: 'fill',
+      source: 'player-accuracy',
+      paint: {
+        'fill-color': 'rgba(56, 189, 248, 0.18)',
+        'fill-opacity': 0.25,
+      },
+    });
+    map.addLayer({
+      id: 'player-accuracy-outline',
+      type: 'line',
+      source: 'player-accuracy',
+      paint: {
+        'line-color': 'rgba(56, 189, 248, 0.55)',
+        'line-width': 1.2,
+      },
+    });
+  }
+}
+
+function computeBounds(points) {
+  if (!points || !points.length) return null;
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  points.forEach(([lng, lat]) => {
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  });
+
+  if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) {
+    return null;
+  }
+
+  if (minLng === maxLng && minLat === maxLat) {
+    const pad = 0.005;
+    return [
+      [minLng - pad, minLat - pad],
+      [maxLng + pad, maxLat + pad],
+    ];
+  }
+
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ];
+}
+
+function createMissionMarkerElement() {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.style.width = '46px';
+  button.style.height = '46px';
+  button.style.borderRadius = '50%';
+  button.style.borderWidth = '2px';
+  button.style.borderStyle = 'solid';
+  button.style.display = 'grid';
+  button.style.placeItems = 'center';
+  button.style.fontWeight = '700';
+  button.style.fontFamily = 'inherit';
+  button.style.cursor = 'pointer';
+  button.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+  button.style.color = '#020617';
+  button.style.boxShadow = '0 14px 28px rgba(2, 6, 23, 0.45)';
+  button.style.background = 'rgba(59, 130, 246, 0.92)';
+
+  const label = document.createElement('span');
+  label.style.fontSize = '14px';
+  label.style.textShadow = '0 1px 2px rgba(2, 6, 23, 0.4)';
+  button.appendChild(label);
+
+  return button;
+}
+
+function applyMissionMarkerElement(element, mission) {
+  if (!element) return;
+  const label = element.querySelector('span');
+  if (label) {
+    label.textContent = mission.indexLabel || '•';
+  }
+  element.style.background = mission.palette.fill;
+  element.style.borderColor = mission.palette.stroke;
+  element.style.boxShadow = mission.isCurrent
+    ? '0 0 0 6px rgba(61, 214, 140, 0.35)'
+    : '0 14px 28px rgba(2, 6, 23, 0.45)';
+  element.style.transform = mission.isCurrent ? 'scale(1.05)' : 'scale(1)';
+  element.setAttribute('aria-label', `${mission.title || 'Mission'} — ${mission.palette.label}`);
+}
+
+function createDeviceMarkerElement() {
+  const wrapper = document.createElement('div');
+  wrapper.style.width = '40px';
+  wrapper.style.height = '40px';
+  wrapper.style.borderRadius = '12px';
+  wrapper.style.borderWidth = '2px';
+  wrapper.style.borderStyle = 'solid';
+  wrapper.style.display = 'grid';
+  wrapper.style.placeItems = 'center';
+  wrapper.style.fontWeight = '700';
+  wrapper.style.fontSize = '12px';
+  wrapper.style.color = '#020617';
+  wrapper.style.boxShadow = '0 12px 26px rgba(2, 6, 23, 0.4)';
+  wrapper.style.background = 'rgba(148, 163, 184, 0.95)';
+  wrapper.style.fontFamily = 'inherit';
+  wrapper.style.cursor = 'default';
+
+  const label = document.createElement('span');
+  label.style.pointerEvents = 'none';
+  wrapper.appendChild(label);
+
+  return wrapper;
+}
+
+function applyDeviceMarkerElement(element, device) {
+  if (!element) return;
+  const palette = device.palette || DEVICE_TYPE_STYLES.default;
+  element.style.background = palette.fill;
+  element.style.borderColor = palette.stroke;
+  const label = element.querySelector('span');
+  if (label) {
+    label.textContent = device.indexLabel || device.typeLabel || 'DEV';
+  }
+  element.setAttribute('aria-label', device.title || 'Device');
+}
+
+function createLocationMarkerElement() {
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.transform = 'translateY(8px)';
+  wrapper.style.pointerEvents = 'none';
+
+  const dot = document.createElement('div');
+  dot.style.width = '18px';
+  dot.style.height = '18px';
+  dot.style.borderRadius = '50%';
+  dot.style.border = '3px solid rgba(56, 189, 248, 0.45)';
+  dot.style.background = '#38bdf8';
+  dot.style.boxShadow = '0 0 0 6px rgba(56, 189, 248, 0.18)';
+
+  const label = document.createElement('span');
+  label.textContent = 'You';
+  label.style.marginTop = '4px';
+  label.style.padding = '4px 10px';
+  label.style.borderRadius = '999px';
+  label.style.background = 'rgba(15, 23, 42, 0.85)';
+  label.style.border = '1px solid rgba(148, 163, 184, 0.3)';
+  label.style.fontSize = '11px';
+  label.style.textTransform = 'uppercase';
+  label.style.letterSpacing = '0.4px';
+  label.style.fontWeight = '600';
+  label.style.color = '#e2e8f0';
+
+  wrapper.appendChild(dot);
+  wrapper.appendChild(label);
+
+  return wrapper;
+}
+
+function loadMapboxGL(token) {
+  if (typeof window === 'undefined') {
+    return Promise.resolve(null);
+  }
+
+  if (!token) {
+    return Promise.reject(new Error('Missing Mapbox access token'));
+  }
+
+  if (window.mapboxgl && window.mapboxgl.Map) {
+    window.mapboxgl.accessToken = token;
+    return Promise.resolve(window.mapboxgl);
+  }
+
+  if (window.__mapboxglPromise) {
+    return window.__mapboxglPromise;
+  }
+
+  window.__mapboxglPromise = new Promise((resolve, reject) => {
+    const baseUrl = `https://api.mapbox.com/mapbox-gl-js/${MAPBOX_VERSION}`;
+    const query = `?access_token=${encodeURIComponent(token)}`;
+
+    if (!document.querySelector('link[data-mapbox-gl]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `${baseUrl}/mapbox-gl.css${query}`;
+      link.crossOrigin = 'anonymous';
+      link.dataset.mapboxGl = 'true';
+      document.head.appendChild(link);
+    }
+
+    let script = document.querySelector('script[data-mapbox-gl]');
+    if (!script) {
+      script = document.createElement('script');
+      script.async = true;
+      script.src = `${baseUrl}/mapbox-gl.js${query}`;
+      script.crossOrigin = 'anonymous';
+      script.dataset.mapboxGl = 'true';
+      document.head.appendChild(script);
+    }
+
+    const cleanup = () => {
+      delete window.__mapboxglPromise;
+    };
+
+    const handleLoad = () => {
+      if (window.mapboxgl && window.mapboxgl.Map) {
+        window.mapboxgl.accessToken = token;
+        resolve(window.mapboxgl);
+      } else {
+        cleanup();
+        reject(new Error('Mapbox GL JS loaded but window.mapboxgl is unavailable'));
+      }
+    };
+
+    const handleError = () => {
+      cleanup();
+      reject(new Error('Failed to load Mapbox GL JS assets'));
+    };
+
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
+  });
+
+  return window.__mapboxglPromise;
 }
 
 export default function MissionMap({
   missions = [],
+  devices = [],
   currentId,
   answers,
   onSelect,
   currentLocation,
   children,
 }) {
-  const { missions: plottedMissions, location } = useMemo(
-    () => normalizeMissions(missions, answers, currentId, currentLocation),
-    [missions, answers, currentId, currentLocation],
+  const mapNodeRef = useRef(null);
+  const mapRef = useRef(null);
+  const missionMarkersRef = useRef(new Map());
+  const deviceMarkersRef = useRef(new Map());
+  const locationMarkerRef = useRef(null);
+  const fitAppliedRef = useRef(false);
+  const lastLocationPresenceRef = useRef(false);
+  const [mapStatus, setMapStatus] = useState(
+    (typeof window !== 'undefined' && window.__MAPBOX_ACCESS_TOKEN) || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+      ? 'idle'
+      : 'missing-token',
   );
 
-  const hasMissions = plottedMissions.length > 0;
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
+
+  const normalized = useMemo(() => {
+    const missionList = [];
+    const deviceList = [];
+
+    missions.forEach((mission, index) => {
+      if (!mission) return;
+      const lat = sanitizeCoordinate(mission.lat ?? mission?.content?.lat);
+      const lng = sanitizeCoordinate(mission.lng ?? mission?.content?.lng);
+      if (lat === null || lng === null) return;
+
+      const radiusMeters = sanitizeRadius(
+        mission.radiusMeters ?? mission?.content?.radiusMeters ?? mission.radius ?? 0,
+      );
+
+      const entry = getAnswerEntry(answers, mission.id);
+      const statusKey = entry ? (entry.correct ? 'complete' : 'attempted') : 'pending';
+      const palette = STATUS_STYLES[statusKey] || STATUS_STYLES.pending;
+
+      missionList.push({
+        ...mission,
+        id: mission.id || `mission-${index + 1}`,
+        index,
+        lat,
+        lng,
+        radiusMeters,
+        status: statusKey,
+        palette,
+        indexLabel: mission.indexLabel || String(index + 1).padStart(2, '0'),
+        isCurrent: mission.id === currentId,
+      });
+    });
+
+    devices.forEach((device, index) => {
+      if (!device) return;
+      const lat = sanitizeCoordinate(device.lat ?? device.latitude ?? device?.location?.lat);
+      const lng = sanitizeCoordinate(device.lng ?? device.longitude ?? device?.location?.lng);
+      if (lat === null || lng === null) return;
+
+      const typeKey = String(device.type || '').toLowerCase();
+      const palette = DEVICE_TYPE_STYLES[typeKey] || DEVICE_TYPE_STYLES.default;
+      const radiusMeters = sanitizeRadius(
+        device.radiusMeters ?? device.pickupRadius ?? device.rangeMeters ?? 0,
+      );
+
+      deviceList.push({
+        ...device,
+        id: device.id || `device-${index + 1}`,
+        lat,
+        lng,
+        radiusMeters,
+        palette,
+        indexLabel: (typeKey || 'device').slice(0, 3).toUpperCase(),
+        typeLabel: typeKey,
+      });
+    });
+
+    let locationPoint = null;
+    if (currentLocation) {
+      const lat = sanitizeCoordinate(currentLocation.lat);
+      const lng = sanitizeCoordinate(currentLocation.lng);
+      if (lat !== null && lng !== null) {
+        locationPoint = {
+          lat,
+          lng,
+          accuracy: clampAccuracy(currentLocation.accuracy),
+        };
+      }
+    }
+
+    return { missions: missionList, devices: deviceList, location: locationPoint };
+  }, [missions, devices, answers, currentId, currentLocation]);
+
+  const mapboxToken =
+    (typeof window !== 'undefined' && window.__MAPBOX_ACCESS_TOKEN) ||
+    process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ||
+    '';
+
+  useEffect(() => {
+    if (!mapNodeRef.current) return undefined;
+    if (mapRef.current) return undefined;
+    if (!mapboxToken) {
+      setMapStatus('missing-token');
+      return undefined;
+    }
+
+    let cancelled = false;
+    setMapStatus('loading');
+
+    let styleHandler;
+
+    loadMapboxGL(mapboxToken)
+      .then((mapbox) => {
+        if (cancelled || !mapNodeRef.current) {
+          return;
+        }
+
+        const map = new mapbox.Map({
+          container: mapNodeRef.current,
+          style: MAPBOX_STYLE,
+          center: [0, 0],
+          zoom: 2,
+          attributionControl: true,
+        });
+
+        mapRef.current = map;
+
+        map.addControl(new mapbox.NavigationControl({ showCompass: false }), 'top-right');
+
+        map.once('load', () => {
+          if (cancelled) return;
+          ensureMapLayers(map);
+          map.resize();
+          setMapStatus('ready');
+        });
+
+        styleHandler = () => ensureMapLayers(map);
+        map.on('styledata', styleHandler);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('Failed to initialize Mapbox map', error);
+        setMapStatus(error.message === 'Missing Mapbox access token' ? 'missing-token' : 'error');
+      });
+
+    return () => {
+      cancelled = true;
+      const map = mapRef.current;
+      if (map && styleHandler) {
+        map.off('styledata', styleHandler);
+      }
+      if (map) {
+        map.remove();
+      }
+      mapRef.current = null;
+      missionMarkersRef.current.forEach((marker) => marker.remove());
+      missionMarkersRef.current.clear();
+      deviceMarkersRef.current.forEach((marker) => marker.remove());
+      deviceMarkersRef.current.clear();
+      if (locationMarkerRef.current) {
+        locationMarkerRef.current.remove();
+        locationMarkerRef.current = null;
+      }
+      fitAppliedRef.current = false;
+    };
+  }, [mapboxToken]);
+
+  useEffect(() => {
+    const hadLocation = lastLocationPresenceRef.current;
+    const hasLocation = Boolean(normalized.location);
+    if (hadLocation !== hasLocation) {
+      fitAppliedRef.current = false;
+    }
+    lastLocationPresenceRef.current = hasLocation;
+  }, [normalized.location]);
+
+  useEffect(() => {
+    fitAppliedRef.current = false;
+  }, [normalized.missions.length, normalized.devices.length]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const mapbox = typeof window !== 'undefined' ? window.mapboxgl : null;
+    if (!map || mapStatus !== 'ready' || !mapbox || !mapbox.Marker) return;
+
+    const missionSource = map.getSource('mission-rings');
+    if (missionSource) {
+      const missionFeatures = normalized.missions
+        .map((mission) =>
+          circleFeature(
+            { lat: mission.lat, lng: mission.lng },
+            mission.radiusMeters,
+            {
+              id: mission.id,
+              fillColor: mission.palette.fill,
+              strokeColor: mission.palette.stroke,
+            },
+          ),
+        )
+        .filter(Boolean);
+      missionSource.setData({ type: 'FeatureCollection', features: missionFeatures });
+    }
+
+    const deviceSource = map.getSource('device-rings');
+    if (deviceSource) {
+      const deviceFeatures = normalized.devices
+        .map((device) =>
+          circleFeature(
+            { lat: device.lat, lng: device.lng },
+            device.radiusMeters,
+            {
+              id: device.id,
+              fillColor: device.palette.fill,
+              strokeColor: device.palette.stroke,
+            },
+          ),
+        )
+        .filter(Boolean);
+      deviceSource.setData({ type: 'FeatureCollection', features: deviceFeatures });
+    }
+
+    const accuracySource = map.getSource('player-accuracy');
+    if (accuracySource) {
+      const features = normalized.location && normalized.location.accuracy > 0
+        ? [
+            circleFeature(
+              { lat: normalized.location.lat, lng: normalized.location.lng },
+              normalized.location.accuracy,
+              {},
+            ),
+          ].filter(Boolean)
+        : [];
+      accuracySource.setData({ type: 'FeatureCollection', features });
+    }
+
+    const missionIds = new Set();
+    normalized.missions.forEach((mission) => {
+      missionIds.add(mission.id);
+      if (!Number.isFinite(mission.lat) || !Number.isFinite(mission.lng)) return;
+
+      let marker = missionMarkersRef.current.get(mission.id);
+      if (!marker) {
+        const element = createMissionMarkerElement();
+        element.addEventListener('click', () => {
+          if (mission.id && onSelectRef.current) {
+            onSelectRef.current(mission.id);
+          }
+        });
+        marker = new mapbox.Marker({ element, anchor: 'center' })
+          .setLngLat([mission.lng, mission.lat])
+          .addTo(map);
+        missionMarkersRef.current.set(mission.id, marker);
+      } else {
+        marker.setLngLat([mission.lng, mission.lat]);
+      }
+      applyMissionMarkerElement(marker.getElement(), mission);
+    });
+
+    Array.from(missionMarkersRef.current.keys()).forEach((id) => {
+      if (!missionIds.has(id)) {
+        const marker = missionMarkersRef.current.get(id);
+        if (marker) marker.remove();
+        missionMarkersRef.current.delete(id);
+      }
+    });
+
+    const deviceIds = new Set();
+    normalized.devices.forEach((device) => {
+      deviceIds.add(device.id);
+      if (!Number.isFinite(device.lat) || !Number.isFinite(device.lng)) return;
+
+      let marker = deviceMarkersRef.current.get(device.id);
+      if (!marker) {
+        const element = createDeviceMarkerElement();
+        marker = new mapbox.Marker({ element, anchor: 'center' })
+          .setLngLat([device.lng, device.lat])
+          .addTo(map);
+        deviceMarkersRef.current.set(device.id, marker);
+      } else {
+        marker.setLngLat([device.lng, device.lat]);
+      }
+      applyDeviceMarkerElement(marker.getElement(), device);
+    });
+
+    Array.from(deviceMarkersRef.current.keys()).forEach((id) => {
+      if (!deviceIds.has(id)) {
+        const marker = deviceMarkersRef.current.get(id);
+        if (marker) marker.remove();
+        deviceMarkersRef.current.delete(id);
+      }
+    });
+
+    if (normalized.location) {
+      if (!locationMarkerRef.current) {
+        const element = createLocationMarkerElement();
+        locationMarkerRef.current = new mapbox.Marker({ element, anchor: 'bottom' })
+          .setLngLat([normalized.location.lng, normalized.location.lat])
+          .addTo(map);
+      } else {
+        locationMarkerRef.current.setLngLat([normalized.location.lng, normalized.location.lat]);
+      }
+    } else if (locationMarkerRef.current) {
+      locationMarkerRef.current.remove();
+      locationMarkerRef.current = null;
+    }
+  }, [mapStatus, normalized]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || mapStatus !== 'ready') return;
+    if (fitAppliedRef.current) return;
+
+    const points = [];
+    normalized.missions.forEach((mission) => {
+      if (Number.isFinite(mission.lng) && Number.isFinite(mission.lat)) {
+        points.push([mission.lng, mission.lat]);
+      }
+    });
+    normalized.devices.forEach((device) => {
+      if (Number.isFinite(device.lng) && Number.isFinite(device.lat)) {
+        points.push([device.lng, device.lat]);
+      }
+    });
+    if (normalized.location) {
+      points.push([normalized.location.lng, normalized.location.lat]);
+    }
+
+    const bounds = computeBounds(points);
+    if (!bounds) return;
+
+    fitAppliedRef.current = true;
+    map.fitBounds(bounds, {
+      padding: { top: 200, bottom: 320, left: 96, right: 96 },
+      maxZoom: 16,
+      duration: 850,
+    });
+  }, [mapStatus, normalized]);
+
+  const hasGeodata =
+    normalized.missions.length > 0 || normalized.devices.length > 0 || Boolean(normalized.location);
+
+  let overlayMessage = '';
+  if (mapStatus === 'missing-token') {
+    overlayMessage = 'Add NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN to enable the live mission map.';
+  } else if (mapStatus === 'error') {
+    overlayMessage = 'Map failed to load. Check your network connection and Mapbox token.';
+  } else if (mapStatus === 'ready' && !hasGeodata) {
+    overlayMessage = 'Mission coordinates are unavailable for this game.';
+  }
 
   return (
     <div style={container}>
-      <div style={backgroundLayer} />
-      <div style={gridLayer} />
-
-      {!hasMissions && (
-        <div style={emptyState}>Mission coordinates are unavailable for this game.</div>
-      )}
-
-      {plottedMissions.map((mission) => (
-        <React.Fragment key={mission.id || mission.index}>
-          {mission.radiusPx > 0 && (
-            <div
-              aria-hidden="true"
-              style={{
-                ...radiusRing,
-                borderColor: `${mission.palette.stroke}33`,
-                background: `${mission.palette.stroke}12`,
-                width: mission.radiusPx,
-                height: mission.radiusPx,
-                left: `calc(${mission.x * 100}% - ${mission.radiusPx / 2}px)`,
-                top: `calc(${mission.y * 100}% - ${mission.radiusPx / 2}px)`,
-              }}
-            />
-          )}
-
-          <button
-            type="button"
-            onClick={() => onSelect && mission.id && onSelect(mission.id)}
-            aria-label={`${mission.title || 'Mission'} — ${mission.palette.label}`}
-            style={{
-              ...markerButton,
-              left: `calc(${mission.x * 100}% - 24px)`,
-              top: `calc(${mission.y * 100}% - 24px)`,
-              background: mission.palette.fill,
-              borderColor: mission.palette.stroke,
-              boxShadow: mission.isCurrent
-                ? '0 0 0 6px rgba(61, 214, 140, 0.35)'
-                : '0 12px 24px rgba(0, 0, 0, 0.35)',
-              transform: mission.isCurrent ? 'scale(1.05)' : 'scale(1)',
-              zIndex: mission.isCurrent ? 16 : 12,
-            }}
-          >
-            <span style={markerIndex}>{mission.indexLabel || '•'}</span>
-          </button>
-
-          <div
-            aria-hidden="true"
-            style={{
-              ...markerLabel,
-              left: `calc(${mission.x * 100}% - 80px)`,
-              top: `calc(${mission.y * 100}% + 28px)`,
-            }}
-          >
-            <div style={{ fontWeight: 600 }}>{mission.title || mission.name || 'Mission'}</div>
-            <div style={{ opacity: 0.7, fontSize: 12 }}>{mission.palette.label}</div>
-          </div>
-        </React.Fragment>
-      ))}
-
-      {location && (
-        <React.Fragment>
-          {location.accuracySize > 0 && (
-            <div
-              aria-hidden="true"
-              style={{
-                ...accuracyRing,
-                width: location.accuracySize,
-                height: location.accuracySize,
-                left: `calc(${location.x * 100}% - ${location.accuracySize / 2}px)`,
-                top: `calc(${location.y * 100}% - ${location.accuracySize / 2}px)`,
-              }}
-            />
-          )}
-
-          <div
-            role="status"
-            aria-label="Current location"
-            style={{
-              ...locationDot,
-              left: `calc(${location.x * 100}% - 9px)`,
-              top: `calc(${location.y * 100}% - 9px)`,
-            }}
-          />
-          <div
-            aria-hidden="true"
-            style={{
-              ...locationLabel,
-              left: `calc(${location.x * 100}% - 32px)`,
-              top: `calc(${location.y * 100}% + 16px)`,
-            }}
-          >
-            You
-          </div>
-        </React.Fragment>
-      )}
-
+      <div ref={mapNodeRef} style={mapCanvas} aria-hidden="true" />
+      <div style={scrimLayer} />
+      {overlayMessage ? <div style={emptyState}>{overlayMessage}</div> : null}
       {children}
     </div>
   );
@@ -258,21 +746,20 @@ const container = {
   overflow: 'hidden',
   fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
   color: '#e2e8f0',
+  background: '#020617',
 };
 
-const backgroundLayer = {
+const mapCanvas = {
   position: 'absolute',
   inset: 0,
-  background: 'radial-gradient(circle at 30% 20%, rgba(30, 64, 175, 0.45), rgba(2, 6, 23, 0.95))',
   zIndex: 0,
 };
 
-const gridLayer = {
+const scrimLayer = {
   position: 'absolute',
   inset: 0,
-  backgroundImage:
-    'linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px)',
-  backgroundSize: '80px 80px',
+  background: 'radial-gradient(circle at 20% 20%, rgba(30, 64, 175, 0.35), rgba(2, 6, 23, 0.82))',
+  pointerEvents: 'none',
   zIndex: 1,
 };
 
@@ -281,86 +768,13 @@ const emptyState = {
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
-  background: 'rgba(15, 23, 42, 0.85)',
-  border: '1px solid rgba(148, 163, 184, 0.2)',
-  borderRadius: 12,
+  background: 'rgba(15, 23, 42, 0.88)',
+  border: '1px solid rgba(148, 163, 184, 0.28)',
+  borderRadius: 14,
   padding: '16px 24px',
   fontSize: 15,
   zIndex: 5,
   textAlign: 'center',
+  width: 'min(360px, 80vw)',
+  boxShadow: '0 18px 36px rgba(2, 6, 23, 0.5)',
 };
-
-const markerButton = {
-  position: 'absolute',
-  width: 48,
-  height: 48,
-  borderRadius: '50%',
-  borderWidth: 2,
-  borderStyle: 'solid',
-  cursor: 'pointer',
-  display: 'grid',
-  placeItems: 'center',
-  color: '#020617',
-  fontWeight: 700,
-  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-  zIndex: 12,
-};
-
-const markerIndex = {
-  fontSize: 14,
-  textShadow: '0 1px 2px rgba(2, 6, 23, 0.4)',
-};
-
-const markerLabel = {
-  position: 'absolute',
-  width: 160,
-  padding: '8px 10px',
-  borderRadius: 12,
-  background: 'rgba(15, 23, 42, 0.75)',
-  border: '1px solid rgba(148, 163, 184, 0.25)',
-  boxShadow: '0 10px 30px rgba(2, 6, 23, 0.45)',
-  pointerEvents: 'none',
-  zIndex: 11,
-};
-
-const radiusRing = {
-  position: 'absolute',
-  borderRadius: '50%',
-  borderWidth: 1,
-  borderStyle: 'dashed',
-  transition: 'opacity 0.2s ease',
-  zIndex: 8,
-};
-
-const accuracyRing = {
-  position: 'absolute',
-  borderRadius: '50%',
-  border: '1px solid rgba(56, 189, 248, 0.35)',
-  background: 'rgba(56, 189, 248, 0.12)',
-  zIndex: 9,
-};
-
-const locationDot = {
-  position: 'absolute',
-  width: 18,
-  height: 18,
-  borderRadius: '50%',
-  border: '3px solid rgba(56, 189, 248, 0.45)',
-  background: '#38bdf8',
-  boxShadow: '0 0 0 6px rgba(56, 189, 248, 0.2)',
-  zIndex: 14,
-};
-
-const locationLabel = {
-  position: 'absolute',
-  padding: '4px 8px',
-  borderRadius: 999,
-  background: 'rgba(15, 23, 42, 0.85)',
-  border: '1px solid rgba(148, 163, 184, 0.25)',
-  fontSize: 11,
-  letterSpacing: 0.4,
-  textTransform: 'uppercase',
-  zIndex: 13,
-  pointerEvents: 'none',
-};
-

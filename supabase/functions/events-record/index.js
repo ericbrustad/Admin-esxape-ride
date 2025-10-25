@@ -1,4 +1,4 @@
-// supabase/functions/events-record/index.ts
+// supabase/functions/events-record/index.js
 // Records a gameplay event for analytics.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';

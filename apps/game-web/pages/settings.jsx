@@ -240,6 +240,8 @@ export default function Settings({ metadata, conversationLog }) {
         second: '2-digit',
       })
     : '—';
+  const commitDisplay = metadata?.commitSha || metadata?.commitShaShort;
+  const deploymentDisplay = metadata?.deploymentUrl || '—';
 
   return (
     <main className="container" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 32 }}>
@@ -347,10 +349,10 @@ export default function Settings({ metadata, conversationLog }) {
         }}
       >
         <span>
-          {metadata?.repoName} @ {metadata?.branchName} • {metadata?.commitShaShort}
+          {metadata?.repoName} @ {metadata?.branchName} • {commitDisplay}
         </span>
         <span>
-          {metadata?.deploymentUrl} • {timestamp}
+          {deploymentDisplay} • {timestamp}
         </span>
       </footer>
     </main>

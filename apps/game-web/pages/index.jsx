@@ -496,6 +496,24 @@ function GameApp() {
     });
   }, [missionOrder, missionMap]);
 
+  const devicesForMap = useMemo(() => {
+    const list = Array.isArray(config?.devices) ? config.devices : [];
+    return list.map((device, index) => {
+      const lat = device?.location?.lat ?? device?.lat ?? device?.latitude;
+      const lng = device?.location?.lng ?? device?.lng ?? device?.longitude;
+      return {
+        id: device?.id || `device-${index + 1}`,
+        title: device?.title || device?.name || `Device ${index + 1}`,
+        type: device?.type || '',
+        lat: Number(lat),
+        lng: Number(lng),
+        radiusMeters: Number(
+          device?.radiusMeters ?? device?.pickupRadius ?? device?.rangeMeters ?? 0,
+        ),
+      };
+    });
+  }, [config?.devices]);
+
   const totalBackpackItems = useMemo(() => {
     return Object.values(backpackSummary || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
   }, [backpackSummary]);
