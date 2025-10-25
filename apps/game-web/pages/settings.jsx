@@ -16,7 +16,7 @@ export async function getServerSideProps() {
   const branchName = env.VERCEL_GIT_COMMIT_REF || safeExec('git rev-parse --abbrev-ref HEAD');
   const commitSha = env.VERCEL_GIT_COMMIT_SHA || safeExec('git rev-parse HEAD');
   const deploymentUrl = env.VERCEL_URL ? `https://${env.VERCEL_URL}` : env.DEPLOYMENT_URL || '';
-  const yarnVersion = safeExec('yarn --version');
+  const npmVersion = safeExec('npm --version');
 
   const metadata = {
     repoName: repoName || 'unknown-repo',
@@ -26,7 +26,7 @@ export async function getServerSideProps() {
     deploymentUrl: deploymentUrl || '—',
     nodeVersion: process.version,
     nodeTarget: '22.x',
-    yarnVersion: yarnVersion || '(unavailable)',
+    npmVersion: npmVersion || '(unavailable)',
     generatedAt: new Date().toISOString(),
   };
 
@@ -109,7 +109,7 @@ export async function getServerSideProps() {
     {
       speaker: 'GPT',
       message:
-        'Converted the repo to Yarn workspaces with node-modules linking, added .yarnrc.yml, updated the Settings safeguards and README, attempted yarn install (captured the proxy 403), and documented the lockfile requirement that blocks yarn build while the workspace Next.js build continues to succeed via the existing binaries.',
+        'Converted the repo to npm workspaces with node-modules linking, refreshed the Settings safeguards and README, attempted npm install (captured the proxy 403), and documented the lockfile requirement that blocks npm run build while the workspace Next.js build continues to succeed via the existing binaries.',
     },
     {
       speaker: 'Operator',
@@ -157,7 +157,7 @@ export async function getServerSideProps() {
     {
       speaker: 'GPT',
       message:
-        'Repointed vercel.json at yarn build so turbo compiles the game and admin workspaces under Node 22, updated scripts and docs, and verified each Next.js build locally while keeping the Yarn proxy caveats documented.',
+        'Repointed vercel.json at npm run build so both workspaces compile under Node 22, updated scripts and docs, and verified each Next.js build locally while keeping the npm proxy caveats documented.',
     },
     {
       speaker: 'Operator',
@@ -167,7 +167,7 @@ export async function getServerSideProps() {
     {
       speaker: 'GPT',
       message:
-        'Updated the checked-in Node version to 22.11.0, rewired yarn build to run the admin and game workspaces sequentially so the routes manifest exists, expanded the Yarn lockfile, refreshed the safeguards, and reran both Next.js builds to verify outputs.',
+        'Updated the checked-in Node version to 22.11.0, rewired npm run build to run the admin and game workspaces sequentially so the routes manifest exists, captured the install diagnostics, refreshed the safeguards, and reran both Next.js builds to verify outputs.',
     },
     {
       speaker: 'Operator',
@@ -219,6 +219,16 @@ export async function getServerSideProps() {
       message:
         'Traced the failure to Supabase REST outages blocking bundle fetches, added an automatic fallback to the cached missions/config files, and verified the game page now recovers without the error banner.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Retire the Yarn artifacts, migrate the monorepo to npm workspaces, capture an npm lockfile attempt, and make sure the Settings footer still reports repo, branch, commit, deployment, and timestamp.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Removed Yarn manifests, rewired scripts and docs to npm, refreshed the repository snapshot footer with the latest metadata, attempted npm install under the proxy (captured the 403), and logged the migration here for QA traceability.',
+    },
   ];
 
   return {
@@ -260,38 +270,38 @@ export default function Settings({ metadata, conversationLog }) {
               Align every workspace and deployment target with <code>node 22.x</code> so Vercel builds run without rejecting the runtime declaration.
             </li>
             <li>
-              Keep <code>vercel.json</code> pointed at <code>yarn install --immutable</code> and <code>yarn build</code> so both admin and game workspaces compile under Yarn, and ensure no stray <code>pnpm</code> manifests remain so Vercel stays on the Yarn toolchain.
+              Keep <code>vercel.json</code> pointed at <code>npm install</code> and <code>npm run build</code> so both admin and game workspaces compile under npm, and ensure no stray <code>pnpm</code> or <code>yarn</code> manifests remain so Vercel stays on the npm toolchain.
             </li>
             <li>
               Distinguish Codex shell proxy failures from Vercel deployment issues by checking where the errors appear, running
               <code>env | grep -i _proxy</code>, <code>npm config get https-proxy</code>, and <code>curl -I</code> diagnostics inside Codex, and recording the findings here for comparison with Vercel build logs.
             </li>
             <li>
-              Run <code>yarn install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
+              Run <code>npm install</code> from the repo root to hydrate workspaces. When the proxy blocks registry access (403 Forbidden), capture the logs and mirror them in the README and this safeguards list for network follow-up.
             </li>
             <li>
-              Primary builds run through <code>yarn build</code>, which now executes the admin workspace first (<code>yarn workspace esx-admin-control-panel-map run build</code>) and then the game workspace (<code>yarn workspace game-web run build</code>) so both <code>.next</code> outputs exist for deployment. Until a Yarn lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any Yarn proxy errors alongside the logs.
+              Primary builds run through <code>npm run build</code>, which executes the admin workspace first (<code>npm run build --workspace esx-admin-control-panel-map</code>) and then the game workspace (<code>npm run build --workspace game-web</code>) so both <code>.next</code> outputs exist for deployment. Until an npm lockfile is captured, fall back to <code>node apps/game-web/node_modules/.bin/next build</code> and <code>node apps/admin/node_modules/.bin/next build</code>, archiving any npm proxy errors alongside the logs.
             </li>
             <li>
-              Use <code>yarn build:admin</code> to compile the admin dashboard when verifying both applications locally, or <code>yarn build:game</code> for a focused game rebuild.
+              Use <code>npm run build:admin</code> to compile the admin dashboard when verifying both applications locally, or <code>npm run build:game</code> for a focused game rebuild.
             </li>
             <li>
-              Keep <code>yarn build:turbo</code> available for aggregate builds; it still invokes <code>turbo run build</code> across workspaces when that package is installed.
+              Keep <code>npm run build:turbo</code> available for aggregate builds; it invokes <code>npm run build --workspaces --if-present</code> across workspaces when every dependency is installed.
             </li>
             <li>
-              Manage Yarn settings through <code>.yarnrc.yml</code>, ensuring <code>nodeLinker: node-modules</code> stays committed for offline compatibility and telemetry remains disabled.
+              Manage proxy and registry settings through <code>.npmrc</code> so installs behave consistently in restricted environments, keeping telemetry disabled and retries tuned for slow links.
             </li>
             <li>
-              Mirror proxy host/credential details in <code>.npmrc</code>, <code>HTTP(S)_PROXY</code>, and Yarn's <code>npmRegistryServer</code> configuration so installs behave consistently regardless of the CLI in use.
+              Mirror proxy host/credential details in <code>.npmrc</code>, <code>HTTP(S)_PROXY</code>, and system trust stores so installs behave consistently regardless of the CLI in use.
             </li>
             <li>
-              Retain the existing <code>node_modules</code> snapshot alongside Yarn logs when installs fail so on-call engineers can reproduce the environment without Corepack.
+              Retain the existing <code>node_modules</code> snapshot alongside npm logs when installs fail so on-call engineers can reproduce the environment without Corepack.
             </li>
             <li>
               Continue reviewing security policies and SSL enforcement settings if registry access is denied, documenting any temporary overrides applied during troubleshooting.
             </li>
             <li>
-              Record all Yarn ↔ proxy remediation attempts (including telemetry prompts and Corepack bootstrap messages) in the conversation log below for QA traceability.
+              Record all npm ↔ proxy remediation attempts (including telemetry prompts and Corepack bootstrap messages) in the conversation log below for QA traceability.
             </li>
           </ul>
         </div>
@@ -329,8 +339,8 @@ export default function Settings({ metadata, conversationLog }) {
           <dd style={{ margin: 0 }}>{metadata?.deploymentUrl}</dd>
           <dt style={{ color: 'var(--muted)' }}>Node runtime</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeVersion}</dd>
-          <dt style={{ color: 'var(--muted)' }}>Yarn version</dt>
-          <dd style={{ margin: 0 }}>{metadata?.yarnVersion}</dd>
+          <dt style={{ color: 'var(--muted)' }}>npm version</dt>
+          <dd style={{ margin: 0 }}>{metadata?.npmVersion}</dd>
           <dt style={{ color: 'var(--muted)' }}>Target range</dt>
           <dd style={{ margin: 0 }}>{metadata?.nodeTarget}</dd>
         </dl>

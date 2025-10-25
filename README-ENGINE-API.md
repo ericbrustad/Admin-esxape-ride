@@ -8,7 +8,7 @@ mission, device, media, and event persistence.
 
 1. Copy `.env.local.example` to `.env.local` and fill in the Supabase project
    URL plus anon/service keys.
-2. Install dependencies with `yarn install` from the repository root.
+2. Install dependencies with `npm install` from the repository root.
 3. Apply the SQL migrations:
 
    ```bash
@@ -32,7 +32,7 @@ mission, device, media, and event persistence.
 6. Start the Admin dashboard:
 
    ```bash
-   yarn workspace admin dev
+   npm run dev --workspace esx-admin-control-panel-map
    ```
 
 ## API Surfaces

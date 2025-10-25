@@ -1,4 +1,4 @@
-# Toolchain Drop-in (Node 22 + Yarn 4) — 2025-10-28T00:00:00.000Z
+# Toolchain Drop-in (Node 22 + npm 10) — 2025-10-28T00:00:00.000Z
 
 Place **all files** at the **repo root** (same folder as `turbo.json`).
 
@@ -6,12 +6,12 @@ Files included:
 - `.npmrc` — hardened registry/timeouts and engine strictness
 - `.nvmrc` — pins Node 22.11.0
 - `package.json` (root) — adds engines, packageManager, Volta pins, and `vercel:info`
-- `tools/vercel-info.mjs` — prints Node/Corepack/Yarn during build (non-fatal if Node 22)
+- `tools/vercel-info.mjs` — prints Node/Corepack/npm during build (non-fatal if Node 22)
 
 ## Vercel settings (both Admin & Game projects)
 Install Command:
 ```
-yarn install --immutable
+npm install
 ```
 Env vars:
 ```

@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-30 — npm workspace migration & safeguard refresh. Commit: (pending HEAD)
+  - Direct links: `package.json`, `vercel.json`, `apps/game-web/pages/settings.jsx`, `apps/admin/pages/index.jsx`, `apps/admin/pages/api/admin-meta.js`, `tools/vercel-info.mjs`, `README.txt`, `README_DROPIN.md`, `README-ENGINE-API.md`
+  - Notes: Removed Yarn artifacts, migrated scripts/docs to npm workspace commands, refreshed runtime diagnostics for npm, documented the proxy-blocked npm install for `@supabase/supabase-js`, and logged the repository snapshot plus conversation updates in Settings.
 - 2025-10-29 — Node 22 warning cleanup & admin manifest fix. Commit: (pending HEAD)
   - Direct links: `.node-version`, `package.json`, `apps/game-web/pages/settings.jsx`, `yarn.lock`, `README.txt`
   - Notes: Bumped the checked-in Node version to 22.11.0 to match the enforced runtime, rewired <code>yarn build</code> to run the admin and game workspace builds sequentially so the admin routes manifest is always generated, expanded the Yarn lockfile, and logged the troubleshooting summary in the Settings safeguards and conversation log.
@@ -121,66 +124,16 @@ Device & Response UI Package
   - Direct link: `middleware.js`
   - Notes: Middleware now checks `/admin-protection.json` before challenging, allowing the password switch to disable prompts while keeping caching for quick reads.
 
-## Yarn workspace workflow
+## npm workspace workflow
 
-- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
-- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
-  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
-  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
-  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
-- **Primary build** — `yarn build` now runs the admin workspace first (`yarn workspace esx-admin-control-panel-map run build`) and then the game workspace (`yarn workspace game-web run build`) so both `.next` directories exist for deployment. When the missing lockfile blocks Yarn, run `node apps/game-web/node_modules/.bin/next build` and `node apps/admin/node_modules/.bin/next build`, then attach the Yarn error output for continuity.
-- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
-- **Game build** — Use `yarn build:game` for a focused game workspace rebuild.
-- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds when you need every workspace’s pipeline.
-- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
-  de_modules` layout during offline work.
-- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
-  future operators understand the mitigation path.
-
-## Yarn workspace workflow
-
-- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
-- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
-  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
-  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
-  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
-- **Primary build** — `yarn build` executes `turbo run build --filter=game-web --filter=esx-admin-control-panel-map` so both apps compile together. When the missing lockfile blocks Yarn, run `node apps/game-web/node_modules/.bin/next build` and `node apps/admin/node_modules/.bin/next build`, then attach the Yarn error output for continuity.
-- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
-- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds when you need every workspace’s pipeline.
-- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
-  de_modules` layout during offline work.
-- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
-  future operators understand the mitigation path.
-
-## Yarn workspace workflow
-
-- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
-- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
-  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
-  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
-  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
-- **Primary build** — `yarn build` delegates to `yarn workspace game-web run build`. When the missing lockfile blocks Yarn, execute `node apps/game-web/node_modules/.bin/next build` and attach the Yarn error output for continuity.
-- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
-- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds.
-- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
-  de_modules` layout during offline work.
-- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
-  future operators understand the mitigation path.
-
-## Yarn workspace workflow
-
-- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the Yarn commands below.
-- **Install dependencies** — Run `yarn install` from the repository root. In proxy-restricted environments this may surface `40
-  3` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until a Yarn lockfi
-  le can be generated those failures will block `yarn build`; rely on the workspace Next.js binaries (for example `node apps/gam
-  e-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
-- **Primary build** — `yarn build` delegates to `yarn workspace game-web run build`. When the missing lockfile blocks Yarn, execute `node apps/game-web/node_modules/.bin/next build` and attach the Yarn error output for continuity.
-- **Admin build** — Use `yarn build:admin` when you need to compile the admin panel (`apps/admin`).
-- **Turbo aggregate** — `yarn build:turbo` retains the original `turbo run build` orchestration for multi-app rebuilds.
-- Keep `.yarnrc.yml`'s `nodeLinker: node-modules` setting in sync with production expectations so Yarn respects the existing `no
-  de_modules` layout during offline work.
-- Document Yarn/Corepack proxy incidents (including telemetry warnings and Corepack's Yarn 4 bootstrap) in the Settings log so 
-  future operators understand the mitigation path.
+- **Node runtime** — Vercel requires `node 22.x`; mirror that version locally and in CI before running the npm commands below.
+- **Install dependencies** — Run `npm install` from the repository root. In proxy-restricted environments this may surface `403` responses; capture those logs so networking teams can allow the registry or provide an approved mirror. Until an npm lockfile can be generated those failures will block `npm run build`; rely on the workspace Next.js binaries (for example `node apps/game-web/node_modules/.bin/next build`) for smoke checks and keep the proxy errors attached for follow-up.
+- **Primary build** — `npm run build` now runs the admin workspace first (`npm run build --workspace esx-admin-control-panel-map`) and then the game workspace (`npm run build --workspace game-web`) so both `.next` directories exist for deployment. When the missing lockfile blocks npm, run `node apps/game-web/node_modules/.bin/next build` and `node apps/admin/node_modules/.bin/next build`, then attach the npm error output for continuity.
+- **Admin build** — Use `npm run build:admin` when you need to compile the admin panel (`apps/admin`).
+- **Game build** — Use `npm run build:game` for a focused game workspace rebuild.
+- **Turbo aggregate** — `npm run build:turbo` retains the aggregate orchestration when you need every workspace’s pipeline.
+- Keep `.npmrc` proxy and retry settings in sync with production expectations so npm respects the existing `node_modules` layout during offline work.
+- Document npm/Corepack proxy incidents (including telemetry warnings and Corepack's bootstrap) in the Settings log so future operators understand the mitigation path.
 
 ## Offline pnpm workflow
 

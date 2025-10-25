@@ -1,7 +1,7 @@
 {
   "name": "admin-esxape-ride",
   "private": true,
-  "packageManager": "yarn@4.9.4+sha512.7b1cb0b62abba6a537b3a2ce00811a843bea02bcf53138581a6ae5b1bf563f734872bd47de49ce32a9ca9dcaff995aa789577ffb16811da7c603dcf69e73750b",
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,17 +11,14 @@
   },
   "volta": {
     "node": "22.11.0",
-    "yarn": "4.9.4"
+    "npm": "10.8.2"
   },
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
-    "dev": "turbo run dev --parallel",
-    "build": "yarn workspace esx-admin-control-panel-map run build && yarn workspace game-web run build",
-    "build:admin": "yarn workspace esx-admin-control-panel-map run build",
-    "build:game": "yarn workspace game-web run build",
-    "build:turbo": "turbo run build"
-  },
-  "devDependencies": {
-    "turbo": "^2.0.0"
+    "dev": "npm run dev --workspaces --if-present --parallel",
+    "build": "npm run build --workspace esx-admin-control-panel-map && npm run build --workspace game-web",
+    "build:admin": "npm run build --workspace esx-admin-control-panel-map",
+    "build:game": "npm run build --workspace game-web",
+    "build:turbo": "npm run build --workspaces --if-present"
   }
 }
