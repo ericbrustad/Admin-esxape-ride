@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import PhotoCapture from '../components/PhotoCapture';
 import OutcomeModal from '../components/OutcomeModal';
 import BackpackButton from '../components/BackpackButton';
@@ -16,6 +17,14 @@ import {
 } from '../lib/backpack';
 import { fetchGameBundle } from '../lib/supabase/client.js';
 import { createMediaIndex, createMissionMap } from '../lib/mmaps';
+
+const DEFAULT_SLUG = process.env.NEXT_PUBLIC_DEFAULT_GAME_SLUG || 'default';
+const DEFAULT_CHANNEL = process.env.NEXT_PUBLIC_DEFAULT_CHANNEL || 'published';
+
+function firstString(value) {
+  if (Array.isArray(value)) return value[0] || '';
+  return typeof value === 'string' ? value : '';
+}
 
 const SUPABASE_ENABLED = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -55,6 +64,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function GameApp() {
+  const router = useRouter();
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
   const [status, setStatus] = useState('Loading…');
@@ -64,19 +74,53 @@ function GameApp() {
   const [backpackOpen, setBackpackOpen] = useState(false);
   const [points, setPoints] = useState(0);
 
-  const { slug, channel } = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return { slug: '', channel: 'published' };
-    }
-    try {
-      const u = new URL(window.location.href);
-      return { slug: u.searchParams.get('slug') || '', channel: u.searchParams.get('channel') || 'published' };
-    } catch {
-      return { slug: '', channel: 'published' };
-    }
-  }, []);
+  const slugParam = firstString(router?.query?.slug);
+  const gameParam = firstString(router?.query?.game);
+  const channelParam = firstString(router?.query?.channel);
 
-  useEffect(() => { initBackpack(slug); }, [slug]);
+  const slug = slugParam || gameParam || (router?.isReady ? DEFAULT_SLUG : '');
+  const channel = channelParam || DEFAULT_CHANNEL;
+
+  useEffect(() => {
+    if (!router?.isReady) return;
+
+    const canonicalSlug = slugParam || gameParam;
+    const canonicalChannel = channelParam || DEFAULT_CHANNEL;
+
+    const nextQuery = { ...router.query };
+    let changed = false;
+
+    if (!canonicalSlug) {
+      nextQuery.slug = DEFAULT_SLUG;
+      if (nextQuery.game) {
+        delete nextQuery.game;
+      }
+      changed = true;
+    } else {
+      if (firstString(nextQuery.slug) !== canonicalSlug) {
+        nextQuery.slug = canonicalSlug;
+        changed = true;
+      }
+      if (nextQuery.game) {
+        delete nextQuery.game;
+        changed = true;
+      }
+    }
+
+    if (firstString(nextQuery.channel) !== canonicalChannel) {
+      nextQuery.channel = canonicalChannel;
+      changed = true;
+    }
+
+    if (changed) {
+      router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true });
+    }
+  }, [router, slugParam, gameParam, channelParam]);
+
+  useEffect(() => {
+    if (!slug) return;
+    initBackpack(slug);
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) return undefined;
@@ -97,7 +141,7 @@ function GameApp() {
 
     (async () => {
       if (!slug) {
-        setStatus('Missing game slug.');
+        setStatus('Loading default game…');
         return;
       }
 

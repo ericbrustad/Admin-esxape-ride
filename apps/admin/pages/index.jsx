@@ -2504,6 +2504,11 @@ export default function Admin() {
   const metaRuntimeYarnPath = metaRuntimeYarnPathRaw
     ? metaRuntimeYarnPathRaw.split(/\r?\n/).find(Boolean) || ''
     : '';
+  const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
+  const metaBranchDisplay = metaBranchLabel || '—';
+  const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
+  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || '—';
+  const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3903,7 +3908,37 @@ export default function Admin() {
               </div>
             )}
             <div style={S.settingsFooterTime}>
-              Footer Audit — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Snapshot {metaTimestampLabel || '—'} • Local {metaNowLabel || '—'}
+              Deployment Snapshot — Repo{' '}
+              {metaRepoUrl ? (
+                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                  {metaRepoDisplay}
+                </a>
+              ) : (
+                metaRepoDisplay
+              )}{' '}
+              • Branch {metaBranchDisplay}{' '}
+              • Commit{' '}
+              {metaCommitUrl ? (
+                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                  {metaCommitDisplay}
+                </a>
+              ) : (
+                metaCommitDisplay
+              )}{' '}
+              • Deployment{' '}
+              {metaDeploymentUrl ? (
+                <a
+                  href={metaDeploymentUrl.startsWith('http') ? metaDeploymentUrl : `https://${metaDeploymentUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={S.settingsFooterLink}
+                >
+                  {metaDeploymentDisplay}
+                </a>
+              ) : (
+                metaDeploymentDisplay
+              )}{' '}
+              • Timestamp {metaFooterTimestamp}
             </div>
           </footer>
         </main>
