@@ -1,3 +1,5 @@
+//2//
+
 export default async function handler(req, res) {
   try {
     const baseUrl = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
