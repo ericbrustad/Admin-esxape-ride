@@ -680,6 +680,7 @@ export default function Admin() {
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
+  const lastMetaLoggedRef = useRef('');
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Starfield default stored on legacy root
@@ -1127,6 +1128,42 @@ export default function Admin() {
       clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    const fetchedAt = adminMeta?.fetchedAt || '';
+    if (!fetchedAt) return;
+    if (lastMetaLoggedRef.current === fetchedAt) return;
+
+    lastMetaLoggedRef.current = fetchedAt;
+
+    const repo = adminMeta?.repo || '';
+    const owner = adminMeta?.owner || '';
+    const repoDisplay = repo ? `${owner ? `${owner}/` : ''}${repo}` : 'unknown repo';
+    const branchLabel = adminMeta?.branch || 'unknown branch';
+    const commitLabel = adminMeta?.commit || 'unknown commit';
+    const deploymentSource = adminMeta?.deploymentUrl
+      || adminMeta?.vercelUrl
+      || adminMeta?.deploymentState
+      || '';
+    const deploymentLabel = deploymentSource || '—';
+    const fetchedLabel = formatLocalDateTime(fetchedAt) || fetchedAt;
+
+    logConversation('You', 'Requested repository snapshot metadata for Settings footer');
+    logConversation(
+      'GPT',
+      `Repository snapshot → Repo ${repoDisplay} • Branch ${branchLabel} • Commit ${commitLabel} • Deployment ${deploymentLabel} • Fetched ${fetchedLabel}`,
+    );
+  }, [
+    adminMeta.branch,
+    adminMeta.commit,
+    adminMeta.deploymentState,
+    adminMeta.deploymentUrl,
+    adminMeta.fetchedAt,
+    adminMeta.owner,
+    adminMeta.repo,
+    adminMeta.vercelUrl,
+    logConversation,
+  ]);
 
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -2509,6 +2546,16 @@ export default function Admin() {
   const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
   const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || '—';
   const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
+  const metaFooterFetchedDisplay = metaTimestampLabel || '—';
+  const metaFooterRenderedDisplay = metaNowLabel || '—';
+  const metaDevSnapshotSummary = [
+    `Repo ${metaRepoDisplay}`,
+    `Branch ${metaBranchDisplay}`,
+    `Commit ${metaCommitLabel || '—'}`,
+    `Deployment ${metaDeploymentDisplay}`,
+    `Fetched ${metaFooterFetchedDisplay}`,
+    `Rendered ${metaFooterRenderedDisplay}`,
+  ].join(' • ');
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3942,6 +3989,9 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               Repository Snapshot — {metaRepoDisplay} • Branch {metaBranchDisplay} • Commit {metaCommitDisplay} • Vercel {metaVercelLabel || metaDeploymentDisplay} • Recorded {metaFooterTimestamp}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Dev Snapshot Summary — {metaDevSnapshotSummary}
             </div>
           </footer>
         </main>
