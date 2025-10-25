@@ -4,6 +4,7 @@ import PhotoCapture from '../components/PhotoCapture';
 import OutcomeModal from '../components/OutcomeModal';
 import BackpackButton from '../components/BackpackButton';
 import BackpackDrawer from '../components/BackpackDrawer';
+import MissionMap from '../components/MissionMap';
 import {
   initBackpack,
   addPhoto,
@@ -73,6 +74,9 @@ function GameApp() {
   const [outcome, setOutcome] = useState(null);   // outcome config snapshot
   const [backpackOpen, setBackpackOpen] = useState(false);
   const [points, setPoints] = useState(0);
+  const [answers, setAnswers] = useState(() => new Map());
+  const [backpackSummary, setBackpackSummary] = useState({});
+  const [answerDraft, setAnswerDraft] = useState('');
 
   const slugParam = firstString(router?.query?.slug);
   const gameParam = firstString(router?.query?.game);
@@ -127,6 +131,21 @@ function GameApp() {
     const update = () => {
       const map = getBackpackMap(slug);
       setPoints(Number(map.get('points')) || 0);
+      const answersMap = map.get('answers');
+      if (answersMap instanceof Map) {
+        setAnswers(new Map(answersMap));
+      } else if (answersMap && typeof answersMap === 'object') {
+        setAnswers(new Map(Object.entries(answersMap)));
+      } else {
+        setAnswers(new Map());
+      }
+      const pockets = ['photos', 'videos', 'audios', 'rewards', 'utilities', 'clues'];
+      const summary = {};
+      pockets.forEach((key) => {
+        const items = map.get(key);
+        summary[key] = Array.isArray(items) ? items.length : 0;
+      });
+      setBackpackSummary(summary);
     };
     update();
     return onBackpackChange(slug, update);
@@ -194,9 +213,20 @@ function GameApp() {
 
   const missionMap = missionMemo.map;
   const missionOrder = missionMemo.order;
+  const missionIndexMap = useMemo(() => {
+    const indexMap = new Map();
+    missionOrder.forEach((id, index) => {
+      indexMap.set(id, index);
+    });
+    return indexMap;
+  }, [missionOrder]);
   const missionCount = missionOrder.length;
   const missionId = missionOrder[idx] || null;
   const mission = missionId ? missionMap.get(missionId) : null;
+
+  useEffect(() => {
+    setAnswerDraft('');
+  }, [missionId]);
 
   useEffect(() => {
     if (!missionCount) {
@@ -318,13 +348,17 @@ function GameApp() {
         );
       }
       case 'short_answer': {
-        let val='';
         return (
           <div style={bodyStyle}>
             {label(mission.content?.question || '')}
-            <input style={input} onChange={(e)=>{ val=e.target.value; }} placeholder="Type your answer…"/>
+            <input
+              style={input}
+              value={answerDraft}
+              onChange={(e)=>setAnswerDraft(e.target.value)}
+              placeholder="Type your answer…"
+            />
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
-              <button style={btn} onClick={()=>handleSA(val)}>Submit</button>
+              <button style={btn} onClick={()=>handleSA(answerDraft)}>Submit</button>
               <button style={btn} onClick={prev}>Back</button>
             </div>
           </div>
@@ -359,18 +393,49 @@ function GameApp() {
     }
   }
 
+  const missionsForMap = useMemo(() => {
+    return missionOrder.map((id, index) => {
+      const row = missionMap.get(id) || {};
+      return {
+        id,
+        index,
+        indexLabel: String(index + 1).padStart(2, '0'),
+        title: row.title || row.name || `Mission ${index + 1}`,
+        subtitle: row.type ? row.type.replace(/_/g, ' ') : 'mission',
+      };
+    });
+  }, [missionOrder, missionMap]);
+
+  const totalBackpackItems = useMemo(() => {
+    return Object.values(backpackSummary || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
+  }, [backpackSummary]);
+
   return (
     <main style={outer}>
 
-      <BackpackButton onClick={()=>setBackpackOpen(true)} />
+      <BackpackButton onClick={()=>setBackpackOpen(true)} itemCount={totalBackpackItems} />
       <BackpackDrawer slug={slug} open={backpackOpen} onClose={()=>setBackpackOpen(false)} />
 
-      <div style={card}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9fb0bf' }}>Mission {missionCount ? idx+1 : 0} / {missionCount}</span></div>
-          <div style={{ color:'#9fb0bf' }}>Points: {points}</div>
+      <div style={layout}>
+        <MissionMap
+          missions={missionsForMap}
+          currentId={missionId}
+          answers={answers}
+          onSelect={(id) => {
+            if (!missionIndexMap.has(id)) return;
+            setIdx(missionIndexMap.get(id));
+          }}
+          points={points}
+          backpackSummary={backpackSummary}
+        />
+
+        <div style={card}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <div><b>{config.game?.title || 'Game'}</b> — <span style={{ color:'#9fb0bf' }}>Mission {missionCount ? idx+1 : 0} / {missionCount}</span></div>
+            <div style={{ color:'#9fb0bf' }}>Points: {points}</div>
+          </div>
+          {renderMission()}
         </div>
-        {renderMission()}
       </div>
 
       {showPhoto && (
@@ -417,8 +482,9 @@ function missionBodyStyle(a) {
 
 function hex(h){try{const s=h.replace('#','');const b=s.length===3?s.split('').map(c=>c+c).join(''):s;return `${parseInt(b.slice(0,2),16)}, ${parseInt(b.slice(2,4),16)}, ${parseInt(b.slice(4,6),16)}`;}catch{return'0,0,0';}}
 
-const outer = { maxWidth: 960, margin:'0 auto', padding:12, minHeight:'100vh', background:'#0b0c10', color:'#e9eef2', fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif' };
-const card  = { background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12, marginTop:12 };
+const outer = { maxWidth: 1120, margin:'0 auto', padding:12, minHeight:'100vh', background:'#0b0c10', color:'#e9eef2', fontFamily:'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif' };
+const layout = { display:'grid', gap:16, alignItems:'start', gridTemplateColumns:'minmax(260px, 1fr) minmax(0, 2fr)', marginTop:12 };
+const card  = { background:'#12181d', border:'1px solid #1f262d', borderRadius:12, padding:12 };
 const labelStyle = { background:'rgba(0,0,0,.25)', padding:'6px 10px', borderRadius:8, marginBottom:8 };
 const btn   = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#1a2027', color:'#e9eef2', cursor:'pointer' };
 const input = { padding:'10px 12px', borderRadius:10, border:'1px solid #2a323b', background:'#0b0c10', color:'#e9eef2', width:'100%' };
