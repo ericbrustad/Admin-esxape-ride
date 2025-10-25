@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '../../../lib/supabase-lite.js';
 
 export default async function handler(req, res) {
   try {

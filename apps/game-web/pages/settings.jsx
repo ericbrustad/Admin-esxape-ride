@@ -179,6 +179,56 @@ export async function getServerSideProps() {
       message:
         'Restored the interactive missions, added mmaps for mission/media lookup plus backpack persistence, and verified the Settings snapshot still reports the repository, branch, commit, deployment, and timestamp.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Use the latest work branch for game-esxape-ride, rebuild the mobile mission map without Leaflet, keep the backpack pinned to the lower-left, surface live location, and overlay mission media/text as it streams in.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shipped the mmaps-driven full-screen mission canvas with live geolocation, adaptive mission overlays, and an anchored backpack control so Android and iOS players can track updates in real time.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Load all necessary nodes and dependencies so Yarn stops failing, open whatever proxy is required, and debug until the build tests cleanly.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Replaced the Supabase SDK dependency with an internal REST client, wired every API route and smoke test to it, and confirmed the game workspace completes a Next.js production build inside the proxy-restricted environment.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Follow the bootstrap script to guarantee the Next.js binary exists locally: enforce Node 22, scope installs to apps/game-web with pnpm, and rebuild until the tests pass without proxy-related failures.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Synced the workspace engines to Node 22.x, removed the unused Supabase SDK dependency, documented the Yarn lockfile gap that blocks workspace builds, and reran node apps/game-web/node_modules/.bin/next build to confirm the production output still succeeds with the repository snapshot footer intact.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Players report the mission runner only shows “Failed to load game.” Investigate why the bundle fetch is breaking and restore a working fallback so the app launches again.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Traced the failure to Supabase REST outages blocking bundle fetches, added an automatic fallback to the cached missions/config files, and verified the game page now recovers without the error banner.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Convert every remaining .ts or .tsx source to JavaScript, surface the repo, branch, commit, deployment, and timestamp at the bottom of the Settings page, keep debugging until builds pass, and capture our chat for QA.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Ported each Supabase edge function to vanilla JavaScript, removed the stray type declaration, refreshed the Settings footer metadata, reran the Next.js production build, and logged this dialogue for future traceability.',
+    },
   ];
 
   return {
@@ -200,6 +250,8 @@ export default function Settings({ metadata, conversationLog }) {
         second: '2-digit',
       })
     : '—';
+  const commitDisplay = metadata?.commitSha || metadata?.commitShaShort;
+  const deploymentDisplay = metadata?.deploymentUrl || '—';
 
   return (
     <main className="container" style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 32 }}>
@@ -307,10 +359,10 @@ export default function Settings({ metadata, conversationLog }) {
         }}
       >
         <span>
-          {metadata?.repoName} @ {metadata?.branchName} • {metadata?.commitShaShort}
+          {metadata?.repoName} @ {metadata?.branchName} • {commitDisplay}
         </span>
         <span>
-          {metadata?.deploymentUrl} • {timestamp}
+          {deploymentDisplay} • {timestamp}
         </span>
       </footer>
     </main>

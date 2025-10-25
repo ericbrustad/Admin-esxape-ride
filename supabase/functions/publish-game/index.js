@@ -1,4 +1,4 @@
-// supabase/functions/publish-game/index.ts
+// supabase/functions/publish-game/index.js
 // Aggregates the latest game data into the published snapshot table.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';
@@ -74,7 +74,7 @@ serve(async (req) => {
         .select('id, slug, bucket, path, mime_type, size_bytes, tags, metadata'),
     ]);
 
-    const mediaIndex = new Map<string, any>();
+    const mediaIndex = new Map();
     (media ?? []).forEach((item) => {
       mediaIndex.set(item.id, {
         id: item.id,
@@ -89,7 +89,7 @@ serve(async (req) => {
       });
     });
 
-    const missionMediaIndex = new Map<string, any[]>();
+    const missionMediaIndex = new Map();
     (missionMedia ?? []).forEach((row) => {
       const list = missionMediaIndex.get(row.mission_id) ?? [];
       list.push(row);

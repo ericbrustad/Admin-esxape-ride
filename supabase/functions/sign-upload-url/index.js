@@ -1,4 +1,4 @@
-// supabase/functions/sign-upload-url/index.ts
+// supabase/functions/sign-upload-url/index.js
 // Generates a short-lived signed upload URL for Supabase Storage objects.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';
@@ -39,7 +39,8 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const bucket = String(body.bucket || MEDIA_BUCKET);
     const path = String(body.path || '').replace(/^\/+/, '');
-    const contentType = typeof body.contentType === 'string' && body.contentType ? body.contentType : 'application/octet-stream';
+    const contentType =
+      typeof body.contentType === 'string' && body.contentType ? body.contentType : 'application/octet-stream';
     const upsert = Boolean(body.upsert);
 
     if (!path) {

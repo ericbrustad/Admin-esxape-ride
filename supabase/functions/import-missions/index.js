@@ -1,4 +1,4 @@
-// supabase/functions/import-missions/index.ts
+// supabase/functions/import-missions/index.js
 // Loads a CSV or JSON file from Supabase Storage and upserts missions for a game.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';
@@ -24,7 +24,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-function parseBoolean(value: unknown, fallback = true) {
+function parseBoolean(value, fallback = true) {
   if (typeof value === 'boolean') return value;
   const normalized = String(value ?? '').trim().toLowerCase();
   if (normalized === 'true' || normalized === '1' || normalized === 'yes') return true;
@@ -32,12 +32,12 @@ function parseBoolean(value: unknown, fallback = true) {
   return fallback;
 }
 
-function parseNumber(value: unknown) {
+function parseNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 }
 
-function buildGeo(row: Record<string, unknown>) {
+function buildGeo(row) {
   const lat = parseNumber(row.lat ?? row.latitude);
   const lng = parseNumber(row.lng ?? row.lon ?? row.longitude);
   const radius = parseNumber(row.radius ?? row.range ?? row.radius_meters);
@@ -49,7 +49,7 @@ function buildGeo(row: Record<string, unknown>) {
   };
 }
 
-async function loadFile(bucket: string, path: string) {
+async function loadFile(bucket, path) {
   const { data, error } = await supabase.storage.from(bucket).download(path);
   if (error || !data) {
     throw new Error(error?.message || 'Unable to download import file');
@@ -59,15 +59,15 @@ async function loadFile(bucket: string, path: string) {
   return text;
 }
 
-function parseCsvText(text: string) {
+function parseCsvText(text) {
   const rows = parse(text.trim(), { skipFirstRow: false });
   if (!Array.isArray(rows) || rows.length === 0) return [];
-  const header = rows[0]?.map?.((col: unknown) => String(col || '').trim()) ?? [];
-  const items = [] as Record<string, string>[];
+  const header = rows[0]?.map?.((col) => String(col || '').trim()) ?? [];
+  const items = [];
   for (let i = 1; i < rows.length; i += 1) {
     const raw = rows[i];
     if (!raw) continue;
-    const entry: Record<string, string> = {};
+    const entry = {};
     header.forEach((column, idx) => {
       entry[column] = String(raw[idx] ?? '').trim();
     });
@@ -77,16 +77,16 @@ function parseCsvText(text: string) {
   return items;
 }
 
-function parseJsonText(text: string) {
+function parseJsonText(text) {
   const data = JSON.parse(text);
-  if (Array.isArray(data)) return data as Record<string, unknown>[];
-  if (Array.isArray(data?.missions)) return data.missions as Record<string, unknown>[];
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.missions)) return data.missions;
   return [];
 }
 
-function safeJson(value: unknown) {
+function safeJson(value) {
   if (!value) return null;
-  if (typeof value === 'object') return value as Record<string, unknown>;
+  if (typeof value === 'object') return value;
   try {
     return JSON.parse(String(value));
   } catch {
@@ -156,7 +156,7 @@ serve(async (req) => {
       .select('id, slug')
       .eq('game_id', gameId);
 
-    const missionIndex = new Map<string, string>();
+    const missionIndex = new Map();
     (existingMissions ?? []).forEach((mission) => {
       missionIndex.set(mission.slug, mission.id);
     });
@@ -169,10 +169,10 @@ serve(async (req) => {
       added: 0,
       updated: 0,
       skipped: 0,
-      errors: [] as { row: number; slug: string; error: string }[],
+      errors: [],
     };
 
-    const mediaToLink: { missionSlug: string; mediaPath: string; role: string }[] = [];
+    const mediaToLink = [];
 
     for (let i = 0; i < rows.length; i += 1) {
       const raw = rows[i] ?? {};
@@ -189,9 +189,9 @@ serve(async (req) => {
         title: String(raw.title || raw.name || slug),
         type: String(raw.type || raw.kind || 'statement'),
         description: raw.description ? String(raw.description) : null,
-        geo: buildGeo(raw) as Record<string, unknown> | null,
-        triggers: safeJson(raw.triggers) as Record<string, unknown> | null,
-        config: safeJson(raw.config) as Record<string, unknown> | null,
+        geo: buildGeo(raw),
+        triggers: safeJson(raw.triggers),
+        config: safeJson(raw.config),
         order_index: parseNumber(raw.order_index ?? raw.sort ?? i) ?? i,
         is_active: parseBoolean(raw.is_active ?? raw.active ?? true),
       };
