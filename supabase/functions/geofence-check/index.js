@@ -1,4 +1,4 @@
-// supabase/functions/geofence-check/index.ts
+// supabase/functions/geofence-check/index.js
 // Returns missions and devices within range of the provided coordinates.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.48.0';
@@ -21,9 +21,9 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000; // earth radius in meters
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toRad = (deg) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
@@ -95,9 +95,9 @@ serve(async (req) => {
         .eq('game_id', gameFilterId),
     ]);
 
-    const evaluate = (items: any[], type: 'mission' | 'device') => {
-      const eligible: any[] = [];
-      const distances: any[] = [];
+    const evaluate = (items, type) => {
+      const eligible = [];
+      const distances = [];
       for (const item of items ?? []) {
         if (!item?.is_active) continue;
         const geo = item.geo ?? {};

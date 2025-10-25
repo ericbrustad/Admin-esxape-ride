@@ -1,13 +1,26 @@
-import React from 'react';
-import { getBackpack, removePocketItem } from '../lib/backpack';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getBackpackMap, onBackpackChange, removePocketItem } from '../lib/backpack';
 
 export default function BackpackDrawer({ slug, open, onClose }) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!slug) return undefined;
+    const unsubscribe = onBackpackChange(slug, () => setTick((v) => v + 1));
+    return unsubscribe;
+  }, [slug]);
+
+  const snapshot = useMemo(() => {
+    if (!slug) return new Map();
+    return getBackpackMap(slug);
+  }, [slug, tick]);
+
   if (!open) return null;
-  const s = getBackpack(slug);
-  const ph = (s.pockets?.photos)||[];
-  const rw = (s.pockets?.rewards)||[];
-  const ut = (s.pockets?.utilities)||[];
-  const cl = (s.pockets?.clues)||[];
+
+  const ph = snapshot.get('photos') || [];
+  const rw = snapshot.get('rewards') || [];
+  const ut = snapshot.get('utilities') || [];
+  const cl = snapshot.get('clues') || [];
 
   return (
     <div style={wrap} onClick={onClose}>

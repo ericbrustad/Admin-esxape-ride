@@ -95,6 +95,7 @@ const ADMIN_META_INITIAL_STATE = {
     packageManager: '',
     environment: '',
     platform: '',
+    yarnPath: '',
   },
 };
 function classifyByExt(u) {
@@ -702,6 +703,7 @@ export default function Admin() {
   const [newCoverDropActive, setNewCoverDropActive] = useState(false);
   const newGameCoverInputRef = useRef(null);
   const newGameSlugSeed = useRef('');
+  const newGameSlugEdited = useRef(false);
 
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
@@ -794,6 +796,13 @@ export default function Admin() {
     return newGameSlugSeed.current;
   }
 
+  function buildSuggestedSlug(title) {
+    const base = slugifyTitle(title) || 'escape-ride';
+    const suffix = ensureNewGameSlugSeed();
+    const combined = `${base}-${suffix}`.replace(/-+/g, '-');
+    return combined.slice(0, 48);
+  }
+
   const setStatus = useCallback((message) => {
     if (typeof message === 'function') {
       setStatusInternal((prev) => {
@@ -820,6 +829,7 @@ export default function Admin() {
     setNewAlertMin(10);
     setNewGameSlug('');
     newGameSlugSeed.current = '';
+    newGameSlugEdited.current = false;
     setNewShortDesc('');
     setNewLongDesc('');
     setNewCoverPreview('');
@@ -908,6 +918,27 @@ export default function Admin() {
     updateNewGameStatus('✅ Using cover from the media pool.', 'success');
   }
 
+  function handleNewGameSlugInput(value) {
+    newGameSlugEdited.current = true;
+    const sanitized = slugifyTitle(value);
+    setNewGameSlug(sanitized);
+    logConversation('You', `Edited slug to “${value}”`);
+    logConversation('GPT', sanitized
+      ? `Slug captured as ${sanitized}.`
+      : 'Slug cleared — a new value will be generated when you save.');
+  }
+
+  function regenerateNewGameSlug({ resetSeed = false } = {}) {
+    if (resetSeed) {
+      newGameSlugSeed.current = '';
+    }
+    newGameSlugEdited.current = false;
+    const suggestion = buildSuggestedSlug(newTitle);
+    setNewGameSlug(suggestion);
+    logConversation('You', 'Regenerated slug suggestion');
+    logConversation('GPT', `Suggested slug updated to ${suggestion || 'default'}.`);
+  }
+
   async function handleCreateNewGame() {
     if (newGameBusy) return;
     const title = newTitle.trim();
@@ -920,7 +951,12 @@ export default function Admin() {
       updateNewGameStatus('❌ Title is required.', 'danger');
       return;
     }
-    const slugInput = (newGameSlug || `${slugifyTitle(title) || 'escape-ride'}-${ensureNewGameSlugSeed()}`).trim().slice(0, 48);
+    const slugCandidate = slugifyTitle(newGameSlug);
+    const slugInput = (slugCandidate || buildSuggestedSlug(title)).trim().slice(0, 48);
+    if (!slugCandidate) {
+      newGameSlugEdited.current = false;
+      setNewGameSlug(slugInput);
+    }
     setNewGameBusy(true);
     updateNewGameStatus('Creating game…', 'info');
     let coverPath = newCoverSelectedUrl;
@@ -961,10 +997,9 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    const base = slugifyTitle(newTitle) || 'escape-ride';
-    const suffix = ensureNewGameSlugSeed();
-    const combined = `${base}-${suffix}`.replace(/-+/g, '-');
-    setNewGameSlug(combined.slice(0, 48));
+    if (newGameSlugEdited.current) return;
+    const suggestion = buildSuggestedSlug(newTitle);
+    setNewGameSlug(suggestion);
   }, [newTitle]);
 
   useEffect(() => {
@@ -2465,6 +2500,15 @@ export default function Admin() {
   const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
   const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
+  const metaRuntimeYarnPathRaw = adminMeta.runtime?.yarnPath ? String(adminMeta.runtime.yarnPath) : '';
+  const metaRuntimeYarnPath = metaRuntimeYarnPathRaw
+    ? metaRuntimeYarnPathRaw.split(/\r?\n/).find(Boolean) || ''
+    : '';
+  const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
+  const metaBranchDisplay = metaBranchLabel || '—';
+  const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
+  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || '—';
+  const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3856,7 +3900,7 @@ export default function Admin() {
               Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • Yarn {metaRuntimeYarnLabel || '—'}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned Yarn {metaPinnedYarnLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • Yarn {metaRuntimeYarnLabel || '—'}{metaRuntimeYarnPath ? ` @ ${metaRuntimeYarnPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned Yarn {metaPinnedYarnLabel || '—'}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>
@@ -3864,7 +3908,37 @@ export default function Admin() {
               </div>
             )}
             <div style={S.settingsFooterTime}>
-              Footer Audit — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Snapshot {metaTimestampLabel || '—'} • Local {metaNowLabel || '—'}
+              Deployment Snapshot — Repo{' '}
+              {metaRepoUrl ? (
+                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                  {metaRepoDisplay}
+                </a>
+              ) : (
+                metaRepoDisplay
+              )}{' '}
+              • Branch {metaBranchDisplay}{' '}
+              • Commit{' '}
+              {metaCommitUrl ? (
+                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                  {metaCommitDisplay}
+                </a>
+              ) : (
+                metaCommitDisplay
+              )}{' '}
+              • Deployment{' '}
+              {metaDeploymentUrl ? (
+                <a
+                  href={metaDeploymentUrl.startsWith('http') ? metaDeploymentUrl : `https://${metaDeploymentUrl}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={S.settingsFooterLink}
+                >
+                  {metaDeploymentDisplay}
+                </a>
+              ) : (
+                metaDeploymentDisplay
+              )}{' '}
+              • Timestamp {metaFooterTimestamp}
             </div>
           </footer>
         </main>
@@ -4002,6 +4076,30 @@ export default function Admin() {
                 />
                 <div style={S.noteText}>This name appears wherever the game is listed.</div>
                 <div style={S.noteText}>A unique slug is generated automatically for storage and Supabase lookups.</div>
+              </Field>
+              <Field label="Game Slug">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8, alignItems:'center' }}>
+                  <input
+                    style={S.input}
+                    value={newGameSlug}
+                    onChange={(e)=>handleNewGameSlugInput(e.target.value)}
+                    placeholder="escape-ride-starship"
+                    maxLength={48}
+                  />
+                  <button
+                    type="button"
+                    style={{ ...S.button, whiteSpace:'nowrap' }}
+                    onClick={()=>regenerateNewGameSlug({ resetSeed: true })}
+                  >
+                    Reset slug
+                  </button>
+                </div>
+                <div style={S.noteText}>
+                  Used for file storage and Supabase records. Lowercase, numbers, and dashes only. Max 48 characters.
+                </div>
+                <div style={S.noteText}>
+                  Example path: <code>/public/games/{newGameSlug || 'your-slug'}</code>
+                </div>
               </Field>
               <Field label="Game Type">
                 <select style={S.input} value={newType} onChange={(e)=>setNewType(e.target.value)}>
