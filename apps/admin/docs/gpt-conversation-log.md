@@ -105,3 +105,11 @@
 **You:** Turn off all proxies and try again so the Supabase signing endpoint works with the Admin viewer. Reapply the original signing route and simple gallery.
 
 **GPT:** Reset the repo to commit 8de3300, restored the Supabase signing API and gallery test page, and prepared to verify settings metadata after testing.
+
+---
+
+**Timestamp:** 2025-10-25T20:30:00Z
+
+**You:** Override any yarn build references in development so the admin workspace only relies on npm.
+
+**GPT:** Updated the admin metadata API and settings footer to surface npm runtime details instead of yarn, preserved pinned package manager info, and reran the admin build to confirm the npm-first workflow passes.

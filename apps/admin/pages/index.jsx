@@ -88,14 +88,15 @@ const ADMIN_META_INITIAL_STATE = {
   error: '',
   runtime: {
     node: '',
-    yarn: '',
+    npm: '',
+    npmPath: '',
     corepack: '',
     pinnedNode: '',
+    pinnedNpm: '',
     pinnedYarn: '',
     packageManager: '',
     environment: '',
     platform: '',
-    yarnPath: '',
   },
 };
 function classifyByExt(u) {
@@ -2494,8 +2495,6 @@ export default function Admin() {
   const metaRuntimeNodeLabel = metaRuntimeNodeRaw
     ? (metaRuntimeNodeRaw.startsWith('v') ? metaRuntimeNodeRaw : `v${metaRuntimeNodeRaw}`)
     : '';
-  const metaRuntimeYarnRaw = adminMeta.runtime?.yarn ? String(adminMeta.runtime.yarn) : '';
-  const metaRuntimeYarnLabel = metaRuntimeYarnRaw || '';
   const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
   const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
   const metaRuntimeEnv = adminMeta.runtime?.environment || '';
@@ -2505,13 +2504,17 @@ export default function Admin() {
   const metaRuntimePlatform = adminMeta.runtime?.platform || '';
   const metaPinnedNodeRaw = adminMeta.runtime?.pinnedNode ? String(adminMeta.runtime.pinnedNode) : '';
   const metaPinnedNodeLabel = metaPinnedNodeRaw || '';
+  const metaRuntimeNpmRaw = adminMeta.runtime?.npm ? String(adminMeta.runtime.npm) : '';
+  const metaRuntimeNpmLabel = metaRuntimeNpmRaw || '';
+  const metaRuntimeNpmPathRaw = adminMeta.runtime?.npmPath ? String(adminMeta.runtime.npmPath) : '';
+  const metaRuntimeNpmPath = metaRuntimeNpmPathRaw
+    ? metaRuntimeNpmPathRaw.split(/\r?\n/).find(Boolean) || ''
+    : '';
+  const metaPinnedNpmRaw = adminMeta.runtime?.pinnedNpm ? String(adminMeta.runtime.pinnedNpm) : '';
+  const metaPinnedNpmLabel = metaPinnedNpmRaw || '';
   const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
   const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
-  const metaRuntimeYarnPathRaw = adminMeta.runtime?.yarnPath ? String(adminMeta.runtime.yarnPath) : '';
-  const metaRuntimeYarnPath = metaRuntimeYarnPathRaw
-    ? metaRuntimeYarnPathRaw.split(/\r?\n/).find(Boolean) || ''
-    : '';
   const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
   const metaBranchDisplay = metaBranchLabel || '—';
   const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
@@ -3908,7 +3911,7 @@ export default function Admin() {
               Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • Yarn {metaRuntimeYarnLabel || '—'}{metaRuntimeYarnPath ? ` @ ${metaRuntimeYarnPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned Yarn {metaPinnedYarnLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • npm {metaRuntimeNpmLabel || '—'}{metaRuntimeNpmPath ? ` @ ${metaRuntimeNpmPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'}{metaPinnedNpmLabel ? ` • Pinned npm ${metaPinnedNpmLabel}` : ''}{metaPinnedYarnLabel ? ` • Pinned Yarn ${metaPinnedYarnLabel}` : ''}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>

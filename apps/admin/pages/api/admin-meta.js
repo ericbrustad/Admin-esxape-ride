@@ -51,27 +51,30 @@ function detectGitMetadata() {
 
 function buildRuntimeMetadata() {
   const nodeVersion = process.version || '';
-  const yarnVersion = safeExec('yarn --version');
-  const yarnPathRaw = process.platform === 'win32'
-    ? safeExec('where yarn')
-    : safeExec('command -v yarn');
-  const yarnPath = yarnPathRaw.split(/\r?\n/).find(Boolean) || '';
+  const npmVersion = safeExec('npm --version');
+  const npmPathRaw = process.platform === 'win32'
+    ? safeExec('where npm')
+    : safeExec('command -v npm');
+  const npmPath = npmPathRaw.split(/\r?\n/).find(Boolean) || '';
   const corepackVersion = safeExec('corepack --version');
   const pinnedNode = packageJson?.volta?.node || '';
-  const pinnedYarn = packageJson?.volta?.yarn || (
-    typeof packageJson?.packageManager === 'string'
-      ? packageJson.packageManager.split('@')[1] || ''
-      : ''
-  );
+  const pinnedYarn = packageJson?.volta?.yarn || '';
+  const packageManager = typeof packageJson?.packageManager === 'string'
+    ? packageJson.packageManager
+    : '';
+  const pinnedNpm = packageManager.startsWith('npm@')
+    ? packageManager.split('@')[1] || ''
+    : '';
 
   return {
     node: nodeVersion,
-    yarn: yarnVersion,
-    yarnPath,
+    npm: npmVersion,
+    npmPath,
     corepack: corepackVersion,
     pinnedNode,
+    pinnedNpm,
     pinnedYarn,
-    packageManager: packageJson?.packageManager || '',
+    packageManager,
     environment: process.env.VERCEL ? 'vercel' : (process.env.NODE_ENV || 'development'),
     platform: `${process.platform} ${process.arch}`,
   };
