@@ -179,6 +179,16 @@ export async function getServerSideProps() {
       message:
         'Restored the interactive missions, added mmaps for mission/media lookup plus backpack persistence, and verified the Settings snapshot still reports the repository, branch, commit, deployment, and timestamp.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Use the latest work branch for game-esxape-ride, rebuild the mobile mission map without Leaflet, keep the backpack pinned to the lower-left, surface live location, and overlay mission media/text as it streams in.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Shipped the mmaps-driven full-screen mission canvas with live geolocation, adaptive mission overlays, and an anchored backpack control so Android and iOS players can track updates in real time.',
+    },
   ];
 
   return {
