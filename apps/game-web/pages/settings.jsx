@@ -169,6 +169,16 @@ export async function getServerSideProps() {
       message:
         'Updated the checked-in Node version to 22.11.0, rewired yarn build to run the admin and game workspaces sequentially so the routes manifest exists, expanded the Yarn lockfile, refreshed the safeguards, and reran both Next.js builds to verify outputs.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        "Let's bring the Escape Ride game back to life—replace the smoke test with the interactive mission runner and use mmaps to power the game flow and backpack state.",
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Restored the interactive missions, added mmaps for mission/media lookup plus backpack persistence, and verified the Settings snapshot still reports the repository, branch, commit, deployment, and timestamp.',
+    },
   ];
 
   return {
