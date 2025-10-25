@@ -5,7 +5,6 @@
   "engines": {
     "node": "22.x"
   },
-  "packageManager": "yarn@4.9.4",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

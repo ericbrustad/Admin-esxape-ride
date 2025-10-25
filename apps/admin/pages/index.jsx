@@ -88,14 +88,14 @@ const ADMIN_META_INITIAL_STATE = {
   error: '',
   runtime: {
     node: '',
-    yarn: '',
+    npm: '',
     corepack: '',
     pinnedNode: '',
-    pinnedYarn: '',
+    pinnedNpm: '',
     packageManager: '',
     environment: '',
     platform: '',
-    yarnPath: '',
+    npmPath: '',
   },
 };
 function classifyByExt(u) {
@@ -734,11 +734,11 @@ export default function Admin() {
     [
       {
         speaker: 'You',
-        text: 'Swapped the repo over to Yarn workspaces so builds no longer depend on pnpm/Corepack.',
+        text: 'Swapped the repo over to npm workspaces so builds no longer depend on Yarn/Corepack artifacts.',
       },
       {
         speaker: 'GPT',
-        text: 'Rewired the admin and game build scripts to Yarn workspace commands and confirmed local Next.js binaries are still available when installs fail.',
+        text: 'Rewired the admin and game build scripts to npm workspace commands and confirmed local Next.js binaries are still available when installs fail.',
       },
       {
         speaker: 'You',
@@ -746,11 +746,11 @@ export default function Admin() {
       },
       {
         speaker: 'GPT',
-        text: 'Confirmed Next.js build runs cleanly now that Yarn is no longer invoked for missing types.',
+        text: 'Confirmed Next.js build runs cleanly now that npm no longer invokes TypeScript downloads.',
       },
       {
         speaker: 'You',
-        text: 'Pinned Volta to Node 22.11.0 and Yarn 4.9.4 so every sandbox step uses the same toolchain.',
+        text: 'Pinned Volta to Node 22.11.0 and npm 10.8.2 so every sandbox step uses the same toolchain.',
       },
       {
         speaker: 'GPT',
@@ -786,7 +786,7 @@ export default function Admin() {
       },
       {
         speaker: 'GPT',
-        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime alongside Yarn 4.',
+        text: 'Updated package.json and Volta pins mean Vercel detects the supported Node 22 runtime alongside npm 10.',
       },
     ].forEach(({ speaker, text }) => logConversation(speaker, text));
     initialConversationLoggedRef.current = true;
@@ -2494,8 +2494,8 @@ export default function Admin() {
   const metaRuntimeNodeLabel = metaRuntimeNodeRaw
     ? (metaRuntimeNodeRaw.startsWith('v') ? metaRuntimeNodeRaw : `v${metaRuntimeNodeRaw}`)
     : '';
-  const metaRuntimeYarnRaw = adminMeta.runtime?.yarn ? String(adminMeta.runtime.yarn) : '';
-  const metaRuntimeYarnLabel = metaRuntimeYarnRaw || '';
+  const metaRuntimeNpmRaw = adminMeta.runtime?.npm ? String(adminMeta.runtime.npm) : '';
+  const metaRuntimeNpmLabel = metaRuntimeNpmRaw || '';
   const metaRuntimeCorepackRaw = adminMeta.runtime?.corepack ? String(adminMeta.runtime.corepack) : '';
   const metaRuntimeCorepackLabel = metaRuntimeCorepackRaw || '';
   const metaRuntimeEnv = adminMeta.runtime?.environment || '';
@@ -2505,12 +2505,12 @@ export default function Admin() {
   const metaRuntimePlatform = adminMeta.runtime?.platform || '';
   const metaPinnedNodeRaw = adminMeta.runtime?.pinnedNode ? String(adminMeta.runtime.pinnedNode) : '';
   const metaPinnedNodeLabel = metaPinnedNodeRaw || '';
-  const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
-  const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
+  const metaPinnedNpmRaw = adminMeta.runtime?.pinnedNpm ? String(adminMeta.runtime.pinnedNpm) : '';
+  const metaPinnedNpmLabel = metaPinnedNpmRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
-  const metaRuntimeYarnPathRaw = adminMeta.runtime?.yarnPath ? String(adminMeta.runtime.yarnPath) : '';
-  const metaRuntimeYarnPath = metaRuntimeYarnPathRaw
-    ? metaRuntimeYarnPathRaw.split(/\r?\n/).find(Boolean) || ''
+  const metaRuntimeNpmPathRaw = adminMeta.runtime?.npmPath ? String(adminMeta.runtime.npmPath) : '';
+  const metaRuntimeNpmPath = metaRuntimeNpmPathRaw
+    ? metaRuntimeNpmPathRaw.split(/\r?\n/).find(Boolean) || ''
     : '';
   const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
   const metaBranchDisplay = metaBranchLabel || '—';
@@ -3908,7 +3908,7 @@ export default function Admin() {
               Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
-              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • Yarn {metaRuntimeYarnLabel || '—'}{metaRuntimeYarnPath ? ` @ ${metaRuntimeYarnPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned Yarn {metaPinnedYarnLabel || '—'}
+              Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • npm {metaRuntimeNpmLabel || '—'}{metaRuntimeNpmPath ? ` @ ${metaRuntimeNpmPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'} • Pinned npm {metaPinnedNpmLabel || '—'}
             </div>
             {metaRuntimePackageManager && (
               <div style={S.settingsFooterTime}>

@@ -10,9 +10,9 @@ function safe(cmd) {
 console.log("=== VERCEL BUILD TOOLCHAIN ===");
 console.log("node:", process.version);
 const corepackV = safe("corepack --version") || "(unavailable)";
-const yarnV     = safe("yarn --version") || "(unavailable)";
+const npmV      = safe("npm --version") || "(unavailable)";
 console.log("corepack:", corepackV);
-console.log("yarn:", yarnV);
+console.log("npm:", npmV);
 
 const major = Number(process.version.slice(1).split(".")[0]);
 if (major !== 22) {
