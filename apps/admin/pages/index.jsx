@@ -766,6 +766,14 @@ export default function Admin() {
       },
       {
         speaker: 'You',
+        text: 'Hooked up Supabase ping, storage list, and signed URL endpoints for the admin toolbox.',
+      },
+      {
+        speaker: 'GPT',
+        text: 'Exposed the Supabase health check API trio and a thumbnail viewer so operators can spot media issues quickly.',
+      },
+      {
+        speaker: 'You',
         text: 'Removed the disabled publishing banner from the New Game modal and streamlined the launch button.',
       },
       {
@@ -3939,6 +3947,9 @@ export default function Admin() {
                 metaDeploymentDisplay
               )}{' '}
               • Timestamp {metaFooterTimestamp}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Repository Snapshot — {metaRepoDisplay} • Branch {metaBranchDisplay} • Commit {metaCommitDisplay} • Vercel {metaVercelLabel || metaDeploymentDisplay} • Recorded {metaFooterTimestamp}
             </div>
           </footer>
         </main>

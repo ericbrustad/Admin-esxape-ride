@@ -1,5 +1,13 @@
 # Operator ↔ GPT Debug Log
 
+---
+
+**Timestamp:** 2025-10-25T15:07:42Z
+
+**You:** The Supabase signing route is double-encoding folder paths and the gallery page hides failures. Turn off any proxy overrides and get the admin build to pass once the fixes land.
+
+**GPT:** Normalized each object path segment before signing, enriched the Supabase gallery with parallel signing plus inline expiry/error details, and reran the admin workspace build without proxy helpers to verify the bundle succeeds.
+
 **Timestamp:** 2025-10-21T02:57:59Z
 
 **You:** I'm seeing an "React has detected a change in the order of Hooks" warning when the admin dashboard loads. What steps should I take to fix this safely?
@@ -90,3 +98,10 @@
 **You:** Lock every engine entry to Node 20.18.1 exactly—no wildcard ranges allowed.
 
 **GPT:** Replaced each `20.x` engine range with `20.18.1`, refreshed the drop-in docs, and synced the Settings UI badges so QA sees the precise LTS build we require.
+---
+
+**Timestamp:** 2025-10-25T15:13:29Z
+
+**You:** Turn off all proxies and try again so the Supabase signing endpoint works with the Admin viewer. Reapply the original signing route and simple gallery.
+
+**GPT:** Reset the repo to commit 8de3300, restored the Supabase signing API and gallery test page, and prepared to verify settings metadata after testing.
