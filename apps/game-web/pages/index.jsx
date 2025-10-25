@@ -587,7 +587,6 @@ function GameApp() {
     <main style={outer}>
       <MissionMap
         missions={missionsForMap}
-        devices={devicesForMap}
         currentId={missionId}
         answers={answers}
         onSelect={(id) => {
