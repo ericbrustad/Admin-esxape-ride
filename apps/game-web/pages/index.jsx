@@ -231,27 +231,7 @@ function GameApp() {
         return;
       }
 
-      try {
-        if (SUPABASE_ENABLED) {
-          const bundle = await fetchGameBundle({ slug, channel });
-          if (cancelled) return;
-          const missions = Array.isArray(bundle?.missions) ? bundle.missions : [];
-          const devices = Array.isArray(bundle?.devices) ? bundle.devices : [];
-          const configFromSupabase = bundle?.config && typeof bundle.config === 'object'
-            ? { ...bundle.config }
-            : {};
-          if (!Array.isArray(configFromSupabase.devices)) {
-            configFromSupabase.devices = devices;
-          }
-          if (!Array.isArray(configFromSupabase.powerups) && Array.isArray(devices)) {
-            configFromSupabase.powerups = configFromSupabase.powerups || [];
-          }
-          setSuite({ missions });
-          setConfig(configFromSupabase);
-          setStatus('');
-          return;
-        }
-
+      const loadStaticBundle = async () => {
         const base = channel === 'published' ? 'published' : 'draft';
         const missionsRes = await fetch(`/games/${encodeURIComponent(slug)}/${base}/missions.json`, { cache: 'no-store' });
         if (!missionsRes.ok) throw new Error(`missions ${missionsRes.status}`);
@@ -263,6 +243,40 @@ function GameApp() {
         setSuite(ms);
         setConfig(cfg);
         setStatus('');
+      };
+
+      const loadSupabaseBundle = async () => {
+        const bundle = await fetchGameBundle({ slug, channel });
+        if (cancelled) return;
+        const missions = Array.isArray(bundle?.missions) ? bundle.missions : [];
+        const devices = Array.isArray(bundle?.devices) ? bundle.devices : [];
+        const configFromSupabase = bundle?.config && typeof bundle.config === 'object'
+          ? { ...bundle.config }
+          : {};
+        if (!Array.isArray(configFromSupabase.devices)) {
+          configFromSupabase.devices = devices;
+        }
+        if (!Array.isArray(configFromSupabase.powerups) && Array.isArray(devices)) {
+          configFromSupabase.powerups = configFromSupabase.powerups || [];
+        }
+        setSuite({ missions });
+        setConfig(configFromSupabase);
+        setStatus('');
+      };
+
+      try {
+        if (SUPABASE_ENABLED) {
+          try {
+            await loadSupabaseBundle();
+            return;
+          } catch (supabaseError) {
+            if (cancelled) return;
+            console.warn('Supabase bundle fetch failed, falling back to cached files', supabaseError);
+            setStatus('Supabase unavailable, loading cached bundle…');
+          }
+        }
+
+        await loadStaticBundle();
       } catch (e) {
         if (cancelled) return;
         console.error('Failed to load game bundle', e);
