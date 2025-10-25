@@ -4,12 +4,13 @@ export default async function handler(req, res) {
     const srk = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
     const bucket = (req.query.bucket || process.env.SUPABASE_MEDIA_BUCKET || '').toString().trim();
     const path = (req.query.path || '').toString().trim();
-    const expiresIn = Math.max(10, Math.min(60 * 60, Number(req.query.expiresIn || 300))); // default 5 min
+    const expiresIn = Math.max(10, Math.min(3600, Number(req.query.expiresIn || 300))); // default 5 min
 
     if (!baseUrl || !srk) return res.status(400).json({ ok: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
     if (!bucket || !path) return res.status(400).json({ ok: false, error: 'Provide ?bucket= & ?path=' });
 
-    const url = `${baseUrl}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${encodeURIComponent(path)}`;
+    const encPath = (p) => String(p).split('/').map(encodeURIComponent).join('/');
+    const url = `${baseUrl}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${encPath(path)}`;
     const r = await fetch(url, {
       method: 'POST',
       headers: {

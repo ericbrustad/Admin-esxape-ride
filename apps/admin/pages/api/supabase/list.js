@@ -16,7 +16,6 @@ export default async function handler(req, res) {
     }
     if (!bucket) return res.status(400).json({ ok: false, error: 'Provide ?bucket= or set SUPABASE_MEDIA_BUCKET' });
 
-    let data = null, text = null;
     try {
       const r = await fetch(`${baseUrl}/storage/v1/object/list/${encodeURIComponent(bucket)}`, {
         method: 'POST',
@@ -27,16 +26,32 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({ prefix, limit: 100, offset: 0, sortBy: { column: 'name', order: 'asc' } })
       });
-      text = await r.text();
-      data = text ? (JSON.parse.bind(JSON))(text) : null; // parse if JSON
+
+      const text = await r.text();
+      const data = text
+        ? (() => {
+            try {
+              return JSON.parse(text);
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+
       if (!r.ok) {
-        return res.status(200).json({ ok: false, error: text || `HTTP ${r.status}`, bucket, prefix });
+        return res.status(200).json({
+          ok: false,
+          error: text || `HTTP ${r.status}`,
+          bucket,
+          prefix,
+          ...(debug ? { baseUrl } : {})
+        });
       }
+
+      return res.status(200).json({ ok: true, bucket, prefix, count: data?.length || 0, files: data, ...(debug ? { baseUrl } : {}) });
     } catch (e) {
       return res.status(500).json({ ok: false, error: e.message, ...(debug ? { bucket, prefix, baseUrl } : {}) });
     }
-
-    return res.status(200).json({ ok: true, bucket, prefix, count: data?.length || 0, files: data });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e.message, ...(debug ? { stack: e.stack } : {}) });
   }
