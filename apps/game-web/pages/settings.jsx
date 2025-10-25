@@ -229,6 +229,16 @@ export async function getServerSideProps() {
       message:
         'Ported each Supabase edge function to vanilla JavaScript, removed the stray type declaration, refreshed the Settings footer metadata, reran the Next.js production build, and logged this dialogue for future traceability.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Install Mapbox for the Escape Ride mission runner so the mobile game shows a full-screen map with the live player location, device placements, and mission pins ready for overlays.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Hooked the mission runner into Mapbox GL JS with token-aware loading, drew mission/device radius overlays, live location accuracy, and kept the existing UI chrome layered over the map while logging the change here.',
+    },
   ];
 
   return {
