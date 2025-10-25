@@ -1,5 +1,13 @@
 # Operator ↔ GPT Debug Log
 
+---
+
+**Timestamp:** 2025-10-25T15:07:42Z
+
+**You:** The Supabase signing route is double-encoding folder paths and the gallery page hides failures. Turn off any proxy overrides and get the admin build to pass once the fixes land.
+
+**GPT:** Normalized each object path segment before signing, enriched the Supabase gallery with parallel signing plus inline expiry/error details, and reran the admin workspace build without proxy helpers to verify the bundle succeeds.
+
 **Timestamp:** 2025-10-21T02:57:59Z
 
 **You:** I'm seeing an "React has detected a change in the order of Hooks" warning when the admin dashboard loads. What steps should I take to fix this safely?
@@ -90,3 +98,34 @@
 **You:** Lock every engine entry to Node 20.18.1 exactly—no wildcard ranges allowed.
 
 **GPT:** Replaced each `20.x` engine range with `20.18.1`, refreshed the drop-in docs, and synced the Settings UI badges so QA sees the precise LTS build we require.
+---
+
+**Timestamp:** 2025-10-25T15:13:29Z
+
+**You:** Turn off all proxies and try again so the Supabase signing endpoint works with the Admin viewer. Reapply the original signing route and simple gallery.
+
+**GPT:** Reset the repo to commit 8de3300, restored the Supabase signing API and gallery test page, and prepared to verify settings metadata after testing.
+---
+
+**Timestamp:** 2025-10-25T15:31:16Z
+
+**You:** Fix the zero-install prep by vendoring Yarn 4.9.4, running the install, and committing the release plus cache artifacts.
+
+**GPT:** Enabled Corepack, pinned Yarn 4.9.4, copied the prepared release into `.yarn/releases`, retried the install (blocked by the offline registry), and staged the reproducible toolchain assets for review.
+
+---
+
+**Timestamp:** 2025-10-25T16:05:00Z
+
+**You:** Switch to online mode, reset network settings, and rerun the Yarn 4.9.4 setup (Corepack enable, set version, install, commit the vendored release/cache) before pushing.
+
+**GPT:** Re-enabled Corepack, attempted to download Yarn 4.9.4, and retried `yarn install`; both steps still hit the 403 registry proxy block, so no new artifacts were generated beyond the existing vendored release. Documented the failure and reran the admin Next.js build to confirm the app stays healthy offline.
+
+---
+
+**Timestamp:** 2025-10-25T15:40:55Z
+
+**You:** Try routing Yarn through the port 8000 proxy and run `node ./.yarn/releases/yarn-4.9.4.cjs install --immutable --inline-builds`.
+
+**GPT:** Set `HTTP(S)_PROXY` to `http://127.0.0.1:8000` for the install attempt, but the registry still returned HTTP 403 during the resolution step, leaving the workspace unchanged.
+
