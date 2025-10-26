@@ -77,9 +77,12 @@ export default function GameMap({ overlays: overlaysProp }){
       if(!isMounted || !containerRef.current) return;
       const map = new glLib.Map({
         container: containerRef.current,
-        style: mode === "mapbox" ? "mapbox://styles/mapbox/streets-v12" : "https://demotiles.maplibre.org/style.json",
+        // Prefer Mapbox Standard (3D) when available, otherwise MapLibre demo tiles.
+        style: mode === "mapbox" ? "mapbox://styles/mapbox/standard" : "https://demotiles.maplibre.org/style.json",
         center: [-93.265, 44.9778],
         zoom: 12,
+        pitch: mode === "mapbox" ? 60 : 0,
+        bearing: mode === "mapbox" ? -17 : 0,
       });
       map.addControl(new glLib.NavigationControl({ visualizePitch: true }), "top-left");
       if (mode === "mapbox" && glLib.GeolocateControl) {
@@ -92,6 +95,18 @@ export default function GameMap({ overlays: overlaysProp }){
       mapRef.current = map;
       setEngine(mode);
       setEngineNote(fallbackNote);
+
+      if (mode === "mapbox") {
+        try {
+          if (typeof map.setProjection === "function") map.setProjection("globe");
+          const params = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
+          const preset = params?.get("light")?.toLowerCase?.() ?? "";
+          const allowed = ["day", "dawn", "dusk", "night"];
+          if (allowed.includes(preset) && typeof map.setConfigProperty === "function") {
+            map.setConfigProperty("basemap", "lightPreset", preset);
+          }
+        } catch {}
+      }
 
       // Build overlays
       const records = overlayRecordsRef.current;
