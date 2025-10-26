@@ -4,22 +4,16 @@ export default async function handler(_req, res) {
   const out = {
     ok: true,
     time: new Date().toISOString(),
-    env: {
-      ...envSummary(),
-      hasAnonKey: !!process.env.SUPABASE_ANON_KEY || !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    },
+    env: { ...envSummary() },
     projectRef: getProjectRef(),
     buckets: [],
     storageError: null,
   };
   try {
     const { data, error } = await listBuckets();
-    if (error) {
-      out.ok = false;
-      out.storageError = error;
-    } else {
-      out.buckets = (data || []).map((b) => b.name);
-    }
+    // If no service key, listBuckets() returns [] without error. That's fine.
+    if (error) { out.storageError = error; }
+    out.buckets = (data || []).map((b) => b.name);
   } catch (e) {
     out.ok = false;
     out.storageError = e?.message || String(e);

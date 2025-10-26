@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const { data, error } = await listBuckets();
     return res.status(200).json({
       ok: false,
-      error: "Missing ?bucket= parameter.",
+      error: "Missing ?bucket= parameter. (Tip: set SUPABASE_MEDIA_BUCKET or pass ?bucket=)",
       files: [],
       available: (data || []).map((b) => b.name),
       bucketsError: error ?? null,
@@ -17,20 +17,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data: buckets, error: lbErr } = await listBuckets();
-    if (lbErr) {
-      return res.status(200).json({ ok: false, error: lbErr, files: [] });
-    }
-    const exists = (buckets || []).some((b) => b.name === bucket);
-    if (!exists) {
-      return res.status(200).json({
-        ok: false,
-        error: `Bucket '${bucket}' not found`,
-        available: (buckets || []).map((b) => b.name),
-        files: [],
-      });
-    }
-
+    // Try listing the bucket directly; if it doesn't exist or is blocked by policy,
+    // Supabase returns an error which we surface.
     const { data, error } = await listFiles(bucket, prefix || "", 1000, { column: "name", order: "asc" });
     if (error) return res.status(200).json({ ok: false, error, files: [] });
     const files = (data || []).map((f) => ({
