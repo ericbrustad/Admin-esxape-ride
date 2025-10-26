@@ -1,3 +1,5 @@
+import { safeErrorMessage } from '../../../lib/safe-error';
+
 export default async function handler(req, res) {
   const debug = req.query.debug === '1';
   try {
@@ -33,11 +35,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: false, error: text || `HTTP ${r.status}`, bucket, prefix });
       }
     } catch (e) {
-      return res.status(500).json({ ok: false, error: e.message, ...(debug ? { bucket, prefix, baseUrl } : {}) });
+      return res.status(500).json({ ok: false, error: safeErrorMessage(e), ...(debug ? { bucket, prefix, baseUrl } : {}) });
     }
 
     return res.status(200).json({ ok: true, bucket, prefix, count: data?.length || 0, files: data });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message, ...(debug ? { stack: e.stack } : {}) });
+    return res.status(500).json({
+      ok: false,
+      error: safeErrorMessage(e),
+      ...(debug ? { stack: typeof e?.stack === 'string' ? e.stack : undefined } : {}),
+    });
   }
 }

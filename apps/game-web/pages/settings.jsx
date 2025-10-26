@@ -219,6 +219,26 @@ export async function getServerSideProps() {
       message:
         'Traced the failure to Supabase REST outages blocking bundle fetches, added an automatic fallback to the cached missions/config files, and verified the game page now recovers without the error banner.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Make sure the Supabase ping and list endpoints match the latest guidance, and surface the live repository, branch, commit, deployment URL, and timestamp at the very bottom of Settings with an updated GPT log entry.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Refreshed the Supabase API handlers for the game workspace, extended the Settings footer with the repository snapshot details, and recorded this exchange so the deployment metadata stays visible.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Install Yarn properly for the game workspace, generate a fresh lockfile inside apps/game-web without committing binaries, and rerun the Supabase diagnostics until the APIs hold steady.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Removed the vendored Yarn runtime, committed the standalone game lockfile, rewrote the Supabase storage API to call the REST endpoints directly, and logged the successful metadata snapshot with this exchange.',
+    },
   ];
 
   return {
@@ -240,7 +260,6 @@ export default function Settings({ metadata, conversationLog }) {
         second: '2-digit',
       })
     : '—';
-  const commitDisplay = metadata?.commitSha || metadata?.commitShaShort;
   const deploymentDisplay = metadata?.deploymentUrl || '—';
 
   return (
@@ -338,22 +357,28 @@ export default function Settings({ metadata, conversationLog }) {
 
       <footer
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: 8,
           alignItems: 'center',
-          justifyContent: 'space-between',
           fontSize: 13,
           color: 'var(--muted)',
           marginTop: 16,
+          borderTop: '1px solid var(--border)',
+          paddingTop: 12,
         }}
       >
+        <span><strong>Repository:</strong> {metadata?.repoName || '—'}</span>
+        <span><strong>Branch:</strong> {metadata?.branchName || '—'}</span>
         <span>
-          {metadata?.repoName} @ {metadata?.branchName} • {commitDisplay}
+          <strong>Commit:</strong>{' '}
+          <code>{metadata?.commitShaShort || '—'}</code>
+          {metadata?.commitSha && metadata.commitSha !== metadata.commitShaShort ? (
+            <span className="hint" style={{ marginLeft: 6 }}>{metadata.commitSha}</span>
+          ) : null}
         </span>
-        <span>
-          {deploymentDisplay} • {timestamp}
-        </span>
+        <span><strong>Deployment:</strong> {deploymentDisplay}</span>
+        <span><strong>Generated:</strong> {timestamp}</span>
       </footer>
     </main>
   );

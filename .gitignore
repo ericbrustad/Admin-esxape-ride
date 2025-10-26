@@ -2,6 +2,7 @@ node_modules/
 .next/
 public/game/node_modules/
 game/node_modules/
+.yarn/releases/
 .env.local
 .vercel
 .DS_Store

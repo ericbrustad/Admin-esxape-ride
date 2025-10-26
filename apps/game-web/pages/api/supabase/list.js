@@ -1,60 +1,73 @@
-import { createClient } from '@supabase/supabase-js';
-
-const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
-
-// Server-side client (service key stays on the server only)
-const supabase = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-  : null;
-
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
 
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'GET') {
-    return res.status(405).json({ ok: false, error: 'Method not allowed' });
-  }
+  const bucket = String(req.query.bucket || '').trim();
+  const prefix = String(req.query.prefix || '').trim();
 
-  if (!supabase) {
-    return res.status(500).json({
-      ok: false,
-      error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
-    });
-  }
-
-  const bucket = (req.query.bucket || 'media').toString();
-  const prefix = (req.query.prefix || '').toString();
+  if (!bucket) return res.status(400).json({ ok: false, error: 'Missing ?bucket' });
 
   try {
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(prefix, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+    const url = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (error) {
-      return res.status(200).json({
+    if (!url || !serviceKey) {
+      return res.status(500).json({ ok: false, error: 'Supabase credentials are not configured' });
+    }
+
+    const listEndpoint = new URL(`/storage/v1/object/list/${encodeURIComponent(bucket)}`, url);
+    const requestBody = {
+      prefix: prefix || '',
+      limit: 1000,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' },
+    };
+
+    const response = await fetch(listEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      let errorPayload;
+      try {
+        errorPayload = await response.json();
+      } catch (err) {
+        errorPayload = { error: response.statusText };
+      }
+
+      const bucketsEndpoint = new URL('/storage/v1/bucket', url);
+      const bucketsResponse = await fetch(bucketsEndpoint, {
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+      }).catch(() => null);
+
+      let available = [];
+      if (bucketsResponse?.ok) {
+        try {
+          const buckets = await bucketsResponse.json();
+          available = Array.isArray(buckets) ? buckets.map(b => b.name).filter(Boolean) : [];
+        } catch (err) {
+          available = [];
+        }
+      }
+
+      return res.status(response.status).json({
         ok: false,
-        bucket,
-        prefix,
-        error: error.message,
+        error: errorPayload?.error || 'Failed to list storage objects',
+        available,
       });
     }
 
-    return res.status(200).json({
-      ok: true,
-      bucket,
-      prefix,
-      files: data || [],
-    });
-  } catch (e) {
-    return res.status(200).json({
-      ok: false,
-      bucket,
-      prefix,
-      error: e?.message || 'Unknown error',
-    });
+    const data = await response.json();
+    return res.status(200).json({ ok: true, bucket, prefix, files: Array.isArray(data) ? data : [] });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err?.message || 'Unknown error' });
   }
 }
-
