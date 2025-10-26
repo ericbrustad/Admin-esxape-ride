@@ -1,4 +1,5 @@
 //2//
+import { safeErrorMessage } from '../../../lib/safe-error';
 
 export default async function handler(req, res) {
   try {
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ ok: true, projectRef, authHealth, buckets, bucketsError });
   } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    res.status(500).json({ ok: false, error: safeErrorMessage(e) });
   }
 }
 
