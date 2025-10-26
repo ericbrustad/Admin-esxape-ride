@@ -58,3 +58,31 @@ export function getDefaults() {
     prefix: process.env.NEXT_PUBLIC_SUPABASE_MEDIA_PREFIX || process.env.SUPABASE_MEDIA_PREFIX || "",
   };
 }
+
+// Fetch a JSON object from storage (public URL first, then auth if needed)
+export async function getObjectJson(bucket, path) {
+  const url = getSupabaseUrl();
+  if (!url) return { data: null, error: "Missing SUPABASE_URL" };
+
+  async function tryFetch(endpoint, headers = {}) {
+    const r = await fetch(endpoint, { headers });
+    if (!r.ok) return { ok: false, status: r.status, text: await r.text() };
+    try {
+      return { ok: true, json: await r.json() };
+    } catch (e) {
+      return { ok: false, status: 200, text: "Invalid JSON" };
+    }
+  }
+
+  // 1) Public (no auth)
+  let resp = await tryFetch(`${url}/storage/v1/object/public/${encodeURIComponent(bucket)}/${path}`);
+  if (resp.ok) return { data: resp.json, error: null };
+
+  // 2) Auth (service or anon)
+  const key = getServiceKey() || getAnonKey();
+  if (!key) return { data: null, error: "Missing service or anon key to fetch object" };
+  resp = await tryFetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${path}`, authHeaders(key));
+  if (resp.ok) return { data: resp.json, error: null };
+
+  return { data: null, error: resp.text || `HTTP ${resp.status}` };
+}

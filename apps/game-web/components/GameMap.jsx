@@ -7,7 +7,7 @@ import { emit, on, Events } from "../lib/eventBus";
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.async=true; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 function loadCssOnce(href){ if([...(document.styleSheets||[])].some(ss=>ss.href===href)) return; const l=document.createElement("link"); l.rel="stylesheet"; l.href=href; document.head.appendChild(l); }
 
-export default function GameMap(){
+export default function GameMap({ overlays: overlaysProp }){
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const simMarkerRef = useRef(null);
@@ -93,7 +93,8 @@ export default function GameMap(){
         return { el, media };
       }
 
-      for(const f of OVERLAYS){
+      const ACTIVE = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
+      for(const f of ACTIVE){
         const { el, media } = buildDom(f);
         const marker = new mapboxgl.Marker({ element: el }).setLngLat(f.coordinates).addTo(map);
         records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false });
@@ -144,7 +145,7 @@ export default function GameMap(){
       cleanupRef.current.onMapClick = onMapClick;
 
       // Start geofence watcher; stopFence clears navigator.geolocation watch + unsubscribes sim listener
-      cleanupRef.current.stopFence = startGeofenceWatcher({ features: OVERLAYS, highAccuracy: true });
+      cleanupRef.current.stopFence = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
     })();
 
     // ✅ Proper cleanup returned to React so we don't leak listeners or tracking.
@@ -184,7 +185,7 @@ export default function GameMap(){
       try{ mapRef.current?.remove?.(); }catch{}
       mapRef.current = null;
     };
-  },[simulate]); // simulate in deps so click handler respects current toggle
+  },[simulate, overlaysProp]); // re-init when simulation toggle or overlays change
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:0 }}>
