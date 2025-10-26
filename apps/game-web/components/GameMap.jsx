@@ -4,8 +4,23 @@ import { startGeofenceWatcher } from "../lib/geofence";
 import { emit, on, Events } from "../lib/eventBus";
 
 // CDN loaders (no node_modules needed)
-function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.async=true; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
-function loadCssOnce(href){ if([...(document.styleSheets||[])].some(ss=>ss.href===href)) return; const l=document.createElement("link"); l.rel="stylesheet"; l.href=href; document.head.appendChild(l); }
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+function loadCssOnce(href){
+  if ([...(document.styleSheets || [])].some((ss) => ss.href === href)) return;
+  const l = document.createElement("link");
+  l.rel = "stylesheet";
+  l.href = href;
+  document.head.appendChild(l);
+}
 
 export default function GameMap({ overlays: overlaysProp }){
   const containerRef = useRef(null);
@@ -25,6 +40,8 @@ export default function GameMap({ overlays: overlaysProp }){
 
   const [simulate, setSimulate] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [engine, setEngine] = useState(null); // 'mapbox' | 'maplibre'
+  const [engineNote, setEngineNote] = useState("");
 
   useEffect(()=>{
     // Reset cleanup refs for this mount
@@ -37,26 +54,44 @@ export default function GameMap({ overlays: overlaysProp }){
     let isMounted = true;
 
     (async ()=>{
-      // Mapbox from CDN
-      loadCssOnce("https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css");
-      await loadScript("https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.js");
-      const mapboxgl = window.mapboxgl;
-      mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || process.env.MAPBOX_TOKEN || "";
+      const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || process.env.MAPBOX_TOKEN || "";
+      let glLib = null;
+      let mode = null;
+      let fallbackNote = "";
+      try {
+        if (!token) throw new Error("Missing token");
+        loadCssOnce("https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.css");
+        await loadScript("https://api.mapbox.com/mapbox-gl-js/v3.5.1/mapbox-gl.js");
+        if (!window.mapboxgl) throw new Error("Mapbox unavailable");
+        window.mapboxgl.accessToken = token;
+        glLib = window.mapboxgl;
+        mode = "mapbox";
+      } catch (err) {
+        loadCssOnce("https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css");
+        await loadScript("https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js");
+        glLib = window.maplibregl;
+        mode = "maplibre";
+        fallbackNote = token ? "Mapbox blocked; using MapLibre" : "Missing token; using MapLibre";
+      }
 
       if(!isMounted || !containerRef.current) return;
-      const map = new mapboxgl.Map({
+      const map = new glLib.Map({
         container: containerRef.current,
-        style: "mapbox://styles/mapbox/streets-v12",
+        style: mode === "mapbox" ? "mapbox://styles/mapbox/streets-v12" : "https://demotiles.maplibre.org/style.json",
         center: [-93.265, 44.9778],
         zoom: 12,
       });
-      map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-left");
-      map.addControl(new mapboxgl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-        showUserHeading: true,
-      }), "top-left");
+      map.addControl(new glLib.NavigationControl({ visualizePitch: true }), "top-left");
+      if (mode === "mapbox" && glLib.GeolocateControl) {
+        map.addControl(new glLib.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: true,
+          showUserHeading: true,
+        }), "top-left");
+      }
       mapRef.current = map;
+      setEngine(mode);
+      setEngineNote(fallbackNote);
 
       // Build overlays
       const records = overlayRecordsRef.current;
@@ -96,7 +131,7 @@ export default function GameMap({ overlays: overlaysProp }){
       const ACTIVE = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
       for(const f of ACTIVE){
         const { el, media } = buildDom(f);
-        const marker = new mapboxgl.Marker({ element: el }).setLngLat(f.coordinates).addTo(map);
+        const marker = new glLib.Marker({ element: el }).setLngLat(f.coordinates).addTo(map);
         records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false });
       }
 
@@ -137,8 +172,15 @@ export default function GameMap({ overlays: overlaysProp }){
       // Map click handler for simulated position
       const onMapClick = (e)=>{
         if(!simulate) return;
-        if(!simMarkerRef.current){ simMarkerRef.current = new window.mapboxgl.Marker({ color:"#007aff" }).addTo(map); }
-        simMarkerRef.current.setLngLat([e.lngLat.lng, e.lngLat.lat]);
+        if(!simMarkerRef.current){
+          const MarkerCtor = mode === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
+          if (MarkerCtor) {
+            simMarkerRef.current = new MarkerCtor({ color:"#007aff" }).addTo(map);
+          }
+        }
+        if (simMarkerRef.current) {
+          simMarkerRef.current.setLngLat([e.lngLat.lng, e.lngLat.lat]);
+        }
         emit(Events.GEO_POSITION, { lng:e.lngLat.lng, lat:e.lngLat.lat, accuracy:0 });
       };
       map.on("click", onMapClick);
@@ -189,10 +231,18 @@ export default function GameMap({ overlays: overlaysProp }){
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:0 }}>
-      <div ref={containerRef} style={{ position:"absolute", inset:0 }} />
+      <div ref={containerRef} style={{ position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw" }} />
       <div style={{ position:"absolute", left:12, top:12, zIndex:10 }}>
         <button onClick={()=>emit(Events.SETTINGS_UPDATE,{ audioEnabled:true, debug, simulate })} style={{ background:"#fff", border:"1px solid #ddd", padding:"8px 10px", borderRadius:10, cursor:"pointer" }}>🔉 Enable Audio</button>
       </div>
+      {engine && (
+        <div style={{ position:"absolute", right:12, top:12, zIndex:10 }}>
+          <div style={{ background:"#fff", border:"1px solid #ddd", padding:"6px 10px", borderRadius:10, fontSize:12 }}>
+            Map engine: <strong>{engine === "mapbox" ? "Mapbox" : "MapLibre"}</strong>
+            {engineNote ? <span style={{opacity:0.7}}> — {engineNote}</span> : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
