@@ -1,54 +1,35 @@
-import { createClient } from '../../lib/supabase-lite.js';
+import { listBuckets, listFiles } from "../../lib/supabaseHttp";
 
 export default async function handler(req, res) {
+  const bucket = String(req.query.bucket || "").trim();
+  let prefix = String(req.query.prefix || "").trim();
+  if (prefix && !prefix.endsWith("/")) prefix += "/";
+
+  if (!bucket) {
+    const { data, error } = await listBuckets();
+    return res.status(200).json({
+      ok: false,
+      error: "Missing ?bucket= parameter. (Tip: set SUPABASE_MEDIA_BUCKET or pass ?bucket=)",
+      files: [],
+      available: (data || []).map((b) => b.name),
+      bucketsError: error ?? null,
+    });
+  }
+
   try {
-    if (req.method !== 'GET') {
-      return res.status(405).json({ ok: false, error: 'Method not allowed' });
-    }
-
-    const url = process.env.SUPABASE_URL;
-    const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const anon = process.env.SUPABASE_ANON_KEY;
-    if (!url || (!service && !anon)) {
-      return res.status(500).json({ ok: false, error: 'Missing SUPABASE env vars' });
-    }
-
-    const key = service || anon;
-    const keyType = service ? 'service' : 'anon';
-    const projectRef = new URL(url).hostname.split('.')[0];
-    const supabase = createClient(url, key);
-
-    if ((req.query.action || '') === 'status') {
-      const { data, error } = await supabase.storage.listBuckets?.();
-      return res.status(200).json({
-        ok: !error,
-        projectRef,
-        keyType,
-        buckets: data ?? null,
-        error: error?.message ?? null,
-      });
-    }
-
-    const bucket = (req.query.bucket || 'media').toString();
-    const prefix = (req.query.prefix || '').toString().replace(/^\/+|\/+$/g, '');
-    const limit = Number(req.query.limit) || 1000;
-
-    // Validate bucket (best-effort)
-    const { data: buckets, error: bucketsErr } = await supabase.storage.listBuckets?.();
-    if (bucketsErr) {
-      // If listBuckets isn’t allowed (anon) we’ll skip validation and try to list files anyway
-      console.warn('listBuckets error:', bucketsErr.message);
-    } else if (buckets && !buckets.map(b => b.name).includes(bucket)) {
-      return res.status(404).json({ ok: false, error: `Bucket '${bucket}' not found`, available: buckets.map(b => b.name) });
-    }
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(prefix || '', { limit, sortBy: { column: 'name', order: 'asc' } });
-
-    if (error) return res.status(500).json({ ok: false, error: error.message, bucket, prefix });
-    return res.status(200).json({ ok: true, projectRef, keyType, bucket, prefix, count: (data || []).length, files: data || [] });
+    // Try listing the bucket directly; if it doesn't exist or is blocked by policy,
+    // Supabase returns an error which we surface.
+    const { data, error } = await listFiles(bucket, prefix || "", 1000, { column: "name", order: "asc" });
+    if (error) return res.status(200).json({ ok: false, error, files: [] });
+    const files = (data || []).map((f) => ({
+      name: f.name,
+      id: f.id ?? null,
+      updated_at: f.updated_at ?? null,
+      created_at: f.created_at ?? null,
+      metadata: f.metadata ?? null,
+    }));
+    return res.status(200).json({ ok: true, bucket, prefix: prefix || "", files });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: String(e) });
+    return res.status(200).json({ ok: false, error: e?.message || String(e), files: [] });
   }
 }
