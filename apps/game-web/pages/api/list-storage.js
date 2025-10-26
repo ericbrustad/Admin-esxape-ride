@@ -44,4 +44,14 @@ export default async function handler(req, res) {
   } catch (e) {
     return res.status(200).json({ ok: false, error: e?.message || String(e), files: [] });
   }
+  try{
+    const { data:buckets, error:lbErr } = await supabase.storage.listBuckets();
+    if(lbErr) return res.status(200).json({ ok:false, error:lbErr.message, files:[] });
+    const exists=(buckets||[]).some(b=>b.name===bucket);
+    if(!exists) return res.status(200).json({ ok:false, error:`Bucket '${bucket}' not found`, available:(buckets||[]).map(b=>b.name), files:[] });
+    const { data, error } = await supabase.storage.from(bucket).list(prefix, { limit:1000, sortBy:{ column:"name", order:"asc" } });
+    if(error) return res.status(200).json({ ok:false, error:error.message, files:[] });
+    const files=(data||[]).map(f=>({ name:f.name, id:f.id, updated_at:f.updated_at, created_at:f.created_at, metadata:f.metadata||null }));
+    return res.status(200).json({ ok:true, bucket, prefix:prefix||"", files });
+  }catch(e){ return res.status(200).json({ ok:false, error:e?.message||String(e), files:[] }); }
 }
