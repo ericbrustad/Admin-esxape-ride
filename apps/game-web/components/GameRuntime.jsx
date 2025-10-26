@@ -3,93 +3,272 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import { BackpackButton, SettingsButton } from "./ui/CornerButtons";
 import { BackpackPanel, SettingsPanel } from "./ui/Panels";
+import Modal from "./ui/Modal";
 import { on, Events, emit } from "../lib/eventBus";
 
 const GameMap = dynamic(() => import("./GameMap"), { ssr: false });
 
+// Helpers to pull labels from overlay/mission/bundle or default
+function labelFrom(paths, fallback="Continue") {
+  for (const p of paths) {
+    if (!p) continue;
+    if (typeof p === "string" && p.trim()) return p;
+    if (typeof p === "object" && typeof p.continueLabel === "string" && p.continueLabel.trim()) return p.continueLabel;
+  }
+  return fallback;
+}
+
 export default function GameRuntime(){
   const router = useRouter();
   const gameId = useMemo(() => (typeof router.query?.game === "string" ? router.query.game : "demo"), [router.query?.game]);
-  const [overlays, setOverlays] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+
+  // Bundle + missions
+  const [bundle, setBundle] = useState(null);
+  const [missions, setMissions] = useState([]);        // normalized missions[]
+  const [mi, setMi] = useState(0);                     // mission index
+
+  // Current mission state
+  const currentMission = missions[mi] || { overlays: [], prompts: [] };
+  const [answers, setAnswers] = useState({});          // {promptId: value}
+  const [gameFinished, setGameFinished] = useState(false);
+  const allPromptIds = useMemo(()=> (Array.isArray(currentMission.prompts) ? currentMission.prompts.map(p=>p.id) : []), [currentMission]);
+  const requiredIds = useMemo(()=> allPromptIds.filter(id => {
+    const p = currentMission.prompts?.find(x=>x.id===id);
+    return p?.required !== false; // default required
+  }), [allPromptIds, currentMission]);
+  const autoComplete = currentMission?.ui?.autoComplete ?? true;
+  const complete = requiredIds.length > 0
+    ? requiredIds.every(id => answers[id] != null && String(answers[id]).trim().length > 0)
+    : (autoComplete && (currentMission.prompts?.length || 0) === 0);
+
+  // UI panels
   const [openBackpack, setOpenBackpack] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
-  const [answers, setAnswers] = useState({});
-  const [complete, setComplete] = useState(false);
 
-  // Load mission bundle (if present)
+  // Modals
+  const [modal, setModal] = useState(null);
+  // modal = {
+  //   type: 'prompt'|'response'|'complete'|'finished'|'message',
+  //   overlay, prompt, mission, fields...
+  //   value, continueLabel
+  // }
+
+  // Load mission bundle
   useEffect(()=>{
     let cancelled = false;
     (async ()=>{
-      setLoading(true); setError(null);
       try {
         const r = await fetch(`/api/game-load?game=${encodeURIComponent(gameId)}`);
         const j = await r.json();
         if (cancelled) return;
         if (j.ok && j.bundle) {
-          const ov = Array.isArray(j.bundle.overlays) ? j.bundle.overlays : [];
-          setOverlays(ov);
-          const initial = {};
-          if (Array.isArray(j.bundle.prompts)) {
-            for (const p of j.bundle.prompts) initial[p.id] = null;
+          const b = j.bundle;
+          setBundle(b);
+          // Normalize to missions[]
+          let ms = [];
+          if (Array.isArray(b.missions) && b.missions.length) {
+            ms = b.missions.map((m, idx)=>({
+              id: m.id || `m${idx+1}`,
+              title: m.title || `Mission ${idx+1}`,
+              overlays: Array.isArray(m.overlays) ? m.overlays : [],
+              prompts: Array.isArray(m.prompts) ? m.prompts : [],
+              ui: m.ui || {}
+            }));
+          } else {
+            ms = [{
+              id: b.id || gameId,
+              title: b.title || "Mission",
+              overlays: Array.isArray(b.overlays) ? b.overlays : [],
+              prompts: Array.isArray(b.prompts) ? b.prompts : [],
+              ui: b.ui || {}
+            }];
           }
-          setAnswers(initial);
-          setError(null);
+          setMissions(ms);
+          setMi(0);
+          // Reset answers per mission
+          const init = {};
+          for (const p of (ms[0]?.prompts || [])) init[p.id] = null;
+          setAnswers(init);
+          setGameFinished(false);
+          setModal(null);
         } else {
-          setOverlays([]);
+          // No bundle: leave missions empty so GameMap falls back to demo overlays
+          setBundle(null);
+          setMissions([]);
+          setMi(0);
           setAnswers({});
-          setError(j?.error || "No mission bundle found");
+          setGameFinished(false);
+          setModal(null);
         }
-      } catch (e) {
-        if (!cancelled) setError(e?.message || String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
+      } catch {
+        if (!cancelled) { setBundle(null); setMissions([]); setMi(0); setAnswers({}); setGameFinished(false); setModal(null); }
       }
     })();
-    return () => { cancelled = true; };
+    return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Minimal answer capture: if an overlay contains { prompt: { id, question, correct } }, ask on GEO_ENTER
+  // Prompt handling on GEO_ENTER (replaces window.prompt)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
-      const prompt = feature?.prompt;
-      if (!prompt?.id || !prompt?.question) return;
-      if (answers[prompt.id] != null) return;
-      const a = window.prompt(prompt.question) ?? "";
-      setAnswers((prev)=> ({ ...prev, [prompt.id]: a }));
-      if (prompt.correct != null && String(a).trim().toLowerCase() === String(prompt.correct).trim().toLowerCase()) {
-        emit(Events.GEO_ENTER, { feature: { id:`answer-${prompt.id}`, type:"text", coordinates: feature.coordinates, radius: 10, text:`Answered: ${prompt.id}` }});
+      if (!feature) return;
+      // Overlay-provided prompt or message
+      const prompt = feature.prompt;
+      if (prompt?.id && prompt?.question) {
+        if (answers[prompt.id] != null) return; // already answered
+        const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
+        setModal({
+          type: "prompt",
+          overlay: feature,
+          prompt,
+          mission: currentMission,
+          title: prompt.title || "Answer Required",
+          question: prompt.question,
+          value: "",
+          continueLabel
+        });
+        return;
+      }
+      // Generic message window (no input)
+      if (feature.dialog?.text || feature.text) {
+        const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
+        setModal({
+          type: "message",
+          overlay: feature,
+          mission: currentMission,
+          title: feature.dialog?.title || "Info",
+          message: feature.dialog?.text || feature.text,
+          continueLabel
+        });
       }
     });
     return () => offEnter();
-  }, [answers]);
+  }, [answers, currentMission, bundle]);
 
+  // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
-    const ids = Object.keys(answers);
-    if (ids.length === 0) return;
-    const allAnswered = ids.every((k)=> answers[k] != null);
-    setComplete(allAnswered);
-  }, [answers]);
+    if (!complete) return;
+    if (gameFinished) return;
+    if (modal && modal.type !== "complete" && modal.type !== "finished") return;
+    if (modal?.type === "complete" || modal?.type === "finished") return;
+    const continueLabel = labelFrom([currentMission?.ui?.completeLabel, bundle?.ui?.completeLabel, "Continue"]);
+    setModal({
+      type: "complete",
+      mission: currentMission,
+      title: currentMission?.ui?.completeTitle || "Mission Complete",
+      message: currentMission?.ui?.completeMessage || "Great work!",
+      continueLabel
+    });
+  }, [complete, currentMission, bundle, modal, gameFinished]);
+
+  // Handlers
+  const onPromptChange = (e)=> setModal((m)=> ({ ...m, value: e.target.value }));
+  const onContinue = ()=>{
+    if (!modal) return;
+    if (modal.type === "prompt") {
+      const { prompt, value, overlay } = modal;
+      setAnswers((prev)=> ({ ...prev, [prompt.id]: value }));
+      if (prompt.correct != null) {
+        const normalizedAnswer = String(value ?? "").trim().toLowerCase();
+        const normalizedCorrect = String(prompt.correct).trim().toLowerCase();
+        if (normalizedAnswer === normalizedCorrect) {
+          emit(Events.GEO_ENTER, { feature: { id:`answer-${prompt.id}`, type:"text", coordinates: overlay?.coordinates || [0,0], radius: 0, text:`Answered: ${prompt.id}` } });
+        }
+      }
+      // Optional response window
+      const resp = prompt.responseText || overlay?.dialog?.responseText;
+      if (resp) {
+        const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
+        setModal({ type:"response", title: prompt.responseTitle || "Response", message: resp, continueLabel });
+      } else {
+        setModal(null);
+      }
+      return;
+    }
+    if (modal.type === "message" || modal.type === "response") {
+      setModal(null);
+      return;
+    }
+    if (modal.type === "complete") {
+      // Advance to next mission if any
+      if (mi + 1 < missions.length) {
+        const next = mi + 1;
+        setMi(next);
+        // Reset answers for next mission prompts
+        const init = {};
+        for (const p of (missions[next]?.prompts || [])) init[p.id] = null;
+        setAnswers(init);
+        setGameFinished(false);
+        setModal(null);
+      } else {
+        // No more missions – show finished banner
+        const continueLabel = labelFrom([bundle?.ui?.finishLabel, "Close"]);
+        setGameFinished(true);
+        setModal({ type:"finished", title:"All Missions Complete", message:"You’ve finished the game.", continueLabel });
+      }
+    } else if (modal.type === "finished") {
+      setModal(null);
+    }
+  };
+
+  // Overlays to render for the current mission (or demo if empty)
+  const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
 
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
       <GameMap overlays={overlays} />
 
+      {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
       <SettingsButton onClick={()=>setOpenSettings(true)} />
       <BackpackPanel open={openBackpack} onClose={()=>setOpenBackpack(false)} />
       <SettingsPanel open={openSettings} onClose={()=>setOpenSettings(false)} />
 
-      <div style={{ position:"fixed", right:12, bottom:12, zIndex:25 }}>
-        {loading && <div style={pill()}>Loading mission…</div>}
-        {error && <div style={{...pill(), background:"#ffe9e9", color:"#821", border:"1px solid #f5c2c7"}}>Load error: {String(error)}</div>}
-        {complete && <div style={{...pill(), background:"#e9ffe9", color:"#064", border:"1px solid #b6f5c2"}}>Mission complete ✅</div>}
-      </div>
+      {/* Modals */}
+      <Modal
+        open={modal?.type==="prompt"}
+        title={modal?.title}
+        primaryLabel={modal?.continueLabel || "Continue"}
+        onPrimary={onContinue}
+      >
+        <div style={{display:"grid", gap:8}}>
+          <div>{modal?.question}</div>
+          <input
+            autoFocus
+            value={modal?.value ?? ""}
+            onChange={onPromptChange}
+            placeholder="Type your answer"
+            style={{padding:"10px 12px", border:"1px solid #ccc", borderRadius:10}}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        open={modal?.type==="message" || modal?.type==="response"}
+        title={modal?.title}
+        primaryLabel={modal?.continueLabel || "Continue"}
+        onPrimary={onContinue}
+      >
+        <div>{modal?.message}</div>
+      </Modal>
+
+      <Modal
+        open={modal?.type==="complete"}
+        title={modal?.title}
+        primaryLabel={modal?.continueLabel || "Continue"}
+        onPrimary={onContinue}
+      >
+        <div>{modal?.message}</div>
+        {mi + 1 < missions.length ? <p style={{opacity:0.7, marginTop:8}}>Next: {missions[mi+1]?.title || `Mission ${mi+2}`}</p> : null}
+      </Modal>
+
+      <Modal
+        open={modal?.type==="finished"}
+        title={modal?.title}
+        primaryLabel={modal?.continueLabel || "Close"}
+        onPrimary={onContinue}
+      >
+        <div>{modal?.message}</div>
+      </Modal>
     </div>
   );
-}
-
-function pill(){
-  return { background:"#fff", color:"#111", border:"1px solid #ddd", padding:"8px 12px", borderRadius:999, boxShadow:"0 6px 18px rgba(0,0,0,0.18)" };
 }
