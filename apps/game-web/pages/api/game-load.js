@@ -12,14 +12,28 @@ export default async function handler(req, res) {
   // If a fully qualified path is passed, honor it:
   if (req.query.path) candidates.unshift(String(req.query.path));
 
-  // If we can list, prefer the first that exists; otherwise, just try to fetch each.
+  // 1) Supabase candidates
   for (const path of candidates) {
     const { data, error } = await getObjectJson(bucket, path);
     if (data && !error) {
       return res.status(200).json({ ok: true, bucket, path, bundle: data });
     }
   }
-  // Optional hint: list the bucket root to help user see what's there
+
+  // 2) Local fallback from Next.js public/ (apps/game-web/public)
+  //    We fetch it over HTTP so it works in serverless.
+  try {
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    const proto = (req.headers["x-forwarded-proto"] || "https").toString();
+    const localPath = `games/${game}/bundle.json`;
+    const r = await fetch(`${proto}://${host}/${localPath}`);
+    if (r.ok) {
+      const bundle = await r.json();
+      return res.status(200).json({ ok: true, bucket: null, path: localPath, bundle, source: "local" });
+    }
+  } catch (_) {}
+
+  // 3) Optional hint: list the bucket root to help user see what's there
   try {
     const list = await listFiles(bucket, "", 100, { column: "name", order: "asc" });
     return res.status(200).json({
