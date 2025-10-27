@@ -23,5 +23,7 @@ export const Events = {
   ACTION_PLAY:"action:play_media",
   ACTION_PAUSE:"action:pause_media",
   ACTION_SHOW:"action:show_overlay",
-  ACTION_HIDE:"action:hide_overlay"
+  ACTION_HIDE:"action:hide_overlay",
+  UI_OPEN_DIALOG:"ui:open_dialog",
+  UI_MODAL_OPEN:"ui:modal-open"
 };
