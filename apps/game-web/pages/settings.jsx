@@ -259,6 +259,16 @@ export async function getServerSideProps() {
       message:
         'Moved the debug rings onto dedicated map markers with dynamic sizing so they persist outside the overlay visibility, and cleared the ring markers during teardown to avoid leaks.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'The ring markers distort at scale—render true geodesic circles via GeoJSON layers so debug outlines stay accurate regardless of zoom.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Swapped the marker heuristics for a GeoJSON line layer that samples the geodesic circle, updates when debug mode toggles, and tears down the shared source/layer during cleanup.',
+    },
   ];
 
   return {

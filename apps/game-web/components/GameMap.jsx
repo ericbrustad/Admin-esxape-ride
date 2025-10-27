@@ -27,6 +27,7 @@ export default function GameMap({ overlays: overlaysProp }){
   const mapRef = useRef(null);
   const simMarkerRef = useRef(null);
   const audioGate = useRef(false);
+  const debugStateRef = useRef(false);
 
   // Keep overlay/handler references outside the async IIFE so cleanup can access them.
   const overlayRecordsRef = useRef(new Map()); // id -> { marker, el, type, media, feature, visible }
@@ -150,39 +151,80 @@ export default function GameMap({ overlays: overlaysProp }){
         records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false, __ringMarker:null });
       }
 
-      // Always-visible debug rings (rendered as their own markers so overlays stay hidden until entered)
+      if(debugStateRef.current) setDebugRings(true);
+
+      // --- Geo helpers for geodesic debug circles rendered via a shared line layer
+      const R_EARTH = 6371000;
+      function destPoint(lng, lat, bearingDeg, distMeters){
+        const phi1 = (lat * Math.PI) / 180;
+        const lambda1 = (lng * Math.PI) / 180;
+        const theta = (bearingDeg * Math.PI) / 180;
+        const delta = distMeters / R_EARTH;
+        const sinPhi1 = Math.sin(phi1), cosPhi1 = Math.cos(phi1);
+        const sinDelta = Math.sin(delta), cosDelta = Math.cos(delta), sinTheta = Math.sin(theta), cosTheta = Math.cos(theta);
+        const sinPhi2 = sinPhi1 * cosDelta + cosPhi1 * sinDelta * cosTheta;
+        const phi2 = Math.asin(sinPhi2);
+        const y = sinTheta * sinDelta * cosPhi1;
+        const x = cosDelta - sinPhi1 * sinPhi2;
+        const lambda2 = lambda1 + Math.atan2(y, x);
+        return [(((lambda2 * 180) / Math.PI) + 540) % 360 - 180, (phi2 * 180) / Math.PI];
+      }
+      function circlePolygon([lng, lat], radiusMeters, steps = 80){
+        const ring = [];
+        for(let i=0;i<=steps;i++){
+          const bearing = (i / steps) * 360;
+          ring.push(destPoint(lng, lat, bearing, radiusMeters));
+        }
+        return {
+          type:"Feature",
+          geometry:{ type:"Polygon", coordinates:[ring] },
+          properties:{}
+        };
+      }
       function setDebugRings(enabled){
+        const mapInstance = mapRef.current;
+        if(!mapInstance) return;
+        const srcId = "__rings_src";
+        const layerId = "__rings_line";
+        if(!enabled){
+          if(mapInstance.getLayer(layerId)) mapInstance.removeLayer(layerId);
+          if(mapInstance.getSource(srcId)) mapInstance.removeSource(srcId);
+          return;
+        }
+        if(typeof mapInstance.isStyleLoaded === "function" && !mapInstance.isStyleLoaded()){
+          mapInstance.once?.("load", ()=>{ if(debugStateRef.current) setDebugRings(true); });
+          return;
+        }
+        const features = [];
         for(const rec of records.values()){
-          const { feature } = rec;
-          if(!enabled){
-            try{ rec.__ringMarker?.remove?.(); }catch{}
-            rec.__ringMarker = null;
-            continue;
+          const feature = rec.feature;
+          const radius = Math.max(10, Number(feature.radius || 100));
+          if(Array.isArray(feature.coordinates) && feature.coordinates.length === 2){
+            features.push(circlePolygon([feature.coordinates[0], feature.coordinates[1]], radius, 80));
           }
-          if(!rec.__ringMarker){
-            const diameter = Math.max(120, Math.min(520, (feature.radius || 100) / 0.75));
-            const ringEl = document.createElement("div");
-            Object.assign(ringEl.style,{
-              width:`${diameter}px`,
-              height:`${diameter}px`,
-              border:"2px dashed rgba(255,0,0,0.7)",
-              borderRadius:"50%",
-              transform:"translate(-50%,-50%)",
-              position:"relative",
-              pointerEvents:"none",
-              boxSizing:"border-box",
-            });
-            const MarkerCtor = glLib?.Marker || (engine === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker);
-            if(MarkerCtor && mapRef.current){
-              rec.__ringMarker = new MarkerCtor({ element:ringEl }).setLngLat(feature.coordinates).addTo(mapRef.current);
+        }
+        const collection = { type:"FeatureCollection", features };
+        if(mapInstance.getSource(srcId)){
+          mapInstance.getSource(srcId).setData(collection);
+        } else {
+          mapInstance.addSource(srcId, { type:"geojson", data:collection });
+          mapInstance.addLayer({
+            id: layerId,
+            type: "line",
+            source: srcId,
+            paint: {
+              "line-color": "rgba(255,0,0,0.75)",
+              "line-width": 2,
+              "line-dasharray": [2, 2]
             }
-          }
+          });
         }
       }
 
       // Event-bus subscriptions (store unsubscribe functions for cleanup)
       cleanupRef.current.offSettings = on(Events.SETTINGS_UPDATE, ({ audioEnabled, debug, simulate })=>{
-        audioGate.current = !!audioEnabled; setDebug(!!debug); setSimulate(!!simulate); setDebugRings(!!debug);
+        audioGate.current = !!audioEnabled; debugStateRef.current = !!debug;
+        setDebug(!!debug); setSimulate(!!simulate); setDebugRings(!!debug);
       });
 
       const handleEnter = ({ feature })=>{
@@ -257,6 +299,12 @@ export default function GameMap({ overlays: overlaysProp }){
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       overlayRecordsRef.current.clear();
+
+      // Remove debug ring layer/source before tearing down the map
+      try{
+        if(mapRef.current?.getLayer("__rings_line")) mapRef.current.removeLayer("__rings_line");
+        if(mapRef.current?.getSource("__rings_src")) mapRef.current.removeSource("__rings_src");
+      }catch{}
 
       // Finally, remove the map instance
       try{ mapRef.current?.remove?.(); }catch{}
