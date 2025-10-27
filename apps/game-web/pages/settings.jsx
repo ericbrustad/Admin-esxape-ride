@@ -202,6 +202,16 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
+        'Disable the local bundle fallback unless explicitly enabled, tag the API response source, and stop auto-completing missions without an explicit opt-in. Keep the metadata footer accurate.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Gated the public bundle fallback behind ALLOW_LOCAL_BUNDLE, tagged /api/game-load responses with their source, kept mission auto-complete opt-in only, and verified the Settings footer still surfaces repo, branch, commit, deployment, and timestamp.',
+    },
+    {
+      speaker: 'Operator',
+      message:
         'Follow the bootstrap script to guarantee the Next.js binary exists locally: enforce Node 22, scope installs to apps/game-web with pnpm, and rebuild until the tests pass without proxy-related failures.',
     },
     {
@@ -238,6 +248,66 @@ export async function getServerSideProps() {
       speaker: 'GPT',
       message:
         'Removed the vendored Yarn runtime, committed the standalone game lockfile, rewrote the Supabase storage API to call the REST endpoints directly, and logged the successful metadata snapshot with this exchange.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Enable a server-side export path so the hosted site can upload bundle.json to Supabase without local tooling, and surface a quick /export helper to drive it.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Implemented the Supabase text upload helper, secured the POST /api/export-bundle route behind EXPORT_API_KEY, added the optional /export uploader form, and kept the repository snapshot footer current for this release.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'Make the debug geofence rings render as their own markers so they stay visible before entering, and ensure cleanup removes the ring overlays when toggled off.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Moved the debug rings onto dedicated map markers with dynamic sizing so they persist outside the overlay visibility, and cleared the ring markers during teardown to avoid leaks.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'The ring markers distort at scale—render true geodesic circles via GeoJSON layers so debug outlines stay accurate regardless of zoom.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Swapped the marker heuristics for a GeoJSON line layer that samples the geodesic circle, updates when debug mode toggles, and tears down the shared source/layer during cleanup.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'The geofence watcher is still subscribing to the full overlay list—point it at the rendered ACTIVE set so custom overlays trigger correctly.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Updated GameMap to initialize the geofence watcher with the same ACTIVE overlays used for markers, keeping simulated and filtered missions aligned.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'The top-left Enable Audio toggle feels redundant. Split the controls so we can enable all audio or just music/FX individually, and keep logging these follow-ups.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Refined the Settings panel with separate All/Music/FX audio toggles, wired the runtime event so overlays respect each gate, and noted the change here for future audits.',
+    },
+    {
+      speaker: 'Operator',
+      message:
+        'The new map runtime keeps freezing after simulated clicks—rip out the experimental overlay system and drop in the stable Mapbox baseline so we have a clean foundation again.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Replaced GameMap with the Mapbox v3.13.0 baseline loader, simplifying the integration back to a single-map bootstrap while keeping the Settings metadata intact for verification.',
     },
   ];
 
