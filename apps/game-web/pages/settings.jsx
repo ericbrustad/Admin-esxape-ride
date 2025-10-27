@@ -202,6 +202,16 @@ export async function getServerSideProps() {
     {
       speaker: 'Operator',
       message:
+        'Disable the local bundle fallback unless explicitly enabled, tag the API response source, and stop auto-completing missions without an explicit opt-in. Keep the metadata footer accurate.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Gated the public bundle fallback behind ALLOW_LOCAL_BUNDLE, tagged /api/game-load responses with their source, kept mission auto-complete opt-in only, and verified the Settings footer still surfaces repo, branch, commit, deployment, and timestamp.',
+    },
+    {
+      speaker: 'Operator',
+      message:
         'Follow the bootstrap script to guarantee the Next.js binary exists locally: enforce Node 22, scope installs to apps/game-web with pnpm, and rebuild until the tests pass without proxy-related failures.',
     },
     {
