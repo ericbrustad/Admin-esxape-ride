@@ -289,6 +289,16 @@ export async function getServerSideProps() {
       message:
         'Refined the Settings panel with separate All/Music/FX audio toggles, wired the runtime event so overlays respect each gate, and noted the change here for future audits.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'The new map runtime keeps freezing after simulated clicks—rip out the experimental overlay system and drop in the stable Mapbox baseline so we have a clean foundation again.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Replaced GameMap with the Mapbox v3.13.0 baseline loader, simplifying the integration back to a single-map bootstrap while keeping the Settings metadata intact for verification.',
+    },
   ];
 
   return {
