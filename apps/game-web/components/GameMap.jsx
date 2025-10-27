@@ -147,18 +147,36 @@ export default function GameMap({ overlays: overlaysProp }){
       for(const f of ACTIVE){
         const { el, media } = buildDom(f);
         const marker = new glLib.Marker({ element: el }).setLngLat(f.coordinates).addTo(map);
-        records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false });
+        records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false, __ringMarker:null });
       }
 
+      // Always-visible debug rings (rendered as their own markers so overlays stay hidden until entered)
       function setDebugRings(enabled){
-        for(const { el } of records.values()){
-          let ring=el.querySelector(".__ring");
-          if(enabled && !ring){
-            ring=document.createElement("div"); ring.className="__ring";
-            Object.assign(ring.style,{ position:"absolute", width:"200px", height:"200px", left:"50%", top:"50%", transform:"translate(-50%,-50%)", border:"2px dashed rgba(255,0,0,0.65)", borderRadius:"50%", pointerEvents:"none" });
-            el.appendChild(ring);
+        for(const rec of records.values()){
+          const { feature } = rec;
+          if(!enabled){
+            try{ rec.__ringMarker?.remove?.(); }catch{}
+            rec.__ringMarker = null;
+            continue;
           }
-          if(ring) ring.style.display = enabled ? "block" : "none";
+          if(!rec.__ringMarker){
+            const diameter = Math.max(120, Math.min(520, (feature.radius || 100) / 0.75));
+            const ringEl = document.createElement("div");
+            Object.assign(ringEl.style,{
+              width:`${diameter}px`,
+              height:`${diameter}px`,
+              border:"2px dashed rgba(255,0,0,0.7)",
+              borderRadius:"50%",
+              transform:"translate(-50%,-50%)",
+              position:"relative",
+              pointerEvents:"none",
+              boxSizing:"border-box",
+            });
+            const MarkerCtor = glLib?.Marker || (engine === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker);
+            if(MarkerCtor && mapRef.current){
+              rec.__ringMarker = new MarkerCtor({ element:ringEl }).setLngLat(feature.coordinates).addTo(mapRef.current);
+            }
+          }
         }
       }
 
@@ -234,6 +252,8 @@ export default function GameMap({ overlays: overlaysProp }){
       // Remove overlay markers and pause any audio
       for(const rec of overlayRecordsRef.current.values()){
         try{ rec.marker.remove(); }catch{}
+        try{ rec.__ringMarker?.remove?.(); }catch{}
+        rec.__ringMarker = null;
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       overlayRecordsRef.current.clear();

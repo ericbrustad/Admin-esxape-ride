@@ -249,6 +249,16 @@ export async function getServerSideProps() {
       message:
         'Implemented the Supabase text upload helper, secured the POST /api/export-bundle route behind EXPORT_API_KEY, added the optional /export uploader form, and kept the repository snapshot footer current for this release.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'Make the debug geofence rings render as their own markers so they stay visible before entering, and ensure cleanup removes the ring overlays when toggled off.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Moved the debug rings onto dedicated map markers with dynamic sizing so they persist outside the overlay visibility, and cleared the ring markers during teardown to avoid leaks.',
+    },
   ];
 
   return {
