@@ -261,7 +261,7 @@ export default function GameMap({ overlays: overlaysProp }){
       map.on("click", onMapClick);
       cleanupRef.current.onMapClick = onMapClick;
 
-      // Start geofence watcher; stopFence clears navigator.geolocation watch + unsubscribes sim listener
+      // Start geofence watcher **using the same overlays we rendered**; stopFence clears navigator.geolocation watch + unsubscribes sim listener
       cleanupRef.current.stopFence = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
     })();
 

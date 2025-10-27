@@ -269,6 +269,16 @@ export async function getServerSideProps() {
       message:
         'Swapped the marker heuristics for a GeoJSON line layer that samples the geodesic circle, updates when debug mode toggles, and tears down the shared source/layer during cleanup.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'The geofence watcher is still subscribing to the full overlay list—point it at the rendered ACTIVE set so custom overlays trigger correctly.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Updated GameMap to initialize the geofence watcher with the same ACTIVE overlays used for markers, keeping simulated and filtered missions aligned.',
+    },
   ];
 
   return {
