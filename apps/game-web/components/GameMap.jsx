@@ -103,6 +103,9 @@ export default function GameMap({ overlays: overlaysProp }) {
   const [engineNote, setEngineNote] = useState("");
   const [mapReady, setMapReady] = useState(false);
   const [simulateActive, setSimulateActive] = useState(false);
+  const debugUi =
+    (typeof process !== "undefined" && (process.env.NEXT_PUBLIC_DEBUG_UI === "1" || process.env.DEBUG_UI === "1")) ||
+    (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug_ui") === "1");
 
   function clearRecords() {
     for (const rec of recordsRef.current.values()) {
@@ -534,7 +537,7 @@ export default function GameMap({ overlays: overlaysProp }) {
           zIndex: 5
         }}
       />
-      {engine && (
+      {debugUi && engine && (
         <div style={{ position: "absolute", right: 12, top: 12, zIndex: 10, pointerEvents: "none" }}>
           <div style={{ background: "#fff", border: "1px solid #ddd", padding: "6px 10px", borderRadius: 10, fontSize: 12 }}>
             Map engine: <strong>{engine === "mapbox" ? "Mapbox" : "MapLibre"}</strong>
