@@ -38,7 +38,8 @@ export default function GameRuntime(){
     const p = currentMission.prompts?.find(x=>x.id===id);
     return p?.required !== false; // default required
   }), [allPromptIds, currentMission]);
-  const autoComplete = currentMission?.ui?.autoComplete ?? true;
+  // Do NOT auto-complete missions unless explicitly opted-in
+  const autoComplete = currentMission?.ui?.autoComplete === true;
   const complete = requiredIds.length > 0
     ? requiredIds.every(id => answers[id] != null && String(answers[id]).trim().length > 0)
     : (autoComplete && (currentMission.prompts?.length || 0) === 0);
