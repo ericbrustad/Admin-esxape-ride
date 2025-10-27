@@ -304,8 +304,11 @@ export default function GameMap({ overlays: overlaysProp }) {
     const map = mapRef.current;
     function selectOne(list) {
       if (!Array.isArray(list) || list.length === 0) return [];
-      const withUi = list.find((o) => o?.dialog || o?.prompt);
-      return [withUi || list[0]];
+      const withPrompt = list.find((o) => o?.prompt);
+      if (withPrompt) return [withPrompt];
+      const withDialog = list.find((o) => o?.dialog);
+      if (withDialog) return [withDialog];
+      return [list[0]];
     }
     const allOverlays = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
     const ACTIVE = selectOne(allOverlays);
