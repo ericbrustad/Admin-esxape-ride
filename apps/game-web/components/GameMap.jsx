@@ -100,9 +100,14 @@ export default function GameMap({ overlays: overlaysProp }){
       }
       if(destroyed || !map) return;
       mapRef.current = map; engineRef.current = mode; setEngine(mode);
-      // Mark map ready on first 'load'
-      const onLoad = () => { setMapReady(true); };
+      // Mark ready on 'load', also set on first 'styledata' and a small fallback timer
+      let readyTicked = false;
+      const onLoad = () => { if (!readyTicked) { readyTicked = true; setMapReady(true); } };
+      const onStyle = () => { if (!readyTicked && map.isStyleLoaded?.()) { readyTicked = true; setMapReady(true); } };
       map.on("load", onLoad);
+      map.on("styledata", onStyle);
+      // Fallback: flip ready after ~1.2s if style events were missed but map exists
+      const t = setTimeout(()=>{ if (!readyTicked) { readyTicked = true; setMapReady(true); } }, 1200);
 
       // click handler (respects simulateRef)
       const onClick=(e)=>{
@@ -135,10 +140,15 @@ export default function GameMap({ overlays: overlaysProp }){
           if (nearest) {
             const r=Number(nearest.radius||100);
             const inside = best <= r;
-            try { if (typeof showBanner==="function") showBanner(`Click → nearest ${nearest.id} = ${Math.round(best)}m / R=${r}m · ${inside?"INSIDE":"outside"}`, 2000); } catch {}
+            try { if (typeof showBanner==="function") showBanner(`Click → ${nearest.id}: ${Math.round(best)}m / R=${r}m · ${inside?"INSIDE":"outside"}`, 1800); } catch {}
             if (inside && !insideIdsRef.current.has(nearest.id)) {
               insideIdsRef.current.add(nearest.id);
               emit(Events.GEO_ENTER, { feature: nearest, distance: best });
+              emit(Events.UI_OPEN_DIALOG, {
+                title: nearest.dialog?.title || "Zone reached",
+                message: (nearest.dialog?.text || nearest.text || `Entered zone: ${nearest.id}`),
+                continueLabel: nearest.dialog?.continueLabel || "Continue"
+              });
             }
           }
         } catch {}
@@ -158,6 +168,8 @@ export default function GameMap({ overlays: overlaysProp }){
         offSettings();
         try{ map.off("click", onClick); }catch{}
         try{ map.off("load", onLoad); }catch{}
+        try{ map.off("styledata", onStyle); }catch{}
+        try{ clearTimeout(t); }catch{}
         try{
           const m = mapRef.current;
           if(m?.getLayer("__rings_line")) m.removeLayer("__rings_line");

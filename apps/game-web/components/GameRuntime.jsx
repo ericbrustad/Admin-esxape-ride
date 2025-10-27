@@ -166,6 +166,19 @@ export default function GameRuntime(){
     return ()=>off();
   }, []);
 
+  // Listen for direct UI dialog requests (fallback from GameMap)
+  useEffect(()=>{
+    const off = on(Events.UI_OPEN_DIALOG, (p={})=>{
+      setModal({
+        type:"message",
+        title: p.title || "Info",
+        message: p.message || "…",
+        continueLabel: p.continueLabel || "Continue"
+      });
+    });
+    return ()=>off();
+  }, []);
+
   // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
     if (!complete) return;
