@@ -5,6 +5,7 @@ import { BackpackButton, SettingsButton } from "./ui/CornerButtons";
 import { BackpackPanel, SettingsPanel } from "./ui/Panels";
 import Modal from "./ui/Modal";
 import { on, Events, emit } from "../lib/eventBus";
+import { showBanner } from "./ui/Banner";
 
 const GameMap = dynamic(() => import("./GameMap"), { ssr: false });
 
@@ -110,6 +111,8 @@ export default function GameRuntime(){
   // Prompt/message on GEO_ENTER (always show something when entering a zone)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
+      // Always show a banner so you can SEE the enter event
+      showBanner(`Entered zone: ${feature?.id ?? "unknown"}`);
       if (!feature) return;
       // Overlay-provided prompt or message
       const prompt = feature.prompt;
@@ -128,7 +131,7 @@ export default function GameRuntime(){
         });
         return;
       }
-      // Generic message window (no input) — always show something friendly
+      // Generic message window (no input) — FALLBACK ALWAYS
       const msgText =
         (feature.dialog && feature.dialog.text) ||
         feature.text ||
@@ -148,6 +151,20 @@ export default function GameRuntime(){
     });
     return () => offEnter();
   }, [answers, currentMission, bundle]);
+
+
+  // Test modal hook from Settings
+  useEffect(()=>{
+    const off = on("debug:test_modal", ()=>{
+      setModal({
+        type:"message",
+        title:"Test dialog",
+        message:"If you can see this, the portal/z-index is working.",
+        continueLabel:"Close"
+      });
+    });
+    return ()=>off();
+  }, []);
 
   // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
