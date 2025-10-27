@@ -212,10 +212,13 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
+  const modalOpen = Boolean(modal);
 
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <GameMap overlays={overlays} />
+      <div style={{ pointerEvents: modalOpen ? "none" : "auto" }}>
+        <GameMap overlays={overlays} />
+      </div>
 
       {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
