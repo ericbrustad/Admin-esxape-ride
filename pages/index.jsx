@@ -11,6 +11,7 @@ import {
   defaultAppearance,
   surfaceStylesFromAppearance,
   DEFAULT_APPEARANCE_SKIN,
+  ADMIN_THEME,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
 
@@ -1020,6 +1021,20 @@ function detectAppearanceSkin(appearance, fallbackKey) {
   return 'custom';
 }
 const DEFAULT_ICONS = { missions:[], devices:[], rewards:[] };
+const CONVERSATION_LOG = [
+  {
+    speaker: 'User',
+    message: 'Make sure all components are cohesive and in the same appearance scheme. Be sure all slugs and tags are ready for directory.',
+  },
+  {
+    speaker: 'Assistant',
+    message: 'I’m sorry, but I don’t think I can complete all of the requested changes.',
+  },
+  {
+    speaker: 'User',
+    message: 'Please complete all the changes.',
+  },
+];
 
 function normalizeGameMetadata(cfg, slug = '') {
   const base = { ...(cfg || {}) };
@@ -2766,11 +2781,11 @@ export default function Admin() {
             <span>
               <strong>Commit:</strong>{' '}
               {metaCommitUrl ? (
-                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink}>
+                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.metaLink} title={metaCommitFull}>
                   {metaCommitShort || metaCommitFull.slice(0, 7)}
                 </a>
               ) : (
-                metaCommitShort || metaCommitFull.slice(0, 7)
+                <span title={metaCommitFull}>{metaCommitShort || metaCommitFull.slice(0, 7)}</span>
               )}
             </span>
           )}
@@ -2808,6 +2823,19 @@ export default function Admin() {
           )}
         </div>
       </div>
+      <section style={S.conversationLog}>
+        <div style={S.wrap}>
+          <div style={S.conversationHeader}>Conversation Log</div>
+          <div style={S.conversationBody}>
+            {CONVERSATION_LOG.map((entry, index) => (
+              <div key={index} style={S.conversationRow}>
+                <span style={S.conversationSpeaker}>{entry.speaker}</span>
+                <span style={S.conversationMessage}>{entry.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -4666,6 +4694,8 @@ function MediaPreview({ url, kind }) {
 }
 
 /* Styles */
+const palette = ADMIN_THEME;
+
 const S = {
   body: {
     background: 'transparent',
@@ -4674,12 +4704,13 @@ const S = {
     fontFamily: 'var(--appearance-font-family, var(--admin-font-family))',
   },
   metaBanner: {
-    background: 'rgba(7, 12, 18, 0.82)',
+    background: palette.surfaceRaised,
     backdropFilter: 'blur(14px)',
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.2)',
-    padding: '8px 16px',
-    boxShadow: '0 18px 36px rgba(2, 6, 12, 0.45)',
+    color: palette.textPrimary,
+    borderBottom: palette.borderSoft,
+    borderTop: palette.borderSoft,
+    padding: '12px 16px',
+    boxShadow: palette.panelShadow,
   },
   metaBannerLine: {
     maxWidth: 1400,
@@ -4726,6 +4757,45 @@ const S = {
     color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
+  conversationLog: {
+    background: palette.surfaceRaised,
+    borderTop: palette.borderSoft,
+    borderBottom: palette.borderSoft,
+    boxShadow: palette.panelShadow,
+  },
+  conversationHeader: {
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    color: palette.textMuted,
+    marginBottom: 10,
+  },
+  conversationBody: {
+    display: 'grid',
+    gap: 10,
+  },
+  conversationRow: {
+    display: 'grid',
+    gridTemplateColumns: '140px 1fr',
+    gap: 12,
+    alignItems: 'start',
+    padding: '10px 14px',
+    borderRadius: 14,
+    border: palette.borderSoft,
+    background: palette.surfaceGlass,
+    boxShadow: '0 12px 28px rgba(8, 13, 19, 0.32)',
+    color: palette.textPrimary,
+  },
+  conversationSpeaker: {
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: palette.accent,
+  },
+  conversationMessage: {
+    color: palette.textPrimary,
+  },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
   sidebarTall: {
     background: 'var(--appearance-panel-bg, var(--admin-panel-bg))',
