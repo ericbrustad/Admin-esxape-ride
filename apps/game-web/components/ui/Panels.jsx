@@ -21,11 +21,13 @@ export function BackpackPanel({ open, onClose }){
 }
 
 export function SettingsPanel({ open, onClose }){
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioAll, setAudioAll] = useState(false);
+  const [audioMusic, setAudioMusic] = useState(false);
+  const [audioFx, setAudioFx] = useState(false);
   const [debug, setDebug] = useState(false);
   const [simulate, setSimulate] = useState(false);
   const [buildInfo, setBuildInfo] = useState(null);
-  useEffect(()=>{ emit(Events.SETTINGS_UPDATE,{audioEnabled, debug, simulate}); },[audioEnabled,debug,simulate]);
+  useEffect(()=>{ emit(Events.SETTINGS_UPDATE,{audioAll, audioMusic, audioFx, debug, simulate}); },[audioAll,audioMusic,audioFx,debug,simulate]);
   useEffect(()=>{
     let cancelled=false;
     (async()=>{
@@ -45,10 +47,23 @@ export function SettingsPanel({ open, onClose }){
     <div style={{...panelBase, right:12}}>
       <div style={header}><strong>⚙️ Settings</strong><button style={btn} onClick={onClose}>Close</button></div>
       <div style={{padding:12, display:"grid", gap:12}}>
-        <label><input type="checkbox" checked={audioEnabled} onChange={e=>setAudioEnabled(e.target.checked)} /> Enable audio playback</label>
+        <fieldset style={{border:"1px solid #eee", borderRadius:12, padding:"10px 12px"}}>
+          <legend style={{padding:"0 6px", fontWeight:600}}>Audio controls</legend>
+          <label style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
+            <input type="checkbox" checked={audioAll} onChange={e=>setAudioAll(e.target.checked)} /> Enable all audio
+          </label>
+          <label style={{display:"flex", alignItems:"center", gap:8, marginBottom:6}}>
+            <input type="checkbox" checked={audioMusic} onChange={e=>setAudioMusic(e.target.checked)} /> Enable music overlays
+          </label>
+          <label style={{display:"flex", alignItems:"center", gap:8}}>
+            <input type="checkbox" checked={audioFx} onChange={e=>setAudioFx(e.target.checked)} /> Enable FX overlays
+          </label>
+          <p style={{margin:"8px 0 0", fontSize:12, lineHeight:1.4, opacity:0.75}}>Turn on "all" for a global allow, or toggle categories to hear only music or FX overlays.</p>
+        </fieldset>
         <label><input type="checkbox" checked={debug} onChange={e=>setDebug(e.target.checked)} /> Show geofence debug rings</label>
         <label><input type="checkbox" checked={simulate} onChange={e=>setSimulate(e.target.checked)} /> Click to simulate location</label>
         <button onClick={()=>emit(Events.GEO_POSITION,null)} style={btn}>Reset simulated location</button>
+        <button onClick={()=>emit("debug:test_modal", {})} style={btn}>Open test modal</button>
         <div style={{marginTop:12,fontSize:12,lineHeight:1.5,opacity:0.8}}>
           <div><strong>Repository:</strong> {buildInfo?.repository || "n/a"}</div>
           <div><strong>Branch:</strong> {buildInfo?.branch || "n/a"}</div>
