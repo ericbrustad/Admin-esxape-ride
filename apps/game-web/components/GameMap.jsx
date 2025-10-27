@@ -91,7 +91,6 @@ export default function GameMap({ overlays: overlaysProp }) {
   const engineRef = useRef("maplibre");
   const recordsRef = useRef(new Map());
   const stopFenceRef = useRef(null);
-  const simMarkerRef = useRef(null);
   const debugRef = useRef(false);
   const simulateRef = useRef(false);
   const audioGateRef = useRef({ all: false, music: false, fx: false });
@@ -247,15 +246,31 @@ export default function GameMap({ overlays: overlaysProp }) {
           map.once("load", markReady);
         }
 
+        const setInteractions = () => {
+          try {
+            const method = simulateRef.current ? "disable" : "enable";
+            map.doubleClickZoom?.[method]?.();
+            map.boxZoom?.[method]?.();
+            map.dragRotate?.[method]?.();
+            map.dragPan?.[method]?.();
+            map.keyboard?.[method]?.();
+            map.scrollZoom?.[method]?.();
+            if (simulateRef.current) {
+              map.touchZoomRotate?.disableRotation?.();
+            } else {
+              map.touchZoomRotate?.enableRotation?.();
+            }
+          } catch {}
+        };
+
+        setInteractions();
+
         offSettings = on(Events.SETTINGS_UPDATE, ({ audioAll, audioMusic, audioFx, debug, simulate }) => {
           audioGateRef.current = { all: !!audioAll, music: !!audioMusic, fx: !!audioFx };
           debugRef.current = !!debug;
           simulateRef.current = !!simulate;
           setSimulateActive(!!simulate);
-          if (!simulate) {
-            try { simMarkerRef.current?.remove?.(); } catch {}
-            simMarkerRef.current = null;
-          }
+          setInteractions();
           renderRings();
         });
       } catch (err) {
@@ -280,8 +295,6 @@ export default function GameMap({ overlays: overlaysProp }) {
       engineRef.current = "maplibre";
       mapReadyRef.current = false;
       setMapReady(false);
-      try { simMarkerRef.current?.remove?.(); } catch {}
-      simMarkerRef.current = null;
       insideIdsRef.current.clear();
     };
   }, []);
@@ -289,7 +302,13 @@ export default function GameMap({ overlays: overlaysProp }) {
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    const ACTIVE = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
+    function selectOne(list) {
+      if (!Array.isArray(list) || list.length === 0) return [];
+      const withUi = list.find((o) => o?.dialog || o?.prompt);
+      return [withUi || list[0]];
+    }
+    const allOverlays = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
+    const ACTIVE = selectOne(allOverlays);
 
     try { stopFenceRef.current?.(); } catch {}
     stopFenceRef.current = null;
@@ -463,19 +482,13 @@ export default function GameMap({ overlays: overlaysProp }) {
       clickCooldown = true;
       setTimeout(() => { clickCooldown = false; }, 800);
 
+      try { ev.preventDefault(); ev.stopPropagation(); } catch {}
+
       const rect = overlayEl.getBoundingClientRect();
       const px = [ev.clientX - rect.left, ev.clientY - rect.top];
       const lngLat = map.unproject(px);
       if (!lngLat) return;
       const { lng, lat } = lngLat;
-
-      const MarkerClass = engineRef.current === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
-      if (MarkerClass) {
-        if (!simMarkerRef.current) {
-          simMarkerRef.current = new MarkerClass({ color: "#007aff" }).addTo(map);
-        }
-        simMarkerRef.current.setLngLat([lng, lat]);
-      }
 
       emit(Events.GEO_POSITION, { lng, lat, accuracy: 0 });
 
@@ -509,7 +522,7 @@ export default function GameMap({ overlays: overlaysProp }) {
       }
     };
 
-    overlayEl.addEventListener("click", onClick, { passive: true });
+    overlayEl.addEventListener("click", onClick, { passive: false });
     return () => {
       overlayEl.removeEventListener("click", onClick);
     };

@@ -109,7 +109,7 @@ export default function GameRuntime(){
     return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Prompt/message on GEO_ENTER (always show something when entering a zone)
+  // Prompt/message on GEO_ENTER (always show a dialog for the single active ring)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
       // Always show a banner so you can SEE the enter event
@@ -132,14 +132,9 @@ export default function GameRuntime(){
         });
         return;
       }
-      // Generic message window (no input) — FALLBACK ALWAYS
-      const msgText =
-        (feature.dialog && feature.dialog.text) ||
-        feature.text ||
-        `Entered zone: ${feature.id}`;
-      const msgTitle =
-        (feature.dialog && feature.dialog.title) ||
-        "Zone reached";
+      // Generic message window (no input) — ALWAYS show something
+      const msgText = feature?.dialog?.text || feature?.text || `Entered zone: ${feature?.id ?? "zone"}`;
+      const msgTitle = feature?.dialog?.title || "Zone reached";
       const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
       setModal({
         type: "message",
