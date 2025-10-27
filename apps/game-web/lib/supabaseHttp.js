@@ -86,3 +86,33 @@ export async function getObjectJson(bucket, path) {
 
   return { data: null, error: resp.text || `HTTP ${resp.status}` };
 }
+
+// Server-only: upload/overwrite a text object (e.g., JSON) to Storage
+export async function putObjectText(
+  bucket,
+  path,
+  text,
+  contentType = "application/json",
+  upsert = true
+) {
+  const url = getSupabaseUrl();
+  const key = getServiceKey();
+  if (!url || !key) {
+    return { data: null, error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" };
+  }
+
+  const body = typeof text === "string" ? text : JSON.stringify(text);
+  const r = await fetch(`${url}/storage/v1/object/${encodeURIComponent(bucket)}/${path}`, {
+    method: "POST",
+    headers: { ...authHeaders(key), "content-type": contentType, "x-upsert": String(!!upsert) },
+    body,
+  });
+  if (!r.ok) {
+    return { data: null, error: (await r.text()) || r.statusText, status: r.status };
+  }
+  try {
+    return { data: await r.json(), error: null };
+  } catch {
+    return { data: null, error: null };
+  }
+}
