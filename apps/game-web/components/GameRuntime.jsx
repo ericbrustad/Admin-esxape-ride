@@ -107,7 +107,7 @@ export default function GameRuntime(){
     return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Prompt handling on GEO_ENTER (replaces window.prompt)
+  // Prompt/message on GEO_ENTER (always show something when entering a zone)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
       if (!feature) return;
@@ -128,18 +128,23 @@ export default function GameRuntime(){
         });
         return;
       }
-      // Generic message window (no input)
-      if (feature.dialog?.text || feature.text) {
-        const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
-        setModal({
-          type: "message",
-          overlay: feature,
-          mission: currentMission,
-          title: feature.dialog?.title || "Info",
-          message: feature.dialog?.text || feature.text,
-          continueLabel
-        });
-      }
+      // Generic message window (no input) — always show something friendly
+      const msgText =
+        (feature.dialog && feature.dialog.text) ||
+        feature.text ||
+        `Entered zone: ${feature.id}`;
+      const msgTitle =
+        (feature.dialog && feature.dialog.title) ||
+        "Zone reached";
+      const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
+      setModal({
+        type: "message",
+        overlay: feature,
+        mission: currentMission,
+        title: msgTitle,
+        message: msgText,
+        continueLabel
+      });
     });
     return () => offEnter();
   }, [answers, currentMission, bundle]);
@@ -212,10 +217,13 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
+  const modalOpen = Boolean(modal);
 
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <GameMap overlays={overlays} />
+      <div style={{ pointerEvents: modalOpen ? "none" : "auto" }}>
+        <GameMap overlays={overlays} />
+      </div>
 
       {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
