@@ -234,8 +234,6 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
-  const modalOpen = Boolean(modal);
-
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
       <div style={{ pointerEvents: modalOpen ? "none" : "auto" }}>

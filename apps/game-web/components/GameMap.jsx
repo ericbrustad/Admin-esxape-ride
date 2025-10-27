@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { OVERLAYS } from "../lib/overlays";
 import { startGeofenceWatcher } from "../lib/geofence";
 import { emit, on, Events } from "../lib/eventBus";
+import { showBanner } from "./ui/Banner";
 
 // CDN loaders (no node_modules needed)
 function loadScript(src){
@@ -247,6 +248,8 @@ export default function GameMap({ overlays: overlaysProp }){
       // Map click handler for simulated position
       const onMapClick = (e)=>{
         if(!simulate) return;
+        const lng = e.lngLat.lng;
+        const lat = e.lngLat.lat;
         if(!simMarkerRef.current){
           const MarkerCtor = mode === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
           if (MarkerCtor) {
@@ -254,9 +257,34 @@ export default function GameMap({ overlays: overlaysProp }){
           }
         }
         if (simMarkerRef.current) {
-          simMarkerRef.current.setLngLat([e.lngLat.lng, e.lngLat.lat]);
+          simMarkerRef.current.setLngLat([lng, lat]);
         }
-        emit(Events.GEO_POSITION, { lng:e.lngLat.lng, lat:e.lngLat.lat, accuracy:0 });
+        emit(Events.GEO_POSITION, { lng, lat, accuracy:0 });
+        // Debug banner: report nearest overlay + distance so ops can confirm geofence math.
+        try {
+          let nearest = null;
+          let best = Infinity;
+          const toRad = (d)=>d * Math.PI / 180;
+          const R = 6371000;
+          for (const rec of overlayRecordsRef.current.values()) {
+            const [flng, flat] = rec.feature.coordinates;
+            const dLat = toRad(flat - lat);
+            const dLng = toRad(flng - lng);
+            const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat)) * Math.cos(toRad(flat)) * Math.sin(dLng/2)**2;
+            const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+            if (dist < best) {
+              best = dist;
+              nearest = rec.feature;
+            }
+          }
+          if (nearest) {
+            const radius = Number(nearest.radius || 100);
+            const inside = best <= radius;
+            showBanner(`Click ${lng.toFixed(5)}, ${lat.toFixed(5)} → ${nearest.id}: ${Math.round(best)}m / R=${radius}m (${inside ? "INSIDE" : "outside"})`, 2600);
+          } else {
+            showBanner(`Click ${lng.toFixed(5)}, ${lat.toFixed(5)} → no overlays`, 2000);
+          }
+        } catch {}
       };
       map.on("click", onMapClick);
       cleanupRef.current.onMapClick = onMapClick;
