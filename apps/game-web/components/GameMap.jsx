@@ -153,7 +153,7 @@ export default function GameMap({ overlays: overlaysProp }){
       for(const f of ACTIVE){
         const { el, media } = buildDom(f);
         const marker = new glLib.Marker({ element: el }).setLngLat(f.coordinates).addTo(map);
-        records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false });
+        records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false, __ringMarker:null });
       }
 
       if(debugStateRef.current) setDebugRings(true);
@@ -326,6 +326,8 @@ export default function GameMap({ overlays: overlaysProp }){
       // Remove overlay markers and pause any audio
       for(const rec of overlayRecordsRef.current.values()){
         try{ rec.marker.remove(); }catch{}
+        try{ rec.__ringMarker?.remove?.(); }catch{}
+        rec.__ringMarker = null;
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       overlayRecordsRef.current.clear();
