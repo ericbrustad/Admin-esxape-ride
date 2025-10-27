@@ -29,6 +29,7 @@ export default function GameMap({ overlays: overlaysProp }){
   const simMarkerRef = useRef(null);
   const audioGate = useRef(false);
   const debugStateRef = useRef(false);
+  const simulateRef = useRef(false);
 
   // Keep overlay/handler references outside the async IIFE so cleanup can access them.
   const overlayRecordsRef = useRef(new Map()); // id -> { marker, el, type, media, feature, visible }
@@ -45,6 +46,8 @@ export default function GameMap({ overlays: overlaysProp }){
   const [engine, setEngine] = useState(null); // 'mapbox' | 'maplibre'
   const [engineNote, setEngineNote] = useState("");
 
+  useEffect(()=>{ simulateRef.current = simulate; }, [simulate]);
+  // Initialize map ONCE; do not re-init on settings toggles
   useEffect(()=>{
     // Reset cleanup refs for this mount
     cleanupRef.current.offSettings = null;
@@ -117,7 +120,8 @@ export default function GameMap({ overlays: overlaysProp }){
         const el=document.createElement("div");
         el.style.position="relative";
         el.style.transform="translate(-50%,-50%)";
-        el.style.pointerEvents="auto";
+        // Important: overlays must NOT intercept pointer events so map stays responsive
+        el.style.pointerEvents="none";
         el.style.userSelect="none";
         el.dataset.overlayId=feature.id;
         el.style.display="none"; // hidden until user enters geofence
@@ -224,7 +228,7 @@ export default function GameMap({ overlays: overlaysProp }){
 
       // Event-bus subscriptions (store unsubscribe functions for cleanup)
       cleanupRef.current.offSettings = on(Events.SETTINGS_UPDATE, ({ audioEnabled, debug, simulate })=>{
-        audioGate.current = !!audioEnabled; debugStateRef.current = !!debug;
+        audioGate.current = !!audioEnabled; debugStateRef.current = !!debug; simulateRef.current = !!simulate;
         setDebug(!!debug); setSimulate(!!simulate); setDebugRings(!!debug);
       });
 
@@ -247,7 +251,7 @@ export default function GameMap({ overlays: overlaysProp }){
 
       // Map click handler for simulated position
       const onMapClick = (e)=>{
-        if(!simulate) return;
+        if(!simulateRef.current) return;
         const lng = e.lngLat.lng;
         const lat = e.lngLat.lat;
         if(!simMarkerRef.current){
@@ -338,16 +342,23 @@ export default function GameMap({ overlays: overlaysProp }){
       try{ mapRef.current?.remove?.(); }catch{}
       mapRef.current = null;
     };
-  },[simulate, overlaysProp]); // re-init when simulation toggle or overlays change
+  },[]); // run once on mount; internal handlers react via refs and event subscriptions
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:0 }}>
-      <div ref={containerRef} style={{ position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw" }} />
+      <div
+        ref={containerRef}
+        style={{
+          position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw",
+          // nice hint when simulate is ON; harmless otherwise
+          cursor: simulate ? "crosshair" : "auto"
+        }}
+      />
       <div style={{ position:"absolute", left:12, top:12, zIndex:10 }}>
         <button onClick={()=>emit(Events.SETTINGS_UPDATE,{ audioEnabled:true, debug, simulate })} style={{ background:"#fff", border:"1px solid #ddd", padding:"8px 10px", borderRadius:10, cursor:"pointer" }}>🔉 Enable Audio</button>
       </div>
       {engine && (
-        <div style={{ position:"absolute", right:12, top:12, zIndex:10 }}>
+        <div style={{ position:"absolute", right:12, top:12, zIndex:10, pointerEvents:"none" }}>
           <div style={{ background:"#fff", border:"1px solid #ddd", padding:"6px 10px", borderRadius:10, fontSize:12 }}>
             Map engine: <strong>{engine === "mapbox" ? "Mapbox" : "MapLibre"}</strong>
             {engineNote ? <span style={{opacity:0.7}}> — {engineNote}</span> : null}
