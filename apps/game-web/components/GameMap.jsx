@@ -294,6 +294,8 @@ export default function GameMap({ overlays: overlaysProp }){
       }catch{}
       for(const rec of recordsRef.current.values()){
         try{ rec.marker.remove(); }catch{}
+        try{ rec.__ringMarker?.remove?.(); }catch{}
+        rec.__ringMarker = null;
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       recordsRef.current.clear();
