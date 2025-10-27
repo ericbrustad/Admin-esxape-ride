@@ -299,16 +299,6 @@ export async function getServerSideProps() {
       message:
         'Replaced GameMap with the Mapbox v3.13.0 baseline loader, simplifying the integration back to a single-map bootstrap while keeping the Settings metadata intact for verification.',
     },
-    {
-      speaker: 'Operator',
-      message:
-        'Load the demo mission bundle from Supabase at game-media/games/demo/data.json with the new unauthorized zone flow and ensure the Settings footer still shows the repository snapshot with current date and time.',
-    },
-    {
-      speaker: 'GPT',
-      message:
-        'Stored the updated mission data at game-media/games/demo/data.json, taught the game loader to prioritize that path before the legacy bundle fallback, and verified the Settings snapshot renders the repo, branch, commit, deployment URL, and refreshed timestamp.',
-    },
   ];
 
   return {

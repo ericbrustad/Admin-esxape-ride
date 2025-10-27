@@ -109,39 +109,53 @@ export default function GameRuntime(){
     return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Prompt/message on GEO_ENTER (always show a dialog for the single active ring)
+  // Prompt/message on GEO_ENTER (prompt first, then dialog, then fallback message)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
-      // Always show a banner so you can SEE the enter event
       showBanner(`Entered zone: ${feature?.id ?? "unknown"}`);
       if (!feature) return;
-      // Overlay-provided prompt or message
-      const prompt = feature.prompt;
+
+      const prompt = feature?.prompt;
       if (prompt?.id && prompt?.question) {
-        if (answers[prompt.id] != null) return; // already answered
-        const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
+        if (answers[prompt.id] == null) {
+          const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
+          setModal({
+            type: "prompt",
+            overlay: feature,
+            prompt,
+            mission: currentMission,
+            title: prompt.title || "Answer Required",
+            question: prompt.question,
+            value: "",
+            continueLabel
+          });
+          return;
+        }
+        // Prompt already answered; fall through to dialog/text
+      }
+
+      const dialog = feature?.dialog;
+      if (dialog?.text || dialog?.title) {
+        const continueLabel = labelFrom([dialog, currentMission?.ui, bundle?.ui], "Continue");
         setModal({
-          type: "prompt",
+          type: "message",
           overlay: feature,
-          prompt,
           mission: currentMission,
-          title: prompt.title || "Answer Required",
-          question: prompt.question,
-          value: "",
+          title: dialog.title || "Info",
+          message: dialog.text || "",
           continueLabel
         });
         return;
       }
-      // Generic message window (no input) — ALWAYS show something
-      const msgText = feature?.dialog?.text || feature?.text || `Entered zone: ${feature?.id ?? "zone"}`;
-      const msgTitle = feature?.dialog?.title || "Zone reached";
-      const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
+
+      const fallbackMessage = feature?.text || `Entered zone: ${feature?.id ?? "zone"}`;
+      const continueLabel = labelFrom([currentMission?.ui, bundle?.ui], "Continue");
       setModal({
         type: "message",
         overlay: feature,
         mission: currentMission,
-        title: msgTitle,
-        message: msgText,
+        title: "Zone reached",
+        message: fallbackMessage,
         continueLabel
       });
     });

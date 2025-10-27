@@ -302,25 +302,25 @@ export default function GameMap({ overlays: overlaysProp }) {
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
-    function selectOne(list) {
-      if (!Array.isArray(list) || list.length === 0) return [];
-      const withPrompt = list.find((o) => o?.prompt);
+    const sourceOverlays = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
+
+    // Prefer showing an interactive prompt overlay; fall back to dialog; else first
+    function selectOne(arr) {
+      if (!Array.isArray(arr) || !arr.length) return [];
+      const withPrompt = arr.find((o) => o && o.prompt && typeof o.prompt.id === "string");
       if (withPrompt) return [withPrompt];
-      const withDialog = list.find((o) => o?.dialog);
+      const withDialog = arr.find((o) => o && o.dialog);
       if (withDialog) return [withDialog];
-      return [list[0]];
+      return [arr[0]];
     }
-    const allOverlays = Array.isArray(overlaysProp) && overlaysProp.length ? overlaysProp : OVERLAYS;
-    const ACTIVE = selectOne(allOverlays);
+
+    const candidates = sourceOverlays.filter((ov) => Array.isArray(ov?.coordinates) && ov.coordinates.length >= 2);
+    const ACTIVE = selectOne(candidates);
 
     try { stopFenceRef.current?.(); } catch {}
     stopFenceRef.current = null;
     clearRecords();
     insideIdsRef.current.clear();
-    try {
-      if (map.getLayer("__rings_line")) map.removeLayer("__rings_line");
-      if (map.getSource("__rings_src")) map.removeSource("__rings_src");
-    } catch {}
 
     const MarkerClass = engineRef.current === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
     if (!MarkerClass) return;
@@ -417,9 +417,10 @@ export default function GameMap({ overlays: overlaysProp }) {
     }
 
     for (const feature of ACTIVE) {
-      if (!Array.isArray(feature.coordinates)) continue;
+      const coords = Array.isArray(feature.coordinates) ? feature.coordinates : null;
+      if (!coords) continue;
       const { el, media } = buildDom(feature);
-      const marker = new MarkerClass({ element: el }).setLngLat(feature.coordinates).addTo(map);
+      const marker = new MarkerClass({ element: el }).setLngLat(coords).addTo(map);
       recordsRef.current.set(feature.id, { marker, el, type: feature.type, media, feature, visible: false });
     }
 
@@ -455,7 +456,9 @@ export default function GameMap({ overlays: overlaysProp }) {
       if (feature?.id) insideIdsRef.current.delete(feature.id);
     });
 
-    stopFenceRef.current = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
+    if (ACTIVE.length) {
+      stopFenceRef.current = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
+    }
     renderRings();
 
     return () => {
