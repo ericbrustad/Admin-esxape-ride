@@ -84,6 +84,17 @@ const ADMIN_META_INITIAL_STATE = {
   fetchedAt: '',
   error: '',
 };
+
+const IMMERSIVE_TABS = new Set(['settings', 'missions', 'devices', 'assigned', 'media-pool']);
+
+const TAB_LABELS = {
+  missions: 'MISSIONS',
+  devices: 'DEVICES',
+  settings: 'SETTINGS',
+  text: 'TEXT',
+  'media-pool': 'MEDIA POOL',
+  assigned: 'ASSIGNED MEDIA',
+};
 function classifyByExt(u) {
   if (!u) return 'other';
   const s = String(u).toLowerCase();
@@ -1074,6 +1085,8 @@ function slugifyTitle(value) {
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
   const [tab, setTab] = useState('missions');
+  const metaBannerRef = useRef(null);
+  const [metaOffset, setMetaOffset] = useState(0);
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
 
@@ -1107,6 +1120,38 @@ export default function Admin() {
   const deviceFlashTimeout = useRef(null);
   const missionButtonTimeout = useRef(null);
   const deviceButtonTimeout = useRef(null);
+
+  useEffect(() => {
+    if (!metaBannerRef?.current) {
+      return undefined;
+    }
+
+    const update = () => {
+      if (!metaBannerRef.current) return;
+      const rect = metaBannerRef.current.getBoundingClientRect();
+      const next = Math.round((rect && rect.height) || 0);
+      setMetaOffset((prev) => (prev !== next ? next : prev));
+    };
+
+    update();
+
+    let resizeObserver;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => update());
+      resizeObserver.observe(metaBannerRef.current);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('resize', update);
+    }
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      } else if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', update);
+      }
+    };
+  }, [metaBannerRef]);
 
   const [protectionPrompt, setProtectionPrompt] = useState({
     open: false,
@@ -2711,7 +2756,9 @@ export default function Admin() {
   const headerCoverThumb = config?.game?.coverImage
     ? toDirectMediaURL(config.game.coverImage)
     : '';
-  const headerStyle = S.header;
+  const isImmersiveTab = IMMERSIVE_TABS.has(tab);
+  const headerStyle = isImmersiveTab ? { ...S.header, ...S.headerCollapsed } : S.header;
+  const floatingNavOffset = (metaOffset || 0) + 12;
   const metaBranchLabel = adminMeta.branch || 'unknown';
   const metaCommitFull = adminMeta.commit || '';
   const metaCommitShort = metaCommitFull ? String(metaCommitFull).slice(0, 7) : '';
@@ -2738,7 +2785,7 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <div style={S.metaBanner}>
+      <div ref={metaBannerRef} style={S.metaBanner}>
         <div style={{ ...S.metaBannerLine, flexWrap:'wrap', gap:12 }}>
           {metaRepoLabel && (
             <span>
@@ -2831,21 +2878,11 @@ export default function Admin() {
           </div>
           <div style={S.headerNavRow}>
             <div style={S.headerNavPrimary}>
-              {tabsOrder.map((t)=>{
-                const labelMap = {
-                  'missions':'MISSIONS',
-                  'devices':'DEVICES',
-                  'settings':'SETTINGS',
-                  'text':'TEXT',
-                  'media-pool':'MEDIA POOL',
-                  'assigned':'ASSIGNED MEDIA',
-                };
-                return (
-                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                    {labelMap[t] || t.toUpperCase()}
-                  </button>
-                );
-              })}
+              {tabsOrder.map((t)=>(
+                <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
+                  {TAB_LABELS[t] || t.toUpperCase()}
+                </button>
+              ))}
               <button
                 onClick={async ()=>{
                   await saveAndPublish();
@@ -2950,6 +2987,77 @@ export default function Admin() {
           <div style={{ color:'var(--admin-muted)', marginTop:6, whiteSpace:'pre-wrap' }}>{status}</div>
         </div>
       </header>
+
+      {isImmersiveTab && (
+        <div style={{ ...S.floatingNav, top: floatingNavOffset }}>
+          <div style={S.floatingNavInner}>
+            <div style={S.floatingNavTabs}>
+              {tabsOrder.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  style={{
+                    ...S.tab,
+                    ...S.floatingTabButton,
+                    ...(tab === t ? { ...S.tabActive, ...S.floatingTabButtonActive } : {}),
+                  }}
+                >
+                  {TAB_LABELS[t] || t.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div style={S.floatingNavActions}>
+              <button
+                onClick={async () => {
+                  await saveAndPublish();
+                  const isDefaultNow = !activeSlug || activeSlug === 'default';
+                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
+                }}
+                disabled={savePubBusy}
+                style={{
+                  ...S.button,
+                  ...S.savePublishButton,
+                  ...S.floatingNavButton,
+                  opacity: savePubBusy ? 0.65 : 1,
+                }}
+              >
+                {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
+              </button>
+              <div style={S.floatingSelectGroup}>
+                <label style={S.floatingLabel}>Game:</label>
+                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, ...S.floatingSelect }}>
+                  <option value="default">(Default Game)</option>
+                  {games.map(g=>(
+                    <option key={g.slug} value={g.slug}>{g.title} — {g.slug} ({g.mode||'single'})</option>
+                  ))}
+                </select>
+              </div>
+              <label style={{ ...S.floatingLabel, opacity: gameEnabled ? 1 : 0.7 }}>
+                <input
+                  type="checkbox"
+                  checked={deployGameEnabled}
+                  onChange={(e)=>setDeployEnabled(e.target.checked)}
+                  disabled={!gameEnabled}
+                  style={{ marginRight: 6 }}
+                />
+                Deploy game build
+              </label>
+              <label style={{ ...S.floatingLabel, opacity: deployGameEnabled && gameEnabled ? 1 : 0.7 }}>
+                Deploy delay (sec):
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={deployDelaySec}
+                  onChange={(e)=> setDeployDelaySec(Math.max(0, Math.min(120, Number(e.target.value || 0))))}
+                  style={{ ...S.input, ...S.floatingDelayInput }}
+                  disabled={!deployGameEnabled || !gameEnabled}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -4725,6 +4833,9 @@ const S = {
     boxShadow: 'var(--admin-header-shadow)',
     color: 'var(--appearance-font-color, var(--admin-body-color))',
   },
+  headerCollapsed: {
+    display: 'none',
+  },
   wrap: { maxWidth: 1400, margin: '0 auto', padding: 16 },
   wrapGrid2: { display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16, alignItems: 'start', maxWidth: 1400, margin: '0 auto', padding: 16 },
   sidebarTall: {
@@ -4994,6 +5105,72 @@ const S = {
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'center',
+  },
+  floatingNav: {
+    position: 'fixed',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: 'min(1200px, 94vw)',
+    zIndex: 2600,
+    pointerEvents: 'none',
+  },
+  floatingNavInner: {
+    pointerEvents: 'auto',
+    background: 'rgba(9, 15, 26, 0.9)',
+    backdropFilter: 'blur(16px)',
+    borderRadius: 18,
+    border: '1px solid var(--admin-border-soft)',
+    boxShadow: '0 22px 48px rgba(3, 8, 16, 0.45)',
+    padding: 14,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  floatingNavTabs: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  floatingTabButton: {
+    fontSize: 12,
+    padding: '6px 12px',
+    minWidth: 96,
+  },
+  floatingTabButtonActive: {
+    boxShadow: '0 0 0 1px rgba(255,255,255,0.12)',
+  },
+  floatingNavActions: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingNavButton: {
+    minWidth: 160,
+  },
+  floatingSelectGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  floatingLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+  },
+  floatingSelect: {
+    width: 220,
+    minWidth: 180,
+  },
+  floatingDelayInput: {
+    width: 96,
+    marginLeft: 6,
   },
   gameTitleRow: {
     display: 'grid',
