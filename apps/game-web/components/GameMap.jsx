@@ -4,7 +4,7 @@ import { startGeofenceWatcher } from "../lib/geofence";
 import { emit, on, Events } from "../lib/eventBus";
 import { showBanner } from "./ui/Banner";
 
-const MAPBOX_VERSION = "v3.13.0";
+const MAPBOX_VERSION = "v2.15.0";
 const MAPLIBRE_VERSION = "3.6.1";
 const DEFAULT_CENTER = [-93.265, 44.9778];
 const DEFAULT_ZOOM = 12;
@@ -76,6 +76,15 @@ function circleFeature(coords, radiusMeters, steps = 80) {
   };
 }
 
+function distanceMeters(a, b) {
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export default function GameMap({ overlays: overlaysProp }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -87,6 +96,8 @@ export default function GameMap({ overlays: overlaysProp }) {
   const simulateRef = useRef(false);
   const audioGateRef = useRef({ all: false, music: false, fx: false });
   const mapReadyRef = useRef(false);
+  const insideIdsRef = useRef(new Set());
+  const clickOverlayRef = useRef(null);
 
   const [engine, setEngine] = useState(null);
   const [engineNote, setEngineNote] = useState("");
@@ -150,7 +161,6 @@ export default function GameMap({ overlays: overlaysProp }) {
   useEffect(() => {
     let destroyed = false;
     let offSettings = null;
-    let clickHandler = null;
 
     (async () => {
       try {
@@ -234,20 +244,6 @@ export default function GameMap({ overlays: overlaysProp }) {
           map.once("load", markReady);
         }
 
-        clickHandler = (e) => {
-          if (!simulateRef.current) return;
-          const { lng, lat } = e.lngLat || {};
-          if (typeof lng !== "number" || typeof lat !== "number") return;
-          const Marker = mode === "mapbox" ? window.mapboxgl.Marker : window.maplibregl.Marker;
-          if (!simMarkerRef.current) {
-            simMarkerRef.current = new Marker({ color: "#007aff" }).addTo(map);
-          }
-          simMarkerRef.current.setLngLat([lng, lat]);
-          emit(Events.GEO_POSITION, { lng, lat, accuracy: 0 });
-          try { showBanner(`Simulated @ ${lng.toFixed(5)}, ${lat.toFixed(5)}`); } catch {}
-        };
-        map.on("click", clickHandler);
-
         offSettings = on(Events.SETTINGS_UPDATE, ({ audioAll, audioMusic, audioFx, debug, simulate }) => {
           audioGateRef.current = { all: !!audioAll, music: !!audioMusic, fx: !!audioFx };
           debugRef.current = !!debug;
@@ -273,7 +269,6 @@ export default function GameMap({ overlays: overlaysProp }) {
       clearRecords();
       try {
         const map = mapRef.current;
-        if (map && clickHandler) map.off("click", clickHandler);
         if (map?.getLayer("__rings_line")) map.removeLayer("__rings_line");
         if (map?.getSource("__rings_src")) map.removeSource("__rings_src");
         map?.remove?.();
@@ -284,6 +279,7 @@ export default function GameMap({ overlays: overlaysProp }) {
       setMapReady(false);
       try { simMarkerRef.current?.remove?.(); } catch {}
       simMarkerRef.current = null;
+      insideIdsRef.current.clear();
     };
   }, []);
 
@@ -295,6 +291,7 @@ export default function GameMap({ overlays: overlaysProp }) {
     try { stopFenceRef.current?.(); } catch {}
     stopFenceRef.current = null;
     clearRecords();
+    insideIdsRef.current.clear();
     try {
       if (map.getLayer("__rings_line")) map.removeLayer("__rings_line");
       if (map.getSource("__rings_src")) map.removeSource("__rings_src");
@@ -418,6 +415,7 @@ export default function GameMap({ overlays: overlaysProp }) {
         }
       }
       try { showBanner(`Entered zone: ${feature.id}`); } catch {}
+      insideIdsRef.current.add(feature.id);
     });
 
     const offExit = on(Events.GEO_EXIT, ({ feature }) => {
@@ -429,6 +427,7 @@ export default function GameMap({ overlays: overlaysProp }) {
       if (rec.media) {
         try { rec.media.pause(); } catch {}
       }
+      if (feature?.id) insideIdsRef.current.delete(feature.id);
     });
 
     stopFenceRef.current = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
@@ -447,6 +446,72 @@ export default function GameMap({ overlays: overlaysProp }) {
     };
   }, [overlaysProp, mapReady]);
 
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    if (!simulateActive) return;
+    const overlayEl = clickOverlayRef.current;
+    const map = mapRef.current;
+    if (!overlayEl || !map?.unproject) return;
+
+    let clickCooldown = false;
+    const onClick = (ev) => {
+      if (!simulateRef.current) return;
+      if (clickCooldown) return;
+      clickCooldown = true;
+      setTimeout(() => { clickCooldown = false; }, 800);
+
+      const rect = overlayEl.getBoundingClientRect();
+      const px = [ev.clientX - rect.left, ev.clientY - rect.top];
+      const lngLat = map.unproject(px);
+      if (!lngLat) return;
+      const { lng, lat } = lngLat;
+
+      const MarkerClass = engineRef.current === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
+      if (MarkerClass) {
+        if (!simMarkerRef.current) {
+          simMarkerRef.current = new MarkerClass({ color: "#007aff" }).addTo(map);
+        }
+        simMarkerRef.current.setLngLat([lng, lat]);
+      }
+
+      emit(Events.GEO_POSITION, { lng, lat, accuracy: 0 });
+
+      let nearest = null;
+      let best = Infinity;
+      for (const rec of recordsRef.current.values()) {
+        const coords = Array.isArray(rec.feature?.coordinates) ? rec.feature.coordinates : null;
+        if (!coords) continue;
+        const dist = distanceMeters({ lng, lat }, { lng: coords[0], lat: coords[1] });
+        if (dist < best) {
+          best = dist;
+          nearest = rec.feature;
+        }
+      }
+
+      if (nearest) {
+        const radius = Number(nearest.radius || 100);
+        const inside = best <= radius * 1.05;
+        try { showBanner(`Click → ${nearest.id}: ${Math.round(best)}m / R=${radius}m · ${inside ? "INSIDE" : "outside"}`); } catch {}
+        if (inside) {
+          if (!insideIdsRef.current.has(nearest.id)) {
+            insideIdsRef.current.add(nearest.id);
+            emit(Events.GEO_ENTER, { feature: nearest, distance: best });
+          }
+          emit(Events.UI_OPEN_DIALOG, {
+            title: nearest.dialog?.title || "Zone reached",
+            message: nearest.dialog?.text || nearest.text || `Entered zone: ${nearest.id}`,
+            continueLabel: nearest.dialog?.continueLabel || "Continue"
+          });
+        }
+      }
+    };
+
+    overlayEl.addEventListener("click", onClick, { passive: true });
+    return () => {
+      overlayEl.removeEventListener("click", onClick);
+    };
+  }, [mapReady, simulateActive]);
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
       <div
@@ -457,6 +522,16 @@ export default function GameMap({ overlays: overlaysProp }) {
           minHeight: "100vh",
           minWidth: "100vw",
           cursor: simulateActive ? "crosshair" : "grab"
+        }}
+      />
+      <div
+        ref={clickOverlayRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: simulateActive ? "auto" : "none",
+          background: "transparent",
+          zIndex: 5
         }}
       />
       {engine && (

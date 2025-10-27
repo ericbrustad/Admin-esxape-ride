@@ -6,7 +6,6 @@ import { BackpackPanel, SettingsPanel } from "./ui/Panels";
 import Modal from "./ui/Modal";
 import { on, Events, emit } from "../lib/eventBus";
 import { showBanner } from "./ui/Banner";
-import DevPanel from "./ui/DevPanel";
 
 const GameMap = dynamic(() => import("./GameMap"), { ssr: false });
 
@@ -315,8 +314,6 @@ export default function GameRuntime(){
         <div>{modal?.message}</div>
       </Modal>
 
-      {/* Dev helper: force-enter overlays without using the map */}
-      <DevPanel overlays={overlays} missionTitle={currentMission?.title} />
     </div>
   );
 }
