@@ -34,6 +34,8 @@ export default function GameMap({ overlays: overlaysProp }){
   const [mapReady, setMapReady] = useState(false);
   // Track which features we're "inside" to avoid duplicate enter spam on clicks
   const insideIdsRef = useRef(new Set());
+  // Transparent click-catcher overlay (so Mapbox never sees the click directly)
+  const clickCatchRef = useRef(null);
 
   // runtime refs
   const recordsRef = useRef(new Map());          // id -> { marker, el, type, media, feature, visible }
@@ -109,56 +111,14 @@ export default function GameMap({ overlays: overlaysProp }){
       // Fallback: flip ready after ~1.2s if style events were missed but map exists
       const t = setTimeout(()=>{ if (!readyTicked) { readyTicked = true; setMapReady(true); } }, 1200);
 
-      // click handler (respects simulateRef)
-      const onClick=(e)=>{
-        if(!simulateRef.current) return;
-        const lng=e.lngLat.lng, lat=e.lngLat.lat;
-        if(!simMarkerRef.current){
-          const Mk = mode==="mapbox" ? window.mapboxgl.Marker : window.maplibregl.Marker;
-          simMarkerRef.current = new Mk({ color:"#007aff" }).addTo(mapRef.current);
-        }
-        simMarkerRef.current.setLngLat([lng,lat]);
-        // Always emit a simulated position so the watcher (if running) can update
-        emit(Events.GEO_POSITION, { lng, lat, accuracy:0 });
-        // And proactively check ACTIVE overlays so clicks ALWAYS work
-        try {
-          const toRad = (d)=>d*Math.PI/180, R=6371000;
-          function distMeters(a,b){
-            const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
-            const lat1=toRad(a.lat), lat2=toRad(b.lat);
-            const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-            return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
-          }
-          const feats=[]; for (const rec of recordsRef.current.values()) feats.push(rec.feature);
-          let nearest=null, best=Infinity;
-          const pos={ lng, lat };
-          for (const f of feats) {
-            const c={ lng:f.coordinates[0], lat:f.coordinates[1] };
-            const d=distMeters(pos, c);
-            if (d<best) { best=d; nearest=f; }
-          }
-          if (nearest) {
-            const r=Number(nearest.radius||100);
-            const inside = best <= r;
-            try { if (typeof showBanner==="function") showBanner(`Click → ${nearest.id}: ${Math.round(best)}m / R=${r}m · ${inside?"INSIDE":"outside"}`, 1800); } catch {}
-            if (inside && !insideIdsRef.current.has(nearest.id)) {
-              insideIdsRef.current.add(nearest.id);
-              emit(Events.GEO_ENTER, { feature: nearest, distance: best });
-              emit(Events.UI_OPEN_DIALOG, {
-                title: nearest.dialog?.title || "Zone reached",
-                message: (nearest.dialog?.text || nearest.text || `Entered zone: ${nearest.id}`),
-                continueLabel: nearest.dialog?.continueLabel || "Continue"
-              });
-            }
-          }
-        } catch {}
-      };
-      map.on("click", onClick);
-
       // settings listener (once)
       const offSettings = on(Events.SETTINGS_UPDATE, ({ audioAll, audioMusic, audioFx, debug, simulate })=>{
         audioGateRef.current = { all:!!audioAll, music:!!audioMusic, fx:!!audioFx };
         debugRef.current = !!debug; simulateRef.current = !!simulate;
+        if (clickCatchRef.current) {
+          clickCatchRef.current.style.pointerEvents = simulate ? "auto" : "none";
+          clickCatchRef.current.style.cursor = simulate ? "crosshair" : "auto";
+        }
         renderRings(); // reflect toggle immediately
       });
 
@@ -166,7 +126,6 @@ export default function GameMap({ overlays: overlaysProp }){
       return ()=>{
         destroyed=true;
         offSettings();
-        try{ map.off("click", onClick); }catch{}
         try{ map.off("load", onLoad); }catch{}
         try{ map.off("styledata", onStyle); }catch{}
         try{ clearTimeout(t); }catch{}
@@ -294,8 +253,6 @@ export default function GameMap({ overlays: overlaysProp }){
       }catch{}
       for(const rec of recordsRef.current.values()){
         try{ rec.marker.remove(); }catch{}
-        try{ rec.__ringMarker?.remove?.(); }catch{}
-        rec.__ringMarker = null;
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       recordsRef.current.clear();
@@ -325,11 +282,79 @@ export default function GameMap({ overlays: overlaysProp }){
     }
   }
 
+  useEffect(()=>{
+    const div = clickCatchRef.current;
+    const map = mapRef.current;
+    if (!mapReady || !div || !map) return;
+
+    // Ensure overlay reflects current simulate toggle
+    div.style.pointerEvents = simulateRef.current ? "auto" : "none";
+    div.style.cursor = simulateRef.current ? "crosshair" : "auto";
+
+    function handleClick(ev){
+      if (!simulateRef.current) return;
+      try {
+        const rect = div.getBoundingClientRect();
+        const px = [ev.clientX - rect.left, ev.clientY - rect.top];
+        const ll = map.unproject(px);
+        const lng = ll?.lng;
+        const lat = ll?.lat;
+        if (typeof lng !== "number" || typeof lat !== "number") return;
+
+        const Mk = engineRef.current === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
+        if (!simMarkerRef.current && Mk) {
+          simMarkerRef.current = new Mk({ color:"#007aff" }).addTo(map);
+        }
+        try { simMarkerRef.current?.setLngLat?.([lng, lat]); } catch {}
+
+        emit(Events.GEO_POSITION, { lng, lat, accuracy:0 });
+
+        const toRad = (d)=>d*Math.PI/180;
+        const RADIUS = 6371000;
+        let nearest = null, best = Infinity;
+        for (const rec of recordsRef.current.values()) {
+          const [flng, flat] = rec.feature.coordinates || [];
+          if (typeof flng !== "number" || typeof flat !== "number") continue;
+          const dLat = toRad(flat - lat);
+          const dLng = toRad(flng - lng);
+          const lat1 = toRad(lat);
+          const lat2 = toRad(flat);
+          const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+          const dist = 2*RADIUS*Math.asin(Math.min(1, Math.sqrt(h)));
+          if (dist < best) { best = dist; nearest = rec.feature; }
+        }
+        if (nearest) {
+          const radius = Number(nearest.radius || 100);
+          const inside = best <= radius;
+          try { if (typeof showBanner === "function") showBanner(`Click → ${nearest.id}: ${Math.round(best)}m / R=${radius}m · ${inside ? "INSIDE" : "outside"}`, 1600); } catch {}
+          if (inside && !insideIdsRef.current.has(nearest.id)) {
+            insideIdsRef.current.add(nearest.id);
+            emit(Events.GEO_ENTER, { feature: nearest, distance: best });
+            emit(Events.UI_OPEN_DIALOG, {
+              title: nearest.dialog?.title || "Zone reached",
+              message: nearest.dialog?.text || nearest.text || `Entered zone: ${nearest.id}` ,
+              continueLabel: nearest.dialog?.continueLabel || "Continue"
+            });
+          }
+        }
+      } catch {}
+    }
+
+    div.addEventListener("click", handleClick, { passive: true });
+    return () => {
+      try { div.removeEventListener("click", handleClick); } catch {}
+    };
+  }, [mapReady]);
+
   return (
     <div style={{ position:"fixed", inset:0, zIndex:0 }}>
       <div
         ref={containerRef}
         style={{ position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw", cursor: simulateRef.current ? "crosshair" : "auto" }}
+      />
+      <div
+        ref={clickCatchRef}
+        style={{ position:"absolute", inset:0, pointerEvents: simulateRef.current ? "auto" : "none", cursor: simulateRef.current ? "crosshair" : "auto", background:"transparent", zIndex:5 }}
       />
       {engine && (
         <div style={{ position:"absolute", right:12, top:12, zIndex:10, pointerEvents:"none" }}>
