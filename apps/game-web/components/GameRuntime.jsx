@@ -180,6 +180,11 @@ export default function GameRuntime(){
     return ()=>off();
   }, []);
 
+  // Broadcast modal open state so other components (e.g., GameMap) can react
+  useEffect(()=>{
+    emit(Events.UI_MODAL_OPEN, Boolean(modal));
+  }, [modal]);
+
   // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
     if (!complete) return;

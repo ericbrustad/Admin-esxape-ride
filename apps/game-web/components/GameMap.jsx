@@ -34,6 +34,7 @@ export default function GameMap({ overlays: overlaysProp }){
   const [mapReady, setMapReady] = useState(false);
   // Track which features we're "inside" to avoid duplicate enter spam on clicks
   const insideIdsRef = useRef(new Set());
+  const modalOpenRef = useRef(false);
   // Transparent click-catcher overlay (so Mapbox never sees the click directly)
   const clickCatchRef = useRef(null);
 
@@ -44,6 +45,14 @@ export default function GameMap({ overlays: overlaysProp }){
   const simulateRef = useRef(false);
   const debugRef = useRef(false);
   const audioGateRef = useRef({ all:false, music:false, fx:false });
+
+  function updateClickCatcher(){
+    const div = clickCatchRef.current;
+    if (!div) return;
+    const active = simulateRef.current && !modalOpenRef.current;
+    div.style.pointerEvents = active ? "auto" : "none";
+    div.style.cursor = active ? "crosshair" : "auto";
+  }
 
   // ---- boot map ONCE
   useEffect(()=>{
@@ -115,17 +124,20 @@ export default function GameMap({ overlays: overlaysProp }){
       const offSettings = on(Events.SETTINGS_UPDATE, ({ audioAll, audioMusic, audioFx, debug, simulate })=>{
         audioGateRef.current = { all:!!audioAll, music:!!audioMusic, fx:!!audioFx };
         debugRef.current = !!debug; simulateRef.current = !!simulate;
-        if (clickCatchRef.current) {
-          clickCatchRef.current.style.pointerEvents = simulate ? "auto" : "none";
-          clickCatchRef.current.style.cursor = simulate ? "crosshair" : "auto";
-        }
+        updateClickCatcher();
         renderRings(); // reflect toggle immediately
+      });
+
+      const offModal = on(Events.UI_MODAL_OPEN, (isOpen)=>{
+        modalOpenRef.current = !!isOpen;
+        updateClickCatcher();
       });
 
       // cleanup on unmount
       return ()=>{
         destroyed=true;
         offSettings();
+        offModal();
         try{ map.off("load", onLoad); }catch{}
         try{ map.off("styledata", onStyle); }catch{}
         try{ clearTimeout(t); }catch{}
@@ -287,12 +299,12 @@ export default function GameMap({ overlays: overlaysProp }){
     const map = mapRef.current;
     if (!mapReady || !div || !map) return;
 
-    // Ensure overlay reflects current simulate toggle
-    div.style.pointerEvents = simulateRef.current ? "auto" : "none";
-    div.style.cursor = simulateRef.current ? "crosshair" : "auto";
+    // Ensure overlay reflects current simulate/modal state
+    updateClickCatcher();
 
     function handleClick(ev){
       if (!simulateRef.current) return;
+      if (modalOpenRef.current) return;
       try {
         const rect = div.getBoundingClientRect();
         const px = [ev.clientX - rect.left, ev.clientY - rect.top];
@@ -340,9 +352,16 @@ export default function GameMap({ overlays: overlaysProp }){
       } catch {}
     }
 
-    div.addEventListener("click", handleClick, { passive: true });
+    let clickCooldown = false;
+    const wrappedClick = (ev) => {
+      if (clickCooldown) return;
+      clickCooldown = true;
+      handleClick(ev);
+      setTimeout(() => { clickCooldown = false; }, 800);
+    };
+    div.addEventListener("click", wrappedClick, { passive: true });
     return () => {
-      try { div.removeEventListener("click", handleClick); } catch {}
+      try { div.removeEventListener("click", wrappedClick); } catch {}
     };
   }, [mapReady]);
 
@@ -350,11 +369,11 @@ export default function GameMap({ overlays: overlaysProp }){
     <div style={{ position:"fixed", inset:0, zIndex:0 }}>
       <div
         ref={containerRef}
-        style={{ position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw", cursor: simulateRef.current ? "crosshair" : "auto" }}
+        style={{ position:"absolute", inset:0, minHeight:"100vh", minWidth:"100vw", cursor: (simulateRef.current && !modalOpenRef.current) ? "crosshair" : "auto" }}
       />
       <div
         ref={clickCatchRef}
-        style={{ position:"absolute", inset:0, pointerEvents: simulateRef.current ? "auto" : "none", cursor: simulateRef.current ? "crosshair" : "auto", background:"transparent", zIndex:5 }}
+        style={{ position:"absolute", inset:0, pointerEvents: (simulateRef.current && !modalOpenRef.current) ? "auto" : "none", cursor: (simulateRef.current && !modalOpenRef.current) ? "crosshair" : "auto", background:"transparent", zIndex:5 }}
       />
       {engine && (
         <div style={{ position:"absolute", right:12, top:12, zIndex:10, pointerEvents:"none" }}>
