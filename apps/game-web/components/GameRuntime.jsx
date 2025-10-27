@@ -236,7 +236,9 @@ export default function GameRuntime(){
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <GameMap overlays={overlays} />
+      <div style={{ pointerEvents: modalOpen ? "none" : "auto" }}>
+        <GameMap overlays={overlays} />
+      </div>
 
       {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
