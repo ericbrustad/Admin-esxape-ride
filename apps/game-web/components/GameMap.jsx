@@ -31,6 +31,7 @@ export default function GameMap({ overlays: overlaysProp }){
   const engineRef = useRef("maplibre");
   const [engine, setEngine] = useState(null);
   const [engineNote, setEngineNote] = useState("");
+  const [mapReady, setMapReady] = useState(false);
 
   // runtime refs
   const recordsRef = useRef(new Map());          // id -> { marker, el, type, media, feature, visible }
@@ -97,6 +98,9 @@ export default function GameMap({ overlays: overlaysProp }){
       }
       if(destroyed || !map) return;
       mapRef.current = map; engineRef.current = mode; setEngine(mode);
+      // Mark map ready on first 'load'
+      const onLoad = () => { setMapReady(true); };
+      map.on("load", onLoad);
 
       // click handler (respects simulateRef)
       const onClick=(e)=>{
@@ -123,6 +127,7 @@ export default function GameMap({ overlays: overlaysProp }){
         destroyed=true;
         offSettings();
         try{ map.off("click", onClick); }catch{}
+        try{ map.off("load", onLoad); }catch{}
         try{
           const m = mapRef.current;
           if(m?.getLayer("__rings_line")) m.removeLayer("__rings_line");
@@ -141,8 +146,9 @@ export default function GameMap({ overlays: overlaysProp }){
     })();
   },[]);
 
-  // ---- overlay sync: rebuild markers + watcher when overlaysProp changes
+  // ---- overlay sync: rebuild markers + watcher when overlays OR map readiness change
   useEffect(()=>{
+    if (!mapReady) return;
     const map = mapRef.current; if(!map) return;
     const ACTIVE = (Array.isArray(overlaysProp) && overlaysProp.length) ? overlaysProp : OVERLAYS;
 
@@ -249,7 +255,7 @@ export default function GameMap({ overlays: overlaysProp }){
       }
       recordsRef.current.clear();
     };
-  }, [overlaysProp]); // <— resync when mission overlays change
+  }, [overlaysProp, mapReady]); // <— resync when mission overlays change OR map becomes ready
 
   function renderRings(){
     const map = mapRef.current; if(!map) return;
