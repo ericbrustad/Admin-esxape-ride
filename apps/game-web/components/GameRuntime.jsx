@@ -5,6 +5,8 @@ import { BackpackButton, SettingsButton } from "./ui/CornerButtons";
 import { BackpackPanel, SettingsPanel } from "./ui/Panels";
 import Modal from "./ui/Modal";
 import { on, Events, emit } from "../lib/eventBus";
+import { showBanner } from "./ui/Banner";
+import DevPanel from "./ui/DevPanel";
 
 const GameMap = dynamic(() => import("./GameMap"), { ssr: false });
 
@@ -36,7 +38,8 @@ export default function GameRuntime(){
     const p = currentMission.prompts?.find(x=>x.id===id);
     return p?.required !== false; // default required
   }), [allPromptIds, currentMission]);
-  const autoComplete = currentMission?.ui?.autoComplete ?? true;
+  // Do NOT auto-complete missions unless explicitly opted-in
+  const autoComplete = currentMission?.ui?.autoComplete === true;
   const complete = requiredIds.length > 0
     ? requiredIds.every(id => answers[id] != null && String(answers[id]).trim().length > 0)
     : (autoComplete && (currentMission.prompts?.length || 0) === 0);
@@ -107,42 +110,90 @@ export default function GameRuntime(){
     return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Prompt handling on GEO_ENTER (replaces window.prompt)
+  // Prompt/message on GEO_ENTER (prompt first, then dialog, then fallback message)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
+      showBanner(`Entered zone: ${feature?.id ?? "unknown"}`);
       if (!feature) return;
-      // Overlay-provided prompt or message
-      const prompt = feature.prompt;
+
+      const prompt = feature?.prompt;
       if (prompt?.id && prompt?.question) {
-        if (answers[prompt.id] != null) return; // already answered
-        const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
-        setModal({
-          type: "prompt",
-          overlay: feature,
-          prompt,
-          mission: currentMission,
-          title: prompt.title || "Answer Required",
-          question: prompt.question,
-          value: "",
-          continueLabel
-        });
-        return;
+        if (answers[prompt.id] == null) {
+          const continueLabel = labelFrom([prompt, currentMission?.ui, bundle?.ui], "Continue");
+          setModal({
+            type: "prompt",
+            overlay: feature,
+            prompt,
+            mission: currentMission,
+            title: prompt.title || "Answer Required",
+            question: prompt.question,
+            value: "",
+            continueLabel
+          });
+          return;
+        }
+        // Prompt already answered; fall through to dialog/text
       }
-      // Generic message window (no input)
-      if (feature.dialog?.text || feature.text) {
-        const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
+
+      const dialog = feature?.dialog;
+      if (dialog?.text || dialog?.title) {
+        const continueLabel = labelFrom([dialog, currentMission?.ui, bundle?.ui], "Continue");
         setModal({
           type: "message",
           overlay: feature,
           mission: currentMission,
-          title: feature.dialog?.title || "Info",
-          message: feature.dialog?.text || feature.text,
+          title: dialog.title || "Info",
+          message: dialog.text || "",
           continueLabel
         });
+        return;
       }
+
+      const fallbackMessage = feature?.text || `Entered zone: ${feature?.id ?? "zone"}`;
+      const continueLabel = labelFrom([currentMission?.ui, bundle?.ui], "Continue");
+      setModal({
+        type: "message",
+        overlay: feature,
+        mission: currentMission,
+        title: "Zone reached",
+        message: fallbackMessage,
+        continueLabel
+      });
     });
     return () => offEnter();
   }, [answers, currentMission, bundle]);
+
+
+  // Test modal hook from Settings
+  useEffect(()=>{
+    const off = on("debug:test_modal", ()=>{
+      setModal({
+        type:"message",
+        title:"Test dialog",
+        message:"If you can see this, the portal/z-index is working.",
+        continueLabel:"Close"
+      });
+    });
+    return ()=>off();
+  }, []);
+
+  // Listen for direct UI dialog requests (fallback from GameMap)
+  useEffect(()=>{
+    const off = on(Events.UI_OPEN_DIALOG, (p={})=>{
+      setModal({
+        type:"message",
+        title: p.title || "Info",
+        message: p.message || "…",
+        continueLabel: p.continueLabel || "Continue"
+      });
+    });
+    return ()=>off();
+  }, []);
+
+  // Broadcast modal open state so other components (e.g., GameMap) can react
+  useEffect(()=>{
+    emit(Events.UI_MODAL_OPEN, Boolean(modal));
+  }, [modal]);
 
   // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
@@ -212,10 +263,14 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
-
+  // Make sure modalOpen is always defined to avoid runtime errors when referenced elsewhere.
+  const modalOpen = Boolean(modal);
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <GameMap overlays={overlays} />
+      {/* Keep map interactive during debug. To block clicks while a modal is open, change pointerEvents to modalOpen ? "none" : "auto". */}
+      <div style={{ pointerEvents: "auto" }}>
+        <GameMap overlays={overlays} />
+      </div>
 
       {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
@@ -269,6 +324,10 @@ export default function GameRuntime(){
       >
         <div>{modal?.message}</div>
       </Modal>
+
+      {/* Dev helper: trigger enters without clicking the map */}
+      <DevPanel overlays={overlays} missionTitle={currentMission?.title} />
+
     </div>
   );
 }
