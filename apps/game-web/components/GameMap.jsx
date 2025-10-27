@@ -32,6 +32,8 @@ export default function GameMap({ overlays: overlaysProp }){
   const [engine, setEngine] = useState(null);
   const [engineNote, setEngineNote] = useState("");
   const [mapReady, setMapReady] = useState(false);
+  // Track which features we're "inside" to avoid duplicate enter spam on clicks
+  const insideIdsRef = useRef(new Set());
 
   // runtime refs
   const recordsRef = useRef(new Map());          // id -> { marker, el, type, media, feature, visible }
@@ -111,7 +113,35 @@ export default function GameMap({ overlays: overlaysProp }){
           simMarkerRef.current = new Mk({ color:"#007aff" }).addTo(mapRef.current);
         }
         simMarkerRef.current.setLngLat([lng,lat]);
+        // Always emit a simulated position so the watcher (if running) can update
         emit(Events.GEO_POSITION, { lng, lat, accuracy:0 });
+        // And proactively check ACTIVE overlays so clicks ALWAYS work
+        try {
+          const toRad = (d)=>d*Math.PI/180, R=6371000;
+          function distMeters(a,b){
+            const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+            const lat1=toRad(a.lat), lat2=toRad(b.lat);
+            const h=Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+            return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+          }
+          const feats=[]; for (const rec of recordsRef.current.values()) feats.push(rec.feature);
+          let nearest=null, best=Infinity;
+          const pos={ lng, lat };
+          for (const f of feats) {
+            const c={ lng:f.coordinates[0], lat:f.coordinates[1] };
+            const d=distMeters(pos, c);
+            if (d<best) { best=d; nearest=f; }
+          }
+          if (nearest) {
+            const r=Number(nearest.radius||100);
+            const inside = best <= r;
+            try { if (typeof showBanner==="function") showBanner(`Click → nearest ${nearest.id} = ${Math.round(best)}m / R=${r}m · ${inside?"INSIDE":"outside"}`, 2000); } catch {}
+            if (inside && !insideIdsRef.current.has(nearest.id)) {
+              insideIdsRef.current.add(nearest.id);
+              emit(Events.GEO_ENTER, { feature: nearest, distance: best });
+            }
+          }
+        } catch {}
       };
       map.on("click", onClick);
 
@@ -154,6 +184,7 @@ export default function GameMap({ overlays: overlaysProp }){
 
     // clear prior markers, watcher, rings
     try{ stopFenceRef.current?.(); }catch{}
+    insideIdsRef.current.clear();
     for(const rec of recordsRef.current.values()){
       try{ rec.marker.remove(); }catch{}
       if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
@@ -218,15 +249,17 @@ export default function GameMap({ overlays: overlaysProp }){
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
       const rec = recordsRef.current.get(feature.id);
       if(!rec) return;
+      insideIdsRef.current.add(feature.id);
       rec.visible = true; rec.el.style.display="block";
       if(rec.type==="video" && rec.media){ if(feature.autoplay!==false){ rec.media.play().catch(()=>{}); } }
       if(rec.type==="audio" && rec.media){ if(shouldPlayAudio(feature)){ rec.media.play().catch(()=>{}); } }
-      showBanner(`Entered zone: ${feature.id}`, 1200);
+      try { if (typeof showBanner==="function") showBanner(`Entered zone: ${feature.id}`, 1200); } catch {}
       emit(Events.ACTION_SHOW,{feature}); emit(Events.ACTION_PLAY,{feature});
     });
     const offExit = on(Events.GEO_EXIT, ({ feature })=>{
       const rec = recordsRef.current.get(feature.id);
       if(!rec) return;
+      insideIdsRef.current.delete(feature.id);
       rec.visible = false; rec.el.style.display="none";
       if(rec.type==="video" && rec.media){ rec.media.pause(); }
       if(rec.type==="audio" && rec.media){ rec.media.pause(); }
