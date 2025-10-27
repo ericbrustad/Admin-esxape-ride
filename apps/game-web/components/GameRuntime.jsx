@@ -234,9 +234,12 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
+  // Make sure modalOpen is always defined to avoid runtime errors when referenced elsewhere.
+  const modalOpen = Boolean(modal);
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <div style={{ pointerEvents: modalOpen ? "none" : "auto" }}>
+      {/* Keep map interactive during debug. To block clicks while a modal is open, change pointerEvents to modalOpen ? "none" : "auto". */}
+      <div style={{ pointerEvents: "auto" }}>
         <GameMap overlays={overlays} />
       </div>
 
