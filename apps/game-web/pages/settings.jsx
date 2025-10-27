@@ -279,6 +279,16 @@ export async function getServerSideProps() {
       message:
         'Updated GameMap to initialize the geofence watcher with the same ACTIVE overlays used for markers, keeping simulated and filtered missions aligned.',
     },
+    {
+      speaker: 'Operator',
+      message:
+        'The top-left Enable Audio toggle feels redundant. Split the controls so we can enable all audio or just music/FX individually, and keep logging these follow-ups.',
+    },
+    {
+      speaker: 'GPT',
+      message:
+        'Refined the Settings panel with separate All/Music/FX audio toggles, wired the runtime event so overlays respect each gate, and noted the change here for future audits.',
+    },
   ];
 
   return {
