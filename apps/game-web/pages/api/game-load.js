@@ -5,6 +5,7 @@ export default async function handler(req, res) {
   const game = String(req.query.game || "").trim() || "demo";
   const { bucket } = getDefaults(); // defaults to game-media
   const candidates = [
+    `games/${game}/data.json`,
     `games/${game}/bundle.json`,
     `missions/${game}.json`,
     `${game}.json`,
