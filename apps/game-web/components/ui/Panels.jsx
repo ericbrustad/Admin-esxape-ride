@@ -49,6 +49,7 @@ export function SettingsPanel({ open, onClose }){
         <label><input type="checkbox" checked={debug} onChange={e=>setDebug(e.target.checked)} /> Show geofence debug rings</label>
         <label><input type="checkbox" checked={simulate} onChange={e=>setSimulate(e.target.checked)} /> Click to simulate location</label>
         <button onClick={()=>emit(Events.GEO_POSITION,null)} style={btn}>Reset simulated location</button>
+        <button onClick={()=>emit("debug:test_modal", {})} style={btn}>Open test modal</button>
         <div style={{marginTop:12,fontSize:12,lineHeight:1.5,opacity:0.8}}>
           <div><strong>Repository:</strong> {buildInfo?.repository || "n/a"}</div>
           <div><strong>Branch:</strong> {buildInfo?.branch || "n/a"}</div>

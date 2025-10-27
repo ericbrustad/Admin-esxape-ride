@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { OVERLAYS } from "../lib/overlays";
 import { startGeofenceWatcher } from "../lib/geofence";
 import { emit, on, Events } from "../lib/eventBus";
+import { showBanner } from "./ui/Banner";
 
 // CDN loaders (no node_modules needed)
 function loadScript(src){
@@ -27,6 +28,7 @@ export default function GameMap({ overlays: overlaysProp }){
   const mapRef = useRef(null);
   const simMarkerRef = useRef(null);
   const audioGate = useRef(false);
+  const debugStateRef = useRef(false);
 
   // Keep overlay/handler references outside the async IIFE so cleanup can access them.
   const overlayRecordsRef = useRef(new Map()); // id -> { marker, el, type, media, feature, visible }
@@ -150,21 +152,80 @@ export default function GameMap({ overlays: overlaysProp }){
         records.set(f.id, { marker, el, type:f.type, media, feature:f, visible:false });
       }
 
+      if(debugStateRef.current) setDebugRings(true);
+
+      // --- Geo helpers for geodesic debug circles rendered via a shared line layer
+      const R_EARTH = 6371000;
+      function destPoint(lng, lat, bearingDeg, distMeters){
+        const phi1 = (lat * Math.PI) / 180;
+        const lambda1 = (lng * Math.PI) / 180;
+        const theta = (bearingDeg * Math.PI) / 180;
+        const delta = distMeters / R_EARTH;
+        const sinPhi1 = Math.sin(phi1), cosPhi1 = Math.cos(phi1);
+        const sinDelta = Math.sin(delta), cosDelta = Math.cos(delta), sinTheta = Math.sin(theta), cosTheta = Math.cos(theta);
+        const sinPhi2 = sinPhi1 * cosDelta + cosPhi1 * sinDelta * cosTheta;
+        const phi2 = Math.asin(sinPhi2);
+        const y = sinTheta * sinDelta * cosPhi1;
+        const x = cosDelta - sinPhi1 * sinPhi2;
+        const lambda2 = lambda1 + Math.atan2(y, x);
+        return [(((lambda2 * 180) / Math.PI) + 540) % 360 - 180, (phi2 * 180) / Math.PI];
+      }
+      function circlePolygon([lng, lat], radiusMeters, steps = 80){
+        const ring = [];
+        for(let i=0;i<=steps;i++){
+          const bearing = (i / steps) * 360;
+          ring.push(destPoint(lng, lat, bearing, radiusMeters));
+        }
+        return {
+          type:"Feature",
+          geometry:{ type:"Polygon", coordinates:[ring] },
+          properties:{}
+        };
+      }
       function setDebugRings(enabled){
-        for(const { el } of records.values()){
-          let ring=el.querySelector(".__ring");
-          if(enabled && !ring){
-            ring=document.createElement("div"); ring.className="__ring";
-            Object.assign(ring.style,{ position:"absolute", width:"200px", height:"200px", left:"50%", top:"50%", transform:"translate(-50%,-50%)", border:"2px dashed rgba(255,0,0,0.65)", borderRadius:"50%", pointerEvents:"none" });
-            el.appendChild(ring);
+        const mapInstance = mapRef.current;
+        if(!mapInstance) return;
+        const srcId = "__rings_src";
+        const layerId = "__rings_line";
+        if(!enabled){
+          if(mapInstance.getLayer(layerId)) mapInstance.removeLayer(layerId);
+          if(mapInstance.getSource(srcId)) mapInstance.removeSource(srcId);
+          return;
+        }
+        if(typeof mapInstance.isStyleLoaded === "function" && !mapInstance.isStyleLoaded()){
+          mapInstance.once?.("load", ()=>{ if(debugStateRef.current) setDebugRings(true); });
+          return;
+        }
+        const features = [];
+        for(const rec of records.values()){
+          const feature = rec.feature;
+          const radius = Math.max(10, Number(feature.radius || 100));
+          if(Array.isArray(feature.coordinates) && feature.coordinates.length === 2){
+            features.push(circlePolygon([feature.coordinates[0], feature.coordinates[1]], radius, 80));
           }
-          if(ring) ring.style.display = enabled ? "block" : "none";
+        }
+        const collection = { type:"FeatureCollection", features };
+        if(mapInstance.getSource(srcId)){
+          mapInstance.getSource(srcId).setData(collection);
+        } else {
+          mapInstance.addSource(srcId, { type:"geojson", data:collection });
+          mapInstance.addLayer({
+            id: layerId,
+            type: "line",
+            source: srcId,
+            paint: {
+              "line-color": "rgba(255,0,0,0.75)",
+              "line-width": 2,
+              "line-dasharray": [2, 2]
+            }
+          });
         }
       }
 
       // Event-bus subscriptions (store unsubscribe functions for cleanup)
       cleanupRef.current.offSettings = on(Events.SETTINGS_UPDATE, ({ audioEnabled, debug, simulate })=>{
-        audioGate.current = !!audioEnabled; setDebug(!!debug); setSimulate(!!simulate); setDebugRings(!!debug);
+        audioGate.current = !!audioEnabled; debugStateRef.current = !!debug;
+        setDebug(!!debug); setSimulate(!!simulate); setDebugRings(!!debug);
       });
 
       const handleEnter = ({ feature })=>{
@@ -187,6 +248,8 @@ export default function GameMap({ overlays: overlaysProp }){
       // Map click handler for simulated position
       const onMapClick = (e)=>{
         if(!simulate) return;
+        const lng = e.lngLat.lng;
+        const lat = e.lngLat.lat;
         if(!simMarkerRef.current){
           const MarkerCtor = mode === "mapbox" ? window.mapboxgl?.Marker : window.maplibregl?.Marker;
           if (MarkerCtor) {
@@ -194,14 +257,39 @@ export default function GameMap({ overlays: overlaysProp }){
           }
         }
         if (simMarkerRef.current) {
-          simMarkerRef.current.setLngLat([e.lngLat.lng, e.lngLat.lat]);
+          simMarkerRef.current.setLngLat([lng, lat]);
         }
-        emit(Events.GEO_POSITION, { lng:e.lngLat.lng, lat:e.lngLat.lat, accuracy:0 });
+        emit(Events.GEO_POSITION, { lng, lat, accuracy:0 });
+        // Debug banner: report nearest overlay + distance so ops can confirm geofence math.
+        try {
+          let nearest = null;
+          let best = Infinity;
+          const toRad = (d)=>d * Math.PI / 180;
+          const R = 6371000;
+          for (const rec of overlayRecordsRef.current.values()) {
+            const [flng, flat] = rec.feature.coordinates;
+            const dLat = toRad(flat - lat);
+            const dLng = toRad(flng - lng);
+            const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat)) * Math.cos(toRad(flat)) * Math.sin(dLng/2)**2;
+            const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+            if (dist < best) {
+              best = dist;
+              nearest = rec.feature;
+            }
+          }
+          if (nearest) {
+            const radius = Number(nearest.radius || 100);
+            const inside = best <= radius;
+            showBanner(`Click ${lng.toFixed(5)}, ${lat.toFixed(5)} → ${nearest.id}: ${Math.round(best)}m / R=${radius}m (${inside ? "INSIDE" : "outside"})`, 2600);
+          } else {
+            showBanner(`Click ${lng.toFixed(5)}, ${lat.toFixed(5)} → no overlays`, 2000);
+          }
+        } catch {}
       };
       map.on("click", onMapClick);
       cleanupRef.current.onMapClick = onMapClick;
 
-      // Start geofence watcher; stopFence clears navigator.geolocation watch + unsubscribes sim listener
+      // Start geofence watcher **using the same overlays we rendered**; stopFence clears navigator.geolocation watch + unsubscribes sim listener
       cleanupRef.current.stopFence = startGeofenceWatcher({ features: ACTIVE, highAccuracy: true });
     })();
 
@@ -237,6 +325,12 @@ export default function GameMap({ overlays: overlaysProp }){
         if(rec.media && rec.type==="audio"){ try{ rec.media.pause(); }catch{} }
       }
       overlayRecordsRef.current.clear();
+
+      // Remove debug ring layer/source before tearing down the map
+      try{
+        if(mapRef.current?.getLayer("__rings_line")) mapRef.current.removeLayer("__rings_line");
+        if(mapRef.current?.getSource("__rings_src")) mapRef.current.removeSource("__rings_src");
+      }catch{}
 
       // Finally, remove the map instance
       try{ mapRef.current?.remove?.(); }catch{}
