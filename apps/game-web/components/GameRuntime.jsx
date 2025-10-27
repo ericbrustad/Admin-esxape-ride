@@ -5,6 +5,8 @@ import { BackpackButton, SettingsButton } from "./ui/CornerButtons";
 import { BackpackPanel, SettingsPanel } from "./ui/Panels";
 import Modal from "./ui/Modal";
 import { on, Events, emit } from "../lib/eventBus";
+import { showBanner } from "./ui/Banner";
+import DevPanel from "./ui/DevPanel";
 
 const GameMap = dynamic(() => import("./GameMap"), { ssr: false });
 
@@ -107,9 +109,11 @@ export default function GameRuntime(){
     return ()=>{ cancelled = true; };
   }, [gameId]);
 
-  // Prompt handling on GEO_ENTER (replaces window.prompt)
+  // Prompt/message on GEO_ENTER (always show something when entering a zone)
   useEffect(()=>{
     const offEnter = on(Events.GEO_ENTER, ({ feature })=>{
+      // Always show a banner so you can SEE the enter event
+      showBanner(`Entered zone: ${feature?.id ?? "unknown"}`);
       if (!feature) return;
       // Overlay-provided prompt or message
       const prompt = feature.prompt;
@@ -128,21 +132,58 @@ export default function GameRuntime(){
         });
         return;
       }
-      // Generic message window (no input)
-      if (feature.dialog?.text || feature.text) {
-        const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
-        setModal({
-          type: "message",
-          overlay: feature,
-          mission: currentMission,
-          title: feature.dialog?.title || "Info",
-          message: feature.dialog?.text || feature.text,
-          continueLabel
-        });
-      }
+      // Generic message window (no input) — FALLBACK ALWAYS
+      const msgText =
+        (feature.dialog && feature.dialog.text) ||
+        feature.text ||
+        `Entered zone: ${feature.id}`;
+      const msgTitle =
+        (feature.dialog && feature.dialog.title) ||
+        "Zone reached";
+      const continueLabel = labelFrom([feature.dialog, currentMission?.ui, bundle?.ui], "Continue");
+      setModal({
+        type: "message",
+        overlay: feature,
+        mission: currentMission,
+        title: msgTitle,
+        message: msgText,
+        continueLabel
+      });
     });
     return () => offEnter();
   }, [answers, currentMission, bundle]);
+
+
+  // Test modal hook from Settings
+  useEffect(()=>{
+    const off = on("debug:test_modal", ()=>{
+      setModal({
+        type:"message",
+        title:"Test dialog",
+        message:"If you can see this, the portal/z-index is working.",
+        continueLabel:"Close"
+      });
+    });
+    return ()=>off();
+  }, []);
+
+  // Listen for direct UI dialog requests (fallback from GameMap)
+  useEffect(()=>{
+    const off = on(Events.UI_OPEN_DIALOG, (p={})=>{
+      setModal({
+        type:"message",
+        title: p.title || "Info",
+        message: p.message || "…",
+        continueLabel: p.continueLabel || "Continue"
+      });
+    });
+    return ()=>off();
+  }, []);
+
+  // Broadcast modal open state so other components (e.g., GameMap) can react
+  useEffect(()=>{
+    emit(Events.UI_MODAL_OPEN, Boolean(modal));
+  }, [modal]);
 
   // When a mission becomes complete, show the completion modal (once)
   useEffect(()=>{
@@ -212,10 +253,14 @@ export default function GameRuntime(){
 
   // Overlays to render for the current mission (or demo if empty)
   const overlays = useMemo(()=> Array.isArray(currentMission.overlays) ? currentMission.overlays : [], [currentMission]);
-
+  // Make sure modalOpen is always defined to avoid runtime errors when referenced elsewhere.
+  const modalOpen = Boolean(modal);
   return (
     <div style={{ fontFamily:"system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif" }}>
-      <GameMap overlays={overlays} />
+      {/* Keep map interactive during debug. To block clicks while a modal is open, change pointerEvents to modalOpen ? "none" : "auto". */}
+      <div style={{ pointerEvents: "auto" }}>
+        <GameMap overlays={overlays} />
+      </div>
 
       {/* Corner UI */}
       <BackpackButton onClick={()=>setOpenBackpack(true)} />
@@ -269,6 +314,9 @@ export default function GameRuntime(){
       >
         <div>{modal?.message}</div>
       </Modal>
+
+      {/* Dev helper: force-enter overlays without using the map */}
+      <DevPanel overlays={overlays} missionTitle={currentMission?.title} />
     </div>
   );
 }
