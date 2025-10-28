@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-29T01:45:00Z
+
+**You:** The Settings footer still feels noisy—can you collapse the metadata rows into one dev snapshot line, keep the repo/branch/commit/deployment pulled from NEXT_PUBLIC env vars, and retest without using yarn?
+
+**GPT:** Consolidated the footer into a single Dev Environment Snapshot row with repo, branch, commit, deployment, Vercel host, and captured timestamp sourced from admin metadata or the NEXT_PUBLIC fallbacks, then reran the admin Next build directly via `node` to confirm the dashboard passes.
+
+---
+
 **Timestamp:** 2025-10-28T00:30:10Z
 
 **You:** Please make sure the Settings footer still shows the repo name, branch, commit hash, and Vercel deployment with a timestamp even when we only have env variables in dev. Keep the binary-free policy, run the admin build, and log the pairing once it passes.
