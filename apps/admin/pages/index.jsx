@@ -968,12 +968,14 @@ export default function Admin() {
       updateNewGameStatus('❌ Title is required.', 'danger');
       return;
     }
+
     const slugCandidate = slugifyTitle(newGameSlug);
     const slugInput = (slugCandidate || buildSuggestedSlug(title)).trim().slice(0, 48);
     if (!slugCandidate) {
       newGameSlugEdited.current = false;
       setNewGameSlug(slugInput);
     }
+
     setNewGameBusy(true);
     updateNewGameStatus('Creating game…', 'info');
     let coverPath = newCoverSelectedUrl;
@@ -982,27 +984,48 @@ export default function Admin() {
         coverPath = await uploadToRepo(newCoverFile, 'covers');
         if (!coverPath) throw new Error('Cover upload failed');
       }
-      const res = await fetch('/api/games', {
+
+      const defaults = defaultConfig();
+      const defaultGame = defaults.game || {};
+      const currentConfig = config || {};
+      const payload = {
+        slug: slugInput,
+        title,
+        type: newType,
+        config: {
+          ...defaults,
+          game: {
+            ...defaultGame,
+            ...(currentConfig.game || {}),
+            title,
+            type: newType,
+            slug: slugInput,
+            mode: newMode,
+            shortDescription: newShortDesc.trim(),
+            longDescription: newLongDesc.trim(),
+            coverImage: coverPath || '',
+          },
+          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+          appearance: currentConfig.appearance || defaultAppearance(),
+          appearanceSkin: currentConfig.appearanceSkin || defaults.appearanceSkin || DEFAULT_APPEARANCE_SKIN,
+          appearanceTone: currentConfig.appearanceTone || defaults.appearanceTone || 'light',
+        },
+      };
+
+      const res = await fetch('/api/games?channel=draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          title,
-          type: newType,
-          mode: newMode,
-          slug: slugInput,
-          shortDescription: newShortDesc.trim(),
-          longDescription: newLongDesc.trim(),
-          coverImage: coverPath,
-          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({ ok: false }));
       if (!res.ok || data.ok === false) {
         throw new Error(data?.error || 'create failed');
       }
+
       await reloadGamesList();
-      setActiveSlug(data.slug || slugInput || 'default');
+      setActiveSlug(data.slug || slugInput);
+      setTab('settings');
       setStatus(`✅ Created game “${title}”`);
       updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
@@ -1310,9 +1333,9 @@ export default function Admin() {
     if (!gameEnabled) { setGames([]); return; }
     (async () => {
       try {
-        const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+        const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
         const j = await r.json();
-        if (j.ok) setGames(j.games || []);
+        if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
       } catch {}
     })();
   }, [gameEnabled]);
@@ -1609,9 +1632,9 @@ export default function Admin() {
   async function reloadGamesList() {
     if (!gameEnabled) { setGames([]); return; }
     try {
-      const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+      const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
       const j = await r.json();
-      if (j.ok) setGames(j.games || []);
+      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
     } catch {}
   }
 
@@ -2618,6 +2641,12 @@ export default function Admin() {
     metaCapturedSnapshot,
   ].filter(Boolean);
   const metaDevSummary = metaDevSummaryParts.length ? metaDevSummaryParts.join(' • ') : 'Repo snapshot unavailable';
+  const metaRepoFooterLabel = metaSnapshotHasValue(metaRepoDisplay) ? metaRepoDisplay : '—';
+  const metaBranchFooterLabel = metaSnapshotHasValue(metaBranchDisplay) ? metaBranchDisplay : '—';
+  const metaCommitFooterLabel = metaSnapshotHasValue(metaCommitFull) ? metaCommitFull : (metaSnapshotHasValue(metaCommitDisplay) ? metaCommitDisplay : '—');
+  const metaDeploymentFooterLabel = metaSnapshotHasValue(metaDeploymentDisplay) ? metaDeploymentDisplay : '—';
+  const metaFooterNowLabel = metaNowLabel || '—';
+  const metaDevFooterLine = `Repo: ${metaRepoFooterLabel} • Branch: ${metaBranchFooterLabel} • Commit: ${metaCommitFooterLabel} • Deployment: ${metaDeploymentFooterLabel} • Generated ${metaFooterNowLabel}`;
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -4045,6 +4074,9 @@ export default function Admin() {
             )}
             <div style={S.settingsFooterTime}>
               Dev Environment Snapshot — {metaDevSummary}
+            </div>
+            <div style={S.settingsFooterTime}>
+              {metaDevFooterLine}
             </div>
           </footer>
         </main>
