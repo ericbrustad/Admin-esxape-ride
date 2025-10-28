@@ -1047,6 +1047,8 @@ export default function Admin() {
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
+  const [editChannel, setEditChannel] = useState('draft');
+  const [saveBusy, setSaveBusy] = useState(false);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1264,9 +1266,6 @@ export default function Admin() {
   const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
-  // Combined Save & Publish
-  const [savePubBusy, setSavePubBusy] = useState(false);
-
   // Pin size (selected)
   const [selectedPinSize, setSelectedPinSize] = useState(28);
   const defaultPinSize = 24;
@@ -1462,10 +1461,14 @@ export default function Admin() {
   /* ── API helpers respecting Default Game (legacy root) ── */
   function isDefaultSlug(slug) { return !slug || slug === 'default'; }
 
-  async function saveAllWithSlug(slug) {
+  async function saveAllWithSlug(slug, channel = 'draft') {
     if (!suite || !config) return false;
+    const normalizedChannel = String(channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
     setStatus((prev) => {
-      if (typeof prev === 'string' && prev.toLowerCase().includes('publishing')) return prev;
+      if (typeof prev === 'string') {
+        const lower = prev.toLowerCase();
+        if (lower.includes('publishing') || lower.includes('saving')) return prev;
+      }
       return 'Saving…';
     });
     const isDefault = isDefaultSlug(slug);
@@ -1475,13 +1478,14 @@ export default function Admin() {
 
     const supaPayload = {
       slug,
+      channel: normalizedChannel,
       config: preparedConfig,
       missions: suite?.missions || [],
       devices: getDevices(),
     };
 
     const attemptSupabase = async () => {
-      const response = await fetch('/api/save', {
+      const response = await fetch(`/api/games?channel=${encodeURIComponent(normalizedChannel)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1552,6 +1556,56 @@ export default function Admin() {
     }
   }
 
+  async function saveDraftNow() {
+    logConversation('You', 'Requested Save Draft');
+    if (!suite || !config) return;
+    const slug = activeSlug || 'default';
+    setSaveBusy(true);
+    setStatus('Saving draft…');
+    const saved = await saveAllWithSlug(slug, 'draft');
+    if (saved) {
+      setStatus('✅ Draft saved');
+      logConversation('GPT', `Draft saved for ${slug}`);
+      await reloadGamesList();
+    } else {
+      logConversation('GPT', `Draft save failed for ${slug}`);
+    }
+    setSaveBusy(false);
+  }
+
+  async function publishNow() {
+    logConversation('You', 'Requested Publish Now');
+    const slug = activeSlug || 'default';
+    if (!slug) return;
+    setSaveBusy(true);
+    setStatus('Publishing…');
+    try {
+      const response = await fetch(`/api/publish?slug=${encodeURIComponent(slug)}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const text = await response.text();
+      let payload = null;
+      if (text) {
+        try { payload = JSON.parse(text); } catch { payload = null; }
+      }
+      if (!response.ok || (payload && payload.ok === false)) {
+        const message = (payload && payload.error) || text || 'publish failed';
+        throw new Error(message);
+      }
+      setStatus('🚀 Published');
+      logConversation('GPT', `Published ${slug}`);
+      await reloadGamesList();
+      setPreviewNonce((n) => n + 1);
+    } catch (error) {
+      const message = error?.message || 'publish failed';
+      setStatus(`❌ Publish failed: ${message}`);
+      logConversation('GPT', `Publish failed for ${slug}: ${message}`);
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
   async function reloadGamesList() {
     if (!gameEnabled) { setGames([]); return; }
     try {
@@ -1559,22 +1613,6 @@ export default function Admin() {
       const j = await r.json();
       if (j.ok) setGames(j.games || []);
     } catch {}
-  }
-
-  async function saveAndPublish() {
-    logConversation('You', 'Requested Save & Publish');
-    if (!suite || !config) return;
-    const slug = activeSlug || 'default';
-    setSavePubBusy(true);
-    setStatus('Saving…');
-
-    const saved = await saveAllWithSlug(slug);
-    if (!saved) { setSavePubBusy(false); return; }
-
-    setStatus('✅ Saved');
-    await reloadGamesList();
-    setPreviewNonce((n) => n + 1);
-    setSavePubBusy(false);
   }
 
   /* Delete game (with modal confirm) */
@@ -2625,6 +2663,24 @@ export default function Admin() {
           </div>
           <div style={S.headerNavRow}>
             <div style={S.headerNavPrimary}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginRight: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setEditChannel('draft')}
+                  style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
+                  title="Edit in Draft mode"
+                >
+                  Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditChannel('published')}
+                  style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
+                  title="Enable publishing actions"
+                >
+                  Published
+                </button>
+              </div>
               {tabsOrder.map((t)=>{
                 const labelMap = {
                   'missions':'MISSIONS',
@@ -2648,15 +2704,22 @@ export default function Admin() {
                 <span style={S.newGameLabel}>+ New Game</span>
               </button>
               <button
-                onClick={async ()=>{
-                  await saveAndPublish();
-                  const isDefaultNow = !activeSlug || activeSlug === 'default';
-                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
-                }}
-                disabled={savePubBusy}
-                style={{ ...S.button, ...S.savePublishButton, opacity: savePubBusy ? 0.65 : 1 }}
+                type="button"
+                onClick={saveDraftNow}
+                disabled={saveBusy || editChannel !== 'draft'}
+                style={{ ...S.button, ...(editChannel === 'draft' ? S.buttonSuccess : S.buttonDisabled) }}
+                title="Save current changes to the draft channel"
               >
-                {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
+                {saveBusy && editChannel === 'draft' ? 'Saving…' : 'Save Draft'}
+              </button>
+              <button
+                type="button"
+                onClick={publishNow}
+                disabled={saveBusy || editChannel !== 'published'}
+                style={{ ...S.button, ...(editChannel === 'published' ? S.savePublishButton : S.buttonDisabled) }}
+                title="Copy draft to published (players will see it)"
+              >
+                {saveBusy && editChannel === 'published' ? 'Publishing…' : 'Publish Now'}
               </button>
             </div>
             {gameEnabled && (
