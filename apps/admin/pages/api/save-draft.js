@@ -50,6 +50,14 @@ export default async function handler(req, res) {
       : config && Array.isArray(config.devices)
         ? extractDevices(config.devices)
         : [];
+    const powerups = config && Array.isArray(config.powerups) ? extractDevices(config.powerups) : devices;
+
+    const gameMeta = config?.game ?? {};
+    const appearance = config?.appearance ?? {};
+    const appearanceSkin = config?.appearanceSkin ?? null;
+    const appearanceTone = config?.appearanceTone ?? 'light';
+    const tags = Array.isArray(gameMeta?.tags) ? gameMeta.tags : [];
+    const mode = config?.splash?.mode || gameMeta.mode || null;
 
     if (!config && !missionsProvided && !devicesProvided) {
       return res.status(400).json({ ok: false, error: 'No draft payload provided' });
@@ -57,46 +65,74 @@ export default async function handler(req, res) {
 
     const now = new Date().toISOString();
 
-    const tasks = [];
+    let gameId = null;
     if (config) {
-      tasks.push(
-        supa.from('games').upsert({
-          slug,
-          title: config?.game?.title || slug,
-          status: 'draft',
-          theme: config?.appearance || {},
-          map: config?.map || {},
-          config,
-          updated_at: now,
-        })
-      );
+      const gameResult = await supa.from('games').upsert({
+        slug,
+        channel: 'draft',
+        title: gameMeta?.title || slug,
+        type: gameMeta?.type || null,
+        cover_image: gameMeta?.coverImage || null,
+        config,
+        map: config?.map || {},
+        appearance,
+        theme: appearance,
+        appearance_skin: appearanceSkin,
+        appearance_tone: appearanceTone,
+        mode,
+        short_description: gameMeta?.shortDescription || null,
+        long_description: gameMeta?.longDescription || null,
+        tags,
+        status: 'draft',
+        updated_at: now,
+      });
+      if (gameResult?.error) {
+        throw gameResult.error;
+      }
+      const row = Array.isArray(gameResult?.data) ? gameResult.data[0] : gameResult?.data;
+      gameId = row?.id || null;
     }
 
+    const tasks = [];
     if (missionsProvided) {
-      tasks.push(
-        supa.from('missions').upsert({
-          game_slug: slug,
-          channel: 'draft',
-          items: missions,
-          updated_at: now,
-        })
-      );
+      const payload = {
+        game_slug: slug,
+        channel: 'draft',
+        items: missions,
+        updated_at: now,
+      };
+      if (gameId) payload.game_id = gameId;
+      tasks.push(supa.from('missions').upsert(payload));
     }
 
     if (devicesProvided || (config && Array.isArray(config.devices))) {
-      tasks.push(
-        supa.from('devices').upsert({
-          game_slug: slug,
-          items: devices,
-          updated_at: now,
-        })
-      );
+      const payload = {
+        game_slug: slug,
+        channel: 'draft',
+        items: devices,
+        updated_at: now,
+      };
+      if (gameId) payload.game_id = gameId;
+      tasks.push(supa.from('devices').upsert(payload));
     }
 
-    const results = await Promise.all(tasks);
-    const failure = results.find((result) => result?.error);
-    if (failure && failure.error) {
-      throw failure.error;
+    if (config && Array.isArray(config.powerups)) {
+      const payload = {
+        game_slug: slug,
+        channel: 'draft',
+        items: powerups,
+        updated_at: now,
+      };
+      if (gameId) payload.game_id = gameId;
+      tasks.push(supa.from('powerups').upsert(payload).catch(() => ({ error: null })));
+    }
+
+    if (tasks.length) {
+      const results = await Promise.all(tasks);
+      const failure = results.find((result) => result?.error);
+      if (failure && failure.error) {
+        throw failure.error;
+      }
     }
 
     return res.status(200).json({ ok: true, slug, updated_at: now });

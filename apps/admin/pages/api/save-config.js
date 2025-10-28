@@ -33,27 +33,65 @@ export default async function handler(req, res) {
       : Array.isArray(configInput?.powerups)
         ? configInput.powerups
         : [];
+    const powerups = Array.isArray(configInput?.powerups) ? configInput.powerups : devices;
     const now = new Date().toISOString();
 
-    const updates = [
-      supa.from('games').upsert({
-        slug,
-        title: configInput?.game?.title || slug,
-        status: 'draft',
-        theme: configInput?.appearance || {},
-        map: configInput?.map || {},
-        config: configInput,
-        updated_at: now,
-      }),
-      supa.from('devices').upsert({
-        game_slug: slug,
-        items: devices,
-        updated_at: now,
-      }),
-    ];
+    const gameMeta = configInput?.game ?? {};
+    const appearance = configInput?.appearance ?? {};
+    const appearanceSkin = configInput?.appearanceSkin ?? null;
+    const appearanceTone = configInput?.appearanceTone ?? 'light';
+    const tags = Array.isArray(gameMeta?.tags) ? gameMeta.tags : [];
+    const mode = configInput?.splash?.mode || gameMeta.mode || null;
 
-    const results = await Promise.all(updates);
-    const failure = results.find((result) => result?.error);
+    const gameResult = await supa.from('games').upsert({
+      slug,
+      channel: 'draft',
+      title: gameMeta?.title || slug,
+      type: gameMeta?.type || null,
+      cover_image: gameMeta?.coverImage || null,
+      config: configInput,
+      map: configInput?.map || {},
+      appearance,
+      theme: appearance,
+      appearance_skin: appearanceSkin,
+      appearance_tone: appearanceTone,
+      mode,
+      short_description: gameMeta?.shortDescription || null,
+      long_description: gameMeta?.longDescription || null,
+      tags,
+      status: 'draft',
+      updated_at: now,
+    });
+
+    if (gameResult?.error) {
+      throw gameResult.error;
+    }
+
+    const gameRow = Array.isArray(gameResult?.data) ? gameResult.data[0] : gameResult?.data;
+    const gameId = gameRow?.id || null;
+
+    const devicePayload = {
+      game_slug: slug,
+      channel: 'draft',
+      items: devices,
+      updated_at: now,
+    };
+    if (gameId) devicePayload.game_id = gameId;
+
+    const powerupPayload = {
+      game_slug: slug,
+      channel: 'draft',
+      items: powerups,
+      updated_at: now,
+    };
+    if (gameId) powerupPayload.game_id = gameId;
+
+    const [devicesResult, powerupsResult] = await Promise.all([
+      supa.from('devices').upsert(devicePayload),
+      supa.from('powerups').upsert(powerupPayload).catch(() => ({ error: null })),
+    ]);
+
+    const failure = [devicesResult, powerupsResult].find((result) => result?.error);
     if (failure && failure.error) {
       throw failure.error;
     }
