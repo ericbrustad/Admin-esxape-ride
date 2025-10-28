@@ -1,10 +1,9 @@
 /**
- * CODEx NOTE (2025-10-28): Robust Vercel status checker for the Admin footer/banner.
- * - Accepts VERCEL_TOKEN or VERCEL_API_TOKEN.
- * - Accepts project id from ?projectId=, or envs:
- *     VERCEL_PROJECT_ID_GAME, VERCEL_PROJECT_ID_ADMIN, VERCEL_PROJECT_ID (fallback).
- * - If ?project=game but GAME id is missing, falls back to Admin id so the UI doesn't show false errors.
- * - Returns { ok, state, url } on success, or { ok:false, error, missing:{...} } with booleans (no secrets).
+ * CODEx NOTE (2025-10-28): Robust Vercel status checker with API-version fallback.
+ * - TOKEN: VERCEL_API_TOKEN or VERCEL_TOKEN
+ * - PROJECT: ?projectId=... OR env VERCEL_PROJECT_ID_GAME / VERCEL_PROJECT_ID_ADMIN / VERCEL_PROJECT_ID
+ * - TEAM: VERCEL_TEAM_ID or VERCEL_ORG_ID (optional)
+ * - Fallbacks API versions: v13 → v12 → v10 → v9 → v8 → v6
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -16,30 +15,23 @@ export default async function handler(req, res) {
     process.env.VERCEL_API_TOKEN ||
     process.env.VERCEL_TOKEN || '';
 
-  const teamId =
+  const TEAM_ID =
     process.env.VERCEL_TEAM_ID ||
     process.env.VERCEL_ORG_ID || '';
 
-  // What caller asked for: 'admin' | 'game' | '' (default admin)
-  const projectHint = String(req.query.project || req.query.p || 'admin').toLowerCase();
-
-  // Direct override via query (?projectId=...)
+  const hint = String(req.query.project || req.query.p || 'admin').toLowerCase();
   const fromQuery = (req.query.projectId && String(req.query.projectId).trim()) || '';
 
-  // Env candidates (try the most specific first)
   const pidGame  = process.env.VERCEL_PROJECT_ID_GAME  || '';
   const pidAdmin = process.env.VERCEL_PROJECT_ID_ADMIN || '';
   const pidAny   = process.env.VERCEL_PROJECT_ID       || '';
 
-  // Choose project id:
-  let PROJECT_ID = fromQuery
-    || (projectHint === 'game'  ? (pidGame  || pidAdmin || pidAny) : '')
-    || (projectHint === 'admin' ? (pidAdmin || pidAny) : '')
-    || pidAny
-    || pidAdmin
-    || pidGame;
+  let PROJECT_ID =
+    fromQuery ||
+    (hint === 'game'  ? (pidGame  || pidAdmin || pidAny) :
+     hint === 'admin' ? (pidAdmin || pidAny) : '') ||
+    pidAny || pidAdmin || pidGame;
 
-  // Diagnostics when something is missing (no secrets)
   if (!TOKEN || !PROJECT_ID) {
     return res.status(200).json({
       ok: false,
@@ -47,49 +39,69 @@ export default async function handler(req, res) {
       missing: {
         token: !TOKEN,
         projectId: !PROJECT_ID,
-        // Extra hints:
-        expects: {
-          query_projectId: Boolean(fromQuery),
-          project_hint: projectHint,
-          env_pid_game: Boolean(pidGame),
-          env_pid_admin: Boolean(pidAdmin),
-          env_pid_any: Boolean(pidAny),
-          teamId_present: Boolean(teamId),
-        }
+        teamId: !TEAM_ID,
+        hint, fromQuery: Boolean(fromQuery),
+        have: { pidGame: Boolean(pidGame), pidAdmin: Boolean(pidAdmin), pidAny: Boolean(pidAny) }
       }
     });
   }
 
-  try {
-    const qs = new URLSearchParams({ projectId: PROJECT_ID, limit: '1' });
-    if (teamId) qs.set('teamId', teamId);
-    const r = await fetch(`https://api.vercel.com/v13/deployments?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
+  const versions = ['v13','v12','v10','v9','v8','v6'];
+  const qs = new URLSearchParams({ projectId: PROJECT_ID, limit: '1' });
+  if (TEAM_ID) qs.set('teamId', TEAM_ID);
 
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      // Make errors actionable but safe
-      const msg = (j?.error?.message || `Vercel API ${r.status}`);
-      return res.status(200).json({ ok: false, error: msg, apiStatus: r.status });
+  let lastError = null;
+  for (const ver of versions) {
+    try {
+      const url = `https://api.vercel.com/${ver}/deployments?${qs.toString()}`;
+      const r = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const isJson = (r.headers.get('content-type') || '').includes('application/json');
+      const body = isJson ? (await r.json().catch(() => ({}))) : await r.text();
+
+      const msg = (typeof body === 'string' ? body : (body?.error?.message || body?.message || '')).toLowerCase();
+      if (!r.ok && (msg.includes('invalid api version') || r.status === 404)) {
+        lastError = { ver, status: r.status, message: body?.error?.message || body?.message || String(body) };
+        continue;
+      }
+
+      if (!r.ok) {
+        return res.status(200).json({
+          ok: false,
+          error: body?.error?.message || body?.message || `Vercel API ${r.status}`,
+          apiStatus: r.status,
+          apiVersionTried: ver
+        });
+      }
+
+      const list = Array.isArray(body?.deployments) ? body.deployments : (Array.isArray(body) ? body : []);
+      const latest = list[0] || null;
+      const rawUrl = latest?.url || '';
+      const finalUrl = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : '';
+
+      res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
+      return res.status(200).json({
+        ok: true,
+        state: latest?.readyState || latest?.state || 'unknown',
+        url: finalUrl || null,
+        projectId: PROJECT_ID,
+        teamId: TEAM_ID || null,
+        apiVersion: ver,
+        checkedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      lastError = { ver, message: e?.message || String(e) };
     }
-
-    // v13 may return { deployments: [...] } or an array in some cases
-    const list = Array.isArray(j?.deployments) ? j.deployments : (Array.isArray(j) ? j : []);
-    const latest = list[0] || null;
-
-    const rawUrl = latest?.url || '';
-    const url = rawUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : '';
-
-    return res.status(200).json({
-      ok: true,
-      state: latest?.readyState || latest?.state || 'unknown',
-      url,
-      projectId: PROJECT_ID,
-      teamId: teamId || null,
-      checkedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    return res.status(200).json({ ok: false, error: error?.message || 'Vercel status fetch failed' });
   }
+
+  return res.status(200).json({
+    ok: false,
+    error: 'All API versions failed',
+    lastError
+  });
 }
