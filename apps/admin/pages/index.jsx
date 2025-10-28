@@ -1002,15 +1002,9 @@ export default function Admin() {
     if (newGameBusy) return;
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
-    if (!gameEnabled) {
-      updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
-      logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
-    }
-    if (!title) {
-      updateNewGameStatus('❌ Title is required.', 'danger');
-      return;
-    }
+    if (!title) { updateNewGameStatus('❌ Title is required.', 'danger'); return; }
 
+    // build a fresh config for the NEW game; don't mutate current/default
     const slugCandidate = slugifyTitle(newGameSlug);
     const slugInput = (slugCandidate || buildSuggestedSlug(title)).trim().slice(0, 48);
     if (!slugCandidate) {
@@ -1020,63 +1014,61 @@ export default function Admin() {
 
     setNewGameBusy(true);
     updateNewGameStatus('Creating game…', 'info');
-    let coverPath = newCoverSelectedUrl;
+
     try {
+      let coverPath = newCoverSelectedUrl;
       if (!coverPath && newCoverFile) {
         coverPath = await uploadToRepo(newCoverFile, 'covers');
         if (!coverPath) throw new Error('Cover upload failed');
       }
 
-      const defaults = defaultConfig();
-      const defaultGame = defaults.game || {};
-      const currentConfig = config || {};
-      const payload = {
-        slug: slugInput,
-        title,
-        type: newType,
-        config: {
-          ...defaults,
-          game: {
-            ...defaultGame,
-            ...(currentConfig.game || {}),
-            title,
-            type: newType,
-            slug: slugInput,
-            mode: newMode,
-            shortDescription: newShortDesc.trim(),
-            longDescription: newLongDesc.trim(),
-            coverImage: coverPath || '',
-          },
-          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
-          appearance: currentConfig.appearance || defaultAppearance(),
-          appearanceSkin: currentConfig.appearanceSkin || defaults.appearanceSkin || DEFAULT_APPEARANCE_SKIN,
-          appearanceTone: currentConfig.appearanceTone || defaults.appearanceTone || 'light',
+      const freshConfig = {
+        ...defaultConfig(),
+        game: {
+          ...(defaultConfig().game || {}),
+          title,
+          type: newType,
+          slug: slugInput,
+          mode: newMode,
+          shortDescription: newShortDesc.trim(),
+          longDescription: newLongDesc.trim(),
+          coverImage: coverPath || ''
         },
+        timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+        appearance: (config?.appearance || defaultAppearance()),
+        appearanceSkin: (config?.appearanceSkin || DEFAULT_APPEARANCE_SKIN),
+        appearanceTone: (config?.appearanceTone || 'light')
       };
 
       const res = await fetch('/api/games?channel=draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ slug: slugInput, title, type: newType, config: freshConfig })
       });
-      const data = await res.json().catch(() => ({ ok: false }));
-      if (!res.ok || data.ok === false) {
-        throw new Error(data?.error || 'create failed');
-      }
+      const data = await res.json().catch(()=>({ok:false}));
+      if (!res.ok || data.ok === false) throw new Error(data?.error || 'create failed');
 
-      await reloadGamesList();
-      setActiveSlug(data.slug || slugInput);
+      const newSlug = data.slug || slugInput;
+
+      // ⚠️ Switch to the NEW game first (prevents writing new slug into default tags)
+      setActiveSlug(newSlug);
       setTab('settings');
+
+      // Refresh the Saved Games dropdown
+      await reloadGamesList();
+
       setStatus(`✅ Created game “${title}”`);
       updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
     } catch (err) {
-      updateNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`, 'danger');
+      updateNewGameStatus('❌ ' + (err?.message || 'Unable to create game'), 'danger');
     } finally {
       setNewGameBusy(false);
     }
   }
+
+
 
   useEffect(() => {
     if (newGameSlugEdited.current) return;
