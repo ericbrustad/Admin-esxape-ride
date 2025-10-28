@@ -16,14 +16,14 @@ __metadata:
   version: 15.5.5
   resolution: "next@npm:15.5.5"
   dependencies:
-    @next/env: 15.5.5
-    @swc/helpers: 0.5.15
+    "@next/env": 15.5.5
+    "@swc/helpers": 0.5.15
     caniuse-lite: 1.0.30001750
     postcss: 8.4.31
     styled-jsx: 5.1.6
   optionalDependencies:
-    @next/swc-linux-x64-gnu: 15.5.5
-    @next/swc-linux-x64-musl: 15.5.5
+    "@next/swc-linux-x64-gnu": 15.5.5
+    "@next/swc-linux-x64-musl": 15.5.5
   checksum: sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
   languageName: node
   linkType: hard
@@ -166,12 +166,12 @@ __metadata:
   version: 0.34.4
   resolution: "sharp@npm:0.34.4"
   dependencies:
-    @img/colour: 1.0.0
+    "@img/colour": 1.0.0
     detect-libc: 2.1.2
     semver: 7.7.3
   optionalDependencies:
-    @img/sharp-libvips-linux-x64: 1.2.3
-    @img/sharp-linux-x64: 0.34.4
+    "@img/sharp-libvips-linux-x64": 1.2.3
+    "@img/sharp-linux-x64": 0.34.4
   checksum: sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
   languageName: node
   linkType: hard
