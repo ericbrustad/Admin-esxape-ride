@@ -2477,26 +2477,55 @@ export default function Admin() {
     ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
   const headerStyle = S.header;
-  const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
+
+  const envRepoOwner = process.env.NEXT_PUBLIC_REPO_OWNER
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_OWNER
+    || process.env.NEXT_PUBLIC_GITHUB_OWNER
+    || '';
+  const envRepoName = process.env.NEXT_PUBLIC_REPO_NAME
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_SLUG
+    || process.env.NEXT_PUBLIC_GITHUB_REPO
+    || '';
+  const envOwnerRepo = envRepoName
+    ? (envRepoOwner ? `${envRepoOwner}/${envRepoName}` : envRepoName)
+    : '';
+  const envBranchName = process.env.NEXT_PUBLIC_REPO_BRANCH
+    || process.env.NEXT_PUBLIC_GIT_BRANCH
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF
+    || '';
+  const envCommitSha = process.env.NEXT_PUBLIC_COMMIT_SHA
+    || process.env.NEXT_PUBLIC_GIT_COMMIT
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA
+    || '';
+  const envVercelHost = process.env.NEXT_PUBLIC_DEPLOYMENT_URL
+    || process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_URL
+    || process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL
+    || process.env.NEXT_PUBLIC_VERCEL_URL
+    || '';
+  const envVercelUrl = envVercelHost
+    ? (envVercelHost.startsWith('http') ? envVercelHost : `https://${envVercelHost}`)
+    : '';
+
+  const metaBranchLabel = adminMeta.branch || envBranchName || 'unknown';
+  const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : (envCommitSha || '');
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
-  const metaRepoName = adminMeta.repo ? String(adminMeta.repo) : '';
+  const metaRepoName = adminMeta.repo ? String(adminMeta.repo) : (envRepoName || '');
   const metaOwnerRepo = adminMeta.repo
     ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
-    : '';
+    : envOwnerRepo;
   const metaRepoUrl = adminMeta.owner && adminMeta.repo
     ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
-    : '';
+    : (envOwnerRepo ? `https://github.com/${envOwnerRepo}` : '');
   const metaCommitUrl = metaCommitLabel && metaRepoUrl
     ? `${metaRepoUrl}/commit/${metaCommitLabel}`
     : '';
-  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
+  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || envVercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaDeploymentLabel = metaDeploymentUrl
     ? metaDeploymentUrl.replace(/^https?:\/\//, '')
     : (metaDeploymentState || '—');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
-  const metaVercelUrl = adminMeta.vercelUrl || '';
+  const metaVercelUrl = adminMeta.vercelUrl || envVercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const metaRuntimeNodeRaw = adminMeta.runtime?.node ? String(adminMeta.runtime.node) : '';
@@ -2523,11 +2552,18 @@ export default function Admin() {
   const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
   const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
-  const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
-  const metaBranchDisplay = metaBranchLabel || '—';
-  const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
-  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || '—';
+  const metaRepoDisplay = metaOwnerRepo || metaRepoName || envOwnerRepo || envRepoName || '—';
+  const metaBranchDisplay = metaBranchLabel || envBranchName || '—';
+  const metaCommitDisplay = metaCommitShort || metaCommitLabel || (envCommitSha ? envCommitSha.slice(0, 7) : '—');
+  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || (envVercelUrl ? envVercelUrl.replace(/^https?:\/\//, '') : '—');
   const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
+  const metaDevSummary = [
+    metaRepoDisplay ? `Repo ${metaRepoDisplay}` : '',
+    metaBranchDisplay ? `Branch ${metaBranchDisplay}` : '',
+    metaCommitDisplay ? `Commit ${metaCommitDisplay}` : '',
+    metaDeploymentDisplay ? `Deployment ${metaDeploymentDisplay}` : '',
+  ].filter(Boolean).join(' • ') || 'Repo snapshot unavailable';
+  const metaDevRecorded = metaFooterTimestamp || metaNowLabel || '—';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3961,6 +3997,10 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               Repository Snapshot — {metaRepoDisplay} • Branch {metaBranchDisplay} • Commit {metaCommitDisplay} • Vercel {metaVercelLabel || metaDeploymentDisplay} • Recorded {metaFooterTimestamp}
+            </div>
+            <div style={S.settingsFooterTime}>
+              Dev Environment Snapshot — {metaDevSummary}
+              {metaDevRecorded && metaDevRecorded !== '—' ? ` • Captured ${metaDevRecorded}` : ''}
             </div>
           </footer>
         </main>
