@@ -2641,6 +2641,12 @@ export default function Admin() {
     metaCapturedSnapshot,
   ].filter(Boolean);
   const metaDevSummary = metaDevSummaryParts.length ? metaDevSummaryParts.join(' • ') : 'Repo snapshot unavailable';
+  const metaRepoFooterLabel = metaSnapshotHasValue(metaRepoDisplay) ? metaRepoDisplay : '—';
+  const metaBranchFooterLabel = metaSnapshotHasValue(metaBranchDisplay) ? metaBranchDisplay : '—';
+  const metaCommitFooterLabel = metaSnapshotHasValue(metaCommitFull) ? metaCommitFull : (metaSnapshotHasValue(metaCommitDisplay) ? metaCommitDisplay : '—');
+  const metaDeploymentFooterLabel = metaSnapshotHasValue(metaDeploymentDisplay) ? metaDeploymentDisplay : '—';
+  const metaFooterNowLabel = metaNowLabel || '—';
+  const metaDevFooterLine = `Repo: ${metaRepoFooterLabel} • Branch: ${metaBranchFooterLabel} • Commit: ${metaCommitFooterLabel} • Deployment: ${metaDeploymentFooterLabel} • Generated ${metaFooterNowLabel}`;
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -4068,6 +4074,9 @@ export default function Admin() {
             )}
             <div style={S.settingsFooterTime}>
               Dev Environment Snapshot — {metaDevSummary}
+            </div>
+            <div style={S.settingsFooterTime}>
+              {metaDevFooterLine}
             </div>
           </footer>
         </main>
