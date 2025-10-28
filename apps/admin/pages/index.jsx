@@ -168,9 +168,50 @@ const FOLDER_TO_TYPE = new Map([
 async function listInventory(dirs = ['mediapool']) {
   const seen = new Set();
   const out = [];
+  const baseDirs = Array.isArray(dirs) && dirs.length ? dirs : ['mediapool'];
+  const targets = [];
+
+  const normalize = (value) => String(value || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '');
+
+  const ensureMediapool = (value) => {
+    const normalized = normalize(value);
+    if (!normalized) return '';
+    if (normalized.toLowerCase().startsWith('mediapool')) return normalized;
+    return `mediapool/${normalized}`;
+  };
+
+  const pushTarget = (dir) => {
+    const normalized = normalize(dir);
+    if (!normalized) return;
+    if (/^(draft|public)\//i.test(normalized)) {
+      const key = normalized
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .join('/')
+        .toLowerCase();
+      if (!targets.includes(key)) targets.push(key);
+      return;
+    }
+    const mediapoolDir = ensureMediapool(normalized);
+    ['public', 'draft'].forEach((channel) => {
+      if (!mediapoolDir) return;
+      const key = `${channel}/${mediapoolDir}`
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .join('/')
+        .toLowerCase();
+      if (!targets.includes(key)) targets.push(key);
+    });
+  };
+
+  baseDirs.forEach(pushTarget);
+
   await Promise.all(
-    (dirs || ['mediapool']).map(async (dir) => {
-      if (!dir) return;
+    targets.map(async (dir) => {
       try {
         const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
         const j = await r.json();
@@ -184,6 +225,7 @@ async function listInventory(dirs = ['mediapool']) {
       } catch {}
     })
   );
+
   return out;
 }
 function baseNameFromUrl(url) {
@@ -960,58 +1002,73 @@ export default function Admin() {
     if (newGameBusy) return;
     const title = newTitle.trim();
     logConversation('You', `Attempted to create new game “${title || 'untitled'}”`);
-    if (!gameEnabled) {
-      updateNewGameStatus('⚠️ Game project is disabled. Attempting to create a new title anyway…', 'info');
-      logConversation('GPT', 'Game project is disabled. Attempting to create a new title anyway…');
-    }
-    if (!title) {
-      updateNewGameStatus('❌ Title is required.', 'danger');
-      return;
-    }
+    if (!title) { updateNewGameStatus('❌ Title is required.', 'danger'); return; }
+
+    // build a fresh config for the NEW game; don't mutate current/default
     const slugCandidate = slugifyTitle(newGameSlug);
     const slugInput = (slugCandidate || buildSuggestedSlug(title)).trim().slice(0, 48);
     if (!slugCandidate) {
       newGameSlugEdited.current = false;
       setNewGameSlug(slugInput);
     }
+
     setNewGameBusy(true);
     updateNewGameStatus('Creating game…', 'info');
-    let coverPath = newCoverSelectedUrl;
+
     try {
+      let coverPath = newCoverSelectedUrl;
       if (!coverPath && newCoverFile) {
         coverPath = await uploadToRepo(newCoverFile, 'covers');
         if (!coverPath) throw new Error('Cover upload failed');
       }
-      const res = await fetch('/api/games', {
+
+      const freshConfig = {
+        ...defaultConfig(),
+        game: {
+          ...(defaultConfig().game || {}),
+          title,
+          type: newType,
+          slug: slugInput,
+          mode: newMode,
+          shortDescription: newShortDesc.trim(),
+          longDescription: newLongDesc.trim(),
+          coverImage: coverPath || ''
+        },
+        timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
+        appearance: (config?.appearance || defaultAppearance()),
+        appearanceSkin: (config?.appearanceSkin || DEFAULT_APPEARANCE_SKIN),
+        appearanceTone: (config?.appearanceTone || 'light')
+      };
+
+      const res = await fetch('/api/games?channel=draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          title,
-          type: newType,
-          mode: newMode,
-          slug: slugInput,
-          shortDescription: newShortDesc.trim(),
-          longDescription: newLongDesc.trim(),
-          coverImage: coverPath,
-          timer: { durationMinutes: newDurationMin, alertMinutes: newAlertMin },
-        }),
+        body: JSON.stringify({ slug: slugInput, title, type: newType, config: freshConfig })
       });
-      const data = await res.json().catch(() => ({ ok: false }));
-      if (!res.ok || data.ok === false) {
-        throw new Error(data?.error || 'create failed');
-      }
+      const data = await res.json().catch(()=>({ok:false}));
+      if (!res.ok || data.ok === false) throw new Error(data?.error || 'create failed');
+
+      const newSlug = data.slug || slugInput;
+
+      // ⚠️ Switch to the NEW game first (prevents writing new slug into default tags)
+      setActiveSlug(newSlug);
+      setTab('settings');
+
+      // Refresh the Saved Games dropdown
       await reloadGamesList();
-      setActiveSlug(data.slug || slugInput || 'default');
+
       setStatus(`✅ Created game “${title}”`);
       updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
     } catch (err) {
-      updateNewGameStatus(`❌ ${(err?.message) || 'Unable to create game'}`, 'danger');
+      updateNewGameStatus('❌ ' + (err?.message || 'Unable to create game'), 'danger');
     } finally {
       setNewGameBusy(false);
     }
   }
+
+
 
   useEffect(() => {
     if (newGameSlugEdited.current) return;
@@ -1047,6 +1104,10 @@ export default function Admin() {
 
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
+  const [editChannel, setEditChannel] = useState('draft');
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [openGameModal, setOpenGameModal] = useState(false);
+  const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1144,6 +1205,41 @@ export default function Admin() {
       clearInterval(timer);
     };
   }, []);
+
+  async function refreshGamesIndex() {
+    try {
+      const [draftResponse, publishedResponse] = await Promise.all([
+        fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false, games: [] })),
+        fetch('/api/games?list=1&channel=published', { credentials: 'include', cache: 'no-store' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false, games: [] })),
+      ]);
+
+      const bySlug = new Map();
+
+      (Array.isArray(draftResponse.games) ? draftResponse.games : []).forEach((game) => {
+        const entry = bySlug.get(game.slug) || {};
+        entry.draft = game;
+        bySlug.set(game.slug, entry);
+      });
+
+      (Array.isArray(publishedResponse.games) ? publishedResponse.games : []).forEach((game) => {
+        const entry = bySlug.get(game.slug) || {};
+        entry.published = game;
+        bySlug.set(game.slug, entry);
+      });
+
+      setGamesIndex({ bySlug: Object.fromEntries(bySlug), count: bySlug.size });
+    } catch {
+      // ignore index refresh errors; UI can recover on next attempt
+    }
+  }
+
+  useEffect(() => {
+    refreshGamesIndex();
+  }, [activeSlug]);
 
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -1264,9 +1360,6 @@ export default function Admin() {
   const [devDraftBaseline, setDevDraftBaseline] = useState(() => createDeviceDraft());
   const [deviceTriggerPicker, setDeviceTriggerPicker] = useState('');
 
-  // Combined Save & Publish
-  const [savePubBusy, setSavePubBusy] = useState(false);
-
   // Pin size (selected)
   const [selectedPinSize, setSelectedPinSize] = useState(28);
   const defaultPinSize = 24;
@@ -1311,9 +1404,9 @@ export default function Admin() {
     if (!gameEnabled) { setGames([]); return; }
     (async () => {
       try {
-        const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
+        const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
         const j = await r.json();
-        if (j.ok) setGames(j.games || []);
+        if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
       } catch {}
     })();
   }, [gameEnabled]);
@@ -1462,10 +1555,14 @@ export default function Admin() {
   /* ── API helpers respecting Default Game (legacy root) ── */
   function isDefaultSlug(slug) { return !slug || slug === 'default'; }
 
-  async function saveAllWithSlug(slug) {
+  async function saveAllWithSlug(slug, channel = 'draft') {
     if (!suite || !config) return false;
+    const normalizedChannel = String(channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
     setStatus((prev) => {
-      if (typeof prev === 'string' && prev.toLowerCase().includes('publishing')) return prev;
+      if (typeof prev === 'string') {
+        const lower = prev.toLowerCase();
+        if (lower.includes('publishing') || lower.includes('saving')) return prev;
+      }
       return 'Saving…';
     });
     const isDefault = isDefaultSlug(slug);
@@ -1475,13 +1572,14 @@ export default function Admin() {
 
     const supaPayload = {
       slug,
+      channel: normalizedChannel,
       config: preparedConfig,
       missions: suite?.missions || [],
       devices: getDevices(),
     };
 
     const attemptSupabase = async () => {
-      const response = await fetch('/api/save', {
+      const response = await fetch(`/api/games?channel=${encodeURIComponent(normalizedChannel)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -1552,29 +1650,69 @@ export default function Admin() {
     }
   }
 
-  async function reloadGamesList() {
-    if (!gameEnabled) { setGames([]); return; }
-    try {
-      const r = await fetch('/api/games', { credentials:'include', cache:'no-store' });
-      const j = await r.json();
-      if (j.ok) setGames(j.games || []);
-    } catch {}
-  }
-
-  async function saveAndPublish() {
-    logConversation('You', 'Requested Save & Publish');
+  async function saveDraftNow() {
+    logConversation('You', 'Requested Save Draft');
     if (!suite || !config) return;
     const slug = activeSlug || 'default';
-    setSavePubBusy(true);
-    setStatus('Saving…');
+    setSaveBusy(true);
+    setStatus('Saving draft…');
+    const saved = await saveAllWithSlug(slug, 'draft');
+    if (saved) {
+      setStatus('✅ Draft saved');
+      logConversation('GPT', `Draft saved for ${slug}`);
+      await reloadGamesList();
+      await refreshGamesIndex();
+    } else {
+      logConversation('GPT', `Draft save failed for ${slug}`);
+    }
+    setSaveBusy(false);
+  }
 
-    const saved = await saveAllWithSlug(slug);
-    if (!saved) { setSavePubBusy(false); return; }
+  async function publishNow() {
+    logConversation('You', 'Requested Publish Now');
+    const slug = activeSlug || 'default';
+    if (!slug) return;
+    setSaveBusy(true);
+    setStatus('Publishing…');
+    try {
+      const response = await fetch(`/api/publish?slug=${encodeURIComponent(slug)}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const text = await response.text();
+      let payload = null;
+      if (text) {
+        try { payload = JSON.parse(text); } catch { payload = null; }
+      }
+      if (!response.ok || (payload && payload.ok === false)) {
+        const message = (payload && payload.error) || text || 'publish failed';
+        throw new Error(message);
+      }
+      setStatus('🚀 Published');
+      logConversation('GPT', `Published ${slug}`);
+      await reloadGamesList();
+      await refreshGamesIndex();
+      setPreviewNonce((n) => n + 1);
+    } catch (error) {
+      const message = error?.message || 'publish failed';
+      setStatus(`❌ Publish failed: ${message}`);
+      logConversation('GPT', `Publish failed for ${slug}: ${message}`);
+    } finally {
+      setSaveBusy(false);
+    }
+  }
 
-    setStatus('✅ Saved');
-    await reloadGamesList();
-    setPreviewNonce((n) => n + 1);
-    setSavePubBusy(false);
+  async function reloadGamesList() {
+    if (!gameEnabled) {
+      setGames([]);
+      setGamesIndex({ bySlug: {}, count: 0 });
+      return;
+    }
+    try {
+      const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
+      const j = await r.json();
+      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
+    } catch {}
   }
 
   /* Delete game (with modal confirm) */
@@ -2029,6 +2167,65 @@ export default function Admin() {
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
   }
 
+  async function openGameChannel(slug, channel) {
+    if (!slug) return;
+    const normalized = String(channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+    setActiveSlug(slug);
+    setTab('settings');
+    if (typeof setEditChannel === 'function') setEditChannel(normalized);
+    setStatus(`Opened ${slug} (${normalized})`);
+  }
+
+  async function ensureDraftFromCurrent() {
+    const slug = activeSlug || 'default';
+    if (!config) {
+      setStatus('❌ Nothing to clone into draft');
+      return;
+    }
+    setStatus('Creating draft from current config…');
+    try {
+      const payload = {
+        slug,
+        title: config?.game?.title || slug,
+        type: config?.game?.type || null,
+        config,
+      };
+      const response = await fetch('/api/games?channel=draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'draft create failed');
+      setStatus('✅ Draft created');
+      setActiveSlug(slug);
+      if (typeof setEditChannel === 'function') setEditChannel('draft');
+      await refreshGamesIndex();
+      await reloadGamesList();
+    } catch (error) {
+      setStatus(`❌ ${error?.message || 'Unable to create draft'}`);
+    }
+  }
+
+  async function saveGamePublished() {
+    logConversation('You', 'Requested Save Published');
+    if (!suite || !config) return;
+    const slug = activeSlug || 'default';
+    setSaveBusy(true);
+    setStatus('Saving published…');
+    const saved = await saveAllWithSlug(slug, 'published');
+    if (saved) {
+      setStatus('✅ Published saved');
+      logConversation('GPT', `Published saved for ${slug}`);
+      await reloadGamesList();
+      await refreshGamesIndex();
+    } else {
+      logConversation('GPT', `Published save failed for ${slug}`);
+    }
+    setSaveBusy(false);
+  }
+
   // Missions selection operations (Missions tab only)
   function moveSelectedMission(lat, lng) {
     if (selectedMissionIdx == null) return;
@@ -2204,8 +2401,12 @@ export default function Admin() {
       resolvedFolder = `mediapool/${normalizedFolder}`;
     }
 
+    const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET || 'media';
+    const prefix = editChannel === 'published' ? 'public' : 'draft';
+    const folder = `${prefix}/${resolvedFolder}`.replace(/\/+/g, '/');
+
     const uniqueName = `${Date.now()}-${safeName}`;
-    const destinationLabel = resolvedFolder;
+    const destinationLabel = `${prefix.toUpperCase()} @ ${BUCKET}/${folder}`;
     const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
     if (overWarning) {
       const sizeMb = Math.max(0.01, (file.size || 0) / (1024 * 1024));
@@ -2216,7 +2417,7 @@ export default function Admin() {
     const base64 = await fileToBase64(file);
     const body = {
       fileName: uniqueName,
-      folder: resolvedFolder,
+      folder: folder,
       sizeBytes: file.size || 0,
       contentBase64: base64,
       remoteUrl: options.remoteUrl || '',
@@ -2580,6 +2781,12 @@ export default function Admin() {
     metaCapturedSnapshot,
   ].filter(Boolean);
   const metaDevSummary = metaDevSummaryParts.length ? metaDevSummaryParts.join(' • ') : 'Repo snapshot unavailable';
+  const metaRepoFooterLabel = metaSnapshotHasValue(metaRepoDisplay) ? metaRepoDisplay : '—';
+  const metaBranchFooterLabel = metaSnapshotHasValue(metaBranchDisplay) ? metaBranchDisplay : '—';
+  const metaCommitFooterLabel = metaSnapshotHasValue(metaCommitFull) ? metaCommitFull : (metaSnapshotHasValue(metaCommitDisplay) ? metaCommitDisplay : '—');
+  const metaDeploymentFooterLabel = metaSnapshotHasValue(metaDeploymentDisplay) ? metaDeploymentDisplay : '—';
+  const metaFooterNowLabel = metaNowLabel || '—';
+  const metaDevFooterLine = `Repo: ${metaRepoFooterLabel} • Branch: ${metaBranchFooterLabel} • Commit: ${metaCommitFooterLabel} • Deployment: ${metaDeploymentFooterLabel} • Generated ${metaFooterNowLabel}`;
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -2625,39 +2832,118 @@ export default function Admin() {
           </div>
           <div style={S.headerNavRow}>
             <div style={S.headerNavPrimary}>
-              {tabsOrder.map((t)=>{
-                const labelMap = {
-                  'missions':'MISSIONS',
-                  'devices':'DEVICES',
-                  'settings':'SETTINGS',
-                  'text':'TEXT',
-                  'media-pool':'MEDIA POOL',
-                  'assigned':'ASSIGNED MEDIA',
-                };
-                return (
-                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                    {labelMap[t] || t.toUpperCase()}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginRight: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditChannel('draft')}
+                    style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
+                    title="Edit in Draft mode"
+                  >
+                    Draft
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={openNewGameModal}
-                style={{ ...S.button, ...S.headerNewGameButton }}
-              >
-                <span style={S.newGameLabel}>+ New Game</span>
-              </button>
-              <button
-                onClick={async ()=>{
-                  await saveAndPublish();
-                  const isDefaultNow = !activeSlug || activeSlug === 'default';
-                  setActiveSlug(isDefaultNow ? 'default' : activeSlug);
-                }}
-                disabled={savePubBusy}
-                style={{ ...S.button, ...S.savePublishButton, opacity: savePubBusy ? 0.65 : 1 }}
-              >
-                {savePubBusy ? 'Saving & Publishing…' : 'Save & Publish'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditChannel('published')}
+                    style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
+                    title="Enable publishing actions"
+                  >
+                    Published
+                  </button>
+                </div>
+                {tabsOrder.map((t) => {
+                  const labelMap = {
+                    missions: 'MISSIONS',
+                    devices: 'DEVICES',
+                    settings: 'SETTINGS',
+                    text: 'TEXT',
+                    'media-pool': 'MEDIA POOL',
+                    assigned: 'ASSIGNED MEDIA',
+                  };
+                  return (
+                    <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
+                      {labelMap[t] || t.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button type="button" style={S.button} onClick={openNewGameModal}>
+                    New Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={() => {
+                      setOpenGameModal(true);
+                      refreshGamesIndex();
+                    }}
+                  >
+                    Open Game
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    onClick={saveGamePublished}
+                    disabled={saveBusy}
+                    title="Save current slug to channel=published"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save Game'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    onClick={publishNow}
+                    disabled={saveBusy}
+                  >
+                    {saveBusy ? 'Publishing…' : 'Publish Game'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={ensureDraftFromCurrent}
+                    title="Create or refresh a draft row for this slug"
+                  >
+                    New Draft
+                  </button>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={() => {
+                      setOpenGameModal(true);
+                      refreshGamesIndex();
+                    }}
+                  >
+                    Open Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveDraftNow}
+                    disabled={saveBusy}
+                    style={{ ...S.button, ...S.buttonSuccess, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    title="Save current changes to the draft channel"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save Draft'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveDraftNow();
+                      await publishNow();
+                    }}
+                    disabled={saveBusy}
+                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    title="Save draft first, then publish to players"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save & Publish Draft'}
+                  </button>
+                </div>
+              </div>
             </div>
             {gameEnabled && (
               <div style={S.headerNavSecondary}>
@@ -3983,6 +4269,9 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Dev Environment Snapshot — {metaDevSummary}
             </div>
+            <div style={S.settingsFooterTime}>
+              {metaDevFooterLine}
+            </div>
           </footer>
         </main>
       )}
@@ -4312,6 +4601,61 @@ export default function Admin() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openGameModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000, display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div style={{ ...S.card, width: 'min(720px,96vw)', maxHeight: '82vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Open Game</h3>
+              <button style={S.button} onClick={() => setOpenGameModal(false)}>Close</button>
+            </div>
+            <div style={{ color: 'var(--admin-muted)', margin: '6px 0 12px' }}>
+              Choose which channel to open for each slug.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontWeight: 700 }}>Slug</div>
+              <div style={{ fontWeight: 700, textAlign: 'center' }}>Draft</div>
+              <div style={{ fontWeight: 700, textAlign: 'center' }}>Published</div>
+              {Object.entries(gamesIndex.bySlug || {}).map(([slug, channels]) => (
+                <React.Fragment key={slug}>
+                  <div style={{ padding: '6px 0' }}>{slug}</div>
+                  <div style={{ display: 'grid', placeItems: 'center' }}>
+                    <button
+                      style={{ ...S.button, ...(channels?.draft ? {} : S.buttonDisabled) }}
+                      disabled={!channels?.draft}
+                      title={channels?.draft ? 'Open draft' : 'No draft yet'}
+                      onClick={() => {
+                        openGameChannel(slug, 'draft');
+                        setOpenGameModal(false);
+                      }}
+                    >
+                      {channels?.draft ? 'Open' : '—'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', placeItems: 'center' }}>
+                    <button
+                      style={{ ...S.button, ...(channels?.published ? {} : S.buttonDisabled) }}
+                      disabled={!channels?.published}
+                      title={channels?.published ? 'Open published' : 'No published yet'}
+                      onClick={() => {
+                        openGameChannel(slug, 'published');
+                        setOpenGameModal(false);
+                      }}
+                    >
+                      {channels?.published ? 'Open' : '—'}
+                    </button>
+                  </div>
+                </React.Fragment>
+              ))}
+              {(!gamesIndex.count || gamesIndex.count === 0) && (
+                <div style={{ gridColumn: '1 / span 3', color: 'var(--admin-muted)', padding: '12px 0' }}>
+                  No games found yet.
+                </div>
+              )}
             </div>
           </div>
         </div>
