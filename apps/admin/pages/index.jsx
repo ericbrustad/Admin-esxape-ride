@@ -168,9 +168,50 @@ const FOLDER_TO_TYPE = new Map([
 async function listInventory(dirs = ['mediapool']) {
   const seen = new Set();
   const out = [];
+  const baseDirs = Array.isArray(dirs) && dirs.length ? dirs : ['mediapool'];
+  const targets = [];
+
+  const normalize = (value) => String(value || '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '');
+
+  const ensureMediapool = (value) => {
+    const normalized = normalize(value);
+    if (!normalized) return '';
+    if (normalized.toLowerCase().startsWith('mediapool')) return normalized;
+    return `mediapool/${normalized}`;
+  };
+
+  const pushTarget = (dir) => {
+    const normalized = normalize(dir);
+    if (!normalized) return;
+    if (/^(draft|public)\//i.test(normalized)) {
+      const key = normalized
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .join('/')
+        .toLowerCase();
+      if (!targets.includes(key)) targets.push(key);
+      return;
+    }
+    const mediapoolDir = ensureMediapool(normalized);
+    ['public', 'draft'].forEach((channel) => {
+      if (!mediapoolDir) return;
+      const key = `${channel}/${mediapoolDir}`
+        .split('/')
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .join('/')
+        .toLowerCase();
+      if (!targets.includes(key)) targets.push(key);
+    });
+  };
+
+  baseDirs.forEach(pushTarget);
+
   await Promise.all(
-    (dirs || ['mediapool']).map(async (dir) => {
-      if (!dir) return;
+    targets.map(async (dir) => {
       try {
         const r = await fetch(`/api/list-media?dir=${encodeURIComponent(dir)}`, { credentials: 'include', cache: 'no-store' });
         const j = await r.json();
@@ -184,6 +225,7 @@ async function listInventory(dirs = ['mediapool']) {
       } catch {}
     })
   );
+
   return out;
 }
 function baseNameFromUrl(url) {
@@ -2265,8 +2307,12 @@ export default function Admin() {
       resolvedFolder = `mediapool/${normalizedFolder}`;
     }
 
+    const BUCKET = process.env.NEXT_PUBLIC_SUPABASE_MEDIA_BUCKET || 'media';
+    const prefix = editChannel === 'published' ? 'public' : 'draft';
+    const folder = `${prefix}/${resolvedFolder}`.replace(/\/+/g, '/');
+
     const uniqueName = `${Date.now()}-${safeName}`;
-    const destinationLabel = resolvedFolder;
+    const destinationLabel = `${prefix.toUpperCase()} @ ${BUCKET}/${folder}`;
     const overWarning = (file.size || 0) > MEDIA_WARNING_BYTES;
     if (overWarning) {
       const sizeMb = Math.max(0.01, (file.size || 0) / (1024 * 1024));
@@ -2277,7 +2323,7 @@ export default function Admin() {
     const base64 = await fileToBase64(file);
     const body = {
       fileName: uniqueName,
-      folder: resolvedFolder,
+      folder: folder,
       sizeBytes: file.size || 0,
       contentBase64: base64,
       remoteUrl: options.remoteUrl || '',
