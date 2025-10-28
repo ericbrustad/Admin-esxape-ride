@@ -39,17 +39,25 @@ export default async function handler(req, res) {
 
   if (supa) {
     try {
-      const [gameRes, missionsRes, devicesRes] = await Promise.all([
-        supa.from('games').select('*', { filters: { slug }, single: true }),
-        supa.from('missions').select('*', { filters: { game_slug: slug, channel }, single: true }),
-        supa.from('devices').select('*', { filters: { game_slug: slug }, single: true }),
-      ]);
-
+      const gameRes = await supa.from('games').select('*', { filters: { slug, channel }, single: true });
       if (!gameRes.error && gameRes.data) {
         const game = gameRes.data;
         const config = game?.config || {};
+        const gameId = game?.id || null;
+
+        const missionFilters = gameId ? { game_id: gameId, channel } : { game_slug: slug, channel };
+        const deviceFilters = gameId ? { game_id: gameId, channel } : { game_slug: slug, channel };
+        const powerupFilters = gameId ? { game_id: gameId, channel } : { game_slug: slug, channel };
+
+        const [missionsRes, devicesRes, powerupsRes] = await Promise.all([
+          supa.from('missions').select('*', { filters: missionFilters, single: true }),
+          supa.from('devices').select('*', { filters: deviceFilters, single: true }),
+          supa.from('powerups').select('*', { filters: powerupFilters, single: true }).catch(() => ({ data: null, error: null })),
+        ]);
+
         const missions = missionsRes?.data?.items || [];
         const devices = devicesRes?.data?.items || [];
+        const powerups = powerupsRes?.data?.items || [];
         return res.status(200).json({
           ok: true,
           source: 'supabase',
@@ -59,6 +67,7 @@ export default async function handler(req, res) {
           config,
           missions,
           devices,
+          powerups,
         });
       }
     } catch (error) {

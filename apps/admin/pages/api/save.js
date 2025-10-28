@@ -47,34 +47,75 @@ export default async function handler(req, res) {
         : Array.isArray(config?.powerups)
           ? config.powerups
           : [];
+    const powerups = Array.isArray(config?.powerups) ? config.powerups : devices;
+
+    const gameMeta = config?.game ?? {};
+    const appearance = config?.appearance ?? {};
+    const appearanceSkin = config?.appearanceSkin ?? null;
+    const appearanceTone = config?.appearanceTone ?? 'light';
+    const tags = Array.isArray(gameMeta?.tags) ? gameMeta.tags : [];
+    const mode = config?.splash?.mode || gameMeta.mode || null;
 
     const now = new Date().toISOString();
 
-    const updates = [
-      supa.from('games').upsert({
-        slug,
-        title: config?.game?.title || slug,
-        status: 'draft',
-        theme: config?.appearance || {},
-        map: config?.map || {},
-        config,
-        updated_at: now,
-      }),
-      supa.from('missions').upsert({
-        game_slug: slug,
-        channel: 'draft',
-        items: missions,
-        updated_at: now,
-      }),
-      supa.from('devices').upsert({
-        game_slug: slug,
-        items: devices,
-        updated_at: now,
-      }),
-    ];
+    const gameResult = await supa.from('games').upsert({
+      slug,
+      channel: 'draft',
+      title: gameMeta?.title || slug,
+      type: gameMeta?.type || null,
+      cover_image: gameMeta?.coverImage || null,
+      config,
+      map: config?.map || {},
+      appearance,
+      theme: appearance,
+      appearance_skin: appearanceSkin,
+      appearance_tone: appearanceTone,
+      mode,
+      short_description: gameMeta?.shortDescription || null,
+      long_description: gameMeta?.longDescription || null,
+      tags,
+      status: 'draft',
+      updated_at: now,
+    });
 
-    const results = await Promise.all(updates);
-    const failure = results.find((result) => result?.error);
+    if (gameResult?.error) {
+      throw gameResult.error;
+    }
+
+    const gameRow = Array.isArray(gameResult?.data) ? gameResult.data[0] : gameResult?.data;
+    const gameId = gameRow?.id || null;
+
+    const missionPayload = {
+      game_slug: slug,
+      channel: 'draft',
+      items: missions,
+      updated_at: now,
+    };
+    if (gameId) missionPayload.game_id = gameId;
+
+    const devicePayload = {
+      game_slug: slug,
+      channel: 'draft',
+      items: devices,
+      updated_at: now,
+    };
+    if (gameId) devicePayload.game_id = gameId;
+
+    const powerupPayload = {
+      game_slug: slug,
+      channel: 'draft',
+      items: powerups,
+      updated_at: now,
+    };
+    if (gameId) powerupPayload.game_id = gameId;
+
+    const [missionsResult, devicesResult, powerupsResult] = await Promise.all([
+      supa.from('missions').upsert(missionPayload),
+      supa.from('devices').upsert(devicePayload),
+      supa.from('powerups').upsert(powerupPayload).catch(() => ({ error: null })),
+    ]);
+
+    const failure = [missionsResult, devicesResult, powerupsResult].find((result) => result?.error);
     if (failure && failure.error) {
       throw failure.error;
     }
