@@ -2560,14 +2560,26 @@ export default function Admin() {
   const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || (envVercelUrl ? envVercelUrl.replace(/^https?:\/\//, '') : '—');
   const metaVercelDisplay = metaVercelLabel || (metaDeploymentDisplay !== '—' ? metaDeploymentDisplay : '');
   const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
-  const metaDevSummary = [
-    metaRepoDisplay ? `Repo ${metaRepoDisplay}` : '',
-    metaBranchDisplay ? `Branch ${metaBranchDisplay}` : '',
-    metaCommitDisplay ? `Commit ${metaCommitDisplay}` : '',
-    metaDeploymentDisplay ? `Deployment ${metaDeploymentDisplay}` : '',
-    metaVercelDisplay ? `Vercel ${metaVercelDisplay}` : '',
-    metaFooterTimestamp ? `Captured ${metaFooterTimestamp}` : '',
-  ].filter(Boolean).join(' • ') || 'Repo snapshot unavailable';
+  const metaSnapshotHasValue = (value) => Boolean(value && value !== '—');
+  const metaRepoSnapshot = metaSnapshotHasValue(metaRepoDisplay) ? `Repo ${metaRepoDisplay}` : '';
+  const metaBranchSnapshot = metaSnapshotHasValue(metaBranchDisplay) ? `Branch ${metaBranchDisplay}` : '';
+  const metaCommitSnapshot = metaSnapshotHasValue(metaCommitFull)
+    ? `Commit ${metaCommitFull}${metaCommitDisplay && metaCommitDisplay !== metaCommitFull ? ` (${metaCommitDisplay})` : ''}`
+    : '';
+  const metaDeploymentSnapshot = metaSnapshotHasValue(metaDeploymentDisplay) ? `Deployment ${metaDeploymentDisplay}` : '';
+  const metaVercelSnapshot = metaSnapshotHasValue(metaVercelDisplay) && metaVercelDisplay !== metaDeploymentDisplay
+    ? `Vercel ${metaVercelDisplay}`
+    : '';
+  const metaCapturedSnapshot = metaSnapshotHasValue(metaFooterTimestamp) ? `Captured ${metaFooterTimestamp}` : '';
+  const metaDevSummaryParts = [
+    metaRepoSnapshot,
+    metaBranchSnapshot,
+    metaCommitSnapshot,
+    metaDeploymentSnapshot,
+    metaVercelSnapshot,
+    metaCapturedSnapshot,
+  ].filter(Boolean);
+  const metaDevSummary = metaDevSummaryParts.length ? metaDevSummaryParts.join(' • ') : 'Repo snapshot unavailable';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3970,10 +3982,6 @@ export default function Admin() {
             )}
             <div style={S.settingsFooterTime}>
               Dev Environment Snapshot — {metaDevSummary}
-            </div>
-            <div style={S.settingsFooterTime}>
-              Dev Environment Snapshot — {metaDevSummary}
-              {metaDevRecorded && metaDevRecorded !== '—' ? ` • Captured ${metaDevRecorded}` : ''}
             </div>
           </footer>
         </main>

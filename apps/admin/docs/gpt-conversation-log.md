@@ -129,3 +129,11 @@
 **You:** Override any yarn build references in development so the admin workspace only relies on npm.
 
 **GPT:** Updated the admin metadata API and settings footer to surface npm runtime details instead of yarn, preserved pinned package manager info, and reran the admin build to confirm the npm-first workflow passes.
+
+---
+
+**Timestamp:** 2025-10-28T01:03:28Z
+
+**You:** Reset the Yarn workspace config to drop the invalid descriptors and make the Settings footer show the repo, branch, commit, deployment, and timestamp without placeholder dashes.
+
+**GPT:** Replaced the Yarn config with a minimal node-modules linker, normalized the root package manager metadata, filtered the footer snapshot so only real values render (including the full commit hash), and reran the admin build smoke test.
