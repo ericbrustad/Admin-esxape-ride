@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-28T00:30:10Z
+
+**You:** Please make sure the Settings footer still shows the repo name, branch, commit hash, and Vercel deployment with a timestamp even when we only have env variables in dev. Keep the binary-free policy, run the admin build, and log the pairing once it passes.
+
+**GPT:** Added env fallbacks for repo metadata, appended a dev snapshot footer row with the recorded timestamp, updated the README and conversation log, and reran the admin workspace build to confirm everything stays green.
+
+---
+
 **Timestamp:** 2025-10-25T15:07:42Z
 
 **You:** The Supabase signing route is double-encoding folder paths and the gallery page hides failures. Turn off any proxy overrides and get the admin build to pass once the fixes land.
