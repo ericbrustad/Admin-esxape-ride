@@ -2477,26 +2477,56 @@ export default function Admin() {
     ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
   const headerStyle = S.header;
-  const metaBranchLabel = adminMeta.branch || 'unknown';
-  const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : '';
+
+  const envRepoOwner = process.env.NEXT_PUBLIC_REPO_OWNER
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_OWNER
+    || process.env.NEXT_PUBLIC_GITHUB_OWNER
+    || '';
+  const envRepoName = process.env.NEXT_PUBLIC_REPO_NAME
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_SLUG
+    || process.env.NEXT_PUBLIC_GITHUB_REPO
+    || '';
+  const envOwnerRepo = envRepoName
+    ? (envRepoOwner ? `${envRepoOwner}/${envRepoName}` : envRepoName)
+    : '';
+  const envRepoUrl = envOwnerRepo ? `https://github.com/${envOwnerRepo}` : '';
+  const envBranchName = process.env.NEXT_PUBLIC_REPO_BRANCH
+    || process.env.NEXT_PUBLIC_GIT_BRANCH
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_REF
+    || '';
+  const envCommitSha = process.env.NEXT_PUBLIC_COMMIT_SHA
+    || process.env.NEXT_PUBLIC_GIT_COMMIT
+    || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA
+    || '';
+  const envVercelHost = process.env.NEXT_PUBLIC_DEPLOYMENT_URL
+    || process.env.NEXT_PUBLIC_VERCEL_DEPLOYMENT_URL
+    || process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL
+    || process.env.NEXT_PUBLIC_VERCEL_URL
+    || '';
+  const envVercelUrl = envVercelHost
+    ? (envVercelHost.startsWith('http') ? envVercelHost : `https://${envVercelHost}`)
+    : '';
+
+  const metaBranchLabel = adminMeta.branch || envBranchName || '';
+  const metaCommitLabel = adminMeta.commit ? String(adminMeta.commit) : (envCommitSha || '');
   const metaCommitShort = metaCommitLabel ? metaCommitLabel.slice(0, 7) : '';
-  const metaRepoName = adminMeta.repo ? String(adminMeta.repo) : '';
+  const metaRepoName = adminMeta.repo ? String(adminMeta.repo) : (envRepoName || '');
   const metaOwnerRepo = adminMeta.repo
     ? `${adminMeta.owner ? `${adminMeta.owner}/` : ''}${adminMeta.repo}`
-    : '';
+    : envOwnerRepo;
   const metaRepoUrl = adminMeta.owner && adminMeta.repo
     ? `https://github.com/${adminMeta.owner}/${adminMeta.repo}`
-    : '';
+    : envRepoUrl;
   const metaCommitUrl = metaCommitLabel && metaRepoUrl
     ? `${metaRepoUrl}/commit/${metaCommitLabel}`
     : '';
-  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || '';
+  const metaDeploymentUrl = adminMeta.deploymentUrl || adminMeta.vercelUrl || envVercelUrl || '';
   const metaDeploymentState = adminMeta.deploymentState || (metaDeploymentUrl ? 'UNKNOWN' : '');
   const metaDeploymentLabel = metaDeploymentUrl
     ? metaDeploymentUrl.replace(/^https?:\/\//, '')
     : (metaDeploymentState || '—');
   const metaTimestampLabel = adminMeta.fetchedAt ? formatLocalDateTime(adminMeta.fetchedAt) : '';
-  const metaVercelUrl = adminMeta.vercelUrl || '';
+  const metaVercelUrl = adminMeta.vercelUrl || envVercelUrl || '';
   const metaNowLabel = formatLocalDateTime(new Date());
   const metaVercelLabel = metaVercelUrl ? metaVercelUrl.replace(/^https?:\/\//, '') : '';
   const metaRuntimeNodeRaw = adminMeta.runtime?.node ? String(adminMeta.runtime.node) : '';
@@ -2523,11 +2553,33 @@ export default function Admin() {
   const metaPinnedYarnRaw = adminMeta.runtime?.pinnedYarn ? String(adminMeta.runtime.pinnedYarn) : '';
   const metaPinnedYarnLabel = metaPinnedYarnRaw || '';
   const metaRuntimePackageManager = adminMeta.runtime?.packageManager || '';
-  const metaRepoDisplay = metaOwnerRepo || metaRepoName || '—';
-  const metaBranchDisplay = metaBranchLabel || '—';
-  const metaCommitDisplay = metaCommitShort || metaCommitLabel || '—';
-  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || '—';
+  const metaRepoDisplay = metaOwnerRepo || envOwnerRepo || metaRepoName || envRepoName || '—';
+  const metaBranchDisplay = metaBranchLabel || envBranchName || '—';
+  const metaCommitFull = metaCommitLabel || envCommitSha || '';
+  const metaCommitDisplay = metaCommitShort || (metaCommitFull ? metaCommitFull.slice(0, 7) : '—');
+  const metaDeploymentDisplay = metaDeploymentLabel || metaVercelLabel || (envVercelUrl ? envVercelUrl.replace(/^https?:\/\//, '') : '—');
+  const metaVercelDisplay = metaVercelLabel || (metaDeploymentDisplay !== '—' ? metaDeploymentDisplay : '');
   const metaFooterTimestamp = metaTimestampLabel || metaNowLabel || '—';
+  const metaSnapshotHasValue = (value) => Boolean(value && value !== '—');
+  const metaRepoSnapshot = metaSnapshotHasValue(metaRepoDisplay) ? `Repo ${metaRepoDisplay}` : '';
+  const metaBranchSnapshot = metaSnapshotHasValue(metaBranchDisplay) ? `Branch ${metaBranchDisplay}` : '';
+  const metaCommitSnapshot = metaSnapshotHasValue(metaCommitFull)
+    ? `Commit ${metaCommitFull}${metaCommitDisplay && metaCommitDisplay !== metaCommitFull ? ` (${metaCommitDisplay})` : ''}`
+    : '';
+  const metaDeploymentSnapshot = metaSnapshotHasValue(metaDeploymentDisplay) ? `Deployment ${metaDeploymentDisplay}` : '';
+  const metaVercelSnapshot = metaSnapshotHasValue(metaVercelDisplay) && metaVercelDisplay !== metaDeploymentDisplay
+    ? `Vercel ${metaVercelDisplay}`
+    : '';
+  const metaCapturedSnapshot = metaSnapshotHasValue(metaFooterTimestamp) ? `Captured ${metaFooterTimestamp}` : '';
+  const metaDevSummaryParts = [
+    metaRepoSnapshot,
+    metaBranchSnapshot,
+    metaCommitSnapshot,
+    metaDeploymentSnapshot,
+    metaVercelSnapshot,
+    metaCapturedSnapshot,
+  ].filter(Boolean);
+  const metaDevSummary = metaDevSummaryParts.length ? metaDevSummaryParts.join(' • ') : 'Repo snapshot unavailable';
   const activeSlugForClient = isDefault ? '' : activeSlug; // omit for Default Game
 
   if (isBootstrapping) {
@@ -3857,66 +3909,68 @@ export default function Admin() {
                 <strong>Repo:</strong>{' '}
                 {metaRepoUrl ? (
                   <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
-                    {metaOwnerRepo || '—'}
+                    {metaRepoDisplay}
                   </a>
                 ) : (
-                  metaOwnerRepo || '—'
+                  metaRepoDisplay
                 )}
               </span>
               <span style={S.settingsFooterSeparator}>•</span>
               <span style={S.settingsFooterItem}>
                 <strong>Branch:</strong>{' '}
-                {metaBranchLabel || '—'}
+                {metaBranchDisplay}
               </span>
               <span style={S.settingsFooterSeparator}>•</span>
               <span style={S.settingsFooterItem}>
                 <strong>Commit:</strong>{' '}
-                {metaCommitLabel ? (
-                  metaCommitUrl ? (
-                    <a
-                      href={metaCommitUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={S.settingsFooterLink}
-                      title={`Open commit ${metaCommitLabel}`}
-                    >
-                      {metaCommitLabel}
-                    </a>
-                  ) : (
-                    metaCommitLabel
-                  )
+                {metaCommitDisplay !== '—' && metaCommitUrl ? (
+                  <a
+                    href={metaCommitUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={S.settingsFooterLink}
+                    title={`Open commit ${metaCommitLabel}`}
+                  >
+                    {metaCommitDisplay}
+                  </a>
                 ) : (
-                  '—'
+                  metaCommitDisplay
                 )}
               </span>
               <span style={S.settingsFooterSeparator}>•</span>
               <span style={S.settingsFooterItem}>
                 <strong>Deployment:</strong>{' '}
-                {metaDeploymentUrl ? (
-                  <a href={metaDeploymentUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
-                    {metaDeploymentLabel}
+                {metaDeploymentDisplay !== '—' && metaDeploymentUrl ? (
+                  <a
+                    href={metaDeploymentUrl.startsWith('http') ? metaDeploymentUrl : `https://${metaDeploymentUrl}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={S.settingsFooterLink}
+                  >
+                    {metaDeploymentDisplay}
                   </a>
                 ) : (
-                  metaDeploymentLabel
+                  metaDeploymentDisplay
                 )}
               </span>
-              {metaVercelUrl && (
+              {metaVercelDisplay && (
                 <>
                   <span style={S.settingsFooterSeparator}>•</span>
                   <span style={S.settingsFooterItem}>
                     <strong>Vercel:</strong>{' '}
-                    <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
-                      {metaVercelLabel || metaDeploymentLabel}
-                    </a>
+                    {metaVercelLabel && metaVercelUrl ? (
+                      <a href={metaVercelUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
+                        {metaVercelDisplay}
+                      </a>
+                    ) : (
+                      metaVercelDisplay
+                    )}
                   </span>
                 </>
               )}
             </div>
             <div style={S.settingsFooterTime}>
               Snapshot fetched {metaTimestampLabel || '—'} • Rendered {metaNowLabel || '—'}
-            </div>
-            <div style={S.settingsFooterTime}>
-              Dev Snapshot — Repo {metaOwnerRepo || metaRepoName || '—'} • Branch {metaBranchLabel || '—'} • Commit {metaCommitShort || metaCommitLabel || '—'} • Deployment {metaDeploymentLabel || '—'} • Vercel {metaVercelLabel || metaDeploymentLabel || '—'} • Rendered {metaNowLabel || '—'}
             </div>
             <div style={S.settingsFooterTime}>
               Runtime — Node {metaRuntimeNodeLabel || '—'}{metaRuntimeEnvLabel ? ` (${metaRuntimeEnvLabel})` : ''} • npm {metaRuntimeNpmLabel || '—'}{metaRuntimeNpmPath ? ` @ ${metaRuntimeNpmPath}` : ''}{metaRuntimeCorepackLabel ? ` • Corepack ${metaRuntimeCorepackLabel}` : ''} • Platform {metaRuntimePlatform || '—'} • Pinned Node {metaPinnedNodeLabel || '—'}{metaPinnedNpmLabel ? ` • Pinned npm ${metaPinnedNpmLabel}` : ''}{metaPinnedYarnLabel ? ` • Pinned Yarn ${metaPinnedYarnLabel}` : ''}
@@ -3927,40 +3981,7 @@ export default function Admin() {
               </div>
             )}
             <div style={S.settingsFooterTime}>
-              Deployment Snapshot — Repo{' '}
-              {metaRepoUrl ? (
-                <a href={metaRepoUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
-                  {metaRepoDisplay}
-                </a>
-              ) : (
-                metaRepoDisplay
-              )}{' '}
-              • Branch {metaBranchDisplay}{' '}
-              • Commit{' '}
-              {metaCommitUrl ? (
-                <a href={metaCommitUrl} target="_blank" rel="noreferrer" style={S.settingsFooterLink}>
-                  {metaCommitDisplay}
-                </a>
-              ) : (
-                metaCommitDisplay
-              )}{' '}
-              • Deployment{' '}
-              {metaDeploymentUrl ? (
-                <a
-                  href={metaDeploymentUrl.startsWith('http') ? metaDeploymentUrl : `https://${metaDeploymentUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={S.settingsFooterLink}
-                >
-                  {metaDeploymentDisplay}
-                </a>
-              ) : (
-                metaDeploymentDisplay
-              )}{' '}
-              • Timestamp {metaFooterTimestamp}
-            </div>
-            <div style={S.settingsFooterTime}>
-              Repository Snapshot — {metaRepoDisplay} • Branch {metaBranchDisplay} • Commit {metaCommitDisplay} • Vercel {metaVercelLabel || metaDeploymentDisplay} • Recorded {metaFooterTimestamp}
+              Dev Environment Snapshot — {metaDevSummary}
             </div>
           </footer>
         </main>

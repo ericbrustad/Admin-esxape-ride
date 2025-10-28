@@ -4,9 +4,15 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-30 — Yarn config cleanup & metadata snapshot hardening. Commit: (pending HEAD)
+  - Direct links: `.yarnrc.yml`, `package.json`, `apps/admin/pages/index.jsx`, `README.txt`, `apps/admin/docs/gpt-conversation-log.md`
+  - Notes: Reset the Yarn config to a minimal node-modules linker with the public npm registry, normalized the workspace package manager metadata, refined the Settings footer snapshot to drop placeholder dashes while surfacing full commit hashes, and logged the latest operator ↔ GPT session.
 - 2025-10-29 — Node 22 warning cleanup & admin manifest fix. Commit: (pending HEAD)
   - Direct links: `.node-version`, `package.json`, `apps/game-web/pages/settings.jsx`, `yarn.lock`, `README.txt`
   - Notes: Bumped the checked-in Node version to 22.11.0 to match the enforced runtime, rewired <code>yarn build</code> to run the admin and game workspace builds sequentially so the admin routes manifest is always generated, expanded the Yarn lockfile, and logged the troubleshooting summary in the Settings safeguards and conversation log.
+- 2025-10-28 — Settings footer env fallback & dev snapshot row. Commit: (pending HEAD)
+  - Direct links: `apps/admin/pages/index.jsx`, `apps/admin/docs/gpt-conversation-log.md`, `README.txt`
+  - Notes: Added NEXT_PUBLIC fallbacks for repo metadata so the Settings footer stays populated in local/dev runs, consolidated the Dev Environment Snapshot into a single footer row with captured timestamp details, refreshed the pairing log, and reconfirmed the admin build.
 - 2025-10-28 — Yarn-only Vercel build alignment & Node 22 verification. Commit: (pending HEAD)
   - Direct links: `vercel.json`, `package.json`, `apps/game-web/pages/settings.jsx`, `README.txt`
   - Notes: Routed the Vercel build through <code>yarn build</code> so turbo compiles both apps under Node 22, updated root scripts/docs to describe the turbo filtered build, refreshed the Settings safeguards/log with the latest operator request, and kept the Yarn-only workflow guidance current.
