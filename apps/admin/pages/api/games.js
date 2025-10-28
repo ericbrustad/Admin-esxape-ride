@@ -99,20 +99,24 @@ export default async function handler(req, res) {
         slug,
         channel,
         title: body.title ?? gameMeta.title ?? slug,
-      type: body.type ?? gameMeta.type ?? null,
-      cover_image: gameMeta.coverImage ?? body.coverImage ?? null,
-      config,
-      map: config?.map || {},
-      appearance,
-      theme: appearance,
+        type: body.type ?? gameMeta.type ?? null,
+        cover_image: gameMeta.coverImage ?? body.coverImage ?? null,
+        config,
+        map: config?.map || {},
+        appearance,
+        theme: appearance,
         appearance_skin: appearanceSkin,
         appearance_tone: appearanceTone,
-        mode: body.mode ?? gameMeta.mode ?? null,
         short_description: body.shortDescription ?? gameMeta.shortDescription ?? null,
         long_description: body.longDescription ?? gameMeta.longDescription ?? null,
         tags,
         status: channel === 'published' ? 'published' : 'draft',
       };
+
+      const modeValue = body.mode ?? gameMeta.mode ?? null;
+      if (modeValue) {
+        payload.mode = String(modeValue);
+      }
 
       const { data, error } = await supabase
         .from('games')
