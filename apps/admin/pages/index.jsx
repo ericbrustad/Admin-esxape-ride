@@ -1106,6 +1106,8 @@ export default function Admin() {
   const [testChannel, setTestChannel] = useState('draft');
   const [editChannel, setEditChannel] = useState('draft');
   const [saveBusy, setSaveBusy] = useState(false);
+  const [openGameModal, setOpenGameModal] = useState(false);
+  const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1203,6 +1205,41 @@ export default function Admin() {
       clearInterval(timer);
     };
   }, []);
+
+  async function refreshGamesIndex() {
+    try {
+      const [draftResponse, publishedResponse] = await Promise.all([
+        fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false, games: [] })),
+        fetch('/api/games?list=1&channel=published', { credentials: 'include', cache: 'no-store' })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false, games: [] })),
+      ]);
+
+      const bySlug = new Map();
+
+      (Array.isArray(draftResponse.games) ? draftResponse.games : []).forEach((game) => {
+        const entry = bySlug.get(game.slug) || {};
+        entry.draft = game;
+        bySlug.set(game.slug, entry);
+      });
+
+      (Array.isArray(publishedResponse.games) ? publishedResponse.games : []).forEach((game) => {
+        const entry = bySlug.get(game.slug) || {};
+        entry.published = game;
+        bySlug.set(game.slug, entry);
+      });
+
+      setGamesIndex({ bySlug: Object.fromEntries(bySlug), count: bySlug.size });
+    } catch {
+      // ignore index refresh errors; UI can recover on next attempt
+    }
+  }
+
+  useEffect(() => {
+    refreshGamesIndex();
+  }, [activeSlug]);
 
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -1624,6 +1661,7 @@ export default function Admin() {
       setStatus('✅ Draft saved');
       logConversation('GPT', `Draft saved for ${slug}`);
       await reloadGamesList();
+      await refreshGamesIndex();
     } else {
       logConversation('GPT', `Draft save failed for ${slug}`);
     }
@@ -1653,6 +1691,7 @@ export default function Admin() {
       setStatus('🚀 Published');
       logConversation('GPT', `Published ${slug}`);
       await reloadGamesList();
+      await refreshGamesIndex();
       setPreviewNonce((n) => n + 1);
     } catch (error) {
       const message = error?.message || 'publish failed';
@@ -1664,7 +1703,11 @@ export default function Admin() {
   }
 
   async function reloadGamesList() {
-    if (!gameEnabled) { setGames([]); return; }
+    if (!gameEnabled) {
+      setGames([]);
+      setGamesIndex({ bySlug: {}, count: 0 });
+      return;
+    }
     try {
       const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
       const j = await r.json();
@@ -2122,6 +2165,65 @@ export default function Admin() {
     setConfig(prev => ({ ...(prev || {}), appearanceTone: normalized }));
     setDirty(true);
     setStatus(normalized === 'dark' ? '🌙 Dark mission deck enabled' : '☀️ Light command deck enabled');
+  }
+
+  async function openGameChannel(slug, channel) {
+    if (!slug) return;
+    const normalized = String(channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+    setActiveSlug(slug);
+    setTab('settings');
+    if (typeof setEditChannel === 'function') setEditChannel(normalized);
+    setStatus(`Opened ${slug} (${normalized})`);
+  }
+
+  async function ensureDraftFromCurrent() {
+    const slug = activeSlug || 'default';
+    if (!config) {
+      setStatus('❌ Nothing to clone into draft');
+      return;
+    }
+    setStatus('Creating draft from current config…');
+    try {
+      const payload = {
+        slug,
+        title: config?.game?.title || slug,
+        type: config?.game?.type || null,
+        config,
+      };
+      const response = await fetch('/api/games?channel=draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'draft create failed');
+      setStatus('✅ Draft created');
+      setActiveSlug(slug);
+      if (typeof setEditChannel === 'function') setEditChannel('draft');
+      await refreshGamesIndex();
+      await reloadGamesList();
+    } catch (error) {
+      setStatus(`❌ ${error?.message || 'Unable to create draft'}`);
+    }
+  }
+
+  async function saveGamePublished() {
+    logConversation('You', 'Requested Save Published');
+    if (!suite || !config) return;
+    const slug = activeSlug || 'default';
+    setSaveBusy(true);
+    setStatus('Saving published…');
+    const saved = await saveAllWithSlug(slug, 'published');
+    if (saved) {
+      setStatus('✅ Published saved');
+      logConversation('GPT', `Published saved for ${slug}`);
+      await reloadGamesList();
+      await refreshGamesIndex();
+    } else {
+      logConversation('GPT', `Published save failed for ${slug}`);
+    }
+    setSaveBusy(false);
   }
 
   // Missions selection operations (Missions tab only)
@@ -2730,64 +2832,118 @@ export default function Admin() {
           </div>
           <div style={S.headerNavRow}>
             <div style={S.headerNavPrimary}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginRight: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setEditChannel('draft')}
-                  style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
-                  title="Edit in Draft mode"
-                >
-                  Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditChannel('published')}
-                  style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
-                  title="Enable publishing actions"
-                >
-                  Published
-                </button>
-              </div>
-              {tabsOrder.map((t)=>{
-                const labelMap = {
-                  'missions':'MISSIONS',
-                  'devices':'DEVICES',
-                  'settings':'SETTINGS',
-                  'text':'TEXT',
-                  'media-pool':'MEDIA POOL',
-                  'assigned':'ASSIGNED MEDIA',
-                };
-                return (
-                  <button key={t} onClick={()=>setTab(t)} style={{ ...S.tab, ...(tab===t?S.tabActive:{}) }}>
-                    {labelMap[t] || t.toUpperCase()}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginRight: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditChannel('draft')}
+                    style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
+                    title="Edit in Draft mode"
+                  >
+                    Draft
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={openNewGameModal}
-                style={{ ...S.button, ...S.headerNewGameButton }}
-              >
-                <span style={S.newGameLabel}>+ New Game</span>
-              </button>
-              <button
-                type="button"
-                onClick={saveDraftNow}
-                disabled={saveBusy || editChannel !== 'draft'}
-                style={{ ...S.button, ...(editChannel === 'draft' ? S.buttonSuccess : S.buttonDisabled) }}
-                title="Save current changes to the draft channel"
-              >
-                {saveBusy && editChannel === 'draft' ? 'Saving…' : 'Save Draft'}
-              </button>
-              <button
-                type="button"
-                onClick={publishNow}
-                disabled={saveBusy || editChannel !== 'published'}
-                style={{ ...S.button, ...(editChannel === 'published' ? S.savePublishButton : S.buttonDisabled) }}
-                title="Copy draft to published (players will see it)"
-              >
-                {saveBusy && editChannel === 'published' ? 'Publishing…' : 'Publish Now'}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditChannel('published')}
+                    style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
+                    title="Enable publishing actions"
+                  >
+                    Published
+                  </button>
+                </div>
+                {tabsOrder.map((t) => {
+                  const labelMap = {
+                    missions: 'MISSIONS',
+                    devices: 'DEVICES',
+                    settings: 'SETTINGS',
+                    text: 'TEXT',
+                    'media-pool': 'MEDIA POOL',
+                    assigned: 'ASSIGNED MEDIA',
+                  };
+                  return (
+                    <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
+                      {labelMap[t] || t.toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button type="button" style={S.button} onClick={openNewGameModal}>
+                    New Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={() => {
+                      setOpenGameModal(true);
+                      refreshGamesIndex();
+                    }}
+                  >
+                    Open Game
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    onClick={saveGamePublished}
+                    disabled={saveBusy}
+                    title="Save current slug to channel=published"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save Game'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    onClick={publishNow}
+                    disabled={saveBusy}
+                  >
+                    {saveBusy ? 'Publishing…' : 'Publish Game'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={ensureDraftFromCurrent}
+                    title="Create or refresh a draft row for this slug"
+                  >
+                    New Draft
+                  </button>
+                  <button
+                    type="button"
+                    style={S.button}
+                    onClick={() => {
+                      setOpenGameModal(true);
+                      refreshGamesIndex();
+                    }}
+                  >
+                    Open Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveDraftNow}
+                    disabled={saveBusy}
+                    style={{ ...S.button, ...S.buttonSuccess, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    title="Save current changes to the draft channel"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save Draft'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveDraftNow();
+                      await publishNow();
+                    }}
+                    disabled={saveBusy}
+                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
+                    title="Save draft first, then publish to players"
+                  >
+                    {saveBusy ? 'Saving…' : 'Save & Publish Draft'}
+                  </button>
+                </div>
+              </div>
             </div>
             {gameEnabled && (
               <div style={S.headerNavSecondary}>
@@ -4445,6 +4601,61 @@ export default function Admin() {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {openGameModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000, display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div style={{ ...S.card, width: 'min(720px,96vw)', maxHeight: '82vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0 }}>Open Game</h3>
+              <button style={S.button} onClick={() => setOpenGameModal(false)}>Close</button>
+            </div>
+            <div style={{ color: 'var(--admin-muted)', margin: '6px 0 12px' }}>
+              Choose which channel to open for each slug.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center' }}>
+              <div style={{ fontWeight: 700 }}>Slug</div>
+              <div style={{ fontWeight: 700, textAlign: 'center' }}>Draft</div>
+              <div style={{ fontWeight: 700, textAlign: 'center' }}>Published</div>
+              {Object.entries(gamesIndex.bySlug || {}).map(([slug, channels]) => (
+                <React.Fragment key={slug}>
+                  <div style={{ padding: '6px 0' }}>{slug}</div>
+                  <div style={{ display: 'grid', placeItems: 'center' }}>
+                    <button
+                      style={{ ...S.button, ...(channels?.draft ? {} : S.buttonDisabled) }}
+                      disabled={!channels?.draft}
+                      title={channels?.draft ? 'Open draft' : 'No draft yet'}
+                      onClick={() => {
+                        openGameChannel(slug, 'draft');
+                        setOpenGameModal(false);
+                      }}
+                    >
+                      {channels?.draft ? 'Open' : '—'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', placeItems: 'center' }}>
+                    <button
+                      style={{ ...S.button, ...(channels?.published ? {} : S.buttonDisabled) }}
+                      disabled={!channels?.published}
+                      title={channels?.published ? 'Open published' : 'No published yet'}
+                      onClick={() => {
+                        openGameChannel(slug, 'published');
+                        setOpenGameModal(false);
+                      }}
+                    >
+                      {channels?.published ? 'Open' : '—'}
+                    </button>
+                  </div>
+                </React.Fragment>
+              ))}
+              {(!gamesIndex.count || gamesIndex.count === 0) && (
+                <div style={{ gridColumn: '1 / span 3', color: 'var(--admin-muted)', padding: '12px 0' }}>
+                  No games found yet.
+                </div>
+              )}
             </div>
           </div>
         </div>
