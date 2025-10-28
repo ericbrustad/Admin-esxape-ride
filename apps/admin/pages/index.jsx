@@ -3971,6 +3971,10 @@ export default function Admin() {
             <div style={S.settingsFooterTime}>
               Dev Environment Snapshot — {metaDevSummary}
             </div>
+            <div style={S.settingsFooterTime}>
+              Dev Environment Snapshot — {metaDevSummary}
+              {metaDevRecorded && metaDevRecorded !== '—' ? ` • Captured ${metaDevRecorded}` : ''}
+            </div>
           </footer>
         </main>
       )}
