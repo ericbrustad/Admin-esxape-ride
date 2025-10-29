@@ -195,10 +195,29 @@ export const DEVICE_TYPES = [
 ];
 export const FONT_FAMILIES = [
   { v:'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', label:'System' },
-  { v:'Georgia, serif',                      label:'Georgia' },
-  { v:'Times New Roman, Times, serif',      label:'Times New Roman' },
-  { v:'Arial, Helvetica, sans-serif',       label:'Arial' },
-  { v:'Courier New, Courier, monospace',    label:'Courier New' },
+  { v:'"Exo 2", "Segoe UI", sans-serif', label:'Exo 2' },
+  { v:'"Orbitron", "Rajdhani", "Segoe UI", sans-serif', label:'Orbitron' },
+  { v:'"Rajdhani", "Segoe UI", sans-serif', label:'Rajdhani' },
+  { v:'"Titillium Web", "Segoe UI", sans-serif', label:'Titillium Web' },
+  { v:'"Work Sans", "Segoe UI", sans-serif', label:'Work Sans' },
+  { v:'"Source Sans Pro", "Segoe UI", sans-serif', label:'Source Sans Pro' },
+  { v:'"Nunito", "Segoe UI", sans-serif', label:'Nunito' },
+  { v:'"Poppins", "Segoe UI", sans-serif', label:'Poppins' },
+  { v:'"Rubik", "Segoe UI", sans-serif', label:'Rubik' },
+  { v:'"Merriweather Sans", "Segoe UI", sans-serif', label:'Merriweather Sans' },
+  { v:'"Merriweather", "Times New Roman", serif', label:'Merriweather' },
+  { v:'"Playfair Display", "Times New Roman", serif', label:'Playfair Display' },
+  { v:'"Quicksand", "Segoe UI", sans-serif', label:'Quicksand' },
+  { v:'"Baloo 2", "Comic Sans MS", "Segoe UI", sans-serif', label:'Baloo 2' },
+  { v:'"Fredoka", "Segoe UI", sans-serif', label:'Fredoka' },
+  { v:'"Pacifico", "Segoe UI", cursive', label:'Pacifico' },
+  { v:'"Kalam", "Segoe UI", cursive', label:'Kalam' },
+  { v:'"Creepster", "Segoe UI", cursive', label:'Creepster' },
+  { v:'"Chewy", "Comic Sans MS", cursive', label:'Chewy' },
+  { v:'Georgia, serif', label:'Georgia' },
+  { v:'Times New Roman, Times, serif', label:'Times New Roman' },
+  { v:'Arial, Helvetica, sans-serif', label:'Arial' },
+  { v:'Courier New, Courier, monospace', label:'Courier New' },
 ];
 export const DEFAULT_APPEARANCE_SKIN = 'starfield-dawn';
 

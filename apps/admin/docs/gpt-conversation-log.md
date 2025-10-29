@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T21:45:00Z
+
+**You:** Research the legacy skins pack, bring back the forest/military/metal/photo options, and add party plus dog & cat themes with fonts and background controls.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, restored the legacy chrome/forest/military set, added ocean/holiday/seasonal photo presets alongside new party and pet skins with adjustable backgrounds, imported every required Google Font into the picker, and verified the appearance editor exposes the new shadows and controls.
+
+---
+
 **Timestamp:** 2025-10-31T19:15:00Z
 
 **You:** Research the legacy skins and bring back the forest, military, metal, and holiday theme pack instead of leaving every skin on Starfield Dawn.
