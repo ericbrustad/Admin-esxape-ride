@@ -1,20 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { clearDefaultGeo, getDefaultGeo, setDefaultGeo } from '../../lib/geo/defaultGeo.js';
 
-export default function GlobalLocationSelector({ initial, onUpdate }) {
+export default function GlobalLocationSelector({
+  initial,
+  useAsDefault = false,
+  onUpdate,
+  onUseAsDefaultChange,
+}) {
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
   const [enabled, setEnabled] = useState(() => Boolean(initial));
   const [lat, setLat] = useState(() => initial?.lat ?? 44.9778);
   const [lng, setLng] = useState(() => initial?.lng ?? -93.265);
-  const [persistNew, setPersistNew] = useState(false);
+  const [persistNew, setPersistNew] = useState(() => {
+    if (typeof useAsDefault === 'boolean') return useAsDefault;
+    return Boolean(getDefaultGeo());
+  });
   const [updating, setUpdating] = useState(false);
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
 
   useEffect(() => {
-    setPersistNew(Boolean(getDefaultGeo()));
-  }, []);
+    if (typeof useAsDefault === 'boolean') {
+      setPersistNew(useAsDefault);
+    }
+  }, [useAsDefault]);
 
   useEffect(() => {
     if (initial && Number.isFinite(initial.lat) && Number.isFinite(initial.lng)) {
@@ -87,6 +97,18 @@ export default function GlobalLocationSelector({ initial, onUpdate }) {
     } else {
       clearDefaultGeo();
     }
+    if (typeof onUseAsDefaultChange === 'function') {
+      try {
+        const maybe = onUseAsDefaultChange(persistNew);
+        if (maybe && typeof maybe.then === 'function') {
+          maybe.catch((error) => {
+            console.error('Failed to persist location default flag', error);
+          });
+        }
+      } catch (error) {
+        console.error('Failed to persist location default flag', error);
+      }
+    }
     if (!onUpdate) return;
     try {
       const maybePromise = onUpdate(Number(lat), Number(lng));
@@ -155,6 +177,18 @@ export default function GlobalLocationSelector({ initial, onUpdate }) {
                 } else {
                   clearDefaultGeo();
                 }
+                if (typeof onUseAsDefaultChange === 'function') {
+                  try {
+                    const maybe = onUseAsDefaultChange(checked);
+                    if (maybe && typeof maybe.then === 'function') {
+                      maybe.catch((error) => {
+                        console.error('Failed to persist location default flag', error);
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Failed to persist location default flag', error);
+                  }
+                }
               }}
             />
             <span>Use this as default for new Missions / Devices (Draft &amp; Live forms)</span>
@@ -186,4 +220,3 @@ export default function GlobalLocationSelector({ initial, onUpdate }) {
     </div>
   );
 }
-
