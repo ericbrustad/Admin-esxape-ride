@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
-import HideLegacyButtons from '../components/HideLegacyButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
@@ -2811,7 +2810,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <HideLegacyButtons />
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
