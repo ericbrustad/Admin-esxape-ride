@@ -8,6 +8,7 @@ import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
 import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
 import ProjectFlags from '../components/Settings/ProjectFlags.jsx';
+import GlobalLocationSelector from '../components/Settings/GlobalLocationSelector.jsx';
 import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
@@ -21,6 +22,8 @@ import { GAME_ENABLED } from '../lib/game-switch';
 import { useAdminFlags } from '../lib/adminFlags.js';
 import { createNewGame } from '../lib/games/createNewGame.js';
 import { nextMissionId, nextDeviceId } from '../lib/ids.js';
+import { updateAllPinsInSnapshot, deriveInitialGeo } from '../lib/geo/updateAllPins.js';
+import { getDefaultGeo } from '../lib/geo/defaultGeo.js';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -283,6 +286,18 @@ function formatLocalDateTime(value) {
     });
   } catch {
     return '';
+  }
+}
+
+function cloneSnapshot(snapshot) {
+  if (!snapshot) return snapshot;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(snapshot); } catch {}
+  }
+  try {
+    return JSON.parse(JSON.stringify(snapshot));
+  } catch {
+    return snapshot;
   }
 }
 
@@ -2678,6 +2693,20 @@ export default function Admin() {
       geofence: { mode: 'test' },
     };
   }
+  function getPreferredLocation() {
+    let stored = null;
+    try { stored = getDefaultGeo(); } catch {}
+    const fallbackLat = config?.map?.centerLat;
+    const fallbackLng = config?.map?.centerLng;
+    const latCandidate = stored?.lat ?? fallbackLat ?? 44.9778;
+    const lngCandidate = stored?.lng ?? fallbackLng ?? -93.265;
+    const lat = Number(latCandidate);
+    const lng = Number(lngCandidate);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+    return { lat: 44.9778, lng: -93.265 };
+  }
   function defaultContentForType(t) {
     const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
     switch (t) {
@@ -2885,6 +2914,57 @@ export default function Admin() {
     [cloneForSnapshot, config, headerStatus, suite],
   );
 
+  const handleUpdateAllPins = useCallback(
+    async (lat, lng) => {
+      const slug = activeSlug || 'default';
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setStatus('❌ Provide a valid latitude and longitude to update pins');
+        return;
+      }
+      logConversation('You', `Updating all pins to ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      setStatus('📍 Updating all pins…');
+      try {
+        const snapshot = await getSnapshotFor(slug);
+        if (!snapshot) throw new Error('Snapshot unavailable');
+        const mutated = updateAllPinsInSnapshot(cloneSnapshot(snapshot), lat, lng);
+        const response = await fetch('/api/games/save-full', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            slug,
+            channel: headerStatus,
+            snapshot: mutated,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Save failed');
+        }
+        if (mutated?.data?.config) {
+          setConfig(mutated.data.config);
+        } else {
+          setConfig((prev) => {
+            const base = { ...(prev || {}) };
+            base.map = { ...(base.map || {}), centerLat: lat, centerLng: lng };
+            return base;
+          });
+        }
+        if (mutated?.data?.suite) {
+          setSuite(mutated.data.suite);
+        }
+        setStatus('✅ Updated all pins to new location');
+        logConversation('GPT', `All pins updated to ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      } catch (error) {
+        const message = error?.message || 'Update failed';
+        setStatus(`❌ Failed to update pins: ${message}`);
+        logConversation('GPT', `Failed to update pins: ${message}`);
+        throw error;
+      }
+    },
+    [activeSlug, getSnapshotFor, headerStatus, logConversation, setConfig, setStatus, setSuite],
+  );
+
   const saveFull = useCallback(
     async (publish = false) => {
       const slug = activeSlug || 'default';
@@ -3067,6 +3147,16 @@ export default function Admin() {
       showContinue: true,
       trigger: { ...DEFAULT_TRIGGER_CONFIG },
     };
+    const preferred = getPreferredLocation();
+    if (preferred) {
+      const lat = Number(Number(preferred.lat).toFixed(6));
+      const lng = Number(Number(preferred.lng).toFixed(6));
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        draft.content.lat = lat;
+        draft.content.lng = lng;
+        draft.content.geofenceEnabled = true;
+      }
+    }
     setEditing(draft); setSelected(null); setDirty(true);
   }
   function editExisting(m) {
@@ -3238,11 +3328,12 @@ export default function Admin() {
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
     setSelectedMissionIdx(null);
-    const baseLat = Number(config.map?.centerLat ?? 44.9778);
-    const baseLng = Number(config.map?.centerLng ?? -93.2650);
+    const preferred = getPreferredLocation();
+    const baseLat = Number.isFinite(preferred?.lat) ? preferred.lat : 44.9778;
+    const baseLng = Number.isFinite(preferred?.lng) ? preferred.lng : -93.265;
     const initial = createDeviceDraft({
-      lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
-      lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
+      lat: Number(Number(baseLat).toFixed(6)),
+      lng: Number(Number(baseLng).toFixed(6)),
     });
     setDevDraft(initial);
     setDevDraftBaseline(createDeviceDraft({ ...initial }));
@@ -3884,6 +3975,17 @@ export default function Admin() {
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
   const viewConfig = config || fallbackConfig;
+  const globalLocationSeed = useMemo(() => {
+    const fromConfig = deriveInitialGeo({ data: { config: viewConfig || {} } });
+    if (fromConfig) return fromConfig;
+    try {
+      const stored = getDefaultGeo();
+      if (stored && Number.isFinite(stored.lat) && Number.isFinite(stored.lng)) {
+        return stored;
+      }
+    } catch {}
+    return null;
+  }, [viewConfig]);
   const isBootstrapping = !suite || !config;
 
   const mapCenter = {
@@ -5427,6 +5529,10 @@ export default function Admin() {
               error={adminFlagsError}
               onUpdate={updateAdminFlags}
             />
+            <GlobalLocationSelector
+              initial={globalLocationSeed}
+              onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
+            />
             <div style={S.titleEditorBlock}>
               <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
               <input
@@ -5879,6 +5985,9 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               {metaDevFooterLine}
+            </div>
+            <div style={{ ...S.settingsFooterTime, fontWeight: 600 }}>
+              Repo: {metaRepoFooterLabel} • Branch: {metaBranchFooterLabel} • Commit: {metaCommitFooterLabel} • Deployment: {metaDeploymentFooterLabel} • Timestamp {metaFooterNowLabel}
             </div>
           </footer>
         </main>
