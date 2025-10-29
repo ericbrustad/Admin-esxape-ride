@@ -3948,6 +3948,154 @@ export default function Admin() {
       {/* SETTINGS */}
       {tab==='settings' && (
         <main style={S.wrap}>
+          <div style={S.settingsMenuBar}>
+            <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
+              <button
+                type="button"
+                style={{
+                  ...S.settingsMenuButton,
+                  ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
+                }}
+                onClick={() => setSettingsMenuOpen((open) => !open)}
+              >
+                Settings Menu {settingsMenuOpen ? '▴' : '▾'}
+              </button>
+              {settingsMenuOpen && (
+                <div style={S.settingsMenuDropdown}>
+                  <div style={S.settingsMenuSectionLabel}>Actions</div>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(openNewGameModal)}
+                  >
+                    ➕ New Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() =>
+                      runSettingsMenuAction(() => {
+                        setOpenGameModal(true);
+                        refreshGamesIndex();
+                      })
+                    }
+                  >
+                    📂 Open Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() =>
+                      runSettingsMenuAction(() => {
+                        setOpenGameModal(true);
+                        refreshGamesIndex();
+                        if (typeof setEditChannel === 'function') setEditChannel('draft');
+                      })
+                    }
+                  >
+                    📁 Open Draft
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(ensureDraftFromCurrent)}
+                  >
+                    📝 New Draft
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveDraftNow)}
+                  >
+                    💾 Save Draft
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveGamePublished)}
+                  >
+                    💾 Save Game
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(publishNow)}
+                  >
+                    🚀 Publish Game
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveDraftThenPublish)}
+                  >
+                    🚀 Save & Publish Draft
+                  </button>
+                  {gameEnabled && (
+                    <button
+                      type="button"
+                      style={{ ...S.settingsMenuItem, ...S.settingsMenuDanger }}
+                      onClick={() =>
+                        runSettingsMenuAction(() => {
+                          setConfirmDeleteOpen(true);
+                        })
+                      }
+                    >
+                      🗑 Delete Game
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(scanProject)}
+                  >
+                    🔎 Scan Media Usage
+                  </button>
+                  <div style={S.settingsMenuDivider} />
+                  <div style={S.settingsMenuSectionLabel}>Open & View</div>
+                  {settingsMenuGames.map((entry) => (
+                    <button
+                      key={`${entry.slug}::${entry.channel}`}
+                      type="button"
+                      style={{
+                        ...S.settingsMenuItem,
+                        ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
+                      }}
+                      onClick={() =>
+                        runSettingsMenuAction(() => {
+                          setActiveSlug(entry.slug);
+                          if (entry.channel === 'published') {
+                            setEditChannel('published');
+                          } else {
+                            setEditChannel('draft');
+                          }
+                          setTab('settings');
+                          setStatus(`Opened ${entry.label}`);
+                        })
+                      }
+                    >
+                      {entry.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
