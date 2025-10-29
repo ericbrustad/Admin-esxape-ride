@@ -1,4 +1,5 @@
 import { serverClient } from '../../../lib/supabaseClient';
+import { upsertReturning } from '../../../lib/supabase/upsertReturning.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,10 +20,7 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('games').upsert(payload, { onConflict: 'slug' });
-    if (error) {
-      return res.status(500).json({ ok: false, error: error.message });
-    }
+    await upsertReturning(supabase, 'games', payload, { onConflict: 'slug' });
 
     return res.status(200).json({ ok: true, published: true });
   } catch (error) {
