@@ -145,3 +145,11 @@
 **You:** Reset the Yarn workspace config to drop the invalid descriptors and make the Settings footer show the repo, branch, commit, deployment, and timestamp without placeholder dashes.
 
 **GPT:** Replaced the Yarn config with a minimal node-modules linker, normalized the root package manager metadata, filtered the footer snapshot so only real values render (including the full commit hash), and reran the admin build smoke test.
+
+---
+
+**Timestamp:** 2025-10-30T00:00:00Z
+
+**You:** Hide every legacy “Open …” button and keep the settings menu as the single launch surface.
+
+**GPT:** Replaced the default button component with a no-op stub, added a MutationObserver guard to hide any remaining “Open …” triggers, and mounted the guard from the admin shell.
