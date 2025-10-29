@@ -9,9 +9,17 @@ const boxStyle = {
   background: 'white',
 };
 
-export default function ProjectFlags({ flags = null, busy = false, error = '', onUpdate = () => {} }) {
-  const gameEnabled = typeof flags?.game_enabled === 'boolean' ? flags.game_enabled : true;
-  const defaultChannel = flags?.new_game_default_channel === 'published' ? 'published' : 'draft';
+export default function ProjectFlags({
+  gameEnabled = true,
+  defaultChannel = 'draft',
+  useLocationAsDefault = false,
+  busy = false,
+  error = '',
+  onMirrorChange = () => {},
+  onChannelChange = () => {},
+  onUseLocationDefaultChange = () => {},
+}) {
+  const normalizedChannel = defaultChannel === 'published' ? 'published' : 'draft';
 
   return (
     <div style={boxStyle}>
@@ -24,9 +32,9 @@ export default function ProjectFlags({ flags = null, busy = false, error = '', o
       <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <input
           type="checkbox"
-          checked={gameEnabled}
+          checked={!!gameEnabled}
           disabled={busy}
-          onChange={(event) => onUpdate({ game_enabled: event.target.checked })}
+          onChange={(event) => onMirrorChange(event.target.checked)}
         />
         <span>Mirror to Game project (GAME_ENABLED)</span>
       </label>
@@ -38,9 +46,9 @@ export default function ProjectFlags({ flags = null, busy = false, error = '', o
             <input
               type="radio"
               name="new-game-default-channel"
-              checked={defaultChannel === 'draft'}
+              checked={normalizedChannel === 'draft'}
               disabled={busy}
-              onChange={() => onUpdate({ new_game_default_channel: 'draft' })}
+              onChange={() => onChannelChange('draft')}
             />
             Draft
           </label>
@@ -48,14 +56,24 @@ export default function ProjectFlags({ flags = null, busy = false, error = '', o
             <input
               type="radio"
               name="new-game-default-channel"
-              checked={defaultChannel === 'published'}
+              checked={normalizedChannel === 'published'}
               disabled={busy}
-              onChange={() => onUpdate({ new_game_default_channel: 'published' })}
+              onChange={() => onChannelChange('published')}
             />
             Live (Publish)
           </label>
         </div>
       </div>
+
+      <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={!!useLocationAsDefault}
+          disabled={busy}
+          onChange={(event) => onUseLocationDefaultChange(event.target.checked)}
+        />
+        <span>Use Settings location as default for new Missions / Devices</span>
+      </label>
     </div>
   );
 }

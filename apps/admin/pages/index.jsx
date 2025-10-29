@@ -8,6 +8,7 @@ import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
 import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
 import ProjectFlags from '../components/Settings/ProjectFlags.jsx';
+import GlobalLocationSelector from '../components/Settings/GlobalLocationSelector.jsx';
 import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
@@ -18,9 +19,10 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
-import { useAdminFlags } from '../lib/adminFlags.js';
 import { createNewGame } from '../lib/games/createNewGame.js';
 import { nextMissionId, nextDeviceId } from '../lib/ids.js';
+import { updateAllPinsInSnapshot, deriveInitialGeo } from '../lib/geo/updateAllPins.js';
+import { getDefaultGeo } from '../lib/geo/defaultGeo.js';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 async function fetchJsonSafe(url, fallback) {
@@ -283,6 +285,18 @@ function formatLocalDateTime(value) {
     });
   } catch {
     return '';
+  }
+}
+
+function cloneSnapshot(snapshot) {
+  if (!snapshot) return snapshot;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(snapshot); } catch {}
+  }
+  try {
+    return JSON.parse(JSON.stringify(snapshot));
+  } catch {
+    return snapshot;
   }
 }
 
@@ -1688,7 +1702,6 @@ const DEFAULT_SNAPSHOT_KEY = 'erix.defaultOriginalSnapshot';
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
-  const { flags: adminFlags, busy: adminFlagsBusy, error: adminFlagsError, update: updateAdminFlags } = useAdminFlags();
   const [gameEnabled, setGameEnabled] = useState(GAME_ENABLED);
   const [tab, setTab] = useState('missions');
 
@@ -1696,6 +1709,9 @@ export default function Admin() {
 
   const [games, setGames] = useState([]);
   const [activeSlug, setActiveSlug] = useState('default'); // Starfield default stored on legacy root
+  const [activeGameMeta, setActiveGameMeta] = useState(null);
+  const [gameFlagsBusy, setGameFlagsBusy] = useState(false);
+  const [gameFlagsError, setGameFlagsError] = useState('');
   const [showNewGame, setShowNewGame] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState('Mystery');
@@ -1721,18 +1737,24 @@ export default function Admin() {
   const newGameSlugEdited = useRef(false);
 
   useEffect(() => {
-    if (!adminFlags) return;
-    if (typeof adminFlags.game_enabled === 'boolean') {
-      setGameEnabled(Boolean(adminFlags.game_enabled));
+    setGameFlagsError('');
+    setGameFlagsBusy(false);
+  }, [activeSlug]);
+
+  useEffect(() => {
+    if (!activeGameMeta) {
+      setGameEnabled(true);
+      return;
     }
-    if (adminFlags.new_game_default_channel) {
-      const normalized = adminFlags.new_game_default_channel === 'published' ? 'published' : 'draft';
-      newGameChannelDefaultRef.current = normalized;
-      if (!showNewGame) {
-        setNewGameChannel(normalized);
-      }
+    if (typeof activeGameMeta.game_enabled === 'boolean') {
+      setGameEnabled(Boolean(activeGameMeta.game_enabled));
     }
-  }, [adminFlags, showNewGame]);
+    const normalized = activeGameMeta.default_channel === 'published' ? 'published' : 'draft';
+    newGameChannelDefaultRef.current = normalized;
+    if (!showNewGame) {
+      setNewGameChannel(normalized);
+    }
+  }, [activeGameMeta, showNewGame]);
 
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
@@ -2637,6 +2659,44 @@ export default function Admin() {
         merged = applyDefaultIcons(merged);
         merged = normalizeGameMetadata(merged, slugForMeta);
 
+        const supaGame = supaPayload?.game || null;
+        if (supaGame) {
+          const tagSource = typeof supaGame.tag === 'string'
+            ? supaGame.tag
+            : typeof supaGame.channel === 'string'
+              ? supaGame.channel
+              : supaPayload?.channel;
+          const normalizedTag = tagSource === 'published' || tagSource === 'live' ? 'published' : 'draft';
+          const defaultChannelRaw = typeof supaGame.default_channel === 'string'
+            ? supaGame.default_channel
+            : typeof supaGame.defaultChannel === 'string'
+              ? supaGame.defaultChannel
+              : 'draft';
+          const normalizedDefaultChannel = defaultChannelRaw === 'published' || defaultChannelRaw === 'live'
+            ? 'published'
+            : 'draft';
+          setActiveGameMeta({
+            id: supaGame.id ?? null,
+            slug: supaGame.slug ?? slugParam,
+            tag: normalizedTag,
+            default_channel: normalizedDefaultChannel,
+            game_enabled: typeof supaGame.game_enabled === 'boolean'
+              ? supaGame.game_enabled
+              : true,
+            settings: supaGame.settings || {},
+          });
+        } else {
+          const fallbackTagRaw = supaPayload?.channel;
+          const fallbackTag = fallbackTagRaw === 'published' || fallbackTagRaw === 'live' ? 'published' : 'draft';
+          setActiveGameMeta({
+            id: null,
+            slug: slugParam,
+            tag: fallbackTag,
+            default_channel: fallbackTag,
+            game_enabled: true,
+            settings: {},
+          });
+        }
         setSuite(normalized);
         setConfig(merged);
         setSelected(null);
@@ -2677,6 +2737,20 @@ export default function Admin() {
       map: { centerLat: 44.9778, centerLng: -93.2650, defaultZoom: 13 },
       geofence: { mode: 'test' },
     };
+  }
+  function getPreferredLocation() {
+    let stored = null;
+    try { stored = getDefaultGeo(); } catch {}
+    const fallbackLat = config?.map?.centerLat;
+    const fallbackLng = config?.map?.centerLng;
+    const latCandidate = stored?.lat ?? fallbackLat ?? 44.9778;
+    const lngCandidate = stored?.lng ?? fallbackLng ?? -93.265;
+    const lat = Number(latCandidate);
+    const lng = Number(lngCandidate);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+    return { lat: 44.9778, lng: -93.265 };
   }
   function defaultContentForType(t) {
     const base = { geofenceEnabled:false, lat:'', lng:'', radiusMeters:25, cooldownSeconds:30 };
@@ -2885,6 +2959,130 @@ export default function Admin() {
     [cloneForSnapshot, config, headerStatus, suite],
   );
 
+  const gameIdentifier = useMemo(() => {
+    const slug = (activeGameMeta?.slug || activeSlug || 'default').trim() || 'default';
+    const tagRaw = activeGameMeta?.tag || headerStatus;
+    const tag = tagRaw === 'published' ? 'published' : 'draft';
+    const gameId = activeGameMeta?.id || null;
+    return { gameId, slug, tag };
+  }, [activeGameMeta?.id, activeGameMeta?.slug, activeGameMeta?.tag, activeSlug, headerStatus]);
+
+  const saveGameFlags = useCallback(
+    async (patch) => {
+      if (!patch || typeof patch !== 'object') {
+        return null;
+      }
+      setGameFlagsBusy(true);
+      setGameFlagsError('');
+      try {
+        const payload = { patch };
+        if (gameIdentifier.gameId) {
+          payload.gameId = gameIdentifier.gameId;
+        } else {
+          payload.slug = gameIdentifier.slug;
+          payload.tag = gameIdentifier.tag;
+        }
+        const response = await fetch('/api/game/save-flags', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+          cache: 'no-store',
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result?.ok === false) {
+          const message = result?.error || `Save failed (${response.status})`;
+          throw new Error(message);
+        }
+        const saved = result?.saved || {};
+        setActiveGameMeta((prev) => {
+          const nextSettings = saved.settings ?? prev?.settings ?? {};
+          return {
+            ...(prev || {}),
+            id: saved.id ?? prev?.id ?? gameIdentifier.gameId,
+            slug: saved.slug ?? prev?.slug ?? gameIdentifier.slug,
+            tag: saved.tag ?? prev?.tag ?? gameIdentifier.tag,
+            default_channel: saved.default_channel ?? prev?.default_channel,
+            game_enabled: typeof saved.game_enabled === 'boolean'
+              ? saved.game_enabled
+              : prev?.game_enabled,
+            settings: nextSettings,
+          };
+        });
+        if (Object.prototype.hasOwnProperty.call(saved, 'game_enabled')) {
+          setGameEnabled(Boolean(saved.game_enabled));
+        }
+        if (Object.prototype.hasOwnProperty.call(saved, 'default_channel')) {
+          const normalized = saved.default_channel === 'published' ? 'published' : 'draft';
+          newGameChannelDefaultRef.current = normalized;
+          if (!showNewGame) {
+            setNewGameChannel(normalized);
+          }
+        }
+        return saved;
+      } catch (error) {
+        const message = error?.message || String(error);
+        setGameFlagsError(message);
+        throw error;
+      } finally {
+        setGameFlagsBusy(false);
+      }
+    },
+    [gameIdentifier, showNewGame],
+  );
+
+  const handleUpdateAllPins = useCallback(
+    async (lat, lng) => {
+      const slug = activeSlug || 'default';
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        setStatus('❌ Provide a valid latitude and longitude to update pins');
+        return;
+      }
+      logConversation('You', `Updating all pins to ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      setStatus('📍 Updating all pins…');
+      try {
+        const snapshot = await getSnapshotFor(slug);
+        if (!snapshot) throw new Error('Snapshot unavailable');
+        const mutated = updateAllPinsInSnapshot(cloneSnapshot(snapshot), lat, lng);
+        const response = await fetch('/api/games/save-full', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            slug,
+            channel: headerStatus,
+            snapshot: mutated,
+          }),
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Save failed');
+        }
+        if (mutated?.data?.config) {
+          setConfig(mutated.data.config);
+        } else {
+          setConfig((prev) => {
+            const base = { ...(prev || {}) };
+            base.map = { ...(base.map || {}), centerLat: lat, centerLng: lng };
+            return base;
+          });
+        }
+        if (mutated?.data?.suite) {
+          setSuite(mutated.data.suite);
+        }
+        await saveGameFlags({ globalLocation: { lat, lng } });
+        setStatus('✅ Updated all pins to new location');
+        logConversation('GPT', `All pins updated to ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      } catch (error) {
+        const message = error?.message || 'Update failed';
+        setStatus(`❌ Failed to update pins: ${message}`);
+        logConversation('GPT', `Failed to update pins: ${message}`);
+        throw error;
+      }
+    },
+    [activeSlug, getSnapshotFor, headerStatus, logConversation, saveGameFlags, setConfig, setStatus, setSuite],
+  );
+
   const saveFull = useCallback(
     async (publish = false) => {
       const slug = activeSlug || 'default';
@@ -3067,6 +3265,16 @@ export default function Admin() {
       showContinue: true,
       trigger: { ...DEFAULT_TRIGGER_CONFIG },
     };
+    const preferred = getPreferredLocation();
+    if (preferred) {
+      const lat = Number(Number(preferred.lat).toFixed(6));
+      const lng = Number(Number(preferred.lng).toFixed(6));
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        draft.content.lat = lat;
+        draft.content.lng = lng;
+        draft.content.geofenceEnabled = true;
+      }
+    }
     setEditing(draft); setSelected(null); setDirty(true);
   }
   function editExisting(m) {
@@ -3238,11 +3446,12 @@ export default function Admin() {
     setIsDeviceEditorOpen(true);
     setSelectedDevIdx(null);
     setSelectedMissionIdx(null);
-    const baseLat = Number(config.map?.centerLat ?? 44.9778);
-    const baseLng = Number(config.map?.centerLng ?? -93.2650);
+    const preferred = getPreferredLocation();
+    const baseLat = Number.isFinite(preferred?.lat) ? preferred.lat : 44.9778;
+    const baseLng = Number.isFinite(preferred?.lng) ? preferred.lng : -93.265;
     const initial = createDeviceDraft({
-      lat: Number((isFinite(baseLat) ? baseLat : 44.9778).toFixed(6)),
-      lng: Number((isFinite(baseLng) ? baseLng : -93.2650).toFixed(6)),
+      lat: Number(Number(baseLat).toFixed(6)),
+      lng: Number(Number(baseLng).toFixed(6)),
     });
     setDevDraft(initial);
     setDevDraftBaseline(createDeviceDraft({ ...initial }));
@@ -3884,6 +4093,25 @@ export default function Admin() {
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
   const viewConfig = config || fallbackConfig;
+  const globalLocationSeed = useMemo(() => {
+    const storedSetting = activeGameMeta?.settings?.globalLocation;
+    if (storedSetting) {
+      const lat = Number(storedSetting.lat);
+      const lng = Number(storedSetting.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        return { lat, lng };
+      }
+    }
+    const fromConfig = deriveInitialGeo({ data: { config: viewConfig || {} } });
+    if (fromConfig) return fromConfig;
+    try {
+      const stored = getDefaultGeo();
+      if (stored && Number.isFinite(stored.lat) && Number.isFinite(stored.lng)) {
+        return stored;
+      }
+    } catch {}
+    return null;
+  }, [activeGameMeta?.settings?.globalLocation, viewConfig]);
   const isBootstrapping = !suite || !config;
 
   const mapCenter = {
@@ -5422,10 +5650,20 @@ export default function Admin() {
               </div>
             </div>
             <ProjectFlags
-              flags={adminFlags}
-              busy={adminFlagsBusy}
-              error={adminFlagsError}
-              onUpdate={updateAdminFlags}
+              gameEnabled={activeGameMeta?.game_enabled ?? true}
+              defaultChannel={activeGameMeta?.default_channel ?? 'draft'}
+              useLocationAsDefault={Boolean(activeGameMeta?.settings?.useLocationAsDefault)}
+              busy={gameFlagsBusy}
+              error={gameFlagsError}
+              onMirrorChange={(checked) => saveGameFlags({ gameEnabled: checked }).catch(() => {})}
+              onChannelChange={(value) => saveGameFlags({ defaultChannel: value }).catch(() => {})}
+              onUseLocationDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
+            />
+            <GlobalLocationSelector
+              initial={globalLocationSeed}
+              useAsDefault={Boolean(activeGameMeta?.settings?.useLocationAsDefault)}
+              onUseAsDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
+              onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
             />
             <div style={S.titleEditorBlock}>
               <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
@@ -5879,6 +6117,9 @@ export default function Admin() {
             </div>
             <div style={S.settingsFooterTime}>
               {metaDevFooterLine}
+            </div>
+            <div style={{ ...S.settingsFooterTime, fontWeight: 600 }}>
+              Repo: {metaRepoFooterLabel} • Branch: {metaBranchFooterLabel} • Commit: {metaCommitFooterLabel} • Deployment: {metaDeploymentFooterLabel} • Timestamp {metaFooterNowLabel}
             </div>
           </footer>
         </main>
