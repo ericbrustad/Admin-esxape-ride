@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T00:00:00Z
+
+**You:** Move every Settings action into a single dropdown on the upper-left, keep the delete control handy, and surface the game list there so we can open any default quickly.
+
+**GPT:** Collapsed the Settings header buttons into a dropdown menu with save/publish, draft, delete, and scan controls plus an "Open & View" section listing every game, while keeping the Settings footer metadata snapshot untouched.
+
+---
+
 **Timestamp:** 2025-10-30T15:45:00Z
 
 **You:** Codex wants a dedicated defaults editor that stores the draft/published slugs locally but also persists through Supabase when the `app_settings` table exists—plus a quick way to open those defaults from the Play Test tab and a footer snapshot with repo, branch, commit, deployment, and timestamps. Capture the GPT-5 thinking that confirmed the approach.
