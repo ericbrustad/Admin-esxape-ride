@@ -22,7 +22,7 @@
     "alertMinutes": 8
   },
   "textRules": [
-    "Do not unplug the actual market lighting \u2014 use the provided switches.",
+    "Do not unplug the actual market lighting — use the provided switches.",
     "Return the encoded lantern core to storage between bookings."
   ],
   "devices": [
@@ -149,19 +149,19 @@
     ]
   },
   "appearance": {
-    "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
-    "fontSizePx": 23,
-    "fontColor": "#262a58",
-    "textBgColor": "#f4f0ff",
-    "textBgOpacity": 0.7,
-    "screenBgColor": "#e0dcfa",
-    "screenBgOpacity": 0.46,
-    "screenBgImage": "",
+    "fontFamily": "\"Pacifico\", \"Segoe UI\", cursive",
+    "fontSizePx": 28,
+    "fontColor": "#f8fafc",
+    "textBgColor": "#0f172a",
+    "textBgOpacity": 0.58,
+    "screenBgColor": "#0b1120",
+    "screenBgOpacity": 0.62,
+    "screenBgImage": "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1600&q=80",
     "textAlign": "center",
-    "textVertical": "top",
-    "screenBgImageEnabled": false
+    "textVertical": "middle",
+    "screenBgImageEnabled": true
   },
-  "appearanceSkin": "starfield-dawn",
+  "appearanceSkin": "party-neon",
   "appearanceTone": "light",
   "mediaTriggers": {
     "enabled": false,

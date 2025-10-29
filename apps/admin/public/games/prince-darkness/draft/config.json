@@ -26,15 +26,17 @@
     "penaltiesPool": []
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
-    "textBgOpacity": 0,
-    "screenBgColor": "#05030a",
-    "screenBgOpacity": 0.2,
-    "screenBgImage": "",
+    "fontFamily": "\"Creepster\", \"Segoe UI\", cursive",
+    "fontSizePx": 26,
+    "fontColor": "#ffedd5",
+    "textBgColor": "#1b0f1d",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#2a1130",
+    "screenBgOpacity": 0.58,
+    "screenBgImage": "https://images.unsplash.com/photo-1508882668657-372ac7f1d1b1?auto=format&fit=crop&w=1600&q=80",
     "textAlign": "center",
-    "textVertical": "top"
-  }
+    "textVertical": "top",
+    "screenBgImageEnabled": true
+  },
+  "appearanceSkin": "halloween-midnight"
 }
