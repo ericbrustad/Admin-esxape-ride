@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-29T13:42:41Z
+
+**You:** The Settings title box is still pulling the dark theme background and the tags list keeps default/default-game when I switch or rename games. Fix the styling and make sure we only keep the active slug.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, forced the title input onto a clean white background, tightened the tag enforcement so selection/rename resets everything to the current slug (with a DOM fallback for the visible field), and refreshed the helper note accordingly.
+
+---
+
 **Timestamp:** 2025-10-31T06:05:00Z
 
 **You:** Drop the shell-level settings dropdown entirely, surface the saved-games selector inline on the Settings (Global) screen, and keep the repo/branch/commit/deployment snapshot anchored to the bottom so QA still sees the metadata.

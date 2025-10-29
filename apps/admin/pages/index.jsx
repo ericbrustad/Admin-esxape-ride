@@ -688,14 +688,8 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push(normalizedSlug);
     seen.add(normalizedSlug);
   }
-  if (normalizedSlug === 'default') {
-    STARFIELD_DEFAULTS.tags.forEach((tag) => {
-      const key = tag.toLowerCase();
-      if (seen.has(key)) return;
-      cleaned.push(tag);
-      seen.add(key);
-    });
-  }
+  // Legacy defaults like "default-game" are no longer auto-inserted —
+  // keep only the tags explicitly provided by the caller plus the slug itself.
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
   const normalizedCover = typeof game.coverImage === 'string' ? game.coverImage.trim() : '';
@@ -1393,26 +1387,63 @@ export default function Admin() {
 
   const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
 
+  const updateDomGameTagsField = useCallback((slugValue) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const doc = window.document;
+      if (!doc) return;
+      const nextValue = String(slugValue || '').trim();
+      if (!nextValue) return;
+      const fields = Array.from(doc.querySelectorAll('input,textarea'));
+      for (const field of fields) {
+        const name = (field.getAttribute('name') || '').toLowerCase();
+        const aria = (field.getAttribute('aria-label') || '').toLowerCase();
+        const placeholder = (field.getAttribute('placeholder') || '').toLowerCase();
+        const looksLikeTags = name.includes('tag') || aria.includes('game tags') || placeholder.includes('comma') || placeholder.includes('tag');
+        if (!looksLikeTags) continue;
+        if (field.value !== nextValue) {
+          field.value = nextValue;
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          field.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        break;
+      }
+    } catch {}
+  }, []);
+
   const setActiveTagsToOnly = useCallback((slug) => {
-    const normalized = String(slug || '').trim();
-    if (!normalized) return;
-    setGameTagsDraft(normalized);
+    const raw = String(slug || '').trim();
+    if (!raw) return;
+    let canonical = raw.toLowerCase();
     setConfig((prev) => {
       if (!prev) return prev;
-      const nextGame = { ...(prev.game || {}), tags: [normalized] };
-      return normalizeGameMetadata({ ...prev, game: nextGame }, normalized);
+      const base = { ...prev };
+      const nextGame = { ...(base.game || {}), tags: [canonical] };
+      const normalizedConfig = normalizeGameMetadata({ ...base, game: nextGame }, canonical);
+      const resolvedSlug = (normalizedConfig?.game?.slug || canonical).toString();
+      canonical = resolvedSlug;
+      if (normalizedConfig && normalizedConfig.game) {
+        normalizedConfig.game = {
+          ...normalizedConfig.game,
+          tags: [resolvedSlug],
+        };
+      }
+      return normalizedConfig;
     });
+    const slugForUi = canonical;
+    setGameTagsDraft(slugForUi);
+    updateDomGameTagsField(slugForUi);
     try {
       if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setActiveTags === 'function') {
-        window.__ERIX__.setActiveTags([normalized]);
+        window.__ERIX__.setActiveTags([slugForUi]);
       }
     } catch {}
     try {
       if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setTagFilter === 'function') {
-        window.__ERIX__.setTagFilter([normalized]);
+        window.__ERIX__.setTagFilter([slugForUi]);
       }
     } catch {}
-  }, []);
+  }, [updateDomGameTagsField]);
 
   const readDefaultSnapshot = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -4459,7 +4490,7 @@ export default function Admin() {
                 placeholder="default-game, mystery"
               />
               <div style={S.noteText}>
-                The current slug and <code>default-game</code> are enforced automatically.
+                Switching games or saving a new title resets this list to the active slug automatically.
               </div>
             </Field>
             <Field label="Stripe Splash Page">
@@ -5774,8 +5805,11 @@ const S = {
     border: '1px solid var(--admin-border-soft)',
     fontSize: 15,
     fontWeight: 500,
-    color: 'var(--appearance-font-color, var(--admin-body-color))',
-    background: 'var(--admin-panel-bg)',
+    color: '#0f172a',
+    background: '#ffffff',
+    lineHeight: 1.3,
+    boxShadow: 'none',
+    outline: 'none',
   },
   slugWarning: {
     fontSize: 12,
