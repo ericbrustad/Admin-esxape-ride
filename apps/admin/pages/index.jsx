@@ -1109,6 +1109,8 @@ export default function Admin() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [openGameModal, setOpenGameModal] = useState(false);
   const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef(null);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1139,6 +1141,25 @@ export default function Admin() {
     })();
     return ()=> { mounted = false; };
   },[fetchInventory]);
+
+  useEffect(() => {
+    if (!settingsMenuOpen) return undefined;
+    function handlePointer(event) {
+      if (!settingsMenuRef.current) return;
+      if (settingsMenuRef.current.contains(event.target)) return;
+      setSettingsMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('touchstart', handlePointer);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('touchstart', handlePointer);
+    };
+  }, [settingsMenuOpen]);
+
+  useEffect(() => {
+    setSettingsMenuOpen(false);
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3891,6 +3912,154 @@ export default function Admin() {
       {/* SETTINGS */}
       {tab==='settings' && (
         <main style={S.wrap}>
+          <div style={S.settingsMenuBar}>
+            <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
+              <button
+                type="button"
+                style={{
+                  ...S.settingsMenuButton,
+                  ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
+                }}
+                onClick={() => setSettingsMenuOpen((open) => !open)}
+              >
+                Settings Menu {settingsMenuOpen ? '▴' : '▾'}
+              </button>
+              {settingsMenuOpen && (
+                <div style={S.settingsMenuDropdown}>
+                  <div style={S.settingsMenuSectionLabel}>Actions</div>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(openNewGameModal)}
+                  >
+                    ➕ New Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() =>
+                      runSettingsMenuAction(() => {
+                        setOpenGameModal(true);
+                        refreshGamesIndex();
+                      })
+                    }
+                  >
+                    📂 Open Game
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() =>
+                      runSettingsMenuAction(() => {
+                        setOpenGameModal(true);
+                        refreshGamesIndex();
+                        if (typeof setEditChannel === 'function') setEditChannel('draft');
+                      })
+                    }
+                  >
+                    📁 Open Draft
+                  </button>
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(ensureDraftFromCurrent)}
+                  >
+                    📝 New Draft
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveDraftNow)}
+                  >
+                    💾 Save Draft
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveGamePublished)}
+                  >
+                    💾 Save Game
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(publishNow)}
+                  >
+                    🚀 Publish Game
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saveBusy}
+                    style={{
+                      ...S.settingsMenuItem,
+                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+                    }}
+                    onClick={() => runSettingsMenuAction(saveDraftThenPublish)}
+                  >
+                    🚀 Save & Publish Draft
+                  </button>
+                  {gameEnabled && (
+                    <button
+                      type="button"
+                      style={{ ...S.settingsMenuItem, ...S.settingsMenuDanger }}
+                      onClick={() =>
+                        runSettingsMenuAction(() => {
+                          setConfirmDeleteOpen(true);
+                        })
+                      }
+                    >
+                      🗑 Delete Game
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={S.settingsMenuItem}
+                    onClick={() => runSettingsMenuAction(scanProject)}
+                  >
+                    🔎 Scan Media Usage
+                  </button>
+                  <div style={S.settingsMenuDivider} />
+                  <div style={S.settingsMenuSectionLabel}>Open & View</div>
+                  {settingsMenuGames.map((entry) => (
+                    <button
+                      key={`${entry.slug}::${entry.channel}`}
+                      type="button"
+                      style={{
+                        ...S.settingsMenuItem,
+                        ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
+                      }}
+                      onClick={() =>
+                        runSettingsMenuAction(() => {
+                          setActiveSlug(entry.slug);
+                          if (entry.channel === 'published') {
+                            setEditChannel('published');
+                          } else {
+                            setEditChannel('draft');
+                          }
+                          setTab('settings');
+                          setStatus(`Opened ${entry.label}`);
+                        })
+                      }
+                    >
+                      {entry.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
             <div style={S.gameTitleRow}>
@@ -4855,6 +5024,90 @@ const S = {
   settingsFooterTime: {
     fontSize: 12,
     color: 'var(--admin-muted)',
+  },
+  settingsMenuWrap: {
+    position: 'fixed',
+    top: 16,
+    right: 16,
+    display: 'inline-block',
+    zIndex: 1200,
+  },
+  settingsMenuButton: {
+    padding: '10px 16px',
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-panel-bg)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    cursor: 'pointer',
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    boxShadow: 'var(--admin-glass-sheen)',
+    transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+  },
+  settingsMenuButtonActive: {
+    background: 'var(--admin-tab-active-bg)',
+    borderColor: 'var(--admin-accent, rgba(59, 130, 246, 0.6))',
+    boxShadow: '0 16px 28px rgba(15, 23, 42, 0.28)',
+  },
+  settingsMenuDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 12px)',
+    right: 0,
+    left: 'auto',
+    minWidth: 260,
+    padding: 12,
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, rgba(15, 23, 42, 0.9))',
+    boxShadow: '0 24px 36px rgba(15, 23, 42, 0.45)',
+    display: 'grid',
+    gap: 6,
+    zIndex: 60,
+  },
+  settingsMenuSectionLabel: {
+    fontSize: 11,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+    fontWeight: 700,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  settingsMenuItem: {
+    width: '100%',
+    borderRadius: 10,
+    border: '1px solid transparent',
+    background: 'transparent',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    textAlign: 'left',
+    padding: '8px 10px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    transition: 'background 0.2s ease, color 0.2s ease, border-color 0.2s ease',
+  },
+  settingsMenuItemDisabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+  settingsMenuItemActive: {
+    background: 'rgba(59, 130, 246, 0.18)',
+    borderColor: 'rgba(59, 130, 246, 0.45)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  settingsMenuDanger: {
+    background: 'rgba(153, 27, 27, 0.32)',
+    borderColor: 'rgba(239, 68, 68, 0.65)',
+    color: '#fecaca',
+  },
+  settingsMenuDivider: {
+    margin: '8px 0',
+    borderTop: '1px solid var(--admin-border-soft)',
   },
   header: {
     padding: 20,
