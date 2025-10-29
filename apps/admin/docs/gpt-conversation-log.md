@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T04:45:00Z
+
+**You:** Replace the in-page settings dropdown with a global top-right menu across every admin screen, keep the Save & Publish wording, surface separate selectors for published games and drafts with transparent styling, and make sure the delete and refresh controls still work while the footer keeps the repo snapshot.
+
+**GPT:** Introduced a shared `AdminSettingsRoot` that mounts once via `_app.jsx`, renders a streamlined `SettingsMenu` wrapper plus the new `GameSelect` selectors, wires them into the existing bridge for open/save/delete/refresh actions, exposes a publish API fallback, and verified the metadata footer remains intact.
+
+---
+
 **Timestamp:** 2025-10-31T00:00:00Z
 
 **You:** Move every Settings action into a single dropdown on the upper-left, keep the delete control handy, and surface the game list there so we can open any default quickly.

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
-import HideLegacyButtons from '../components/HideLegacyButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
@@ -1731,7 +1730,6 @@ export default function Admin() {
   }
 
   async function runSettingsMenuAction(action) {
-    setSettingsMenuOpen(false);
     if (typeof action !== 'function') return;
     try {
       const result = action();
@@ -1743,7 +1741,7 @@ export default function Admin() {
     }
   }
 
-  async function reloadGamesList() {
+  const reloadGamesList = useCallback(async () => {
     if (!gameEnabled) {
       setGames([]);
       setGamesIndex({ bySlug: {}, count: 0 });
@@ -1754,7 +1752,7 @@ export default function Admin() {
       const j = await r.json();
       if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
     } catch {}
-  }
+  }, [gameEnabled]);
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
@@ -2564,11 +2562,23 @@ export default function Admin() {
       );
       applyOpenGameFromMenu(slug, normalized, match?.label);
     };
+    bridge.deleteGame = (entry) => {
+      if (entry && entry.slug && entry.slug !== activeSlug) {
+        const normalized = entry.channel === 'published'
+          ? 'published'
+          : entry.channel === 'default'
+          ? 'default'
+          : 'draft';
+        applyOpenGameFromMenu(entry.slug, normalized, entry.label);
+      }
+      setConfirmDeleteOpen(true);
+    };
+    bridge.reloadGames = () => reloadGamesList();
     bridge.getState = () => ({ ...detail });
     window.__esxSettingsBridge = bridge;
     window.dispatchEvent(new CustomEvent('esx:settings:state', { detail }));
     return () => {};
-  }, [activeSlug, editChannel, saveBusy, settingsMenuGames, applyOpenGameFromMenu, saveDraftThenPublish]);
+  }, [activeSlug, editChannel, saveBusy, settingsMenuGames, applyOpenGameFromMenu, saveDraftThenPublish, reloadGamesList]);
   const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
@@ -2916,53 +2926,7 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <HideLegacyButtons />
-      <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
-        <button
-          type="button"
-          style={{
-            ...S.settingsMenuButton,
-            ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
-          }}
-          onClick={() => setSettingsMenuOpen((open) => !open)}
-        >
-          Settings Menu {settingsMenuOpen ? '▴' : '▾'}
-        </button>
-        {settingsMenuOpen && (
-          <div style={S.settingsMenuDropdown}>
-            <div style={S.settingsMenuSectionLabel}>Actions</div>
-            <button
-              type="button"
-              disabled={saveBusy}
-              style={{
-                ...S.settingsMenuItem,
-                ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-              }}
-              onClick={() => runSettingsMenuAction(() => saveDraftThenPublish())}
-            >
-              🚀 Save &amp; Publish Game
-            </button>
-            <div style={S.settingsMenuDivider} />
-            <div style={S.settingsMenuSectionLabel}>Open &amp; View</div>
-            {settingsMenuGames.map((entry) => (
-              <button
-                key={`${entry.slug}::${entry.channel}`}
-                type="button"
-                style={{
-                  ...S.settingsMenuItem,
-                  ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
-                }}
-                onClick={() =>
-                  runSettingsMenuAction(() =>
-                    applyOpenGameFromMenu(entry.slug, entry.channel, entry.label),
-                  )
-                }
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Settings menu rendered globally via AdminSettingsRoot */}
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
