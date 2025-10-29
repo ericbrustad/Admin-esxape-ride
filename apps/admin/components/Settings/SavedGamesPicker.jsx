@@ -10,8 +10,8 @@ export default function SavedGamesPicker({ games = [], value, onChange }) {
   const drafts = games.filter(g => (g.channel || '').toLowerCase() !== 'published');
 
   return (
-    <div style={{ display: 'grid', gap: 6 }}>
-      <label style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>Saved Games</label>
+    <div style={{ display: 'grid', gap: 8 }}>
+      <label style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>Saved Games</label>
       <select
         value={value || ''}
         onChange={(e) => onChange?.(e.target.value)}
@@ -21,6 +21,7 @@ export default function SavedGamesPicker({ games = [], value, onChange }) {
           border: '1px solid rgba(15,23,42,0.12)',
           background: 'white',
           fontSize: 13,
+          color: '#0f172a',
         }}
       >
         <optgroup label="Published">
@@ -38,7 +39,7 @@ export default function SavedGamesPicker({ games = [], value, onChange }) {
           ))}
         </optgroup>
       </select>
-      <div style={{ fontSize: 12, color: '#64748b' }}>
+      <div style={{ fontSize: 12, color: '#0f172a' }}>
         Contains all games (Published and Draft).
       </div>
     </div>

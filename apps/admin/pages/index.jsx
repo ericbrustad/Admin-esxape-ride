@@ -7,6 +7,7 @@ import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
 import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
+import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -2599,6 +2600,12 @@ export default function Admin() {
 
   const savedGamesValue = `${activeSlug || 'default'}:${savedGamesChannel}`;
 
+  useEffect(() => {
+    if (tab !== 'settings' && confirmDeleteOpen) {
+      setConfirmDeleteOpen(false);
+    }
+  }, [tab, confirmDeleteOpen]);
+
   const applyOpenGameFromMenu = useCallback(
     (slug, channel = 'draft', label = '') => {
       if (!slug) return;
@@ -2992,6 +2999,7 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
+      <HideLegacyStatusToggles />
       <div style={S.headerShell}>
         <HeaderBar
           iconUrl={headerCoverThumb}
@@ -3952,11 +3960,33 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteOpen(false);
+                    openNewGameModal();
+                  }}
+                  style={{
+                    fontSize: 13,
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(99,102,241,0.4)',
+                    background: 'linear-gradient(135deg, rgba(168,85,247,.08), rgba(99,102,241,.08))',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: '#1e1b4b',
+                  }}
+                >
+                  + New Game
+                </button>
+              </div>
               <SavedGamesPicker
                 games={savedGamesList}
                 value={savedGamesValue}
                 onChange={(val) => {
+                  setConfirmDeleteOpen(false);
                   const [slug, channel] = String(val || '').split(':');
                   if (!slug) return;
                   const normalized = channel === 'published' ? 'published' : 'draft';
@@ -3969,6 +3999,80 @@ export default function Admin() {
                   applyOpenGameFromMenu(slug, normalized, label);
                 }}
               />
+              <div>
+                {confirmDeleteOpen ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: 12,
+                      borderRadius: 12,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: '#0f172a', flex: '1 1 auto' }}>
+                      Are you sure you want to delete “{headerGameTitle}”? 
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteOpen(false);
+                        void reallyDeleteGame();
+                      }}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(239,68,68,0.5)',
+                        background: 'rgba(239,68,68,0.12)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        color: '#7f1d1d',
+                      }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteOpen(false)}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(15,23,42,0.12)',
+                        background: 'white',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logConversation('You', 'Opened delete confirmation for current game');
+                      setConfirmDeleteOpen(true);
+                    }}
+                    style={{
+                      fontSize: 13,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      color: '#7f1d1d',
+                    }}
+                  >
+                    Delete Current Game
+                  </button>
+                )}
+              </div>
             </div>
             <div style={S.gameTitleRow}>
               <div style={S.readonlyField}>
@@ -4663,27 +4767,6 @@ export default function Admin() {
                   {newGameBusy ? 'Creating…' : 'Save New Game'}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirm modal */}
-      {gameEnabled && confirmDeleteOpen && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'var(--admin-body-color)', marginBottom:12 }}>
-              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
-            </div>
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={reallyDeleteGame}
-              >
-                Delete
-              </button>
             </div>
           </div>
         </div>

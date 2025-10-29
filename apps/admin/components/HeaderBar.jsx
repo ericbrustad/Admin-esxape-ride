@@ -50,7 +50,6 @@ export default function HeaderBar({
             <button type="button" style={S.action} onClick={() => onGo('assigned')}>Assigned Media</button>
             <button type="button" style={S.action} onClick={() => onGo('media')}>Media Pool</button>
             <div style={S.railSpacer} />
-            <button type="button" style={S.cta} onClick={() => onGo('new')}>+ New Game</button>
             <button type="button" style={S.safe} onClick={() => onGo('save')}>Save Draft</button>
             <button type="button" style={S.publish} onClick={() => onGo('publish')}>Publish Now</button>
           </div>
@@ -103,16 +102,6 @@ const styles = {
     background: 'white',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
-  },
-  cta: {
-    fontSize: 12,
-    padding: '6px 12px',
-    borderRadius: 12,
-    border: '1px solid rgba(99,102,241,0.4)',
-    background: 'linear-gradient(135deg, rgba(168,85,247,.08), rgba(99,102,241,.08))',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    fontWeight: 600,
   },
   safe: {
     fontSize: 12,
