@@ -1,6 +1,6 @@
 {
   "id": "msuite_esx",
-  "version": "0.6.25",
+  "version": "0.6.26",
   "flow": {
     "mode": "linear",
     "start": "m01"
@@ -8,20 +8,20 @@
   "missions": [
     {
       "id": "m01",
-      "title": "New Mission",
+      "title": "Shadowed Arrival",
       "type": "short_answer",
       "rewards": {
         "points": 25
       },
       "content": {
-        "question": "hi",
-        "answer": "hello",
-        "acceptable": "yes",
+        "question": "Where do the couriers say the Prince vanished?",
+        "answer": "clocktower",
+        "acceptable": "the clocktower",
         "mediaUrl": "",
         "geofenceEnabled": true,
-        "lat": 39.147904,
-        "lng": -95.510221,
-        "radiusMeters": 25,
+        "lat": 44.9778,
+        "lng": -93.2650,
+        "radiusMeters": 35,
         "cooldownSeconds": 30
       },
       "appearanceOverrideEnabled": false

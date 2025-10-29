@@ -2,6 +2,38 @@
 
 ---
 
+**Timestamp:** 2025-10-29T15:56:06Z
+
+**You:** Replace every `workspace:` reference for Supabase with a plain semver so Yarn 1 on Vercel installs cleanly.
+
+**GPT:** Swapped the admin workspace and root manifests to depend on `@supabase/supabase-js` via `^2.45.4`, keeping ChatGPT-5 looped in through this log and readying a retest once Yarn reinstalls.
+
+---
+
+**Timestamp:** 2025-10-31T10:45:00Z
+
+**You:** Codex noted the legacy Draft/Published hider was nuking the new header actions—add a scoped header id and keep the helper from touching anything inside it.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, tagged the `HeaderBar` root with an `id`/`data-ui` hook, updated the legacy toggle hider to ignore elements inside that container while limiting the hide sweep to the old top-left region, and rechecked the header actions to ensure they remain visible.
+
+---
+
+**Timestamp:** 2025-10-31T09:10:00Z
+
+**You:** Add global Update / Save & Publish controls to the admin header, capture full game snapshots for Supabase, and make sure ChatGPT-5 thinking signs off on the wiring.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, added Supabase-backed save-full and save-and-publish API routes, exposed the new header actions that trigger the snapshot workflow, and verified the Settings footer metadata remains intact.
+
+---
+
+**Timestamp:** 2025-10-29T13:42:41Z
+
+**You:** The Settings title box is still pulling the dark theme background and the tags list keeps default/default-game when I switch or rename games. Fix the styling and make sure we only keep the active slug.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, forced the title input onto a clean white background, tightened the tag enforcement so selection/rename resets everything to the current slug (with a DOM fallback for the visible field), and refreshed the helper note accordingly.
+
+---
+
 **Timestamp:** 2025-10-31T06:05:00Z
 
 **You:** Drop the shell-level settings dropdown entirely, surface the saved-games selector inline on the Settings (Global) screen, and keep the repo/branch/commit/deployment snapshot anchored to the bottom so QA still sees the metadata.
@@ -201,3 +233,33 @@
 **You:** Codex called out that the global Settings dropdown should go away in favor of an inline Saved Games selector—keep the bridge hiding buttons, and confirm ChatGPT-5 is aware.
 
 **GPT:** Removed the shell-level Settings menu, left the bridge active to suppress the legacy controls, and added a dedicated Settings page section with the all-games dropdown so the team (and ChatGPT-5) can switch titles without the global menu.
+
+---
+
+**Timestamp:** 2025-10-29T13:50:14Z
+
+**You:** Ensure the admin workspace ships with Supabase v2.45.4 available and provide a shared client helper so ChatGPT-5 can confirm imports resolve.
+
+**GPT:** Bumped @supabase/supabase-js to ^2.45.4 for the admin workspace, added a supabaseClient helper exposing browser/server creators, and confirmed build tooling still reports the missing dependency issue for visibility to Codex and ChatGPT-5.
+
+---
+
+**Timestamp:** 2025-10-29T16:18:17Z
+
+**You:** Restore the legacy draft games so they reappear in the Saved Games dropdown and make sure ChatGPT-5 logs the fix.
+
+**GPT:** Rebuilt the missing draft configs, repopulated games/index.json with the legacy titles marked as drafts, and noted the change here so ChatGPT-5 tracks the restored catalog.
+---
+
+**Timestamp:** 2025-10-31T19:30:00Z
+
+**You:** Supabase upserts are failing on environments pinned to v1—give me a helper that works on v1 and v2, and update every save endpoint to use it.
+
+**GPT:** Added a shared `upsertReturning` helper that detects `.select()` support, refactored `api/save` plus the new full/publish endpoints to rely on it, and confirmed the admin build still succeeds so ChatGPT-5 can track the compatibility fix.
+---
+
+**Timestamp:** 2025-10-31T22:10:00Z
+
+**You:** Add project-level toggles so we can flip the Game mirror and set the default new-game channel, surface a Draft/Live switch inside the New Game modal, and make sure legacy titles like Prince Darkness return to the Saved Games list. Loop ChatGPT-5 into the change log.
+
+**GPT:** Shipped Supabase-backed admin flags with a Settings panel toggle, wired the New Game workflow to honor Draft vs. Live on create, restored Prince Darkness draft assets plus index entries, and logged the work here so ChatGPT-5 stays in the loop.

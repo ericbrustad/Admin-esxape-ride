@@ -1,11 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-function serverClient() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Missing Supabase configuration');
-  return createClient(url, key, { auth: { persistSession: false } });
-}
+import { serverClient } from '../../lib/supabaseClient';
 
 function normalizeChannel(value, fallback = 'draft') {
   const raw = typeof value === 'string' ? value : Array.isArray(value) ? value[0] : fallback;

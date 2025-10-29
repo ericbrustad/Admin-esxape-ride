@@ -1,7 +1,7 @@
 {
   "name": "admin-esxape-ride",
   "private": true,
-  "packageManager": "yarn@4.9.4",
+  "packageManager": "yarn@1.22.19",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,7 +11,7 @@
   },
   "volta": {
     "node": "22.11.0",
-    "yarn": "4.9.4"
+    "yarn": "1.22.19"
   },
   "scripts": {
     "vercel:info": "node tools/vercel-info.mjs",
@@ -23,5 +23,8 @@
   },
   "devDependencies": {
     "turbo": "^2.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
   }
 }

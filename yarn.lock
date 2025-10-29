@@ -23,7 +23,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-//"esx-admin-control-panel-map@workspace:apps/admin":
+"esx-admin-control-panel-map@workspace:apps/admin":
   version: 1.2.1
   resolution: "esx-admin-control-panel-map@workspace:apps/admin"
   dependencies:
@@ -31,4 +31,4 @@ __metadata:
     react: 18.2.0
     react-dom: 18.2.0
   languageName: unknown
-  linkType: soft//
+  linkType: soft
