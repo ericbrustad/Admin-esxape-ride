@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T19:15:00Z
+
+**You:** Research the legacy skins and bring back the forest, military, metal, and holiday theme pack instead of leaving every skin on Starfield Dawn.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, restored the archived chrome/forest/military presets, added new ocean, spooky, and holiday variations with remote art so no binaries land in Git, and rechecked the admin appearance picker to ensure the CSS variables apply cleanly.
+
+---
+
 **Timestamp:** 2025-10-29T15:56:06Z
 
 **You:** Replace every `workspace:` reference for Supabase with a plain semver so Yarn 1 on Vercel installs cleanly.
