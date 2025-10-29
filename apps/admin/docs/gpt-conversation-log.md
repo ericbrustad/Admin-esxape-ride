@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T05:15:00Z
+
+**You:** Codex spotted that `_app.jsx` still lacked the global bridge and `index.jsx` referenced `HideLegacyButtons` without importing it. Apply the suggested patches so the settings dropdown works everywhere without crashing, then confirm the metadata footer stays intact.
+
+**GPT:** Added a shared `settingsBridge` installer that hides legacy buttons and wires the save/publish and open-game events for every route, removed the stray `<HideLegacyButtons />` call from `index.jsx`, refreshed `_app.jsx` to mount the bridge globally, and rechecked the footer snapshot to ensure the repo metadata still renders at the bottom of Settings.
+
+---
+
 **Timestamp:** 2025-10-31T04:45:00Z
 
 **You:** Replace the in-page settings dropdown with a global top-right menu across every admin screen, keep the Save & Publish wording, surface separate selectors for published games and drafts with transparent styling, and make sure the delete and refresh controls still work while the footer keeps the repo snapshot.

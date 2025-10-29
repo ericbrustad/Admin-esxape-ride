@@ -2925,7 +2925,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <HideLegacyButtons />
       {/* Settings menu rendered globally via AdminSettingsRoot */}
       <header style={headerStyle}>
         <div style={S.wrap}>
