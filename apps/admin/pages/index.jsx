@@ -7,6 +7,7 @@ import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
 import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
+import ProjectFlags from '../components/Settings/ProjectFlags.jsx';
 import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
@@ -17,6 +18,8 @@ import {
   DEFAULT_APPEARANCE_SKIN,
 } from '../lib/admin-shared';
 import { GAME_ENABLED } from '../lib/game-switch';
+import { useAdminFlags } from '../lib/adminFlags.js';
+import { createNewGame } from '../lib/games/createNewGame.js';
 import { nextMissionId, nextDeviceId } from '../lib/ids.js';
 
 /* ───────────────────────── Helpers ───────────────────────── */
@@ -719,7 +722,8 @@ const DEFAULT_SNAPSHOT_KEY = 'erix.defaultOriginalSnapshot';
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
-  const gameEnabled = GAME_ENABLED;
+  const { flags: adminFlags, busy: adminFlagsBusy, error: adminFlagsError, update: updateAdminFlags } = useAdminFlags();
+  const [gameEnabled, setGameEnabled] = useState(GAME_ENABLED);
   const [tab, setTab] = useState('missions');
 
   const [adminMeta, setAdminMeta] = useState(ADMIN_META_INITIAL_STATE);
@@ -744,9 +748,25 @@ export default function Admin() {
   const [newGameStatus, setNewGameStatus] = useState('');
   const [newGameBusy, setNewGameBusy] = useState(false);
   const [newCoverDropActive, setNewCoverDropActive] = useState(false);
+  const newGameChannelDefaultRef = useRef('draft');
+  const [newGameChannel, setNewGameChannel] = useState('draft');
   const newGameCoverInputRef = useRef(null);
   const newGameSlugSeed = useRef('');
   const newGameSlugEdited = useRef(false);
+
+  useEffect(() => {
+    if (!adminFlags) return;
+    if (typeof adminFlags.game_enabled === 'boolean') {
+      setGameEnabled(Boolean(adminFlags.game_enabled));
+    }
+    if (adminFlags.new_game_default_channel) {
+      const normalized = adminFlags.new_game_default_channel === 'published' ? 'published' : 'draft';
+      newGameChannelDefaultRef.current = normalized;
+      if (!showNewGame) {
+        setNewGameChannel(normalized);
+      }
+    }
+  }, [adminFlags, showNewGame]);
 
   const [suite, setSuite] = useState(null);
   const [config, setConfig] = useState(null);
@@ -899,6 +919,7 @@ export default function Admin() {
     updateNewGameStatus('', 'info');
     setNewGameBusy(false);
     setNewCoverDropActive(false);
+    setNewGameChannel(newGameChannelDefaultRef.current);
     if (newGameCoverInputRef.current) newGameCoverInputRef.current.value = '';
   }
 
@@ -909,6 +930,7 @@ export default function Admin() {
       : '⚠️ Game project is disabled. New titles may not sync.';
     updateNewGameStatus(message, gameEnabled ? 'info' : 'danger');
     logConversation('GPT', message);
+    setNewGameChannel(newGameChannelDefaultRef.current);
     setShowNewGame(true);
   }, [gameEnabled, logConversation]);
 
@@ -1013,7 +1035,8 @@ export default function Admin() {
     }
 
     setNewGameBusy(true);
-    updateNewGameStatus('Creating game…', 'info');
+    const channelLabel = newGameChannel === 'published' ? 'Publishing new game…' : 'Creating draft game…';
+    updateNewGameStatus(channelLabel, 'info');
 
     try {
       let coverPath = newCoverSelectedUrl;
@@ -1040,25 +1063,25 @@ export default function Admin() {
         appearanceTone: (config?.appearanceTone || 'light')
       };
 
-      const res = await fetch('/api/games?channel=draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ slug: slugInput, title, type: newType, config: freshConfig })
+      const createdSlug = await createNewGame({
+        title,
+        slug: slugInput,
+        channel: newGameChannel,
+        config: freshConfig,
       });
-      const data = await res.json().catch(()=>({ok:false}));
-      if (!res.ok || data.ok === false) throw new Error(data?.error || 'create failed');
-
-      const newSlug = data.slug || slugInput;
 
       // ⚠️ Switch to the NEW game first (prevents writing new slug into default tags)
-      setActiveSlug(newSlug);
+      setActiveSlug(createdSlug);
+      setEditChannel(newGameChannel === 'published' ? 'published' : 'draft');
       setTab('settings');
 
       // Refresh the Saved Games dropdown
       await reloadGamesList();
 
-      setStatus(`✅ Created game “${title}”`);
+      const successLabel = newGameChannel === 'published'
+        ? `✅ Created & published “${title}”`
+        : `✅ Created draft “${title}”`;
+      setStatus(successLabel);
       updateNewGameStatus('✅ Game created! Loading…', 'success');
       handleNewGameModalClose();
     } catch (err) {
@@ -4432,6 +4455,12 @@ export default function Admin() {
                 )}
               </div>
             </div>
+            <ProjectFlags
+              flags={adminFlags}
+              busy={adminFlagsBusy}
+              error={adminFlagsError}
+              onUpdate={updateAdminFlags}
+            />
             <div style={S.titleEditorBlock}>
               <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
               <input
@@ -5045,6 +5074,31 @@ export default function Admin() {
                 </div>
                 <div style={S.noteText}>
                   Example path: <code>/public/games/{newGameSlug || 'your-slug'}</code>
+                </div>
+              </Field>
+              <Field label="Initial Channel">
+                <div style={{ display:'flex', gap:16, flexWrap:'wrap', alignItems:'center' }}>
+                  <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                    <input
+                      type="radio"
+                      name="new-game-channel"
+                      checked={newGameChannel === 'draft'}
+                      onChange={() => setNewGameChannel('draft')}
+                    />
+                    Draft
+                  </label>
+                  <label style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                    <input
+                      type="radio"
+                      name="new-game-channel"
+                      checked={newGameChannel === 'published'}
+                      onChange={() => setNewGameChannel('published')}
+                    />
+                    Live (Publish)
+                  </label>
+                </div>
+                <div style={S.noteText}>
+                  Draft keeps the game private; Live publishes immediately using the latest snapshot.
                 </div>
               </Field>
               <Field label="Game Type">

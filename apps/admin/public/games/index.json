@@ -78,5 +78,15 @@
     "shortDescription": "A quick pursuit scenario tuned for live testing with the ops team.",
     "channel": "draft",
     "createdAt": "2024-01-16T09:00:00.000Z"
+  },
+  {
+    "slug": "prince-darkness",
+    "title": "Prince Darkness",
+    "type": "Horror",
+    "mode": "single",
+    "coverImage": "",
+    "shortDescription": "Uncover the vanished heir before the eclipse seals the capital in shadow.",
+    "channel": "draft",
+    "createdAt": "2024-01-17T09:00:00.000Z"
   }
 ]

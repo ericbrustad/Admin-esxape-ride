@@ -256,3 +256,10 @@
 **You:** Supabase upserts are failing on environments pinned to v1—give me a helper that works on v1 and v2, and update every save endpoint to use it.
 
 **GPT:** Added a shared `upsertReturning` helper that detects `.select()` support, refactored `api/save` plus the new full/publish endpoints to rely on it, and confirmed the admin build still succeeds so ChatGPT-5 can track the compatibility fix.
+---
+
+**Timestamp:** 2025-10-31T22:10:00Z
+
+**You:** Add project-level toggles so we can flip the Game mirror and set the default new-game channel, surface a Draft/Live switch inside the New Game modal, and make sure legacy titles like Prince Darkness return to the Saved Games list. Loop ChatGPT-5 into the change log.
+
+**GPT:** Shipped Supabase-backed admin flags with a Settings panel toggle, wired the New Game workflow to honor Draft vs. Live on create, restored Prince Darkness draft assets plus index entries, and logged the work here so ChatGPT-5 stays in the loop.
