@@ -1110,6 +1110,8 @@ export default function Admin() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [openGameModal, setOpenGameModal] = useState(false);
   const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef(null);
 
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
@@ -1140,6 +1142,25 @@ export default function Admin() {
     })();
     return ()=> { mounted = false; };
   },[fetchInventory]);
+
+  useEffect(() => {
+    if (!settingsMenuOpen) return undefined;
+    function handlePointer(event) {
+      if (!settingsMenuRef.current) return;
+      if (settingsMenuRef.current.contains(event.target)) return;
+      setSettingsMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('touchstart', handlePointer);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('touchstart', handlePointer);
+    };
+  }, [settingsMenuOpen]);
+
+  useEffect(() => {
+    setSettingsMenuOpen(false);
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1701,6 +1722,24 @@ export default function Admin() {
       logConversation('GPT', `Publish failed for ${slug}: ${message}`);
     } finally {
       setSaveBusy(false);
+    }
+  }
+
+  async function saveDraftThenPublish() {
+    await saveDraftNow();
+    await publishNow();
+  }
+
+  async function runSettingsMenuAction(action) {
+    setSettingsMenuOpen(false);
+    if (typeof action !== 'function') return;
+    try {
+      const result = action();
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+    } catch (error) {
+      console.error('Settings menu action failed', error);
     }
   }
 
@@ -2465,6 +2504,71 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+  const settingsMenuGames = useMemo(() => {
+    const entries = [
+      {
+        slug: 'default',
+        channel: 'default',
+        label: `${STARFIELD_DEFAULTS.title} (default)`,
+      },
+    ];
+    const seen = new Set(entries.map((entry) => `${entry.slug}::${entry.channel}`));
+    if (Array.isArray(games)) {
+      games.forEach((game) => {
+        if (!game || !game.slug) return;
+        const channel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+        const key = `${game.slug}::${channel}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        entries.push({
+          slug: game.slug,
+          channel,
+          label: `${game.title || game.slug} (${channel})`,
+        });
+      });
+    }
+    return entries;
+  }, [games]);
+
+  const applyOpenGameFromMenu = useCallback(
+    (slug, channel = 'draft', label = '') => {
+      if (!slug) return;
+      const normalized = channel === 'published' ? 'published' : slug === 'default' ? 'default' : 'draft';
+      const nextChannel = normalized === 'default' ? 'draft' : normalized;
+      setActiveSlug(slug);
+      setEditChannel(nextChannel);
+      setTab('settings');
+      const displayLabel = label || `${slug} (${normalized === 'default' ? 'default' : nextChannel})`;
+      setStatus(`Opened ${displayLabel}`);
+    },
+    [setActiveSlug, setEditChannel, setTab, setStatus],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const normalizedChannel = editChannel === 'published' ? 'published' : 'draft';
+    const detail = {
+      slug: activeSlug || 'default',
+      channel: normalizedChannel,
+      games: settingsMenuGames,
+      saving: saveBusy,
+    };
+    const bridge = window.__esxSettingsBridge || {};
+    bridge.saveAndPublish = () => {
+      runSettingsMenuAction(() => saveDraftThenPublish());
+    };
+    bridge.openGame = (slug, channel) => {
+      const normalized = channel === 'published' ? 'published' : channel === 'default' ? 'default' : 'draft';
+      const match = settingsMenuGames.find(
+        (entry) => entry.slug === slug && (entry.channel === normalized || (normalized === 'draft' && entry.channel === 'default')),
+      );
+      applyOpenGameFromMenu(slug, normalized, match?.label);
+    };
+    bridge.getState = () => ({ ...detail });
+    window.__esxSettingsBridge = bridge;
+    window.dispatchEvent(new CustomEvent('esx:settings:state', { detail }));
+    return () => {};
+  }, [activeSlug, editChannel, saveBusy, settingsMenuGames, applyOpenGameFromMenu, saveDraftThenPublish]);
   const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
@@ -2812,6 +2916,53 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <HideLegacyButtons />
+      <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
+        <button
+          type="button"
+          style={{
+            ...S.settingsMenuButton,
+            ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
+          }}
+          onClick={() => setSettingsMenuOpen((open) => !open)}
+        >
+          Settings Menu {settingsMenuOpen ? '▴' : '▾'}
+        </button>
+        {settingsMenuOpen && (
+          <div style={S.settingsMenuDropdown}>
+            <div style={S.settingsMenuSectionLabel}>Actions</div>
+            <button
+              type="button"
+              disabled={saveBusy}
+              style={{
+                ...S.settingsMenuItem,
+                ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+              }}
+              onClick={() => runSettingsMenuAction(() => saveDraftThenPublish())}
+            >
+              🚀 Save &amp; Publish Game
+            </button>
+            <div style={S.settingsMenuDivider} />
+            <div style={S.settingsMenuSectionLabel}>Open &amp; View</div>
+            {settingsMenuGames.map((entry) => (
+              <button
+                key={`${entry.slug}::${entry.channel}`}
+                type="button"
+                style={{
+                  ...S.settingsMenuItem,
+                  ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
+                }}
+                onClick={() =>
+                  runSettingsMenuAction(() =>
+                    applyOpenGameFromMenu(entry.slug, entry.channel, entry.label),
+                  )
+                }
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2871,82 +3022,11 @@ export default function Admin() {
                 })}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button type="button" style={S.button} onClick={openNewGameModal}>
-                    New Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={() => {
-                      setOpenGameModal(true);
-                      refreshGamesIndex();
-                    }}
-                  >
-                    Open Game
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...S.button, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    onClick={saveGamePublished}
-                    disabled={saveBusy}
-                    title="Save current slug to channel=published"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save Game'}
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    onClick={publishNow}
-                    disabled={saveBusy}
-                  >
-                    {saveBusy ? 'Publishing…' : 'Publish Game'}
-                  </button>
+              {tab !== 'settings' && (
+                <div style={{ marginTop: 12, color: 'var(--admin-muted)', fontSize: 13 }}>
+                  Use the Settings Menu in the top-right corner to create, open, save, or publish games.
                 </div>
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={ensureDraftFromCurrent}
-                    title="Create or refresh a draft row for this slug"
-                  >
-                    New Draft
-                  </button>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={() => {
-                      setOpenGameModal(true);
-                      refreshGamesIndex();
-                    }}
-                  >
-                    Open Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveDraftNow}
-                    disabled={saveBusy}
-                    style={{ ...S.button, ...S.buttonSuccess, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    title="Save current changes to the draft channel"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save Draft'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await saveDraftNow();
-                      await publishNow();
-                    }}
-                    disabled={saveBusy}
-                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    title="Save draft first, then publish to players"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save & Publish Draft'}
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
             {gameEnabled && (
               <div style={S.headerNavSecondary}>
@@ -3955,7 +4035,7 @@ export default function Admin() {
                 ))}
               </select>
               <div style={S.noteText}>
-                Switch to another saved escape ride. Use the “+ New Game” control in the top navigation to add a title.
+                Switch to another saved escape ride. Use the Settings Menu in the top-right corner to add a new title.
               </div>
             </Field>
             <Field label="Game Type">
@@ -4042,16 +4122,9 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {gameEnabled && (
-                <button
-                  style={{ ...S.button, ...S.buttonDanger }}
-                  onClick={()=> setConfirmDeleteOpen(true)}
-                >
-                  🗑 Delete Game
-                </button>
-              )}
-              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
+            <div style={S.noteText}>
+              Game maintenance actions now live in the <strong>Settings Menu</strong> above. Use it to delete games,
+              scan for unused media, or trigger publishing workflows.
             </div>
           </div>
 
@@ -4839,6 +4912,90 @@ const S = {
   settingsFooterTime: {
     fontSize: 12,
     color: 'var(--admin-muted)',
+  },
+  settingsMenuWrap: {
+    position: 'fixed',
+    top: 16,
+    right: 16,
+    display: 'inline-block',
+    zIndex: 1200,
+  },
+  settingsMenuButton: {
+    padding: '10px 16px',
+    borderRadius: 12,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--admin-panel-bg)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    cursor: 'pointer',
+    fontWeight: 600,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    boxShadow: 'var(--admin-glass-sheen)',
+    transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+  },
+  settingsMenuButtonActive: {
+    background: 'var(--admin-tab-active-bg)',
+    borderColor: 'var(--admin-accent, rgba(59, 130, 246, 0.6))',
+    boxShadow: '0 16px 28px rgba(15, 23, 42, 0.28)',
+  },
+  settingsMenuDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 12px)',
+    right: 0,
+    left: 'auto',
+    minWidth: 260,
+    padding: 12,
+    borderRadius: 14,
+    border: '1px solid var(--admin-border-soft)',
+    background: 'var(--appearance-panel-bg, rgba(15, 23, 42, 0.9))',
+    boxShadow: '0 24px 36px rgba(15, 23, 42, 0.45)',
+    display: 'grid',
+    gap: 6,
+    zIndex: 60,
+  },
+  settingsMenuSectionLabel: {
+    fontSize: 11,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+    fontWeight: 700,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  settingsMenuItem: {
+    width: '100%',
+    borderRadius: 10,
+    border: '1px solid transparent',
+    background: 'transparent',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    textAlign: 'left',
+    padding: '8px 10px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    transition: 'background 0.2s ease, color 0.2s ease, border-color 0.2s ease',
+  },
+  settingsMenuItemDisabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+  settingsMenuItemActive: {
+    background: 'rgba(59, 130, 246, 0.18)',
+    borderColor: 'rgba(59, 130, 246, 0.45)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  settingsMenuDanger: {
+    background: 'rgba(153, 27, 27, 0.32)',
+    borderColor: 'rgba(239, 68, 68, 0.65)',
+    color: '#fecaca',
+  },
+  settingsMenuDivider: {
+    margin: '8px 0',
+    borderTop: '1px solid var(--admin-border-soft)',
   },
   header: {
     padding: 20,
