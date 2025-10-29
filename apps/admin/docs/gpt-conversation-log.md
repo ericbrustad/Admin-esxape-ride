@@ -209,3 +209,11 @@
 **You:** Codex called out that the global Settings dropdown should go away in favor of an inline Saved Games selector—keep the bridge hiding buttons, and confirm ChatGPT-5 is aware.
 
 **GPT:** Removed the shell-level Settings menu, left the bridge active to suppress the legacy controls, and added a dedicated Settings page section with the all-games dropdown so the team (and ChatGPT-5) can switch titles without the global menu.
+
+---
+
+**Timestamp:** 2025-10-29T13:50:14Z
+
+**You:** Ensure the admin workspace ships with Supabase v2.45.4 available and provide a shared client helper so ChatGPT-5 can confirm imports resolve.
+
+**GPT:** Bumped @supabase/supabase-js to ^2.45.4 for the admin workspace, added a supabaseClient helper exposing browser/server creators, and confirmed build tooling still reports the missing dependency issue for visibility to Codex and ChatGPT-5.
