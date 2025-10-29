@@ -69,16 +69,17 @@
     ]
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
-    "textBgOpacity": 0,
-    "screenBgColor": "#000000",
-    "screenBgOpacity": 0,
-    "screenBgImage": "",
+    "fontFamily": "\"Poppins\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 24,
+    "fontColor": "#2f1f0f",
+    "textBgColor": "#fff8eb",
+    "textBgOpacity": 0.74,
+    "screenBgColor": "#ffe9c9",
+    "screenBgOpacity": 0.54,
+    "screenBgImage": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1600&q=80",
     "textAlign": "center",
-    "textVertical": "top"
+    "textVertical": "top",
+    "screenBgImageEnabled": true
   },
   "map": {
     "centerLat": 44.9778,
@@ -87,5 +88,6 @@
   },
   "geofence": {
     "mode": "test"
-  }
+  },
+  "appearanceSkin": "summer-breeze"
 }

@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T23:30:00Z
+
+**You:** Starfield Dawn still overrides every saved game—reset the configs to the restored forest/military/cartoon themes, make Forest Outpost the default skin, and confirm ChatGPT-5 thinking signs off.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, set Forest Outpost as the default appearance skin, re-synced every admin and gameplay config to the matching legacy themes (ocean, military, party, pets, holidays), and verified the background/font controls stay adjustable across the editors.
+
+---
+
 **Timestamp:** 2025-10-31T21:45:00Z
 
 **You:** Research the legacy skins pack, bring back the forest/military/metal/photo options, and add party plus dog & cat themes with fonts and background controls.

@@ -69,15 +69,17 @@
     ]
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
-    "textBgOpacity": 0,
-    "screenBgColor": "#000000",
-    "screenBgOpacity": 0,
-    "screenBgImage": "",
+    "fontFamily": "\"Kalam\", \"Segoe UI\", cursive",
+    "fontSizePx": 25,
+    "fontColor": "#fdf2f8",
+    "textBgColor": "#312e81",
+    "textBgOpacity": 0.6,
+    "screenBgColor": "#1f1b4d",
+    "screenBgOpacity": 0.64,
+    "screenBgImage": "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=1600&q=80",
     "textAlign": "center",
-    "textVertical": "top"
-  }
+    "textVertical": "middle",
+    "screenBgImageEnabled": true
+  },
+  "appearanceSkin": "feline-lounge"
 }

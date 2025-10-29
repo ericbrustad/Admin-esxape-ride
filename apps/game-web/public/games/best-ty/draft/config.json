@@ -69,18 +69,19 @@
     ]
   },
   "appearance": {
-    "fontFamily": "Arial, Helvetica, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffe3ff",
-    "textBgColor": "#3b0f4e",
-    "textBgOpacity": 0.5,
-    "screenBgColor": "#0a0216",
-    "screenBgOpacity": 0.82,
-    "screenBgImage": "",
+    "fontFamily": "\"Baloo 2\", \"Comic Sans MS\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 28,
+    "fontColor": "#4b2c6c",
+    "textBgColor": "#fff1ff",
+    "textBgOpacity": 0.68,
+    "screenBgColor": "#f2dfff",
+    "screenBgOpacity": 0.55,
+    "screenBgImage": "/media/skins/cartoon-balloons.svg",
     "textAlign": "center",
-    "textVertical": "top"
+    "textVertical": "top",
+    "screenBgImageEnabled": true
   },
-  "appearanceSkin": "neon-grid",
+  "appearanceSkin": "cartoon-bubbles",
   "map": {
     "centerLat": 44.9778,
     "centerLng": -93.265,

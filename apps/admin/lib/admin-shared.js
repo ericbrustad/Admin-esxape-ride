@@ -219,7 +219,7 @@ export const FONT_FAMILIES = [
   { v:'Arial, Helvetica, sans-serif', label:'Arial' },
   { v:'Courier New, Courier, monospace', label:'Courier New' },
 ];
-export const DEFAULT_APPEARANCE_SKIN = 'starfield-dawn';
+export const DEFAULT_APPEARANCE_SKIN = 'forest-outpost';
 
 export function defaultAppearance() {
   return {

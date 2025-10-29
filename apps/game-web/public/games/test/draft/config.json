@@ -56,15 +56,17 @@
     "rewards": []
   },
   "appearance": {
-    "fontFamily": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-    "fontSizePx": 22,
-    "fontColor": "#ffffff",
-    "textBgColor": "#000000",
-    "textBgOpacity": 0,
-    "screenBgColor": "#000000",
-    "screenBgOpacity": 0,
-    "screenBgImage": "",
+    "fontFamily": "\"Titillium Web\", \"Segoe UI\", sans-serif",
+    "fontSizePx": 24,
+    "fontColor": "#1b1d2a",
+    "textBgColor": "#f5f6ff",
+    "textBgOpacity": 0.7,
+    "screenBgColor": "#dfe2f3",
+    "screenBgOpacity": 0.52,
+    "screenBgImage": "/media/skins/chrome-luminous.svg",
     "textAlign": "center",
-    "textVertical": "top"
-  }
+    "textVertical": "top",
+    "screenBgImageEnabled": true
+  },
+  "appearanceSkin": "chrome-luminous"
 }
