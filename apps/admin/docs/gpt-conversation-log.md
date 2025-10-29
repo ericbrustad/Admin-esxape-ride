@@ -161,3 +161,11 @@
 **You:** Hide every legacy “Open …” button and keep the settings menu as the single launch surface.
 
 **GPT:** Replaced the default button component with a no-op stub, added a MutationObserver guard to hide any remaining “Open …” triggers, and mounted the guard from the admin shell.
+
+---
+
+**Timestamp:** 2025-10-30T18:45:00Z
+
+**You:** Move the Settings dropdown to the top-right, hide the duplicate action buttons, and rename Publish to “Save & Publish Game.”
+
+**GPT:** Fixed the Settings menu to a global top-right control, trimmed the legacy action buttons from every tab, wired the Save & Publish hook for menu and bridge events, and kept the Open & View list labeling drafts vs. published entries.

@@ -2529,6 +2529,46 @@ export default function Admin() {
     }
     return entries;
   }, [games]);
+
+  const applyOpenGameFromMenu = useCallback(
+    (slug, channel = 'draft', label = '') => {
+      if (!slug) return;
+      const normalized = channel === 'published' ? 'published' : slug === 'default' ? 'default' : 'draft';
+      const nextChannel = normalized === 'default' ? 'draft' : normalized;
+      setActiveSlug(slug);
+      setEditChannel(nextChannel);
+      setTab('settings');
+      const displayLabel = label || `${slug} (${normalized === 'default' ? 'default' : nextChannel})`;
+      setStatus(`Opened ${displayLabel}`);
+    },
+    [setActiveSlug, setEditChannel, setTab, setStatus],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const normalizedChannel = editChannel === 'published' ? 'published' : 'draft';
+    const detail = {
+      slug: activeSlug || 'default',
+      channel: normalizedChannel,
+      games: settingsMenuGames,
+      saving: saveBusy,
+    };
+    const bridge = window.__esxSettingsBridge || {};
+    bridge.saveAndPublish = () => {
+      runSettingsMenuAction(() => saveDraftThenPublish());
+    };
+    bridge.openGame = (slug, channel) => {
+      const normalized = channel === 'published' ? 'published' : channel === 'default' ? 'default' : 'draft';
+      const match = settingsMenuGames.find(
+        (entry) => entry.slug === slug && (entry.channel === normalized || (normalized === 'draft' && entry.channel === 'default')),
+      );
+      applyOpenGameFromMenu(slug, normalized, match?.label);
+    };
+    bridge.getState = () => ({ ...detail });
+    window.__esxSettingsBridge = bridge;
+    window.dispatchEvent(new CustomEvent('esx:settings:state', { detail }));
+    return () => {};
+  }, [activeSlug, editChannel, saveBusy, settingsMenuGames, applyOpenGameFromMenu, saveDraftThenPublish]);
   const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
@@ -2876,6 +2916,53 @@ export default function Admin() {
   return (
     <div style={S.body}>
       <HideLegacyButtons />
+      <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
+        <button
+          type="button"
+          style={{
+            ...S.settingsMenuButton,
+            ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
+          }}
+          onClick={() => setSettingsMenuOpen((open) => !open)}
+        >
+          Settings Menu {settingsMenuOpen ? '▴' : '▾'}
+        </button>
+        {settingsMenuOpen && (
+          <div style={S.settingsMenuDropdown}>
+            <div style={S.settingsMenuSectionLabel}>Actions</div>
+            <button
+              type="button"
+              disabled={saveBusy}
+              style={{
+                ...S.settingsMenuItem,
+                ...(saveBusy ? S.settingsMenuItemDisabled : {}),
+              }}
+              onClick={() => runSettingsMenuAction(() => saveDraftThenPublish())}
+            >
+              🚀 Save &amp; Publish Game
+            </button>
+            <div style={S.settingsMenuDivider} />
+            <div style={S.settingsMenuSectionLabel}>Open &amp; View</div>
+            {settingsMenuGames.map((entry) => (
+              <button
+                key={`${entry.slug}::${entry.channel}`}
+                type="button"
+                style={{
+                  ...S.settingsMenuItem,
+                  ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
+                }}
+                onClick={() =>
+                  runSettingsMenuAction(() =>
+                    applyOpenGameFromMenu(entry.slug, entry.channel, entry.label),
+                  )
+                }
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2936,81 +3023,8 @@ export default function Admin() {
               </div>
 
               {tab !== 'settings' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button type="button" style={S.button} onClick={openNewGameModal}>
-                      New Game
-                    </button>
-                    <button
-                      type="button"
-                      style={S.button}
-                      onClick={() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                      }}
-                    >
-                      Open Game
-                    </button>
-                    <button
-                      type="button"
-                      style={{ ...S.button, ...(saveBusy ? S.buttonDisabled : {}) }}
-                      onClick={saveGamePublished}
-                      disabled={saveBusy}
-                      title="Save current slug to channel=published"
-                    >
-                      {saveBusy ? 'Saving…' : 'Save Game'}
-                    </button>
-                    <button
-                      type="button"
-                      style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                      onClick={publishNow}
-                      disabled={saveBusy}
-                    >
-                      {saveBusy ? 'Publishing…' : 'Publish Game'}
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      style={S.button}
-                      onClick={ensureDraftFromCurrent}
-                      title="Create or refresh a draft row for this slug"
-                    >
-                      New Draft
-                    </button>
-                    <button
-                      type="button"
-                      style={S.button}
-                      onClick={() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                      }}
-                    >
-                      Open Draft
-                    </button>
-                    <button
-                      type="button"
-                      onClick={saveDraftNow}
-                      disabled={saveBusy}
-                      style={{ ...S.button, ...S.buttonSuccess, ...(saveBusy ? S.buttonDisabled : {}) }}
-                      title="Save current changes to the draft channel"
-                    >
-                      {saveBusy ? 'Saving…' : 'Save Draft'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await saveDraftNow();
-                        await publishNow();
-                      }}
-                      disabled={saveBusy}
-                      style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                      title="Save draft first, then publish to players"
-                    >
-                      {saveBusy ? 'Saving…' : 'Save & Publish Draft'}
-                    </button>
-                  </div>
+                <div style={{ marginTop: 12, color: 'var(--admin-muted)', fontSize: 13 }}>
+                  Use the Settings Menu in the top-right corner to create, open, save, or publish games.
                 </div>
               )}
             </div>
@@ -4169,7 +4183,7 @@ export default function Admin() {
                 ))}
               </select>
               <div style={S.noteText}>
-                Switch to another saved escape ride. Use the “+ New Game” control in the top navigation to add a title.
+                Switch to another saved escape ride. Use the Settings Menu in the top-right corner to add a new title.
               </div>
             </Field>
             <Field label="Game Type">
@@ -5047,14 +5061,12 @@ const S = {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  settingsMenuBar: {
-    display: 'flex',
-    justifyContent: 'flex-start',
-    marginBottom: 16,
-  },
   settingsMenuWrap: {
-    position: 'relative',
+    position: 'fixed',
+    top: 16,
+    right: 16,
     display: 'inline-block',
+    zIndex: 1200,
   },
   settingsMenuButton: {
     padding: '10px 16px',
@@ -5077,8 +5089,9 @@ const S = {
   },
   settingsMenuDropdown: {
     position: 'absolute',
-    top: 'calc(100% + 8px)',
-    left: 0,
+    top: 'calc(100% + 12px)',
+    right: 0,
+    left: 'auto',
     minWidth: 260,
     padding: 12,
     borderRadius: 14,
