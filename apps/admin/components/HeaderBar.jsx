@@ -15,11 +15,36 @@ export default function HeaderBar({
   onGo = () => {}, // (key) => void ; keys: 'settings','missions','devices','text','assigned','media','new','save','publish','update','save_and_publish'
   onUpdate = null,
   onSaveAndPublish = null,
+  onMakeLive = null,
+  onSetDraftMode = null,
 }) {
   const S = styles;
   const statusIsPublished = String(status).toLowerCase() === 'published';
-  const statusLabel = statusIsPublished ? 'This version is Published' : 'This version is a Draft';
+  const statusLabel = statusIsPublished ? 'This version is Live' : 'This version is a Draft';
   const statusStyle = statusIsPublished ? S.statusPublished : S.statusDraft;
+  const statusHint = statusIsPublished
+    ? 'Players are currently experiencing this build.'
+    : 'This will enable your Game to be published.';
+
+  const handleMakeLive = () => {
+    if (typeof onMakeLive === 'function') {
+      onMakeLive();
+      return;
+    }
+    if (typeof onSaveAndPublish === 'function') {
+      onSaveAndPublish();
+      return;
+    }
+    onGo('make_live');
+  };
+
+  const handleSetDraft = () => {
+    if (typeof onSetDraftMode === 'function') {
+      onSetDraftMode();
+      return;
+    }
+    onGo('set_draft_mode');
+  };
 
   return (
     <header id="AdminHeaderBar" data-ui="headerbar" style={S.wrap}>
@@ -74,7 +99,21 @@ export default function HeaderBar({
         >
           Save &amp; Publish
         </button>
-        <span style={{ ...S.status, ...statusStyle }}>{statusLabel}</span>
+        <div style={S.statusWrap}>
+          {statusIsPublished ? (
+            <button type="button" style={S.setDraftBtn} onClick={handleSetDraft}>
+              Set to Draft mode
+            </button>
+          ) : (
+            <button type="button" style={S.makeLiveBtn} onClick={handleMakeLive}>
+              Make Live
+            </button>
+          )}
+          <div style={S.statusColumn}>
+            <span style={{ ...S.statusBadge, ...statusStyle }}>{statusLabel}</span>
+            <span style={S.statusHint}>{statusHint}</span>
+          </div>
+        </div>
       </div>
     </header>
   );
@@ -121,7 +160,7 @@ const styles = {
   },
   railSpacer: { width: 10, flex: '0 0 auto' },
 
-  right: { display: 'flex', alignItems: 'center', gap: 8 },
+  right: { display: 'flex', alignItems: 'center', gap: 12 },
   updateBtn: {
     fontSize: 12,
     padding: '6px 10px',
@@ -138,29 +177,70 @@ const styles = {
     borderRadius: 12,
     border: '1px solid rgba(34,197,94,0.45)',
     background: 'rgba(34,197,94,0.25)',
-    opacity: 0.5,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     fontWeight: 700,
     color: '#065f46',
   },
-  status: {
+  statusWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  statusColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    lineHeight: 1.2,
+    gap: 2,
+  },
+  statusBadge: {
     fontSize: 12,
-    padding: '4px 8px',
+    padding: '4px 10px',
     borderRadius: 999,
     border: '1px solid',
     whiteSpace: 'nowrap',
-    fontWeight: 600,
+    fontWeight: 700,
+    letterSpacing: 0.2,
   },
   statusDraft: {
-    color: '#9a3412', // orange-800
-    borderColor: 'rgba(234,88,12,0.45)', // orange-500
-    background: 'rgba(234,88,12,0.08)',
+    color: '#166534',
+    borderColor: 'rgba(74, 222, 128, 0.6)',
+    background: 'rgba(187, 247, 208, 0.5)',
   },
   statusPublished: {
-    color: '#166534', // green-800
-    borderColor: 'rgba(34,197,94,0.45)', // green-500
-    background: 'rgba(34,197,94,0.08)',
+    color: '#047857',
+    borderColor: 'rgba(74, 222, 128, 0.65)',
+    background: 'rgba(134, 239, 172, 0.45)',
+    boxShadow: '0 0 12px rgba(34, 197, 94, 0.35)',
+  },
+  statusHint: {
+    fontSize: 11,
+    color: '#475569',
+    whiteSpace: 'nowrap',
+  },
+  makeLiveBtn: {
+    fontSize: 12,
+    padding: '6px 12px',
+    borderRadius: 999,
+    border: '1px solid rgba(74, 222, 128, 0.8)',
+    background: 'linear-gradient(120deg, rgba(187, 247, 208, 0.92), rgba(134, 239, 172, 0.88))',
+    color: '#166534',
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 6px 14px rgba(34, 197, 94, 0.25)',
+    whiteSpace: 'nowrap',
+  },
+  setDraftBtn: {
+    fontSize: 12,
+    padding: '6px 12px',
+    borderRadius: 999,
+    border: '1px solid rgba(251, 191, 36, 0.6)',
+    background: 'linear-gradient(120deg, rgba(253, 230, 138, 0.92), rgba(253, 224, 71, 0.88))',
+    color: '#854d0e',
+    fontWeight: 700,
+    cursor: 'pointer',
+    boxShadow: '0 6px 14px rgba(217, 119, 6, 0.2)',
+    whiteSpace: 'nowrap',
   },
   backBtn: {
     fontSize: 12,

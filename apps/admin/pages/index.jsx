@@ -1104,6 +1104,48 @@ const APPEARANCE_SKINS = [
     }),
   },
   {
+    key: 'winter-frost',
+    label: 'Winter Frostfall',
+    description: 'Aurora glass, crystalline snowfields, and frosted steel rails.',
+    uiKey: 'winter-frost',
+    appearance: {
+      ...defaultAppearance(),
+      fontFamily: '"Work Sans", "Segoe UI", sans-serif',
+      fontSizePx: 24,
+      fontColor: '#0b1f33',
+      textBgColor: '#e5f2ff',
+      textBgOpacity: 0.78,
+      screenBgColor: '#cfe3f8',
+      screenBgOpacity: 0.62,
+      screenBgImage: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1600&q=80',
+      screenBgImageEnabled: true,
+      textAlign: 'center',
+      textVertical: 'top',
+      textShadow: '0 4px 12px rgba(9, 25, 46, 0.45)',
+    },
+    ui: createUiTheme({
+      headerBg: 'linear-gradient(150deg, rgba(15, 35, 58, 0.94), rgba(26, 70, 105, 0.9))',
+      headerBorder: '1px solid rgba(148, 197, 255, 0.58)',
+      headerShadow: '0 42px 72px rgba(7, 18, 32, 0.55)',
+      headerFrameBg: 'linear-gradient(155deg, rgba(22, 52, 82, 0.94), rgba(32, 78, 114, 0.9))',
+      headerFrameBorder: '1px solid rgba(164, 210, 255, 0.6)',
+      headerFrameShadow: '0 24px 38px rgba(6, 18, 32, 0.5)',
+      tabBg: 'linear-gradient(135deg, rgba(26, 68, 104, 0.88), rgba(20, 52, 82, 0.86))',
+      tabActiveBg: 'linear-gradient(145deg, #38bdf8, #a855f7)',
+      buttonBg: 'linear-gradient(140deg, rgba(24, 60, 90, 0.92), rgba(18, 48, 74, 0.9))',
+      buttonBorder: '1px solid rgba(125, 196, 255, 0.55)',
+      glassSheen: '0 20px 40px rgba(12, 32, 54, 0.45)',
+      borderSoft: 'rgba(148, 197, 255, 0.45)',
+      chipBg: 'rgba(148, 197, 255, 0.32)',
+      chipBorder: '1px solid rgba(148, 197, 255, 0.5)',
+      linkColor: '#38bdf8',
+      accent: '#a855f7',
+      saveGradient: 'linear-gradient(125deg, #38bdf8, #a855f7)',
+      saveBorder: '1px solid rgba(148, 197, 255, 0.58)',
+      saveShadow: '0 24px 36px rgba(10, 30, 48, 0.48)',
+    }),
+  },
+  {
     key: 'ghost-fog',
     label: 'Ghost Fog',
     description: 'Moonlit mist, spectral blue haze, and pale chrome frames.',
@@ -3088,9 +3130,10 @@ export default function Admin() {
       const slug = activeSlug || 'default';
       const intentLabel = publish ? 'Save & Publish' : 'Update';
       logConversation('You', `Triggered ${intentLabel} for ${slug}`);
-      if (!slug) return;
+      if (!slug) return false;
       setSaveBusy(true);
       setStatus(publish ? 'Saving snapshot & publishing…' : 'Saving snapshot…');
+      let success = true;
       try {
         const snapshot = await getSnapshotFor(slug);
         if (!snapshot) throw new Error('Snapshot unavailable');
@@ -3132,12 +3175,29 @@ export default function Admin() {
         const message = error?.message || 'snapshot save failed';
         setStatus(`❌ ${intentLabel} failed: ${message}`);
         logConversation('GPT', `${intentLabel} failed for ${slug}: ${message}`);
+        success = false;
       } finally {
         setSaveBusy(false);
       }
+      return success;
     },
     [activeSlug, getSnapshotFor, headerStatus, logConversation, reloadGamesList, refreshGamesIndex, setPreviewNonce, setStatus],
   );
+
+  const handleMakeLive = useCallback(async () => {
+    const ok = await saveFull(true);
+    if (ok) {
+      if (editChannel !== 'published') setEditChannel('published');
+      const slug = activeSlug || 'default';
+      logConversation('GPT', `Live channel engaged for ${slug}.`);
+    }
+  }, [activeSlug, editChannel, logConversation, saveFull, setEditChannel]);
+
+  const handleSetDraftMode = useCallback(() => {
+    if (editChannel !== 'draft') setEditChannel('draft');
+    const slug = activeSlug || 'default';
+    logConversation('GPT', `Draft channel ready for ${slug}.`);
+  }, [activeSlug, editChannel, logConversation, setEditChannel]);
 
   async function runSettingsMenuAction(action) {
     if (typeof action !== 'function') return;
@@ -3181,11 +3241,17 @@ export default function Admin() {
         case 'save_and_publish':
           runSettingsMenuAction(() => saveFull(true));
           break;
+        case 'make_live':
+          runSettingsMenuAction(() => saveFull(true));
+          break;
+        case 'set_draft_mode':
+          handleSetDraftMode();
+          break;
         default:
           break;
       }
     },
-    [openNewGameModal, publishNow, saveDraftNow, saveFull],
+    [handleSetDraftMode, openNewGameModal, publishNow, saveDraftNow, saveFull],
   );
 
   /* Delete game (with modal confirm) */
@@ -4578,7 +4644,9 @@ export default function Admin() {
           onBack={() => setTab('missions')}
           onGo={handleHeaderNav}
           onUpdate={() => saveFull(false)}
-          onSaveAndPublish={() => saveFull(true)}
+          onSaveAndPublish={handleMakeLive}
+          onMakeLive={handleMakeLive}
+          onSetDraftMode={handleSetDraftMode}
         />
       </div>
       <div style={S.headerControls}>
@@ -5663,6 +5731,10 @@ export default function Admin() {
               initial={globalLocationSeed}
               useAsDefault={Boolean(activeGameMeta?.settings?.useLocationAsDefault)}
               onUseAsDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
+              onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
+            />
+            <GlobalLocationSelector
+              initial={globalLocationSeed}
               onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
             />
             <div style={S.titleEditorBlock}>
