@@ -343,11 +343,14 @@ function GameApp() {
 
   if (!suite || !config) {
     return (
-      <main style={outer}>
+      <main style={BASE_OUTER_STYLE}>
         <div style={loadingState}>{status}</div>
       </main>
     );
   }
+
+  const pageAppearance = config?.appearance || {};
+  const outerStyle = gameBackgroundStyle(pageAppearance);
 
   function next() { setIdx((i) => Math.min(i + 1, Math.max(missionOrder.length - 1, 0))); }
   function prev() { setIdx((i) => Math.max(i - 1, 0)); }
@@ -416,7 +419,22 @@ function GameApp() {
     if (!mission) return <div>Game complete!</div>;
     const appearance = mission.appearanceOverrideEnabled ? (mission.appearance || {}) : (config.appearance || {});
     const bodyStyle = missionBodyStyle(appearance);
-    const label = (s) => <div style={{ ...labelStyle, textAlign:appearance.textAlign }}>{s}</div>;
+    const labelBackground = `rgba(${hex(appearance.textBgColor || '#000')}, ${appearance.textBgOpacity ?? 0})`;
+    const labelColor = appearance.fontColor || '#fff';
+    const labelShadow = appearance.textShadow || 'none';
+    const label = (s) => (
+      <div
+        style={{
+          ...labelStyle,
+          textAlign: appearance.textAlign,
+          background: labelBackground,
+          color: labelColor,
+          textShadow: labelShadow,
+        }}
+      >
+        {s}
+      </div>
+    );
 
     switch (mission.type) {
       case 'multiple_choice': {
@@ -584,7 +602,7 @@ function GameApp() {
   }, [locationStatus]);
 
   return (
-    <main style={outer}>
+    <main style={outerStyle}>
       <MissionMap
         missions={missionsForMap}
         currentId={missionId}
@@ -681,30 +699,74 @@ export default function Home() {
 
 function missionBodyStyle(a) {
   const fontFamily = a.fontFamily || 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif';
-  const fontSize   = (a.fontSizePx || 22) + 'px';
-  const textBg     = `rgba(${hex(a.textBgColor||'#000')}, ${a.textBgOpacity ?? 0})`;
-  const screenBg   = a.screenBgImage
-    ? `linear-gradient(rgba(0,0,0,${a.screenBgOpacity??0}), rgba(0,0,0,${a.screenBgOpacity??0})), url(${toDirect(a.screenBgImage)}) center/cover no-repeat`
-    : `linear-gradient(rgba(0,0,0,${a.screenBgOpacity??0}), rgba(0,0,0,${a.screenBgOpacity??0})), ${a.screenBgColor||'#000'}`;
+  const fontSize = (a.fontSizePx || 22) + 'px';
+  const textBg = `rgba(${hex(a.textBgColor || '#000')}, ${a.textBgOpacity ?? 0})`;
+  const overlay = clamp01(a.screenBgOpacity ?? 0);
+  const overlayLayer = `rgba(0,0,0,${overlay})`;
+  const hasImage = a.screenBgImage && (a.screenBgImageEnabled !== false);
+  const screenBg = hasImage
+    ? `linear-gradient(${overlayLayer}, ${overlayLayer}), url(${toDirect(a.screenBgImage)}) center/cover no-repeat`
+    : `linear-gradient(${overlayLayer}, ${overlayLayer}), ${a.screenBgColor || '#000'}`;
 
   return {
-    background: screenBg, padding:12, minHeight:260, display:'grid',
+    background: screenBg,
+    padding: 12,
+    minHeight: 260,
+    display: 'grid',
     alignContent: a.textVertical === 'center' ? 'center' : 'start',
-    color: a.fontColor || '#fff', fontFamily, fontSize,
+    color: a.fontColor || '#fff',
+    fontFamily,
+    fontSize,
+    textShadow: a.textShadow || 'none',
     backdropFilter: textBg.includes('rgba') ? 'blur(1px)' : undefined,
   };
 }
 
+function clamp01(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.min(Math.max(number, 0), 1);
+}
+
+function gameBackgroundStyle(a) {
+  const base = { ...BASE_OUTER_STYLE };
+  const overlay = clamp01(a.screenBgOpacity ?? 0);
+  const overlayLayer = `rgba(0,0,0,${clamp01(overlay * 0.85)})`;
+  const hasImage = a.screenBgImage && (a.screenBgImageEnabled !== false);
+  const fallbackColor = a.screenBgColor || base.background || '#020b12';
+
+  if (hasImage) {
+    base.background = `linear-gradient(${overlayLayer}, ${overlayLayer}), url(${toDirect(a.screenBgImage)})`;
+    base.backgroundSize = 'cover';
+    base.backgroundRepeat = 'no-repeat';
+    base.backgroundPosition = 'center';
+  } else {
+    base.background = `linear-gradient(${overlayLayer}, ${overlayLayer}), ${fallbackColor}`;
+    base.backgroundSize = 'cover';
+    base.backgroundRepeat = 'no-repeat';
+    base.backgroundPosition = 'center';
+  }
+
+  base.color = a.fontColor || base.color;
+  base.fontFamily = a.fontFamily || base.fontFamily;
+
+  return base;
+}
+
 function hex(h){try{const s=h.replace('#','');const b=s.length===3?s.split('').map(c=>c+c).join(''):s;return `${parseInt(b.slice(0,2),16)}, ${parseInt(b.slice(2,4),16)}, ${parseInt(b.slice(4,6),16)}`;}catch{return'0,0,0';}}
 
-const outer = {
+const BASE_OUTER_STYLE = {
   position: 'relative',
   minHeight: '100vh',
   width: '100%',
   color: '#e9eef2',
   background: '#020b12',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  backgroundRepeat: 'no-repeat',
   fontFamily: 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif',
   overflow: 'hidden',
+  transition: 'background 0.6s ease, color 0.3s ease, font-family 0.3s ease',
 };
 
 const loadingState = {
@@ -926,7 +988,7 @@ const missionContentWrap = {
   gap: 12,
 };
 
-const labelStyle = { background: 'rgba(0,0,0,.25)', padding: '6px 10px', borderRadius: 8, marginBottom: 8 };
+const labelStyle = { padding: '6px 10px', borderRadius: 8, marginBottom: 8, display: 'inline-block' };
 const btn = {
   padding: '10px 12px',
   borderRadius: 10,
