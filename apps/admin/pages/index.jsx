@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import HeaderBar from '../components/HeaderBar';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
+import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
+import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -1106,12 +1109,10 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
   const [editChannel, setEditChannel] = useState('draft');
+  const headerStatus = editChannel === 'published' ? 'published' : 'draft';
   const [saveBusy, setSaveBusy] = useState(false);
   const [openGameModal, setOpenGameModal] = useState(false);
   const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsMenuRef = useRef(null);
-
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const editingIsNew = useMemo(() => {
@@ -1141,25 +1142,6 @@ export default function Admin() {
     })();
     return ()=> { mounted = false; };
   },[fetchInventory]);
-
-  useEffect(() => {
-    if (!settingsMenuOpen) return undefined;
-    function handlePointer(event) {
-      if (!settingsMenuRef.current) return;
-      if (settingsMenuRef.current.contains(event.target)) return;
-      setSettingsMenuOpen(false);
-    }
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('touchstart', handlePointer);
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('touchstart', handlePointer);
-    };
-  }, [settingsMenuOpen]);
-
-  useEffect(() => {
-    setSettingsMenuOpen(false);
-  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1740,6 +1722,37 @@ export default function Admin() {
       console.error('Settings menu action failed', error);
     }
   }
+
+  const handleHeaderNav = useCallback(
+    (key) => {
+      switch (key) {
+        case 'settings':
+          setTab('settings');
+          break;
+        case 'missions':
+        case 'devices':
+        case 'text':
+        case 'assigned':
+          setTab(key);
+          break;
+        case 'media':
+          setTab('media-pool');
+          break;
+        case 'new':
+          runSettingsMenuAction(() => openNewGameModal());
+          break;
+        case 'save':
+          runSettingsMenuAction(() => saveDraftNow());
+          break;
+        case 'publish':
+          runSettingsMenuAction(() => publishNow());
+          break;
+        default:
+          break;
+      }
+    },
+    [openNewGameModal, publishNow, saveDraftNow],
+  );
 
   const reloadGamesList = useCallback(async () => {
     if (!gameEnabled) {
@@ -2483,50 +2496,115 @@ export default function Admin() {
   }
 
   const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: `${STARFIELD_DEFAULTS.title} (default)` }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
+    const entries = new Map();
+    entries.set('default', `${STARFIELD_DEFAULTS.title} (default)`);
+    const bySlug = gamesIndex?.bySlug || {};
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug || slug === 'default') return;
+      const source = channels?.draft || channels?.published || {};
+      const title = source.title || slug;
+      const mode = source.mode;
+      entries.set(slug, mode ? `${title} — ${mode}` : title);
     });
-    return combined;
-  }, [games]);
+    if (entries.size === 1 && Array.isArray(games)) {
+      games.forEach((game) => {
+        if (!game || !game.slug || game.slug === 'default') return;
+        if (entries.has(game.slug)) return;
+        const label = `${game.title || game.slug}${game.mode ? ` — ${game.mode}` : ''}`;
+        entries.set(game.slug, label);
+      });
+    }
+    return Array.from(entries, ([value, label]) => ({ value, label }));
+  }, [gamesIndex, games]);
   const settingsMenuGames = useMemo(() => {
     const entries = [
       {
         slug: 'default',
-        channel: 'default',
+        channel: 'draft',
         label: `${STARFIELD_DEFAULTS.title} (default)`,
       },
     ];
     const seen = new Set(entries.map((entry) => `${entry.slug}::${entry.channel}`));
-    if (Array.isArray(games)) {
-      games.forEach((game) => {
-        if (!game || !game.slug) return;
-        const channel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
-        const key = `${game.slug}::${channel}`;
+    const bySlug = gamesIndex?.bySlug || {};
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug) return;
+      const variants = [
+        { channel: 'published', data: channels?.published },
+        { channel: 'draft', data: channels?.draft },
+      ];
+      variants.forEach(({ channel, data }) => {
+        if (!data) return;
+        const normalizedChannel = channel === 'published' ? 'published' : 'draft';
+        const key = `${slug}::${normalizedChannel}`;
         if (seen.has(key)) return;
         seen.add(key);
         entries.push({
+          slug,
+          channel: normalizedChannel,
+          label: `${data.title || slug} (${normalizedChannel})`,
+        });
+      });
+    });
+    return entries;
+  }, [gamesIndex]);
+
+  const savedGamesList = useMemo(() => {
+    const bySlug = gamesIndex?.bySlug || {};
+    const entries = [];
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug) return;
+      const variants = [
+        { channel: 'published', data: channels?.published },
+        { channel: 'draft', data: channels?.draft },
+      ];
+      variants.forEach(({ channel, data }) => {
+        if (!data) return;
+        const normalizedChannel = channel === 'published' ? 'published' : 'draft';
+        const base = typeof data === 'object' && data !== null ? data : {};
+        entries.push({
+          ...base,
+          slug: base.slug || slug,
+          title: base.title || slug,
+          channel: normalizedChannel,
+        });
+      });
+    });
+    if (!entries.length) {
+      (Array.isArray(games) ? games : []).forEach((game) => {
+        if (!game || !game.slug) return;
+        const normalizedChannel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+        entries.push({
+          ...game,
           slug: game.slug,
-          channel,
-          label: `${game.title || game.slug} (${channel})`,
+          title: game.title || game.slug,
+          channel: normalizedChannel,
         });
       });
     }
+    const hasDefault = entries.some((entry) => entry.slug === 'default' && entry.channel !== 'published');
+    if (!hasDefault) {
+      entries.unshift({ id: 'default', slug: 'default', title: STARFIELD_DEFAULTS.title, channel: 'draft' });
+    }
     return entries;
-  }, [games]);
+  }, [gamesIndex, games]);
+
+  const savedGamesChannel = useMemo(() => {
+    const slug = activeSlug || 'default';
+    const desired = slug === 'default' ? 'draft' : headerStatus;
+    const match = savedGamesList.some(
+      (entry) => entry.slug === slug && (entry.channel || 'draft') === desired,
+    );
+    if (match) return desired;
+    return 'draft';
+  }, [activeSlug, headerStatus, savedGamesList]);
+
+  const savedGamesValue = `${activeSlug || 'default'}:${savedGamesChannel}`;
+
+  useEffect(() => {
+    if (tab !== 'settings' && confirmDeleteOpen) {
+      setConfirmDeleteOpen(false);
+    }
+  }, [tab, confirmDeleteOpen]);
 
   const applyOpenGameFromMenu = useCallback(
     (slug, channel = 'draft', label = '') => {
@@ -2782,9 +2860,6 @@ export default function Admin() {
     }
   }
 
-  // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
-
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
@@ -2793,7 +2868,6 @@ export default function Admin() {
   const headerCoverThumb = viewConfig?.game?.coverImage
     ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
-  const headerStyle = S.header;
 
   const envRepoOwner = process.env.NEXT_PUBLIC_REPO_OWNER
     || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_OWNER
@@ -2925,86 +2999,60 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <header style={headerStyle}>
-        <div style={S.wrap}>
-          <div style={S.headerTopRow}>
-            <div style={S.headerTitleGroup}>
-              <div style={S.headerCoverFrame}>
-                {headerCoverThumb ? (
-                  <img
-                    src={headerCoverThumb}
-                    alt="Active game cover"
-                    style={S.headerCoverThumb}
-                  />
-                ) : (
-                  <div style={S.headerCoverPlaceholder}>No Cover</div>
-                )}
-              </div>
-              <div style={S.headerTitleColumn}>
-                <div style={S.headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.headerSubtitle}>Admin Control Deck</div>
-              </div>
-            </div>
+      <HideLegacyStatusToggles />
+      <div style={S.headerShell}>
+        <HeaderBar
+          iconUrl={headerCoverThumb}
+          title={headerGameTitle}
+          isSettings={tab === 'settings'}
+          status={headerStatus}
+          onBack={() => setTab('missions')}
+          onGo={handleHeaderNav}
+        />
+      </div>
+      <div style={S.headerControls}>
+        <div style={S.headerControlsRow}>
+          <div style={S.headerToggleGroup}>
+            <button
+              type="button"
+              onClick={() => setEditChannel('draft')}
+              style={{ ...S.tab, ...(headerStatus === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
+              title="Edit in Draft mode"
+            >
+              Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditChannel('published')}
+              style={{ ...S.tab, ...(headerStatus === 'published' ? S.tabActive : {}), fontWeight: 700 }}
+              title="Enable publishing actions"
+            >
+              Published
+            </button>
           </div>
-          <div style={S.headerNavRow}>
-            <div style={S.headerNavPrimary}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginRight: 8 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditChannel('draft')}
-                    style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
-                    title="Edit in Draft mode"
-                  >
-                    Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditChannel('published')}
-                    style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
-                    title="Enable publishing actions"
-                  >
-                    Published
-                  </button>
-                </div>
-                {tabsOrder.map((t) => {
-                  const labelMap = {
-                    missions: 'MISSIONS',
-                    devices: 'DEVICES',
-                    settings: 'SETTINGS',
-                    text: 'TEXT',
-                    'media-pool': 'MEDIA POOL',
-                    assigned: 'ASSIGNED MEDIA',
-                  };
-                  return (
-                    <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
-                      {labelMap[t] || t.toUpperCase()}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {tab !== 'settings' && (
-                <div style={{ marginTop: 12, color: 'var(--admin-muted)', fontSize: 13 }}>
-                  Use the Settings Menu in the top-right corner to create, open, save, or publish games.
-                </div>
-              )}
+          {gameEnabled && (
+            <div style={S.headerGameSelect}>
+              <label style={S.headerGameSelectLabel}>Game:</label>
+              <select
+                value={activeSlug}
+                onChange={(e) => setActiveSlug(e.target.value)}
+                style={{ ...S.input, width: 240 }}
+              >
+                {selectGameOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            {gameEnabled && (
-              <div style={S.headerNavSecondary}>
-                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                  <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
-                  {games.map(g=>(
-                    <option key={g.slug} value={g.slug}>{g.title || g.slug}{g.mode ? ` — ${g.mode}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
+          )}
         </div>
-      </header>
+        {tab !== 'settings' && (
+          <div style={S.headerHint}>
+            Settings holds game management actions, including Save & Publish.
+          </div>
+        )}
+      </div>
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -3910,156 +3958,122 @@ export default function Admin() {
       {/* SETTINGS */}
       {tab==='settings' && (
         <main style={S.wrap}>
-          <div style={S.settingsMenuBar}>
-            <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
-              <button
-                type="button"
-                style={{
-                  ...S.settingsMenuButton,
-                  ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
-                }}
-                onClick={() => setSettingsMenuOpen((open) => !open)}
-              >
-                Settings Menu {settingsMenuOpen ? '▴' : '▾'}
-              </button>
-              {settingsMenuOpen && (
-                <div style={S.settingsMenuDropdown}>
-                  <div style={S.settingsMenuSectionLabel}>Actions</div>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(openNewGameModal)}
-                  >
-                    ➕ New Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() =>
-                      runSettingsMenuAction(() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                      })
-                    }
-                  >
-                    📂 Open Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() =>
-                      runSettingsMenuAction(() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                        if (typeof setEditChannel === 'function') setEditChannel('draft');
-                      })
-                    }
-                  >
-                    📁 Open Draft
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(ensureDraftFromCurrent)}
-                  >
-                    📝 New Draft
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveDraftNow)}
-                  >
-                    💾 Save Draft
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveGamePublished)}
-                  >
-                    💾 Save Game
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(publishNow)}
-                  >
-                    🚀 Publish Game
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveDraftThenPublish)}
-                  >
-                    🚀 Save & Publish Draft
-                  </button>
-                  {gameEnabled && (
-                    <button
-                      type="button"
-                      style={{ ...S.settingsMenuItem, ...S.settingsMenuDanger }}
-                      onClick={() =>
-                        runSettingsMenuAction(() => {
-                          setConfirmDeleteOpen(true);
-                        })
-                      }
-                    >
-                      🗑 Delete Game
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(scanProject)}
-                  >
-                    🔎 Scan Media Usage
-                  </button>
-                  <div style={S.settingsMenuDivider} />
-                  <div style={S.settingsMenuSectionLabel}>Open & View</div>
-                  {settingsMenuGames.map((entry) => (
-                    <button
-                      key={`${entry.slug}::${entry.channel}`}
-                      type="button"
-                      style={{
-                        ...S.settingsMenuItem,
-                        ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
-                      }}
-                      onClick={() =>
-                        runSettingsMenuAction(() => {
-                          setActiveSlug(entry.slug);
-                          if (entry.channel === 'published') {
-                            setEditChannel('published');
-                          } else {
-                            setEditChannel('draft');
-                          }
-                          setTab('settings');
-                          setStatus(`Opened ${entry.label}`);
-                        })
-                      }
-                    >
-                      {entry.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
+            <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteOpen(false);
+                    openNewGameModal();
+                  }}
+                  style={{
+                    fontSize: 13,
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(99,102,241,0.4)',
+                    background: 'linear-gradient(135deg, rgba(168,85,247,.08), rgba(99,102,241,.08))',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: '#1e1b4b',
+                  }}
+                >
+                  + New Game
+                </button>
+              </div>
+              <SavedGamesPicker
+                games={savedGamesList}
+                value={savedGamesValue}
+                onChange={(val) => {
+                  setConfirmDeleteOpen(false);
+                  const [slug, channel] = String(val || '').split(':');
+                  if (!slug) return;
+                  const normalized = channel === 'published' ? 'published' : 'draft';
+                  const match = savedGamesList.find(
+                    (entry) => entry.slug === slug && (entry.channel || 'draft') === normalized,
+                  );
+                  const label = match
+                    ? `${match.title || match.slug}${normalized === 'published' ? ' (published)' : ' (draft)'}`
+                    : undefined;
+                  applyOpenGameFromMenu(slug, normalized, label);
+                }}
+              />
+              <div>
+                {confirmDeleteOpen ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: 12,
+                      borderRadius: 12,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: '#0f172a', flex: '1 1 auto' }}>
+                      Are you sure you want to delete “{headerGameTitle}”? 
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteOpen(false);
+                        void reallyDeleteGame();
+                      }}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(239,68,68,0.5)',
+                        background: 'rgba(239,68,68,0.12)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        color: '#7f1d1d',
+                      }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteOpen(false)}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(15,23,42,0.12)',
+                        background: 'white',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logConversation('You', 'Opened delete confirmation for current game');
+                      setConfirmDeleteOpen(true);
+                    }}
+                    style={{
+                      fontSize: 13,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      color: '#7f1d1d',
+                    }}
+                  >
+                    Delete Current Game
+                  </button>
+                )}
+              </div>
+            </div>
             <div style={S.gameTitleRow}>
               <div style={S.readonlyField}>
                 <div style={S.fieldLabel}>Game Title</div>
@@ -4134,20 +4148,6 @@ export default function Admin() {
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
-            <Field label="Saved Games">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={S.noteText}>
-                Switch to another saved escape ride. Use the Settings Menu in the top-right corner to add a new title.
-              </div>
-            </Field>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -4233,7 +4233,7 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={S.noteText}>
-              Game maintenance actions now live in the <strong>Settings Menu</strong> above. Use it to delete games,
+              Game maintenance actions now live in the header toolbar. Switch to Settings to delete games,
               scan for unused media, or trigger publishing workflows.
             </div>
           </div>
@@ -4772,27 +4772,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
-      {gameEnabled && confirmDeleteOpen && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'var(--admin-body-color)', marginBottom:12 }}>
-              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
-            </div>
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={reallyDeleteGame}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {openGameModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000, display: 'grid', placeItems: 'center', padding: 16 }}>
           <div style={{ ...S.card, width: 'min(720px,96vw)', maxHeight: '82vh', overflowY: 'auto' }}>
@@ -5107,16 +5086,48 @@ const S = {
     margin: '8px 0',
     borderTop: '1px solid var(--admin-border-soft)',
   },
-  header: {
-    padding: 20,
-    background: 'rgba(248, 250, 252, 0.72)',
-    backdropFilter: 'blur(18px)',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.28)',
+  headerShell: {
     position: 'sticky',
     top: 0,
-    zIndex: 40,
-    boxShadow: '0 18px 30px rgba(15, 23, 42, 0.18)',
-    color: 'var(--admin-body-color)',
+    zIndex: 50,
+    background: 'transparent',
+  },
+  headerControls: {
+    padding: '8px 16px 16px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+    background: 'rgba(255, 255, 255, 0.6)',
+    backdropFilter: 'blur(8px)',
+    display: 'grid',
+    gap: 8,
+    position: 'sticky',
+    top: 56,
+    zIndex: 39,
+  },
+  headerControlsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerToggleGroup: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  headerGameSelect: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerGameSelectLabel: {
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  headerHint: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   conversationLog: {
     marginTop: 16,
