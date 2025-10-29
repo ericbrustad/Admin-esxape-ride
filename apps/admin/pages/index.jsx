@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
-import HideLegacyButtons from '../components/HideLegacyButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
@@ -1704,7 +1703,24 @@ export default function Admin() {
     }
   }
 
-  async function reloadGamesList() {
+  async function saveDraftThenPublish() {
+    await saveDraftNow();
+    await publishNow();
+  }
+
+  async function runSettingsMenuAction(action) {
+    if (typeof action !== 'function') return;
+    try {
+      const result = action();
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+    } catch (error) {
+      console.error('Settings menu action failed', error);
+    }
+  }
+
+  const reloadGamesList = useCallback(async () => {
     if (!gameEnabled) {
       setGames([]);
       setGamesIndex({ bySlug: {}, count: 0 });
@@ -1715,7 +1731,7 @@ export default function Admin() {
       const j = await r.json();
       if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
     } catch {}
-  }
+  }, [gameEnabled]);
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
@@ -2465,6 +2481,83 @@ export default function Admin() {
     });
     return combined;
   }, [games]);
+  const settingsMenuGames = useMemo(() => {
+    const entries = [
+      {
+        slug: 'default',
+        channel: 'default',
+        label: `${STARFIELD_DEFAULTS.title} (default)`,
+      },
+    ];
+    const seen = new Set(entries.map((entry) => `${entry.slug}::${entry.channel}`));
+    if (Array.isArray(games)) {
+      games.forEach((game) => {
+        if (!game || !game.slug) return;
+        const channel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+        const key = `${game.slug}::${channel}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        entries.push({
+          slug: game.slug,
+          channel,
+          label: `${game.title || game.slug} (${channel})`,
+        });
+      });
+    }
+    return entries;
+  }, [games]);
+
+  const applyOpenGameFromMenu = useCallback(
+    (slug, channel = 'draft', label = '') => {
+      if (!slug) return;
+      const normalized = channel === 'published' ? 'published' : slug === 'default' ? 'default' : 'draft';
+      const nextChannel = normalized === 'default' ? 'draft' : normalized;
+      setActiveSlug(slug);
+      setEditChannel(nextChannel);
+      setTab('settings');
+      const displayLabel = label || `${slug} (${normalized === 'default' ? 'default' : nextChannel})`;
+      setStatus(`Opened ${displayLabel}`);
+    },
+    [setActiveSlug, setEditChannel, setTab, setStatus],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const normalizedChannel = editChannel === 'published' ? 'published' : 'draft';
+    const detail = {
+      slug: activeSlug || 'default',
+      channel: normalizedChannel,
+      games: settingsMenuGames,
+      saving: saveBusy,
+    };
+    const bridge = window.__esxSettingsBridge || {};
+    bridge.saveAndPublish = () => {
+      runSettingsMenuAction(() => saveDraftThenPublish());
+    };
+    bridge.openGame = (slug, channel) => {
+      const normalized = channel === 'published' ? 'published' : channel === 'default' ? 'default' : 'draft';
+      const match = settingsMenuGames.find(
+        (entry) => entry.slug === slug && (entry.channel === normalized || (normalized === 'draft' && entry.channel === 'default')),
+      );
+      applyOpenGameFromMenu(slug, normalized, match?.label);
+    };
+    bridge.deleteGame = (entry) => {
+      if (entry && entry.slug && entry.slug !== activeSlug) {
+        const normalized = entry.channel === 'published'
+          ? 'published'
+          : entry.channel === 'default'
+          ? 'default'
+          : 'draft';
+        applyOpenGameFromMenu(entry.slug, normalized, entry.label);
+      }
+      setConfirmDeleteOpen(true);
+    };
+    bridge.reloadGames = () => reloadGamesList();
+    bridge.getState = () => ({ ...detail });
+    window.__esxSettingsBridge = bridge;
+    window.dispatchEvent(new CustomEvent('esx:settings:state', { detail }));
+    return () => {};
+  }, [activeSlug, editChannel, saveBusy, settingsMenuGames, applyOpenGameFromMenu, saveDraftThenPublish, reloadGamesList]);
   const fallbackSuite = useMemo(() => ({ version: '0.0.0', missions: [] }), []);
   const fallbackConfig = useMemo(() => defaultConfig(), []);
   const viewSuite = suite || fallbackSuite;
@@ -2811,7 +2904,7 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <HideLegacyButtons />
+      {/* Settings menu rendered globally via AdminSettingsRoot */}
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>
@@ -2871,82 +2964,11 @@ export default function Admin() {
                 })}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button type="button" style={S.button} onClick={openNewGameModal}>
-                    New Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={() => {
-                      setOpenGameModal(true);
-                      refreshGamesIndex();
-                    }}
-                  >
-                    Open Game
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...S.button, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    onClick={saveGamePublished}
-                    disabled={saveBusy}
-                    title="Save current slug to channel=published"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save Game'}
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    onClick={publishNow}
-                    disabled={saveBusy}
-                  >
-                    {saveBusy ? 'Publishing…' : 'Publish Game'}
-                  </button>
+              {tab !== 'settings' && (
+                <div style={{ marginTop: 12, color: 'var(--admin-muted)', fontSize: 13 }}>
+                  Use the Settings Menu in the top-right corner to create, open, save, or publish games.
                 </div>
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={ensureDraftFromCurrent}
-                    title="Create or refresh a draft row for this slug"
-                  >
-                    New Draft
-                  </button>
-                  <button
-                    type="button"
-                    style={S.button}
-                    onClick={() => {
-                      setOpenGameModal(true);
-                      refreshGamesIndex();
-                    }}
-                  >
-                    Open Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveDraftNow}
-                    disabled={saveBusy}
-                    style={{ ...S.button, ...S.buttonSuccess, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    title="Save current changes to the draft channel"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save Draft'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await saveDraftNow();
-                      await publishNow();
-                    }}
-                    disabled={saveBusy}
-                    style={{ ...S.button, ...S.savePublishButton, ...(saveBusy ? S.buttonDisabled : {}) }}
-                    title="Save draft first, then publish to players"
-                  >
-                    {saveBusy ? 'Saving…' : 'Save & Publish Draft'}
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
             {gameEnabled && (
               <div style={S.headerNavSecondary}>
@@ -3955,7 +3977,7 @@ export default function Admin() {
                 ))}
               </select>
               <div style={S.noteText}>
-                Switch to another saved escape ride. Use the “+ New Game” control in the top navigation to add a title.
+                Switch to another saved escape ride. Use the Settings Menu in the top-right corner to add a new title.
               </div>
             </Field>
             <Field label="Game Type">
@@ -4042,16 +4064,9 @@ export default function Admin() {
 
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              {gameEnabled && (
-                <button
-                  style={{ ...S.button, ...S.buttonDanger }}
-                  onClick={()=> setConfirmDeleteOpen(true)}
-                >
-                  🗑 Delete Game
-                </button>
-              )}
-              <button style={S.button} onClick={scanProject}>🔎 Scan media usage (find unused)</button>
+            <div style={S.noteText}>
+              Game maintenance actions now live in the <strong>Settings Menu</strong> above. Use it to delete games,
+              scan for unused media, or trigger publishing workflows.
             </div>
           </div>
 
