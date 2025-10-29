@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T06:05:00Z
+
+**You:** Drop the shell-level settings dropdown entirely, surface the saved-games selector inline on the Settings (Global) screen, and keep the repo/branch/commit/deployment snapshot anchored to the bottom so QA still sees the metadata.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, left the bridge active for hiding legacy controls, added the inline Saved Games dropdown plus a shared repo snapshot footer component, and updated the Settings page to render the metadata without the global menu.
+
+---
+
 **Timestamp:** 2025-10-31T05:15:00Z
 
 **You:** Codex spotted that `_app.jsx` still lacked the global bridge and `index.jsx` referenced `HideLegacyButtons` without importing it. Apply the suggested patches so the settings dropdown works everywhere without crashing, then confirm the metadata footer stays intact.

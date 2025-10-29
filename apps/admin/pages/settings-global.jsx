@@ -2,6 +2,7 @@
 // the "Saved Games" dropdown that lists ALL games.
 import React from 'react';
 import SavedGamesSelect from '../components/SavedGamesSelect';
+import RepoSnapshotFooter from '../components/RepoSnapshotFooter';
 
 const P = {
   page: { padding: 24 },
@@ -16,6 +17,7 @@ export default function SettingsGlobalPage() {
       <section style={P.section}>
         <SavedGamesSelect />
       </section>
+      <RepoSnapshotFooter />
     </div>
   );
 }
