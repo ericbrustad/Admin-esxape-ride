@@ -241,3 +241,11 @@
 **You:** Ensure the admin workspace ships with Supabase v2.45.4 available and provide a shared client helper so ChatGPT-5 can confirm imports resolve.
 
 **GPT:** Bumped @supabase/supabase-js to ^2.45.4 for the admin workspace, added a supabaseClient helper exposing browser/server creators, and confirmed build tooling still reports the missing dependency issue for visibility to Codex and ChatGPT-5.
+
+---
+
+**Timestamp:** 2025-10-29T16:18:17Z
+
+**You:** Restore the legacy draft games so they reappear in the Saved Games dropdown and make sure ChatGPT-5 logs the fix.
+
+**GPT:** Rebuilt the missing draft configs, repopulated games/index.json with the legacy titles marked as drafts, and noted the change here so ChatGPT-5 tracks the restored catalog.
