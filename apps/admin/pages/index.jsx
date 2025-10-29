@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TestLauncher from '../components/TestLauncher';
+import HomeDefaultButtons from '../components/HomeDefaultButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
@@ -4368,6 +4369,7 @@ export default function Admin() {
                 </label>
                 <button style={S.button} onClick={()=>setPreviewNonce(n=>n+1)}>Reload preview</button>
                 <TestLauncher slug={activeSlugForClient} channel={testChannel} preferPretty={true} popup={false}/>
+                <HomeDefaultButtons />
               </div>
             </div>
             {!gameBase && <div style={{ color:'var(--admin-muted)', marginBottom:8 }}>Set NEXT_PUBLIC_GAME_ORIGIN to enable preview.</div>}
