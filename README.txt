@@ -4,9 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
-- 2025-10-31 — Legacy theme pack restoration & seasonal skins. Commit: (pending HEAD)
-  - Direct links: `apps/admin/pages/index.jsx`, `apps/admin/docs/gpt-conversation-log.md`, `README.txt`
-  - Notes: Reinstated the chrome/forest/military/cartoon admin skins, added ocean/holiday/seasonal presets with remote art so no binaries touch Git, refreshed the UI theme map wiring, and logged the ChatGPT-5 pairing.
+- 2025-10-31 — Legacy theme pack restoration, pets & party skins, and font imports. Commit: (pending HEAD)
+  - Direct links: `apps/admin/pages/index.jsx`, `apps/admin/lib/admin-shared.js`, `apps/admin/styles/globals.css`, `apps/admin/docs/gpt-conversation-log.md`, `README.txt`
+  - Notes: Reinstated the chrome/forest/military/cartoon admin skins, added ocean/holiday/seasonal presets plus new party and pet themes with remote art so no binaries touch Git, expanded the appearance font picker with Google Font imports, refreshed the UI theme map wiring, and logged the ChatGPT-5 pairing.
 - 2025-10-30 — Default game selectors & Supabase fallbacks. Commit: (pending HEAD)
   - Direct links: `apps/admin/components/DefaultGameControls.jsx`, `apps/admin/components/HomeDefaultButtons.jsx`, `apps/admin/pages/settings-defaults.jsx`, `apps/admin/pages/api/app-settings.js`, `apps/admin/pages/api/games/list.js`, `apps/admin/pages/index.jsx`, `apps/admin/docs/gpt-conversation-log.md`, `README.txt`
   - Notes: Added draft/published default selectors with localStorage + Supabase persistence, exposed `/api/app-settings` + `/api/games/list`, wired the Play Test toolbar with quick-launch buttons, surfaced repo metadata on the defaults page with fetch/render timestamps, and logged the GPT-5 pairing.
