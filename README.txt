@@ -4,6 +4,9 @@ Branch work — 2025-10-14 21:27:31Z
 Device & Response UI Package
 ----------------------------
 ## Update Log
+- 2025-10-30 — Default game selectors & Supabase fallbacks. Commit: (pending HEAD)
+  - Direct links: `apps/admin/components/DefaultGameControls.jsx`, `apps/admin/components/HomeDefaultButtons.jsx`, `apps/admin/pages/settings-defaults.jsx`, `apps/admin/pages/api/app-settings.js`, `apps/admin/pages/api/games/list.js`, `apps/admin/pages/index.jsx`, `apps/admin/docs/gpt-conversation-log.md`, `README.txt`
+  - Notes: Added draft/published default selectors with localStorage + Supabase persistence, exposed `/api/app-settings` + `/api/games/list`, wired the Play Test toolbar with quick-launch buttons, surfaced repo metadata on the defaults page with fetch/render timestamps, and logged the GPT-5 pairing.
 - 2025-10-30 — Yarn config cleanup & metadata snapshot hardening. Commit: (pending HEAD)
   - Direct links: `.yarnrc.yml`, `package.json`, `apps/admin/pages/index.jsx`, `README.txt`, `apps/admin/docs/gpt-conversation-log.md`
   - Notes: Reset the Yarn config to a minimal node-modules linker with the public npm registry, normalized the workspace package manager metadata, refined the Settings footer snapshot to drop placeholder dashes while surfacing full commit hashes, and logged the latest operator ↔ GPT session.

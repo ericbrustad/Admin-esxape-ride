@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-30T15:45:00Z
+
+**You:** Codex wants a dedicated defaults editor that stores the draft/published slugs locally but also persists through Supabase when the `app_settings` table exists—plus a quick way to open those defaults from the Play Test tab and a footer snapshot with repo, branch, commit, deployment, and timestamps. Capture the GPT-5 thinking that confirmed the approach.
+
+**GPT:** Added `/api/app-settings` with graceful fallbacks, a `/api/games/list` helper, new `DefaultGameControls` and `HomeDefaultButtons` components, and a `settings-defaults` page that logs the repo snapshot with fetch/render timestamps. Wired the Play Test toolbar to surface the open buttons and recorded this conversation for traceability.
+
+---
+
 **Timestamp:** 2025-10-29T01:45:00Z
 
 **You:** The Settings footer still feels noisy—can you collapse the metadata rows into one dev snapshot line, keep the repo/branch/commit/deployment pulled from NEXT_PUBLIC env vars, and retest without using yarn?
