@@ -50,6 +50,14 @@ export function AppearanceEditor({ value, onChange }) {
             onChange={(e)=>onChange({ ...a, textBgOpacity:Number(e.target.value) })}/>
           <div style={{ color:'#9fb0bf', fontSize:12, marginTop:4 }}>{(a.textBgOpacity*100).toFixed(0)}%</div>
         </Field>
+        <Field label="Text shadow (CSS)">
+          <input
+            style={styles.input}
+            value={a.textShadow || ''}
+            onChange={(e)=>onChange({ ...a, textShadow:e.target.value })}
+            placeholder="0 2px 8px rgba(0,0,0,0.45)"
+          />
+        </Field>
         <ColorField label="Screen background color" value={a.screenBgColor} onChange={(v)=>onChange({ ...a, screenBgColor:v })}/>
         <Field label="Screen background opacity">
           <input type="range" min={0} max={1} step={0.05} value={a.screenBgOpacity}
@@ -87,6 +95,7 @@ export function AppearanceEditor({ value, onChange }) {
           background:`rgba(${hexToRgb(a.textBgColor)}, ${a.textBgOpacity})`,
           padding:'6px 10px', borderRadius:8, color:a.fontColor, fontFamily:a.fontFamily, fontSize:a.fontSizePx,
           textAlign:a.textAlign, width:'fit-content',
+          textShadow:a.textShadow || 'none',
           justifySelf: a.textAlign==='left' ? 'start' : a.textAlign==='right' ? 'end' : 'center',
         }}>
           Preview text
