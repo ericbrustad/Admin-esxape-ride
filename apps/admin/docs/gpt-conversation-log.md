@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-30T15:45:00Z
+
+**You:** Codex wants a dedicated defaults editor that stores the draft/published slugs locally but also persists through Supabase when the `app_settings` table exists—plus a quick way to open those defaults from the Play Test tab and a footer snapshot with repo, branch, commit, deployment, and timestamps. Capture the GPT-5 thinking that confirmed the approach.
+
+**GPT:** Added `/api/app-settings` with graceful fallbacks, a `/api/games/list` helper, new `DefaultGameControls` and `HomeDefaultButtons` components, and a `settings-defaults` page that logs the repo snapshot with fetch/render timestamps. Wired the Play Test toolbar to surface the open buttons and recorded this conversation for traceability.
+
+---
+
 **Timestamp:** 2025-10-29T01:45:00Z
 
 **You:** The Settings footer still feels noisy—can you collapse the metadata rows into one dev snapshot line, keep the repo/branch/commit/deployment pulled from NEXT_PUBLIC env vars, and retest without using yarn?
@@ -137,3 +145,11 @@
 **You:** Reset the Yarn workspace config to drop the invalid descriptors and make the Settings footer show the repo, branch, commit, deployment, and timestamp without placeholder dashes.
 
 **GPT:** Replaced the Yarn config with a minimal node-modules linker, normalized the root package manager metadata, filtered the footer snapshot so only real values render (including the full commit hash), and reran the admin build smoke test.
+
+---
+
+**Timestamp:** 2025-10-30T00:00:00Z
+
+**You:** Hide every legacy “Open …” button and keep the settings menu as the single launch surface.
+
+**GPT:** Replaced the default button component with a no-op stub, added a MutationObserver guard to hide any remaining “Open …” triggers, and mounted the guard from the admin shell.
