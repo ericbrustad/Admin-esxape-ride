@@ -721,6 +721,8 @@ function slugifyTitle(value) {
     .slice(0, 48);
 }
 
+const DEFAULT_SNAPSHOT_KEY = 'erix.defaultOriginalSnapshot';
+
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
   const gameEnabled = GAME_ENABLED;
@@ -1379,13 +1381,116 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [overwriteDefaultSnapshot, setOverwriteDefaultSnapshot] = useState(false);
+  const [defaultSlug, setDefaultSlug] = useState(() => {
+    if (typeof window !== 'undefined' && window.__ERIX__ && window.__ERIX__.defaultSlug) {
+      return window.__ERIX__.defaultSlug || 'default';
+    }
+    return 'default';
+  });
+  const [defaultSnapshotMeta, setDefaultSnapshotMeta] = useState(null);
 
   const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
+
+  const setActiveTagsToOnly = useCallback((slug) => {
+    const normalized = String(slug || '').trim();
+    if (!normalized) return;
+    setGameTagsDraft(normalized);
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const nextGame = { ...(prev.game || {}), tags: [normalized] };
+      return normalizeGameMetadata({ ...prev, game: nextGame }, normalized);
+    });
+    try {
+      if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setActiveTags === 'function') {
+        window.__ERIX__.setActiveTags([normalized]);
+      }
+    } catch {}
+    try {
+      if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setTagFilter === 'function') {
+        window.__ERIX__.setTagFilter([normalized]);
+      }
+    } catch {}
+  }, []);
+
+  const readDefaultSnapshot = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return JSON.parse(window.localStorage.getItem(DEFAULT_SNAPSHOT_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const writeDefaultSnapshot = useCallback((snapshot) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(DEFAULT_SNAPSHOT_KEY, JSON.stringify(snapshot || null));
+    } catch {}
+  }, []);
+
+  const cloneForSnapshot = useCallback((value) => {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const buildDefaultSnapshotPayload = useCallback(() => {
+    if (!config) return null;
+    const normalizedSlug = slugForMeta || 'default';
+    const payload = {
+      slug: normalizedSlug,
+      title: config?.game?.title || '',
+      channel: headerStatus,
+      capturedAt: new Date().toISOString(),
+      config: cloneForSnapshot(normalizeGameMetadata({ ...config }, normalizedSlug)),
+      suite: cloneForSnapshot({
+        version: suite?.version || '0.0.0',
+        missions: Array.isArray(suite?.missions) ? suite.missions : [],
+      }),
+    };
+    return payload;
+  }, [cloneForSnapshot, config, headerStatus, slugForMeta, suite]);
+
+  const ensureDefaultSnapshotFromState = useCallback(() => {
+    if (slugForMeta !== defaultSlug) return;
+    const existing = readDefaultSnapshot();
+    if (existing) return existing;
+    const snapshot = buildDefaultSnapshotPayload();
+    if (snapshot) writeDefaultSnapshot(snapshot);
+    return snapshot;
+  }, [buildDefaultSnapshotPayload, defaultSlug, readDefaultSnapshot, slugForMeta, writeDefaultSnapshot]);
 
   useEffect(() => {
     const tags = Array.isArray(config?.game?.tags) ? config.game.tags : [];
     setGameTagsDraft(tags.join(', '));
   }, [config?.game?.tags]);
+
+  useEffect(() => {
+    if (!config) return;
+    const captured = ensureDefaultSnapshotFromState();
+    if (captured) setDefaultSnapshotMeta(captured);
+  }, [config, ensureDefaultSnapshotFromState]);
+
+  useEffect(() => {
+    const fallbackTitle = (!config || !(config.game && config.game.title))
+      ? (activeSlug === 'default' ? STARFIELD_DEFAULTS.title : activeSlug || '')
+      : '';
+    const nextTitle = (config?.game?.title || '').trim() || fallbackTitle;
+    setTitleDraft(nextTitle);
+  }, [activeSlug, config?.game?.title]);
+
+  useEffect(() => {
+    setActiveTagsToOnly(slugForMeta);
+  }, [setActiveTagsToOnly, slugForMeta]);
+
+  useEffect(() => {
+    const stored = readDefaultSnapshot();
+    if (stored) setDefaultSnapshotMeta(stored);
+  }, [readDefaultSnapshot]);
 
   useEffect(() => {
     try {
@@ -2868,6 +2973,124 @@ export default function Admin() {
   const headerCoverThumb = viewConfig?.game?.coverImage
     ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
+  const currentSlugDisplay = config?.game?.slug || slugForMeta;
+  const normalizedExistingTitle = (headerGameTitle || '').trim();
+  const normalizedDraftTitle = (titleDraft || '').trim();
+  const currentSlugValue = activeSlug || 'default';
+  const slugPreview = isDefaultSlug(currentSlugValue)
+    ? currentSlugDisplay
+    : (slugifyTitle(normalizedDraftTitle) || slugifyTitle(normalizedExistingTitle) || currentSlugDisplay || currentSlugValue);
+  const disableSaveTitle = !normalizedDraftTitle
+    || (normalizedDraftTitle === normalizedExistingTitle && slugPreview === currentSlugDisplay);
+  const defaultSnapshotCapturedLabel = defaultSnapshotMeta?.capturedAt
+    ? formatLocalDateTime(defaultSnapshotMeta.capturedAt)
+    : '';
+  const defaultSnapshotTitle = defaultSnapshotMeta?.title || '';
+  const disableDefaultAction = !overwriteDefaultSnapshot && !defaultSnapshotMeta;
+
+  const handleSaveTitle = useCallback(() => {
+    const currentSlug = activeSlug || 'default';
+    const draftTitle = (titleDraft || '').trim();
+    const fallbackTitle = draftTitle || (currentSlug === 'default' ? STARFIELD_DEFAULTS.title : currentSlug);
+    const nextTitle = draftTitle || fallbackTitle;
+    const slugCandidate = slugifyTitle(nextTitle) || currentSlug;
+    const nextSlug = isDefaultSlug(currentSlug) ? currentSlug : slugCandidate;
+    if (nextTitle === normalizedExistingTitle && nextSlug === currentSlugDisplay) {
+      setStatus('Title already up to date');
+      return;
+    }
+    setConfig((prev) => {
+      const base = prev ? { ...prev } : defaultConfig();
+      const nextGame = {
+        ...(base.game || {}),
+        title: nextTitle,
+        slug: nextSlug,
+      };
+      return normalizeGameMetadata({ ...base, game: nextGame }, nextSlug);
+    });
+    setDirty(true);
+    setTitleDraft(nextTitle);
+    logConversation('You', `Renamed game to ${nextTitle} (${nextSlug})`);
+    logConversation('GPT', 'Rename applied locally. Save the draft to persist it.');
+    setStatus(`Updated title to “${nextTitle}”`);
+    setActiveTagsToOnly(nextSlug);
+    if (currentSlug !== nextSlug) {
+      setActiveSlug(nextSlug);
+    }
+    setGames((prevGames) => {
+      if (!Array.isArray(prevGames)) return prevGames;
+      return prevGames.map((game) => {
+        if (!game || !game.slug) return game;
+        if (game.slug !== currentSlug && game.slug !== currentSlugDisplay) return game;
+        return { ...game, slug: nextSlug, title: nextTitle };
+      });
+    });
+    setGamesIndex((prevIndex) => {
+      if (!prevIndex || !prevIndex.bySlug) return prevIndex;
+      const base = { ...prevIndex.bySlug };
+      const candidateKeys = [currentSlug, currentSlugDisplay, nextSlug];
+      const existingKey = candidateKeys.find((key) => key && base[key]);
+      const existing = existingKey ? base[existingKey] : undefined;
+      const updated = existing
+        ? {
+            ...existing,
+            draft: existing.draft
+              ? { ...existing.draft, slug: nextSlug, title: nextTitle }
+              : { slug: nextSlug, title: nextTitle },
+          }
+        : {
+            draft: { slug: nextSlug, title: nextTitle },
+          };
+      candidateKeys.forEach((key) => {
+        if (key && key !== nextSlug) delete base[key];
+      });
+      base[nextSlug] = {
+        ...updated,
+        published: existing?.published ? { ...existing.published } : updated.published,
+      };
+      return { bySlug: base, count: Object.keys(base).length };
+    });
+  }, [activeSlug, currentSlugDisplay, defaultConfig, logConversation, normalizedExistingTitle, setActiveSlug, setActiveTagsToOnly, setConfig, setDirty, setGames, setGamesIndex, setStatus, slugForMeta, titleDraft]);
+
+  const handleDefaultSnapshotAction = useCallback(() => {
+    if (slugForMeta !== defaultSlug) return;
+    if (overwriteDefaultSnapshot) {
+      const snapshot = buildDefaultSnapshotPayload();
+      if (snapshot) {
+        writeDefaultSnapshot(snapshot);
+        setDefaultSnapshotMeta(snapshot);
+        setOverwriteDefaultSnapshot(false);
+        logConversation('You', 'Overwrote original default snapshot');
+        logConversation('GPT', 'Default snapshot refreshed. Use reset to restore this state later.');
+        setStatus('Saved new original default snapshot');
+      }
+      return;
+    }
+    const stored = readDefaultSnapshot();
+    if (!stored) {
+      setStatus('No stored default snapshot to restore');
+      logConversation('GPT', 'No original default snapshot is available yet.');
+      return;
+    }
+    try {
+      const restoredConfig = stored.config ? normalizeGameMetadata({ ...stored.config }, slugForMeta) : null;
+      if (restoredConfig) setConfig(restoredConfig);
+      if (stored.suite) {
+        const missionsList = Array.isArray(stored.suite.missions) ? stored.suite.missions : [];
+        setSuite({ version: stored.suite.version || '0.0.0', missions: missionsList });
+      }
+      if (stored.title) setTitleDraft(stored.title);
+      setDirty(true);
+      setActiveTagsToOnly(slugForMeta);
+      setDefaultSnapshotMeta(stored);
+      logConversation('You', 'Reset default game to original snapshot');
+      logConversation('GPT', 'Default content restored locally. Save to push it upstream.');
+      setStatus('Restored original default snapshot');
+      setOverwriteDefaultSnapshot(false);
+    } catch (err) {
+      setStatus('Unable to restore default snapshot');
+    }
+  }, [buildDefaultSnapshotPayload, defaultSlug, logConversation, overwriteDefaultSnapshot, readDefaultSnapshot, setActiveTagsToOnly, setConfig, setDefaultSnapshotMeta, setDirty, setStatus, setSuite, setTitleDraft, slugForMeta, writeDefaultSnapshot]);
 
   const envRepoOwner = process.env.NEXT_PUBLIC_REPO_OWNER
     || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_OWNER
@@ -3985,6 +4208,7 @@ export default function Admin() {
               <SavedGamesPicker
                 games={savedGamesList}
                 value={savedGamesValue}
+                defaultSlug={defaultSlug}
                 onChange={(val) => {
                   setConfirmDeleteOpen(false);
                   const [slug, channel] = String(val || '').split(':');
@@ -3997,6 +4221,9 @@ export default function Admin() {
                     ? `${match.title || match.slug}${normalized === 'published' ? ' (published)' : ' (draft)'}`
                     : undefined;
                   applyOpenGameFromMenu(slug, normalized, label);
+                  setActiveTagsToOnly(slug);
+                  logConversation('You', `Switched to ${label || slug}`);
+                  logConversation('GPT', 'Tag filters updated to focus on the selected game.');
                 }}
               />
               <div>
@@ -4074,18 +4301,87 @@ export default function Admin() {
                 )}
               </div>
             </div>
-            <div style={S.gameTitleRow}>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Game Title</div>
-                <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+            <div style={S.titleEditorBlock}>
+              <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
+              <input
+                id="admin-title-input"
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                placeholder="Enter game title"
+                style={S.titleInput}
+              />
+              <div style={S.slugWarning}>
+                Changing the title will also update this game’s <strong>tag</strong> to{' '}
+                <code style={S.slugMetaCode}>{slugPreview}</code>.
               </div>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Slug</div>
-                <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
-                <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
+              <div style={S.slugMetaRow}>
+                <div style={S.slugMetaItem}>
+                  <span style={S.slugMetaLabel}>Current tag:</span>{' '}
+                  <code style={S.slugMetaCode}>{currentSlugDisplay}</code>
+                </div>
+                <div style={S.slugMetaItem}>
+                  <span style={S.slugMetaLabel}>Preview tag:</span>{' '}
+                  <code style={S.slugMetaCode}>{slugPreview}</code>
+                </div>
+              </div>
+              <div style={S.titleActionsRow}>
+                <button
+                  type="button"
+                  onClick={handleSaveTitle}
+                  disabled={disableSaveTitle}
+                  style={{
+                    ...S.saveTitleButton,
+                    ...(disableSaveTitle ? S.saveTitleButtonDisabled : {}),
+                  }}
+                >
+                  Save Title
+                </button>
               </div>
             </div>
+
+            {slugForMeta === defaultSlug && (
+              <div style={S.defaultControlsBlock}>
+                <div style={S.defaultControlsHeading}>Default Game Controls</div>
+                <label style={S.defaultOverwriteToggle}>
+                  <input
+                    type="checkbox"
+                    checked={overwriteDefaultSnapshot}
+                    onChange={(e) => {
+                      setOverwriteDefaultSnapshot(e.target.checked);
+                      logConversation('You', e.target.checked
+                        ? 'Armed overwrite for default snapshot'
+                        : 'Cancelled default snapshot overwrite');
+                    }}
+                  />
+                  <span style={{
+                    ...S.defaultOverwriteLabel,
+                    ...(overwriteDefaultSnapshot ? S.defaultOverwriteLabelActive : {}),
+                  }}>
+                    Overwrite Original Default (RED when on)
+                  </span>
+                </label>
+                <div style={S.defaultControlsRow}>
+                  <button
+                    type="button"
+                    onClick={handleDefaultSnapshotAction}
+                    disabled={disableDefaultAction}
+                    style={{
+                      ...S.defaultActionButton,
+                      ...(overwriteDefaultSnapshot ? S.defaultActionButtonArmed : {}),
+                      ...(disableDefaultAction ? S.defaultActionButtonDisabled : {}),
+                    }}
+                  >
+                    {overwriteDefaultSnapshot ? 'Save as New Original Default' : 'Reset to Original Default'}
+                  </button>
+                  <div style={S.defaultSnapshotNote}>
+                    {defaultSnapshotCapturedLabel
+                      ? `Original snapshot captured ${defaultSnapshotCapturedLabel}${defaultSnapshotTitle ? ` — ${defaultSnapshotTitle}` : ''}`
+                      : 'Snapshot not captured yet. Saving will create one automatically.'}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={S.coverControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
@@ -5458,41 +5754,149 @@ const S = {
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
-  gameTitleRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 16,
-    alignItems: 'stretch',
-    marginBottom: 16,
-  },
   fieldLabel: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  readonlyField: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+  titleEditorBlock: {
+    display: 'grid',
+    gap: 8,
+    marginBottom: 16,
     padding: '12px 16px',
     borderRadius: 14,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-input-bg)',
     boxShadow: 'var(--admin-glass-sheen)',
   },
-  readonlyValue: {
-    fontSize: 18,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    wordBreak: 'break-word',
+  titleInput: {
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: '1px solid var(--admin-border-soft)',
+    fontSize: 15,
+    fontWeight: 500,
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+    background: 'var(--admin-panel-bg)',
   },
-  readonlyCode: {
-    display: 'inline-block',
+  slugWarning: {
+    fontSize: 12,
+    color: '#b45309',
+    background: 'rgba(251, 191, 36, 0.12)',
+    border: '1px solid rgba(251, 191, 36, 0.4)',
+    borderRadius: 10,
+    padding: '8px 10px',
+  },
+  slugMetaRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+  },
+  slugMetaItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  slugMetaLabel: {
+    fontWeight: 600,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  slugMetaCode: {
+    fontFamily: 'ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: 12,
+    padding: '2px 8px',
+    borderRadius: 8,
+    background: 'rgba(148, 163, 184, 0.15)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  titleActionsRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  saveTitleButton: {
+    fontSize: 13,
+    fontWeight: 600,
+    padding: '8px 18px',
+    borderRadius: 12,
+    border: '1px solid rgba(59, 130, 246, 0.4)',
+    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(37, 99, 235, 0.08))',
+    color: '#0f172a',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+  },
+  saveTitleButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+  },
+  defaultControlsBlock: {
+    marginTop: 12,
+    padding: '12px 16px',
+    borderRadius: 14,
+    border: '1px solid rgba(59, 130, 246, 0.18)',
+    background: 'rgba(59, 130, 246, 0.06)',
+    display: 'grid',
+    gap: 10,
+  },
+  defaultControlsHeading: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  defaultOverwriteToggle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 10,
+    cursor: 'pointer',
+    userSelect: 'none',
+  },
+  defaultOverwriteLabel: {
+    fontSize: 12,
+    fontWeight: 600,
     padding: '4px 10px',
     borderRadius: 999,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    fontWeight: 600,
-    letterSpacing: '0.08em',
+    border: '1px solid rgba(59, 130, 246, 0.35)',
+    background: 'rgba(59, 130, 246, 0.12)',
+    color: '#1d4ed8',
+  },
+  defaultOverwriteLabelActive: {
+    borderColor: 'rgba(239, 68, 68, 0.6)',
+    background: 'rgba(239, 68, 68, 0.12)',
+    color: '#991b1b',
+  },
+  defaultControlsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+  },
+  defaultActionButton: {
+    fontSize: 13,
+    fontWeight: 700,
+    padding: '8px 16px',
+    borderRadius: 12,
+    border: '1px solid rgba(59, 130, 246, 0.35)',
+    background: 'white',
+    color: '#0f172a',
+    cursor: 'pointer',
+  },
+  defaultActionButtonArmed: {
+    borderColor: 'rgba(239, 68, 68, 0.55)',
+    background: 'rgba(239, 68, 68, 0.14)',
+    color: '#7f1d1d',
+  },
+  defaultActionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  defaultSnapshotNote: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    flex: '1 1 auto',
   },
   coverControlsRow: {
     display: 'flex',
