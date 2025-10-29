@@ -2,6 +2,22 @@
 
 ---
 
+**Timestamp:** 2025-10-31T10:45:00Z
+
+**You:** Codex noted the legacy Draft/Published hider was nuking the new header actions—add a scoped header id and keep the helper from touching anything inside it.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, tagged the `HeaderBar` root with an `id`/`data-ui` hook, updated the legacy toggle hider to ignore elements inside that container while limiting the hide sweep to the old top-left region, and rechecked the header actions to ensure they remain visible.
+
+---
+
+**Timestamp:** 2025-10-31T09:10:00Z
+
+**You:** Add global Update / Save & Publish controls to the admin header, capture full game snapshots for Supabase, and make sure ChatGPT-5 thinking signs off on the wiring.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, added Supabase-backed save-full and save-and-publish API routes, exposed the new header actions that trigger the snapshot workflow, and verified the Settings footer metadata remains intact.
+
+---
+
 **Timestamp:** 2025-10-29T13:42:41Z
 
 **You:** The Settings title box is still pulling the dark theme background and the tags list keeps default/default-game when I switch or rename games. Fix the styling and make sure we only keep the active slug.
