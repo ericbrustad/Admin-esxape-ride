@@ -1,4 +1,5 @@
 import { supaService } from '../../lib/supabase/server.js';
+import { upsertReturning } from '../../lib/supabase/upsertReturning.js';
 
 function normalizeSlug(value) {
   const slug = String(value || '').trim();
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
 
     const now = new Date().toISOString();
 
-    const gameResult = await supa.from('games').upsert({
+    const gameResult = await upsertReturning(supa, 'games', {
       slug,
       channel: 'draft',
       title: gameMeta?.title || slug,
@@ -78,11 +79,7 @@ export default async function handler(req, res) {
       updated_at: now,
     });
 
-    if (gameResult?.error) {
-      throw gameResult.error;
-    }
-
-    const gameRow = Array.isArray(gameResult?.data) ? gameResult.data[0] : gameResult?.data;
+    const gameRow = Array.isArray(gameResult) ? gameResult[0] : gameResult;
     const gameId = gameRow?.id || null;
 
     const missionPayload = {
@@ -109,15 +106,18 @@ export default async function handler(req, res) {
     };
     if (gameId) powerupPayload.game_id = gameId;
 
-    const [missionsResult, devicesResult, powerupsResult] = await Promise.all([
-      supa.from('missions').upsert(missionPayload),
-      supa.from('devices').upsert(devicePayload),
-      supa.from('powerups').upsert(powerupPayload).catch(() => ({ error: null })),
+    await Promise.all([
+      upsertReturning(supa, 'missions', missionPayload),
+      upsertReturning(supa, 'devices', devicePayload),
     ]);
 
-    const failure = [missionsResult, devicesResult, powerupsResult].find((result) => result?.error);
-    if (failure && failure.error) {
-      throw failure.error;
+    try {
+      await upsertReturning(supa, 'powerups', powerupPayload);
+    } catch (powerupError) {
+      // Historical installs may not have a powerups table; ignore errors to keep parity.
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Powerups upsert failed (ignored):', powerupError);
+      }
     }
 
     return res.status(200).json({ ok: true, slug, updated_at: now });
