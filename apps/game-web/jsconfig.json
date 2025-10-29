@@ -1,8 +1,0 @@
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@supabase/supabase-js": ["../packages/supabase-js-stub/dist/index"]
-    }
-  }
-}

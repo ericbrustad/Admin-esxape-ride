@@ -13,7 +13,7 @@
     "verify:binaries": "node scripts/list-binary-files.mjs --fail"
   },
   "dependencies": {
-    "@supabase/supabase-js": "workspace:^2.45.4",
+    "@supabase/supabase-js": "^2.45.4",
     "next": "^15.5.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"

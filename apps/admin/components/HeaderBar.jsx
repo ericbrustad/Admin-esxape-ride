@@ -12,9 +12,7 @@ export default function HeaderBar({
   isSettings = false,
   status = 'draft', // 'draft' | 'published'
   onBack = () => {},
-  onGo = () => {}, // (key) => void ; keys: 'settings','missions','devices','text','assigned','media','new','save','publish','update','save_and_publish'
-  onUpdate = null,
-  onSaveAndPublish = null,
+  onGo = () => {}, // (key) => void ; keys: 'settings','missions','devices','text','assigned','media','new','save','publish'
 }) {
   const S = styles;
   const statusIsPublished = String(status).toLowerCase() === 'published';
@@ -52,28 +50,14 @@ export default function HeaderBar({
             <button type="button" style={S.action} onClick={() => onGo('assigned')}>Assigned Media</button>
             <button type="button" style={S.action} onClick={() => onGo('media')}>Media Pool</button>
             <div style={S.railSpacer} />
+            <button type="button" style={S.safe} onClick={() => onGo('save')}>Save Draft</button>
+            <button type="button" style={S.publish} onClick={() => onGo('publish')}>Publish Now</button>
           </div>
         )}
       </div>
 
-      {/* Right: global save actions + status */}
+      {/* Right: tiny global status statement */}
       <div style={S.right}>
-        <button
-          type="button"
-          onClick={() => (onUpdate ? onUpdate() : onGo('update'))}
-          style={S.updateBtn}
-          title="Save (stay in current channel)"
-        >
-          Update
-        </button>
-        <button
-          type="button"
-          onClick={() => (onSaveAndPublish ? onSaveAndPublish() : onGo('save_and_publish'))}
-          style={S.savePublishBtn}
-          title="Save changes and publish live"
-        >
-          Save &amp; Publish
-        </button>
         <span style={{ ...S.status, ...statusStyle }}>{statusLabel}</span>
       </div>
     </header>
@@ -119,31 +103,29 @@ const styles = {
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
-  railSpacer: { width: 10, flex: '0 0 auto' },
-
-  right: { display: 'flex', alignItems: 'center', gap: 8 },
-  updateBtn: {
+  safe: {
     fontSize: 12,
-    padding: '6px 10px',
+    padding: '6px 12px',
     borderRadius: 12,
-    border: '1px solid rgba(15,23,42,0.12)',
-    background: 'white',
+    border: '1px solid rgba(16,185,129,0.3)',
+    background: 'rgba(16,185,129,0.08)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
     fontWeight: 600,
   },
-  savePublishBtn: {
+  publish: {
     fontSize: 12,
-    padding: '6px 10px',
+    padding: '6px 12px',
     borderRadius: 12,
-    border: '1px solid rgba(34,197,94,0.45)',
-    background: 'rgba(34,197,94,0.25)',
-    opacity: 0.5,
+    border: '1px solid rgba(59,130,246,0.35)',
+    background: 'rgba(59,130,246,0.08)',
     cursor: 'pointer',
     whiteSpace: 'nowrap',
-    fontWeight: 700,
-    color: '#065f46',
+    fontWeight: 600,
   },
+  railSpacer: { width: 10, flex: '0 0 auto' },
+
+  right: { display: 'flex', alignItems: 'center', gap: 8 },
   status: {
     fontSize: 12,
     padding: '4px 8px',
