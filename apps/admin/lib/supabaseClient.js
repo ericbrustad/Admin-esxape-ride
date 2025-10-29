@@ -1,4 +1,4 @@
-const { createClient } = require('../../../packages/supabase-js-stub/dist/index.cjs');
+import { createClient } from '@supabase/supabase-js';
 
 export function browserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

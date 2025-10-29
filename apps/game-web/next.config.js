@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const path = require('path');
-
 const nextConfig = {
   reactStrictMode: false,
   poweredByHeader: false,
@@ -12,12 +10,6 @@ const nextConfig = {
       { source: '/g/:slug', destination: '/?slug=:slug&channel=' + defaultChannel },
       { source: '/:slug', destination: '/?slug=:slug&channel=' + defaultChannel },
     ];
-  },
-  webpack(config) {
-    config.resolve = config.resolve || {};
-    config.resolve.alias = config.resolve.alias || {};
-    config.resolve.alias['@supabase/supabase-js'] = path.resolve(__dirname, '../../packages/supabase-js-stub');
-    return config;
   },
 };
 

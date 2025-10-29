@@ -1206,7 +1206,7 @@ export default function Admin() {
     };
   }, []);
 
-  const refreshGamesIndex = useCallback(async () => {
+  async function refreshGamesIndex() {
     try {
       const [draftResponse, publishedResponse] = await Promise.all([
         fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' })
@@ -1235,20 +1235,7 @@ export default function Admin() {
     } catch {
       // ignore index refresh errors; UI can recover on next attempt
     }
-  }, [setGamesIndex]);
-
-  const reloadGamesList = useCallback(async () => {
-    if (!gameEnabled) {
-      setGames([]);
-      setGamesIndex({ bySlug: {}, count: 0 });
-      return;
-    }
-    try {
-      const r = await fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' });
-      const j = await r.json();
-      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
-    } catch {}
-  }, [gameEnabled]);
+  }
 
   useEffect(() => {
     refreshGamesIndex();
@@ -1860,98 +1847,6 @@ export default function Admin() {
     await publishNow();
   }
 
-  const getSnapshotFor = useCallback(
-    async (slug) => {
-      const normalizedSlug = String(slug || 'default').trim() || 'default';
-      try {
-        if (typeof window !== 'undefined' && window.__ERIX__?.getGameSnapshot) {
-          const snap = await window.__ERIX__.getGameSnapshot(normalizedSlug);
-          if (snap) return snap;
-        }
-      } catch (error) {
-        console.warn('getGameSnapshot bridge failed', error);
-      }
-
-      const clonedConfig = config ? cloneForSnapshot(normalizeGameMetadata({ ...config }, normalizedSlug)) : null;
-      const baseSuite = suite
-        ? {
-            version: suite?.version || '0.0.0',
-            missions: cloneForSnapshot(Array.isArray(suite?.missions) ? suite.missions : []),
-          }
-        : { version: '0.0.0', missions: [] };
-
-      return {
-        meta: {
-          slug: normalizedSlug,
-          title: clonedConfig?.game?.title || normalizedSlug,
-          channel: headerStatus,
-          capturedAt: new Date().toISOString(),
-        },
-        data: {
-          config: clonedConfig,
-          suite: baseSuite,
-        },
-      };
-    },
-    [cloneForSnapshot, config, headerStatus, suite],
-  );
-
-  const saveFull = useCallback(
-    async (publish = false) => {
-      const slug = activeSlug || 'default';
-      const intentLabel = publish ? 'Save & Publish' : 'Update';
-      logConversation('You', `Triggered ${intentLabel} for ${slug}`);
-      if (!slug) return;
-      setSaveBusy(true);
-      setStatus(publish ? 'Saving snapshot & publishing…' : 'Saving snapshot…');
-      try {
-        const snapshot = await getSnapshotFor(slug);
-        if (!snapshot) throw new Error('Snapshot unavailable');
-
-        let handled = false;
-        try {
-          if (typeof window !== 'undefined' && window.__ERIX__?.saveFullGame) {
-            await window.__ERIX__.saveFullGame({ slug, publish, snapshot });
-            handled = true;
-          }
-        } catch (bridgeError) {
-          console.warn('saveFullGame bridge failed', bridgeError);
-        }
-
-        if (!handled) {
-          const endpoint = publish ? '/api/games/save-and-publish' : '/api/games/save-full';
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              slug,
-              channel: publish ? 'published' : headerStatus,
-              snapshot,
-            }),
-          });
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(text || 'Save request failed');
-          }
-        }
-
-        setStatus(publish ? '✅ Snapshot saved & published' : '✅ Snapshot updated');
-        logConversation('GPT', publish ? `Saved and published ${slug}` : `Snapshot updated for ${slug}`);
-        await reloadGamesList();
-        await refreshGamesIndex();
-        if (publish) setPreviewNonce((n) => n + 1);
-      } catch (error) {
-        const message = error?.message || 'snapshot save failed';
-        setStatus(`❌ ${intentLabel} failed: ${message}`);
-        logConversation('GPT', `${intentLabel} failed for ${slug}: ${message}`);
-      } finally {
-        setSaveBusy(false);
-      }
-    },
-    [activeSlug, getSnapshotFor, headerStatus, logConversation, reloadGamesList, refreshGamesIndex, setPreviewNonce, setStatus],
-  );
-
   async function runSettingsMenuAction(action) {
     if (typeof action !== 'function') return;
     try {
@@ -1988,18 +1883,25 @@ export default function Admin() {
         case 'publish':
           runSettingsMenuAction(() => publishNow());
           break;
-        case 'update':
-          runSettingsMenuAction(() => saveFull(false));
-          break;
-        case 'save_and_publish':
-          runSettingsMenuAction(() => saveFull(true));
-          break;
         default:
           break;
       }
     },
-    [openNewGameModal, publishNow, saveDraftNow, saveFull],
+    [openNewGameModal, publishNow, saveDraftNow],
   );
+
+  const reloadGamesList = useCallback(async () => {
+    if (!gameEnabled) {
+      setGames([]);
+      setGamesIndex({ bySlug: {}, count: 0 });
+      return;
+    }
+    try {
+      const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
+      const j = await r.json();
+      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
+    } catch {}
+  }, [gameEnabled]);
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
@@ -3360,8 +3262,6 @@ export default function Admin() {
           status={headerStatus}
           onBack={() => setTab('missions')}
           onGo={handleHeaderNav}
-          onUpdate={() => saveFull(false)}
-          onSaveAndPublish={() => saveFull(true)}
         />
       </div>
       <div style={S.headerControls}>
