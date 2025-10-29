@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import HeaderBar from '../components/HeaderBar';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
 import AnswerResponseEditor from '../components/AnswerResponseEditor';
 import InlineMissionResponses from '../components/InlineMissionResponses';
 import AssignedMediaTab from '../components/AssignedMediaTab';
 import SafeBoundary from '../components/SafeBoundary';
+import SavedGamesPicker from '../components/Settings/SavedGamesPicker';
+import HideLegacyStatusToggles from '../components/HideLegacyStatusToggles';
 import { AppearanceEditor } from '../components/ui-kit';
 import {
   normalizeTone,
@@ -685,14 +688,8 @@ function normalizeGameMetadata(cfg, slug = '') {
     cleaned.push(normalizedSlug);
     seen.add(normalizedSlug);
   }
-  if (normalizedSlug === 'default') {
-    STARFIELD_DEFAULTS.tags.forEach((tag) => {
-      const key = tag.toLowerCase();
-      if (seen.has(key)) return;
-      cleaned.push(tag);
-      seen.add(key);
-    });
-  }
+  // Legacy defaults like "default-game" are no longer auto-inserted —
+  // keep only the tags explicitly provided by the caller plus the slug itself.
   const normalizedTitle = (game.title || '').toString().trim();
   const normalizedType = (game.type || '').toString().trim();
   const normalizedCover = typeof game.coverImage === 'string' ? game.coverImage.trim() : '';
@@ -717,6 +714,8 @@ function slugifyTitle(value) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
 }
+
+const DEFAULT_SNAPSHOT_KEY = 'erix.defaultOriginalSnapshot';
 
 /* ───────────────────────── Root ───────────────────────── */
 export default function Admin() {
@@ -1106,12 +1105,10 @@ export default function Admin() {
   const [showRings, setShowRings] = useState(true);
   const [testChannel, setTestChannel] = useState('draft');
   const [editChannel, setEditChannel] = useState('draft');
+  const headerStatus = editChannel === 'published' ? 'published' : 'draft';
   const [saveBusy, setSaveBusy] = useState(false);
   const [openGameModal, setOpenGameModal] = useState(false);
   const [gamesIndex, setGamesIndex] = useState({ bySlug: {}, count: 0 });
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsMenuRef = useRef(null);
-
   const [selected, setSelected] = useState(null);
   const [editing, setEditing]   = useState(null);
   const editingIsNew = useMemo(() => {
@@ -1141,25 +1138,6 @@ export default function Admin() {
     })();
     return ()=> { mounted = false; };
   },[fetchInventory]);
-
-  useEffect(() => {
-    if (!settingsMenuOpen) return undefined;
-    function handlePointer(event) {
-      if (!settingsMenuRef.current) return;
-      if (settingsMenuRef.current.contains(event.target)) return;
-      setSettingsMenuOpen(false);
-    }
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('touchstart', handlePointer);
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('touchstart', handlePointer);
-    };
-  }, [settingsMenuOpen]);
-
-  useEffect(() => {
-    setSettingsMenuOpen(false);
-  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1228,7 +1206,7 @@ export default function Admin() {
     };
   }, []);
 
-  async function refreshGamesIndex() {
+  const refreshGamesIndex = useCallback(async () => {
     try {
       const [draftResponse, publishedResponse] = await Promise.all([
         fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' })
@@ -1257,7 +1235,20 @@ export default function Admin() {
     } catch {
       // ignore index refresh errors; UI can recover on next attempt
     }
-  }
+  }, [setGamesIndex]);
+
+  const reloadGamesList = useCallback(async () => {
+    if (!gameEnabled) {
+      setGames([]);
+      setGamesIndex({ bySlug: {}, count: 0 });
+      return;
+    }
+    try {
+      const r = await fetch('/api/games?list=1&channel=draft', { credentials: 'include', cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
+    } catch {}
+  }, [gameEnabled]);
 
   useEffect(() => {
     refreshGamesIndex();
@@ -1397,13 +1388,153 @@ export default function Admin() {
 
   // Delete confirm modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [overwriteDefaultSnapshot, setOverwriteDefaultSnapshot] = useState(false);
+  const [defaultSlug, setDefaultSlug] = useState(() => {
+    if (typeof window !== 'undefined' && window.__ERIX__ && window.__ERIX__.defaultSlug) {
+      return window.__ERIX__.defaultSlug || 'default';
+    }
+    return 'default';
+  });
+  const [defaultSnapshotMeta, setDefaultSnapshotMeta] = useState(null);
 
   const slugForMeta = (!activeSlug || activeSlug === 'default') ? 'default' : activeSlug;
+
+  const updateDomGameTagsField = useCallback((slugValue) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const doc = window.document;
+      if (!doc) return;
+      const nextValue = String(slugValue || '').trim();
+      if (!nextValue) return;
+      const fields = Array.from(doc.querySelectorAll('input,textarea'));
+      for (const field of fields) {
+        const name = (field.getAttribute('name') || '').toLowerCase();
+        const aria = (field.getAttribute('aria-label') || '').toLowerCase();
+        const placeholder = (field.getAttribute('placeholder') || '').toLowerCase();
+        const looksLikeTags = name.includes('tag') || aria.includes('game tags') || placeholder.includes('comma') || placeholder.includes('tag');
+        if (!looksLikeTags) continue;
+        if (field.value !== nextValue) {
+          field.value = nextValue;
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          field.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        break;
+      }
+    } catch {}
+  }, []);
+
+  const setActiveTagsToOnly = useCallback((slug) => {
+    const raw = String(slug || '').trim();
+    if (!raw) return;
+    let canonical = raw.toLowerCase();
+    setConfig((prev) => {
+      if (!prev) return prev;
+      const base = { ...prev };
+      const nextGame = { ...(base.game || {}), tags: [canonical] };
+      const normalizedConfig = normalizeGameMetadata({ ...base, game: nextGame }, canonical);
+      const resolvedSlug = (normalizedConfig?.game?.slug || canonical).toString();
+      canonical = resolvedSlug;
+      if (normalizedConfig && normalizedConfig.game) {
+        normalizedConfig.game = {
+          ...normalizedConfig.game,
+          tags: [resolvedSlug],
+        };
+      }
+      return normalizedConfig;
+    });
+    const slugForUi = canonical;
+    setGameTagsDraft(slugForUi);
+    updateDomGameTagsField(slugForUi);
+    try {
+      if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setActiveTags === 'function') {
+        window.__ERIX__.setActiveTags([slugForUi]);
+      }
+    } catch {}
+    try {
+      if (typeof window !== 'undefined' && window.__ERIX__ && typeof window.__ERIX__.setTagFilter === 'function') {
+        window.__ERIX__.setTagFilter([slugForUi]);
+      }
+    } catch {}
+  }, [updateDomGameTagsField]);
+
+  const readDefaultSnapshot = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return JSON.parse(window.localStorage.getItem(DEFAULT_SNAPSHOT_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const writeDefaultSnapshot = useCallback((snapshot) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(DEFAULT_SNAPSHOT_KEY, JSON.stringify(snapshot || null));
+    } catch {}
+  }, []);
+
+  const cloneForSnapshot = useCallback((value) => {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const buildDefaultSnapshotPayload = useCallback(() => {
+    if (!config) return null;
+    const normalizedSlug = slugForMeta || 'default';
+    const payload = {
+      slug: normalizedSlug,
+      title: config?.game?.title || '',
+      channel: headerStatus,
+      capturedAt: new Date().toISOString(),
+      config: cloneForSnapshot(normalizeGameMetadata({ ...config }, normalizedSlug)),
+      suite: cloneForSnapshot({
+        version: suite?.version || '0.0.0',
+        missions: Array.isArray(suite?.missions) ? suite.missions : [],
+      }),
+    };
+    return payload;
+  }, [cloneForSnapshot, config, headerStatus, slugForMeta, suite]);
+
+  const ensureDefaultSnapshotFromState = useCallback(() => {
+    if (slugForMeta !== defaultSlug) return;
+    const existing = readDefaultSnapshot();
+    if (existing) return existing;
+    const snapshot = buildDefaultSnapshotPayload();
+    if (snapshot) writeDefaultSnapshot(snapshot);
+    return snapshot;
+  }, [buildDefaultSnapshotPayload, defaultSlug, readDefaultSnapshot, slugForMeta, writeDefaultSnapshot]);
 
   useEffect(() => {
     const tags = Array.isArray(config?.game?.tags) ? config.game.tags : [];
     setGameTagsDraft(tags.join(', '));
   }, [config?.game?.tags]);
+
+  useEffect(() => {
+    if (!config) return;
+    const captured = ensureDefaultSnapshotFromState();
+    if (captured) setDefaultSnapshotMeta(captured);
+  }, [config, ensureDefaultSnapshotFromState]);
+
+  useEffect(() => {
+    const fallbackTitle = (!config || !(config.game && config.game.title))
+      ? (activeSlug === 'default' ? STARFIELD_DEFAULTS.title : activeSlug || '')
+      : '';
+    const nextTitle = (config?.game?.title || '').trim() || fallbackTitle;
+    setTitleDraft(nextTitle);
+  }, [activeSlug, config?.game?.title]);
+
+  useEffect(() => {
+    setActiveTagsToOnly(slugForMeta);
+  }, [setActiveTagsToOnly, slugForMeta]);
+
+  useEffect(() => {
+    const stored = readDefaultSnapshot();
+    if (stored) setDefaultSnapshotMeta(stored);
+  }, [readDefaultSnapshot]);
 
   useEffect(() => {
     try {
@@ -1729,6 +1860,98 @@ export default function Admin() {
     await publishNow();
   }
 
+  const getSnapshotFor = useCallback(
+    async (slug) => {
+      const normalizedSlug = String(slug || 'default').trim() || 'default';
+      try {
+        if (typeof window !== 'undefined' && window.__ERIX__?.getGameSnapshot) {
+          const snap = await window.__ERIX__.getGameSnapshot(normalizedSlug);
+          if (snap) return snap;
+        }
+      } catch (error) {
+        console.warn('getGameSnapshot bridge failed', error);
+      }
+
+      const clonedConfig = config ? cloneForSnapshot(normalizeGameMetadata({ ...config }, normalizedSlug)) : null;
+      const baseSuite = suite
+        ? {
+            version: suite?.version || '0.0.0',
+            missions: cloneForSnapshot(Array.isArray(suite?.missions) ? suite.missions : []),
+          }
+        : { version: '0.0.0', missions: [] };
+
+      return {
+        meta: {
+          slug: normalizedSlug,
+          title: clonedConfig?.game?.title || normalizedSlug,
+          channel: headerStatus,
+          capturedAt: new Date().toISOString(),
+        },
+        data: {
+          config: clonedConfig,
+          suite: baseSuite,
+        },
+      };
+    },
+    [cloneForSnapshot, config, headerStatus, suite],
+  );
+
+  const saveFull = useCallback(
+    async (publish = false) => {
+      const slug = activeSlug || 'default';
+      const intentLabel = publish ? 'Save & Publish' : 'Update';
+      logConversation('You', `Triggered ${intentLabel} for ${slug}`);
+      if (!slug) return;
+      setSaveBusy(true);
+      setStatus(publish ? 'Saving snapshot & publishing…' : 'Saving snapshot…');
+      try {
+        const snapshot = await getSnapshotFor(slug);
+        if (!snapshot) throw new Error('Snapshot unavailable');
+
+        let handled = false;
+        try {
+          if (typeof window !== 'undefined' && window.__ERIX__?.saveFullGame) {
+            await window.__ERIX__.saveFullGame({ slug, publish, snapshot });
+            handled = true;
+          }
+        } catch (bridgeError) {
+          console.warn('saveFullGame bridge failed', bridgeError);
+        }
+
+        if (!handled) {
+          const endpoint = publish ? '/api/games/save-and-publish' : '/api/games/save-full';
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              slug,
+              channel: publish ? 'published' : headerStatus,
+              snapshot,
+            }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || 'Save request failed');
+          }
+        }
+
+        setStatus(publish ? '✅ Snapshot saved & published' : '✅ Snapshot updated');
+        logConversation('GPT', publish ? `Saved and published ${slug}` : `Snapshot updated for ${slug}`);
+        await reloadGamesList();
+        await refreshGamesIndex();
+        if (publish) setPreviewNonce((n) => n + 1);
+      } catch (error) {
+        const message = error?.message || 'snapshot save failed';
+        setStatus(`❌ ${intentLabel} failed: ${message}`);
+        logConversation('GPT', `${intentLabel} failed for ${slug}: ${message}`);
+      } finally {
+        setSaveBusy(false);
+      }
+    },
+    [activeSlug, getSnapshotFor, headerStatus, logConversation, reloadGamesList, refreshGamesIndex, setPreviewNonce, setStatus],
+  );
+
   async function runSettingsMenuAction(action) {
     if (typeof action !== 'function') return;
     try {
@@ -1741,18 +1964,42 @@ export default function Admin() {
     }
   }
 
-  const reloadGamesList = useCallback(async () => {
-    if (!gameEnabled) {
-      setGames([]);
-      setGamesIndex({ bySlug: {}, count: 0 });
-      return;
-    }
-    try {
-      const r = await fetch('/api/games?list=1&channel=draft', { credentials:'include', cache:'no-store' });
-      const j = await r.json();
-      if (j.ok) setGames(Array.isArray(j.games) ? j.games : []);
-    } catch {}
-  }, [gameEnabled]);
+  const handleHeaderNav = useCallback(
+    (key) => {
+      switch (key) {
+        case 'settings':
+          setTab('settings');
+          break;
+        case 'missions':
+        case 'devices':
+        case 'text':
+        case 'assigned':
+          setTab(key);
+          break;
+        case 'media':
+          setTab('media-pool');
+          break;
+        case 'new':
+          runSettingsMenuAction(() => openNewGameModal());
+          break;
+        case 'save':
+          runSettingsMenuAction(() => saveDraftNow());
+          break;
+        case 'publish':
+          runSettingsMenuAction(() => publishNow());
+          break;
+        case 'update':
+          runSettingsMenuAction(() => saveFull(false));
+          break;
+        case 'save_and_publish':
+          runSettingsMenuAction(() => saveFull(true));
+          break;
+        default:
+          break;
+      }
+    },
+    [openNewGameModal, publishNow, saveDraftNow, saveFull],
+  );
 
   /* Delete game (with modal confirm) */
   async function reallyDeleteGame() {
@@ -2483,50 +2730,115 @@ export default function Admin() {
   }
 
   const selectGameOptions = useMemo(() => {
-    const baseOptions = [{ value: 'default', label: `${STARFIELD_DEFAULTS.title} (default)` }];
-    const extra = Array.isArray(games)
-      ? games
-          .filter((g) => g && g.slug && g.slug !== 'default')
-          .map((g) => ({
-            value: g.slug,
-            label: `${g.title || g.slug}${g.mode ? ` — ${g.mode}` : ''}`,
-          }))
-      : [];
-    const seen = new Set();
-    const combined = [];
-    [...baseOptions, ...extra].forEach((option) => {
-      if (!option || !option.value) return;
-      if (seen.has(option.value)) return;
-      seen.add(option.value);
-      combined.push(option);
+    const entries = new Map();
+    entries.set('default', `${STARFIELD_DEFAULTS.title} (default)`);
+    const bySlug = gamesIndex?.bySlug || {};
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug || slug === 'default') return;
+      const source = channels?.draft || channels?.published || {};
+      const title = source.title || slug;
+      const mode = source.mode;
+      entries.set(slug, mode ? `${title} — ${mode}` : title);
     });
-    return combined;
-  }, [games]);
+    if (entries.size === 1 && Array.isArray(games)) {
+      games.forEach((game) => {
+        if (!game || !game.slug || game.slug === 'default') return;
+        if (entries.has(game.slug)) return;
+        const label = `${game.title || game.slug}${game.mode ? ` — ${game.mode}` : ''}`;
+        entries.set(game.slug, label);
+      });
+    }
+    return Array.from(entries, ([value, label]) => ({ value, label }));
+  }, [gamesIndex, games]);
   const settingsMenuGames = useMemo(() => {
     const entries = [
       {
         slug: 'default',
-        channel: 'default',
+        channel: 'draft',
         label: `${STARFIELD_DEFAULTS.title} (default)`,
       },
     ];
     const seen = new Set(entries.map((entry) => `${entry.slug}::${entry.channel}`));
-    if (Array.isArray(games)) {
-      games.forEach((game) => {
-        if (!game || !game.slug) return;
-        const channel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
-        const key = `${game.slug}::${channel}`;
+    const bySlug = gamesIndex?.bySlug || {};
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug) return;
+      const variants = [
+        { channel: 'published', data: channels?.published },
+        { channel: 'draft', data: channels?.draft },
+      ];
+      variants.forEach(({ channel, data }) => {
+        if (!data) return;
+        const normalizedChannel = channel === 'published' ? 'published' : 'draft';
+        const key = `${slug}::${normalizedChannel}`;
         if (seen.has(key)) return;
         seen.add(key);
         entries.push({
+          slug,
+          channel: normalizedChannel,
+          label: `${data.title || slug} (${normalizedChannel})`,
+        });
+      });
+    });
+    return entries;
+  }, [gamesIndex]);
+
+  const savedGamesList = useMemo(() => {
+    const bySlug = gamesIndex?.bySlug || {};
+    const entries = [];
+    Object.entries(bySlug).forEach(([slug, channels]) => {
+      if (!slug) return;
+      const variants = [
+        { channel: 'published', data: channels?.published },
+        { channel: 'draft', data: channels?.draft },
+      ];
+      variants.forEach(({ channel, data }) => {
+        if (!data) return;
+        const normalizedChannel = channel === 'published' ? 'published' : 'draft';
+        const base = typeof data === 'object' && data !== null ? data : {};
+        entries.push({
+          ...base,
+          slug: base.slug || slug,
+          title: base.title || slug,
+          channel: normalizedChannel,
+        });
+      });
+    });
+    if (!entries.length) {
+      (Array.isArray(games) ? games : []).forEach((game) => {
+        if (!game || !game.slug) return;
+        const normalizedChannel = String(game.channel || 'draft').toLowerCase() === 'published' ? 'published' : 'draft';
+        entries.push({
+          ...game,
           slug: game.slug,
-          channel,
-          label: `${game.title || game.slug} (${channel})`,
+          title: game.title || game.slug,
+          channel: normalizedChannel,
         });
       });
     }
+    const hasDefault = entries.some((entry) => entry.slug === 'default' && entry.channel !== 'published');
+    if (!hasDefault) {
+      entries.unshift({ id: 'default', slug: 'default', title: STARFIELD_DEFAULTS.title, channel: 'draft' });
+    }
     return entries;
-  }, [games]);
+  }, [gamesIndex, games]);
+
+  const savedGamesChannel = useMemo(() => {
+    const slug = activeSlug || 'default';
+    const desired = slug === 'default' ? 'draft' : headerStatus;
+    const match = savedGamesList.some(
+      (entry) => entry.slug === slug && (entry.channel || 'draft') === desired,
+    );
+    if (match) return desired;
+    return 'draft';
+  }, [activeSlug, headerStatus, savedGamesList]);
+
+  const savedGamesValue = `${activeSlug || 'default'}:${savedGamesChannel}`;
+
+  useEffect(() => {
+    if (tab !== 'settings' && confirmDeleteOpen) {
+      setConfirmDeleteOpen(false);
+    }
+  }, [tab, confirmDeleteOpen]);
 
   const applyOpenGameFromMenu = useCallback(
     (slug, channel = 'draft', label = '') => {
@@ -2782,9 +3094,6 @@ export default function Admin() {
     }
   }
 
-  // Tabs: missions / devices / settings / text / media-pool / assigned
-  const tabsOrder = ['settings','missions','devices','text','assigned','media-pool'];
-
   const isDefault = slugForMeta === 'default';
   const coverImageUrl = viewConfig?.game?.coverImage ? toDirectMediaURL(viewConfig.game.coverImage) : '';
   const coverPreviewUrl = coverUploadPreview || coverImageUrl;
@@ -2793,7 +3102,124 @@ export default function Admin() {
   const headerCoverThumb = viewConfig?.game?.coverImage
     ? toDirectMediaURL(viewConfig.game.coverImage)
     : '';
-  const headerStyle = S.header;
+  const currentSlugDisplay = config?.game?.slug || slugForMeta;
+  const normalizedExistingTitle = (headerGameTitle || '').trim();
+  const normalizedDraftTitle = (titleDraft || '').trim();
+  const currentSlugValue = activeSlug || 'default';
+  const slugPreview = isDefaultSlug(currentSlugValue)
+    ? currentSlugDisplay
+    : (slugifyTitle(normalizedDraftTitle) || slugifyTitle(normalizedExistingTitle) || currentSlugDisplay || currentSlugValue);
+  const disableSaveTitle = !normalizedDraftTitle
+    || (normalizedDraftTitle === normalizedExistingTitle && slugPreview === currentSlugDisplay);
+  const defaultSnapshotCapturedLabel = defaultSnapshotMeta?.capturedAt
+    ? formatLocalDateTime(defaultSnapshotMeta.capturedAt)
+    : '';
+  const defaultSnapshotTitle = defaultSnapshotMeta?.title || '';
+  const disableDefaultAction = !overwriteDefaultSnapshot && !defaultSnapshotMeta;
+
+  const handleSaveTitle = useCallback(() => {
+    const currentSlug = activeSlug || 'default';
+    const draftTitle = (titleDraft || '').trim();
+    const fallbackTitle = draftTitle || (currentSlug === 'default' ? STARFIELD_DEFAULTS.title : currentSlug);
+    const nextTitle = draftTitle || fallbackTitle;
+    const slugCandidate = slugifyTitle(nextTitle) || currentSlug;
+    const nextSlug = isDefaultSlug(currentSlug) ? currentSlug : slugCandidate;
+    if (nextTitle === normalizedExistingTitle && nextSlug === currentSlugDisplay) {
+      setStatus('Title already up to date');
+      return;
+    }
+    setConfig((prev) => {
+      const base = prev ? { ...prev } : defaultConfig();
+      const nextGame = {
+        ...(base.game || {}),
+        title: nextTitle,
+        slug: nextSlug,
+      };
+      return normalizeGameMetadata({ ...base, game: nextGame }, nextSlug);
+    });
+    setDirty(true);
+    setTitleDraft(nextTitle);
+    logConversation('You', `Renamed game to ${nextTitle} (${nextSlug})`);
+    logConversation('GPT', 'Rename applied locally. Save the draft to persist it.');
+    setStatus(`Updated title to “${nextTitle}”`);
+    setActiveTagsToOnly(nextSlug);
+    if (currentSlug !== nextSlug) {
+      setActiveSlug(nextSlug);
+    }
+    setGames((prevGames) => {
+      if (!Array.isArray(prevGames)) return prevGames;
+      return prevGames.map((game) => {
+        if (!game || !game.slug) return game;
+        if (game.slug !== currentSlug && game.slug !== currentSlugDisplay) return game;
+        return { ...game, slug: nextSlug, title: nextTitle };
+      });
+    });
+    setGamesIndex((prevIndex) => {
+      if (!prevIndex || !prevIndex.bySlug) return prevIndex;
+      const base = { ...prevIndex.bySlug };
+      const candidateKeys = [currentSlug, currentSlugDisplay, nextSlug];
+      const existingKey = candidateKeys.find((key) => key && base[key]);
+      const existing = existingKey ? base[existingKey] : undefined;
+      const updated = existing
+        ? {
+            ...existing,
+            draft: existing.draft
+              ? { ...existing.draft, slug: nextSlug, title: nextTitle }
+              : { slug: nextSlug, title: nextTitle },
+          }
+        : {
+            draft: { slug: nextSlug, title: nextTitle },
+          };
+      candidateKeys.forEach((key) => {
+        if (key && key !== nextSlug) delete base[key];
+      });
+      base[nextSlug] = {
+        ...updated,
+        published: existing?.published ? { ...existing.published } : updated.published,
+      };
+      return { bySlug: base, count: Object.keys(base).length };
+    });
+  }, [activeSlug, currentSlugDisplay, defaultConfig, logConversation, normalizedExistingTitle, setActiveSlug, setActiveTagsToOnly, setConfig, setDirty, setGames, setGamesIndex, setStatus, slugForMeta, titleDraft]);
+
+  const handleDefaultSnapshotAction = useCallback(() => {
+    if (slugForMeta !== defaultSlug) return;
+    if (overwriteDefaultSnapshot) {
+      const snapshot = buildDefaultSnapshotPayload();
+      if (snapshot) {
+        writeDefaultSnapshot(snapshot);
+        setDefaultSnapshotMeta(snapshot);
+        setOverwriteDefaultSnapshot(false);
+        logConversation('You', 'Overwrote original default snapshot');
+        logConversation('GPT', 'Default snapshot refreshed. Use reset to restore this state later.');
+        setStatus('Saved new original default snapshot');
+      }
+      return;
+    }
+    const stored = readDefaultSnapshot();
+    if (!stored) {
+      setStatus('No stored default snapshot to restore');
+      logConversation('GPT', 'No original default snapshot is available yet.');
+      return;
+    }
+    try {
+      const restoredConfig = stored.config ? normalizeGameMetadata({ ...stored.config }, slugForMeta) : null;
+      if (restoredConfig) setConfig(restoredConfig);
+      if (stored.suite) {
+        const missionsList = Array.isArray(stored.suite.missions) ? stored.suite.missions : [];
+        setSuite({ version: stored.suite.version || '0.0.0', missions: missionsList });
+      }
+      if (stored.title) setTitleDraft(stored.title);
+      setDirty(true);
+      setActiveTagsToOnly(slugForMeta);
+      setDefaultSnapshotMeta(stored);
+      logConversation('You', 'Reset default game to original snapshot');
+      logConversation('GPT', 'Default content restored locally. Save to push it upstream.');
+      setStatus('Restored original default snapshot');
+      setOverwriteDefaultSnapshot(false);
+    } catch (err) {
+      setStatus('Unable to restore default snapshot');
+    }
+  }, [buildDefaultSnapshotPayload, defaultSlug, logConversation, overwriteDefaultSnapshot, readDefaultSnapshot, setActiveTagsToOnly, setConfig, setDefaultSnapshotMeta, setDirty, setStatus, setSuite, setTitleDraft, slugForMeta, writeDefaultSnapshot]);
 
   const envRepoOwner = process.env.NEXT_PUBLIC_REPO_OWNER
     || process.env.NEXT_PUBLIC_VERCEL_GIT_REPO_OWNER
@@ -2925,86 +3351,62 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      <header style={headerStyle}>
-        <div style={S.wrap}>
-          <div style={S.headerTopRow}>
-            <div style={S.headerTitleGroup}>
-              <div style={S.headerCoverFrame}>
-                {headerCoverThumb ? (
-                  <img
-                    src={headerCoverThumb}
-                    alt="Active game cover"
-                    style={S.headerCoverThumb}
-                  />
-                ) : (
-                  <div style={S.headerCoverPlaceholder}>No Cover</div>
-                )}
-              </div>
-              <div style={S.headerTitleColumn}>
-                <div style={S.headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.headerSubtitle}>Admin Control Deck</div>
-              </div>
-            </div>
+      <HideLegacyStatusToggles />
+      <div style={S.headerShell}>
+        <HeaderBar
+          iconUrl={headerCoverThumb}
+          title={headerGameTitle}
+          isSettings={tab === 'settings'}
+          status={headerStatus}
+          onBack={() => setTab('missions')}
+          onGo={handleHeaderNav}
+          onUpdate={() => saveFull(false)}
+          onSaveAndPublish={() => saveFull(true)}
+        />
+      </div>
+      <div style={S.headerControls}>
+        <div style={S.headerControlsRow}>
+          <div style={S.headerToggleGroup}>
+            <button
+              type="button"
+              onClick={() => setEditChannel('draft')}
+              style={{ ...S.tab, ...(headerStatus === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
+              title="Edit in Draft mode"
+            >
+              Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditChannel('published')}
+              style={{ ...S.tab, ...(headerStatus === 'published' ? S.tabActive : {}), fontWeight: 700 }}
+              title="Enable publishing actions"
+            >
+              Published
+            </button>
           </div>
-          <div style={S.headerNavRow}>
-            <div style={S.headerNavPrimary}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginRight: 8 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditChannel('draft')}
-                    style={{ ...S.tab, ...(editChannel === 'draft' ? S.tabActive : {}), fontWeight: 700 }}
-                    title="Edit in Draft mode"
-                  >
-                    Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditChannel('published')}
-                    style={{ ...S.tab, ...(editChannel === 'published' ? S.tabActive : {}), fontWeight: 700 }}
-                    title="Enable publishing actions"
-                  >
-                    Published
-                  </button>
-                </div>
-                {tabsOrder.map((t) => {
-                  const labelMap = {
-                    missions: 'MISSIONS',
-                    devices: 'DEVICES',
-                    settings: 'SETTINGS',
-                    text: 'TEXT',
-                    'media-pool': 'MEDIA POOL',
-                    assigned: 'ASSIGNED MEDIA',
-                  };
-                  return (
-                    <button key={t} onClick={() => setTab(t)} style={{ ...S.tab, ...(tab === t ? S.tabActive : {}) }}>
-                      {labelMap[t] || t.toUpperCase()}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {tab !== 'settings' && (
-                <div style={{ marginTop: 12, color: 'var(--admin-muted)', fontSize: 13 }}>
-                  Use the Settings Menu in the top-right corner to create, open, save, or publish games.
-                </div>
-              )}
+          {gameEnabled && (
+            <div style={S.headerGameSelect}>
+              <label style={S.headerGameSelectLabel}>Game:</label>
+              <select
+                value={activeSlug}
+                onChange={(e) => setActiveSlug(e.target.value)}
+                style={{ ...S.input, width: 240 }}
+              >
+                {selectGameOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            {gameEnabled && (
-              <div style={S.headerNavSecondary}>
-                <label style={{ color:'var(--admin-muted)', fontSize:12 }}>Game:</label>
-                <select value={activeSlug} onChange={(e)=>setActiveSlug(e.target.value)} style={{ ...S.input, width:280 }}>
-                  <option value="default">{STARFIELD_DEFAULTS.title} (default)</option>
-                  {games.map(g=>(
-                    <option key={g.slug} value={g.slug}>{g.title || g.slug}{g.mode ? ` — ${g.mode}` : ''}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
+          )}
         </div>
-      </header>
+        {tab !== 'settings' && (
+          <div style={S.headerHint}>
+            Settings holds game management actions, including Save & Publish.
+          </div>
+        )}
+      </div>
 
       {/* MISSIONS */}
       {tab==='missions' && (
@@ -3910,168 +4312,207 @@ export default function Admin() {
       {/* SETTINGS */}
       {tab==='settings' && (
         <main style={S.wrap}>
-          <div style={S.settingsMenuBar}>
-            <div style={S.settingsMenuWrap} ref={settingsMenuRef}>
-              <button
-                type="button"
-                style={{
-                  ...S.settingsMenuButton,
-                  ...(settingsMenuOpen ? S.settingsMenuButtonActive : {}),
-                }}
-                onClick={() => setSettingsMenuOpen((open) => !open)}
-              >
-                Settings Menu {settingsMenuOpen ? '▴' : '▾'}
-              </button>
-              {settingsMenuOpen && (
-                <div style={S.settingsMenuDropdown}>
-                  <div style={S.settingsMenuSectionLabel}>Actions</div>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(openNewGameModal)}
-                  >
-                    ➕ New Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() =>
-                      runSettingsMenuAction(() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                      })
-                    }
-                  >
-                    📂 Open Game
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() =>
-                      runSettingsMenuAction(() => {
-                        setOpenGameModal(true);
-                        refreshGamesIndex();
-                        if (typeof setEditChannel === 'function') setEditChannel('draft');
-                      })
-                    }
-                  >
-                    📁 Open Draft
-                  </button>
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(ensureDraftFromCurrent)}
-                  >
-                    📝 New Draft
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveDraftNow)}
-                  >
-                    💾 Save Draft
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveGamePublished)}
-                  >
-                    💾 Save Game
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(publishNow)}
-                  >
-                    🚀 Publish Game
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saveBusy}
-                    style={{
-                      ...S.settingsMenuItem,
-                      ...(saveBusy ? S.settingsMenuItemDisabled : {}),
-                    }}
-                    onClick={() => runSettingsMenuAction(saveDraftThenPublish)}
-                  >
-                    🚀 Save & Publish Draft
-                  </button>
-                  {gameEnabled && (
-                    <button
-                      type="button"
-                      style={{ ...S.settingsMenuItem, ...S.settingsMenuDanger }}
-                      onClick={() =>
-                        runSettingsMenuAction(() => {
-                          setConfirmDeleteOpen(true);
-                        })
-                      }
-                    >
-                      🗑 Delete Game
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    style={S.settingsMenuItem}
-                    onClick={() => runSettingsMenuAction(scanProject)}
-                  >
-                    🔎 Scan Media Usage
-                  </button>
-                  <div style={S.settingsMenuDivider} />
-                  <div style={S.settingsMenuSectionLabel}>Open & View</div>
-                  {settingsMenuGames.map((entry) => (
-                    <button
-                      key={`${entry.slug}::${entry.channel}`}
-                      type="button"
-                      style={{
-                        ...S.settingsMenuItem,
-                        ...(entry.slug === activeSlug ? S.settingsMenuItemActive : {}),
-                      }}
-                      onClick={() =>
-                        runSettingsMenuAction(() => {
-                          setActiveSlug(entry.slug);
-                          if (entry.channel === 'published') {
-                            setEditChannel('published');
-                          } else {
-                            setEditChannel('draft');
-                          }
-                          setTab('settings');
-                          setStatus(`Opened ${entry.label}`);
-                        })
-                      }
-                    >
-                      {entry.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
-            <div style={S.gameTitleRow}>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Game Title</div>
-                <div style={S.readonlyValue} title={headerGameTitle}>{headerGameTitle}</div>
-                <div style={S.noteText}>Titles are managed per game. Create a new game to set a different name.</div>
+            <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDeleteOpen(false);
+                    openNewGameModal();
+                  }}
+                  style={{
+                    fontSize: 13,
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(99,102,241,0.4)',
+                    background: 'linear-gradient(135deg, rgba(168,85,247,.08), rgba(99,102,241,.08))',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    color: '#1e1b4b',
+                  }}
+                >
+                  + New Game
+                </button>
               </div>
-              <div style={S.readonlyField}>
-                <div style={S.fieldLabel}>Slug</div>
-                <code style={S.readonlyCode}>{config?.game?.slug || slugForMeta}</code>
-                <div style={S.noteText}>Each slug maps to <code>/public/games/[slug]</code> for config, missions, and covers.</div>
+              <SavedGamesPicker
+                games={savedGamesList}
+                value={savedGamesValue}
+                defaultSlug={defaultSlug}
+                onChange={(val) => {
+                  setConfirmDeleteOpen(false);
+                  const [slug, channel] = String(val || '').split(':');
+                  if (!slug) return;
+                  const normalized = channel === 'published' ? 'published' : 'draft';
+                  const match = savedGamesList.find(
+                    (entry) => entry.slug === slug && (entry.channel || 'draft') === normalized,
+                  );
+                  const label = match
+                    ? `${match.title || match.slug}${normalized === 'published' ? ' (published)' : ' (draft)'}`
+                    : undefined;
+                  applyOpenGameFromMenu(slug, normalized, label);
+                  setActiveTagsToOnly(slug);
+                  logConversation('You', `Switched to ${label || slug}`);
+                  logConversation('GPT', 'Tag filters updated to focus on the selected game.');
+                }}
+              />
+              <div>
+                {confirmDeleteOpen ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: 12,
+                      borderRadius: 12,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: '#0f172a', flex: '1 1 auto' }}>
+                      Are you sure you want to delete “{headerGameTitle}”? 
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteOpen(false);
+                        void reallyDeleteGame();
+                      }}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(239,68,68,0.5)',
+                        background: 'rgba(239,68,68,0.12)',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        color: '#7f1d1d',
+                      }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteOpen(false)}
+                      style={{
+                        fontSize: 13,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(15,23,42,0.12)',
+                        background: 'white',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logConversation('You', 'Opened delete confirmation for current game');
+                      setConfirmDeleteOpen(true);
+                    }}
+                    style={{
+                      fontSize: 13,
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(239,68,68,0.35)',
+                      background: 'rgba(239,68,68,0.08)',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      color: '#7f1d1d',
+                    }}
+                  >
+                    Delete Current Game
+                  </button>
+                )}
               </div>
             </div>
+            <div style={S.titleEditorBlock}>
+              <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
+              <input
+                id="admin-title-input"
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                placeholder="Enter game title"
+                style={S.titleInput}
+              />
+              <div style={S.slugWarning}>
+                Changing the title will also update this game’s <strong>tag</strong> to{' '}
+                <code style={S.slugMetaCode}>{slugPreview}</code>.
+              </div>
+              <div style={S.slugMetaRow}>
+                <div style={S.slugMetaItem}>
+                  <span style={S.slugMetaLabel}>Current tag:</span>{' '}
+                  <code style={S.slugMetaCode}>{currentSlugDisplay}</code>
+                </div>
+                <div style={S.slugMetaItem}>
+                  <span style={S.slugMetaLabel}>Preview tag:</span>{' '}
+                  <code style={S.slugMetaCode}>{slugPreview}</code>
+                </div>
+              </div>
+              <div style={S.titleActionsRow}>
+                <button
+                  type="button"
+                  onClick={handleSaveTitle}
+                  disabled={disableSaveTitle}
+                  style={{
+                    ...S.saveTitleButton,
+                    ...(disableSaveTitle ? S.saveTitleButtonDisabled : {}),
+                  }}
+                >
+                  Save Title
+                </button>
+              </div>
+            </div>
+
+            {slugForMeta === defaultSlug && (
+              <div style={S.defaultControlsBlock}>
+                <div style={S.defaultControlsHeading}>Default Game Controls</div>
+                <label style={S.defaultOverwriteToggle}>
+                  <input
+                    type="checkbox"
+                    checked={overwriteDefaultSnapshot}
+                    onChange={(e) => {
+                      setOverwriteDefaultSnapshot(e.target.checked);
+                      logConversation('You', e.target.checked
+                        ? 'Armed overwrite for default snapshot'
+                        : 'Cancelled default snapshot overwrite');
+                    }}
+                  />
+                  <span style={{
+                    ...S.defaultOverwriteLabel,
+                    ...(overwriteDefaultSnapshot ? S.defaultOverwriteLabelActive : {}),
+                  }}>
+                    Overwrite Original Default (RED when on)
+                  </span>
+                </label>
+                <div style={S.defaultControlsRow}>
+                  <button
+                    type="button"
+                    onClick={handleDefaultSnapshotAction}
+                    disabled={disableDefaultAction}
+                    style={{
+                      ...S.defaultActionButton,
+                      ...(overwriteDefaultSnapshot ? S.defaultActionButtonArmed : {}),
+                      ...(disableDefaultAction ? S.defaultActionButtonDisabled : {}),
+                    }}
+                  >
+                    {overwriteDefaultSnapshot ? 'Save as New Original Default' : 'Reset to Original Default'}
+                  </button>
+                  <div style={S.defaultSnapshotNote}>
+                    {defaultSnapshotCapturedLabel
+                      ? `Original snapshot captured ${defaultSnapshotCapturedLabel}${defaultSnapshotTitle ? ` — ${defaultSnapshotTitle}` : ''}`
+                      : 'Snapshot not captured yet. Saving will create one automatically.'}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={S.coverControlsRow}>
               <div
                 onDragOver={(e)=>{ e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; setCoverDropActive(true); }}
@@ -4134,20 +4575,6 @@ export default function Admin() {
               </div>
             </div>
             <div style={{ marginTop: 18 }} />
-            <Field label="Saved Games">
-              <select
-                style={S.input}
-                value={activeSlug}
-                onChange={(e)=>setActiveSlug(e.target.value)}
-              >
-                {selectGameOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <div style={S.noteText}>
-                Switch to another saved escape ride. Use the Settings Menu in the top-right corner to add a new title.
-              </div>
-            </Field>
             <Field label="Game Type">
               <select style={S.input} value={config.game.type}
                 onChange={(e)=>setConfig({ ...config, game:{ ...config.game, type:e.target.value } })}>
@@ -4163,7 +4590,7 @@ export default function Admin() {
                 placeholder="default-game, mystery"
               />
               <div style={S.noteText}>
-                The current slug and <code>default-game</code> are enforced automatically.
+                Switching games or saving a new title resets this list to the active slug automatically.
               </div>
             </Field>
             <Field label="Stripe Splash Page">
@@ -4233,7 +4660,7 @@ export default function Admin() {
           <div style={{ ...S.card, marginTop:16 }}>
             <h3 style={{ marginTop:0 }}>Maintenance</h3>
             <div style={S.noteText}>
-              Game maintenance actions now live in the <strong>Settings Menu</strong> above. Use it to delete games,
+              Game maintenance actions now live in the header toolbar. Switch to Settings to delete games,
               scan for unused media, or trigger publishing workflows.
             </div>
           </div>
@@ -4772,27 +5199,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
-      {gameEnabled && confirmDeleteOpen && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'grid', placeItems:'center', zIndex:3000 }}>
-          <div style={{ ...S.card, width:420 }}>
-            <h3 style={{ marginTop:0 }}>Delete Game</h3>
-            <div style={{ color:'var(--admin-body-color)', marginBottom:12 }}>
-              Are you sure you want to delete <b>{config?.game?.title || (activeSlug || 'this game')}</b>?
-            </div>
-            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-              <button style={S.button} onClick={()=>setConfirmDeleteOpen(false)}>Cancel</button>
-              <button
-                style={{ ...S.button, ...S.buttonDanger }}
-                onClick={reallyDeleteGame}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {openGameModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 4000, display: 'grid', placeItems: 'center', padding: 16 }}>
           <div style={{ ...S.card, width: 'min(720px,96vw)', maxHeight: '82vh', overflowY: 'auto' }}>
@@ -5107,16 +5513,48 @@ const S = {
     margin: '8px 0',
     borderTop: '1px solid var(--admin-border-soft)',
   },
-  header: {
-    padding: 20,
-    background: 'rgba(248, 250, 252, 0.72)',
-    backdropFilter: 'blur(18px)',
-    borderBottom: '1px solid rgba(148, 163, 184, 0.28)',
+  headerShell: {
     position: 'sticky',
     top: 0,
-    zIndex: 40,
-    boxShadow: '0 18px 30px rgba(15, 23, 42, 0.18)',
-    color: 'var(--admin-body-color)',
+    zIndex: 50,
+    background: 'transparent',
+  },
+  headerControls: {
+    padding: '8px 16px 16px',
+    borderBottom: '1px solid rgba(148, 163, 184, 0.18)',
+    background: 'rgba(255, 255, 255, 0.6)',
+    backdropFilter: 'blur(8px)',
+    display: 'grid',
+    gap: 8,
+    position: 'sticky',
+    top: 56,
+    zIndex: 39,
+  },
+  headerControlsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerToggleGroup: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  headerGameSelect: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerGameSelectLabel: {
+    color: 'var(--admin-muted)',
+    fontSize: 12,
+    fontWeight: 600,
+  },
+  headerHint: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
   },
   conversationLog: {
     marginTop: 16,
@@ -5447,41 +5885,152 @@ const S = {
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
-  gameTitleRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-    gap: 16,
-    alignItems: 'stretch',
-    marginBottom: 16,
-  },
   fieldLabel: {
     fontSize: 12,
     color: 'var(--admin-muted)',
   },
-  readonlyField: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 6,
+  titleEditorBlock: {
+    display: 'grid',
+    gap: 8,
+    marginBottom: 16,
     padding: '12px 16px',
     borderRadius: 14,
     border: '1px solid var(--admin-border-soft)',
     background: 'var(--admin-input-bg)',
     boxShadow: 'var(--admin-glass-sheen)',
   },
-  readonlyValue: {
-    fontSize: 18,
-    fontWeight: 700,
-    letterSpacing: '0.06em',
-    wordBreak: 'break-word',
+  titleInput: {
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: '1px solid var(--admin-border-soft)',
+    fontSize: 15,
+    fontWeight: 500,
+    color: '#0f172a',
+    background: '#ffffff',
+    lineHeight: 1.3,
+    boxShadow: 'none',
+    outline: 'none',
   },
-  readonlyCode: {
-    display: 'inline-block',
+  slugWarning: {
+    fontSize: 12,
+    color: '#b45309',
+    background: 'rgba(251, 191, 36, 0.12)',
+    border: '1px solid rgba(251, 191, 36, 0.4)',
+    borderRadius: 10,
+    padding: '8px 10px',
+  },
+  slugMetaRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+  },
+  slugMetaItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+  },
+  slugMetaLabel: {
+    fontWeight: 600,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  slugMetaCode: {
+    fontFamily: 'ui-monospace, SFMono-Regular, SFMono, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    fontSize: 12,
+    padding: '2px 8px',
+    borderRadius: 8,
+    background: 'rgba(148, 163, 184, 0.15)',
+    color: 'var(--appearance-font-color, var(--admin-body-color))',
+  },
+  titleActionsRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  saveTitleButton: {
+    fontSize: 13,
+    fontWeight: 600,
+    padding: '8px 18px',
+    borderRadius: 12,
+    border: '1px solid rgba(59, 130, 246, 0.4)',
+    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.14), rgba(37, 99, 235, 0.08))',
+    color: '#0f172a',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+  },
+  saveTitleButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+  },
+  defaultControlsBlock: {
+    marginTop: 12,
+    padding: '12px 16px',
+    borderRadius: 14,
+    border: '1px solid rgba(59, 130, 246, 0.18)',
+    background: 'rgba(59, 130, 246, 0.06)',
+    display: 'grid',
+    gap: 10,
+  },
+  defaultControlsHeading: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: 'var(--admin-muted)',
+  },
+  defaultOverwriteToggle: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 10,
+    cursor: 'pointer',
+    userSelect: 'none',
+  },
+  defaultOverwriteLabel: {
+    fontSize: 12,
+    fontWeight: 600,
     padding: '4px 10px',
     borderRadius: 999,
-    border: '1px solid var(--admin-border-soft)',
-    background: 'var(--admin-tab-bg)',
-    fontWeight: 600,
-    letterSpacing: '0.08em',
+    border: '1px solid rgba(59, 130, 246, 0.35)',
+    background: 'rgba(59, 130, 246, 0.12)',
+    color: '#1d4ed8',
+  },
+  defaultOverwriteLabelActive: {
+    borderColor: 'rgba(239, 68, 68, 0.6)',
+    background: 'rgba(239, 68, 68, 0.12)',
+    color: '#991b1b',
+  },
+  defaultControlsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 12,
+    alignItems: 'center',
+  },
+  defaultActionButton: {
+    fontSize: 13,
+    fontWeight: 700,
+    padding: '8px 16px',
+    borderRadius: 12,
+    border: '1px solid rgba(59, 130, 246, 0.35)',
+    background: 'white',
+    color: '#0f172a',
+    cursor: 'pointer',
+  },
+  defaultActionButtonArmed: {
+    borderColor: 'rgba(239, 68, 68, 0.55)',
+    background: 'rgba(239, 68, 68, 0.14)',
+    color: '#7f1d1d',
+  },
+  defaultActionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  defaultSnapshotNote: {
+    fontSize: 12,
+    color: 'var(--admin-muted)',
+    flex: '1 1 auto',
   },
   coverControlsRow: {
     display: 'flex',
