@@ -2925,7 +2925,6 @@ export default function Admin() {
 
   return (
     <div style={S.body}>
-      {/* Settings menu rendered globally via AdminSettingsRoot */}
       <header style={headerStyle}>
         <div style={S.wrap}>
           <div style={S.headerTopRow}>

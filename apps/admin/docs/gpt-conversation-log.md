@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-31T06:05:00Z
+
+**You:** Drop the shell-level settings dropdown entirely, surface the saved-games selector inline on the Settings (Global) screen, and keep the repo/branch/commit/deployment snapshot anchored to the bottom so QA still sees the metadata.
+
+**GPT:** Confirmed with ChatGPT-5 thinking, left the bridge active for hiding legacy controls, added the inline Saved Games dropdown plus a shared repo snapshot footer component, and updated the Settings page to render the metadata without the global menu.
+
+---
+
 **Timestamp:** 2025-10-31T05:15:00Z
 
 **You:** Codex spotted that `_app.jsx` still lacked the global bridge and `index.jsx` referenced `HideLegacyButtons` without importing it. Apply the suggested patches so the settings dropdown works everywhere without crashing, then confirm the metadata footer stays intact.
@@ -185,3 +193,11 @@
 **You:** Move the Settings dropdown to the top-right, hide the duplicate action buttons, and rename Publish to “Save & Publish Game.”
 
 **GPT:** Fixed the Settings menu to a global top-right control, trimmed the legacy action buttons from every tab, wired the Save & Publish hook for menu and bridge events, and kept the Open & View list labeling drafts vs. published entries.
+
+---
+
+**Timestamp:** 2025-10-31T02:15:00Z
+
+**You:** Codex called out that the global Settings dropdown should go away in favor of an inline Saved Games selector—keep the bridge hiding buttons, and confirm ChatGPT-5 is aware.
+
+**GPT:** Removed the shell-level Settings menu, left the bridge active to suppress the legacy controls, and added a dedicated Settings page section with the all-games dropdown so the team (and ChatGPT-5) can switch titles without the global menu.

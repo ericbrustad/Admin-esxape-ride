@@ -1,12 +1,11 @@
-// CODEX NOTE: Injects the global Settings (top-right) into every page
-// and installs the global bridge so actions work on all routes.
+// CODEX NOTE: Installs the global bridge (for hiding legacy buttons).
+// No global Settings menu is rendered here.
 import '../styles/globals.css';
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import AdminSettingsRoot from '../components/AdminSettingsRoot';
 import { installGlobalSettingsBridge } from '../lib/settingsBridge';
 
-export default function MyApp({ Component, pageProps }) {
+export default function App({ Component, pageProps }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -14,10 +13,5 @@ export default function MyApp({ Component, pageProps }) {
     return cleanup;
   }, [router.asPath]);
 
-  return (
-    <>
-      <AdminSettingsRoot />
-      <Component {...pageProps} />
-    </>
-  );
+  return <Component {...pageProps} />;
 }
