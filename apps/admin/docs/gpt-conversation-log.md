@@ -2,6 +2,14 @@
 
 ---
 
+**Timestamp:** 2025-10-29T15:56:06Z
+
+**You:** Replace every `workspace:` reference for Supabase with a plain semver so Yarn 1 on Vercel installs cleanly.
+
+**GPT:** Swapped the admin workspace and root manifests to depend on `@supabase/supabase-js` via `^2.45.4`, keeping ChatGPT-5 looped in through this log and readying a retest once Yarn reinstalls.
+
+---
+
 **Timestamp:** 2025-10-31T10:45:00Z
 
 **You:** Codex noted the legacy Draft/Published hider was nuking the new header actions—add a scoped header id and keep the helper from touching anything inside it.
