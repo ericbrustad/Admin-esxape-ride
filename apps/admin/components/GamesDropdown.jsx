@@ -42,12 +42,21 @@ export default function GamesDropdown() {
   }, [options]);
 
   const selectedValue = React.useMemo(() => {
-    return `${currentGame || ''}::${currentChannel || ''}`;
-  }, [currentGame, currentChannel]);
+    if (!options.length) return '';
+    const slug = currentGame || options[0]?.slug || '';
+    if (!slug) return '';
+    const directKey = `${slug}::${currentChannel || ''}`;
+    if (directKey && options.some((opt) => `${opt.slug}::${opt.channel}` === directKey)) {
+      return directKey;
+    }
+    const match = options.find((opt) => opt.slug === slug);
+    return match ? `${match.slug}::${match.channel}` : '';
+  }, [currentChannel, currentGame, options]);
 
   function onChange(e) {
     const value = e.target.value; // "slug::channel"
     const [slug, channel] = value.split('::');
+    if (!slug) return;
     const q = { ...router.query, game: slug };
     if (channel) q.channel = channel;
     else delete q.channel;
@@ -91,6 +100,9 @@ export default function GamesDropdown() {
           <option>No games found</option>
         ) : (
           <>
+            <option value="" disabled hidden>
+              Select a game…
+            </option>
             {grouped.published.length > 0 && (
               <optgroup label="Published">
                 {grouped.published.map((g) => (
