@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import GamesDropdown from '../components/GamesDropdown';
 import HeaderBar from '../components/HeaderBar';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
@@ -5599,6 +5600,10 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
+            {/* Codex note (2025-10-30): Saved Games dropdown (filesystem scan via /api/games/list) */}
+            <div data-codex="SettingsGamesDropdown">
+              <GamesDropdown />
+            </div>
             <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
               <div>
                 <button
