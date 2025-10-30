@@ -5733,10 +5733,6 @@ export default function Admin() {
               onUseAsDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
               onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
             />
-            <GlobalLocationSelector
-              initial={globalLocationSeed}
-              onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
-            />
             <div style={S.titleEditorBlock}>
               <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
               <input
