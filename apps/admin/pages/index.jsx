@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import GamesDropdown from '../components/GamesDropdown';
 import HeaderBar from '../components/HeaderBar';
 import TestLauncher from '../components/TestLauncher';
 import HomeDefaultButtons from '../components/HomeDefaultButtons';
@@ -5599,6 +5600,10 @@ export default function Admin() {
         <main style={S.wrap}>
           <div style={S.card}>
             <h3 style={{ marginTop:0 }}>Game Settings</h3>
+            {/* Codex note (2025-10-30): Saved Games dropdown (filesystem scan via /api/games/list) */}
+            <div data-codex="SettingsGamesDropdown">
+              <GamesDropdown />
+            </div>
             <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
               <div>
                 <button
@@ -5726,12 +5731,6 @@ export default function Admin() {
               onMirrorChange={(checked) => saveGameFlags({ gameEnabled: checked }).catch(() => {})}
               onChannelChange={(value) => saveGameFlags({ defaultChannel: value }).catch(() => {})}
               onUseLocationDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
-            />
-            <GlobalLocationSelector
-              initial={globalLocationSeed}
-              useAsDefault={Boolean(activeGameMeta?.settings?.useLocationAsDefault)}
-              onUseAsDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
-              onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
             />
             <div style={S.titleEditorBlock}>
               <label style={S.fieldLabel} htmlFor="admin-title-input">Game Title</label>
@@ -5905,56 +5904,75 @@ export default function Admin() {
           </div>
 
           <div style={{ ...S.card, marginTop:16 }}>
-            <h3 style={{ marginTop:0 }}>Game Region & Geofence</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
-              <Field label="Default Map Center — Latitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLat ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Default Map Center — Longitude">
-                <input
-                  type="number" step="0.000001" style={S.input}
-                  value={config.map?.centerLng ?? ''}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
-                />
-              </Field>
-              <Field label="Find center by address/city">
-                <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
-                  <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
-                  <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
-                </form>
-                <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
-                  {mapResults.map((r,i)=>(
-                    <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
-                      <div style={{ fontWeight:600 }}>{r.display_name}</div>
-                      <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+            <h3 style={{ marginTop:0 }}>Game Region, Geofence &amp; Global Location</h3>
+            <div
+              style={{
+                display:'grid',
+                gap:16,
+                alignItems:'flex-start',
+                gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',
+              }}
+            >
+              <div style={{ display:'grid', gap:12 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:12 }}>
+                  <Field label="Default Map Center — Latitude">
+                    <input
+                      type="number" step="0.000001" style={S.input}
+                      value={config.map?.centerLat ?? ''}
+                      onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLat: Number(e.target.value||0) } })}
+                    />
+                  </Field>
+                  <Field label="Default Map Center — Longitude">
+                    <input
+                      type="number" step="0.000001" style={S.input}
+                      value={config.map?.centerLng ?? ''}
+                      onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), centerLng: Number(e.target.value||0) } })}
+                    />
+                  </Field>
+                  <Field label="Find center by address/city">
+                    <form onSubmit={searchMapCenter} style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:8 }}>
+                      <input placeholder="Address / City" value={mapSearchQ} onChange={(e)=>setMapSearchQ(e.target.value)} style={S.input}/>
+                      <button type="submit" className="button" style={S.button} disabled={mapSearching}>{mapSearching?'Searching…':'Search'}</button>
+                    </form>
+                    <div style={{ background:'var(--admin-input-bg)', border:'1px solid var(--admin-border-soft)', borderRadius:10, padding:8, marginTop:8, maxHeight:160, overflow:'auto', display: mapResults.length>0 ? 'block' : 'none' }}>
+                      {mapResults.map((r,i)=>(
+                        <div key={i} onClick={()=>useCenterResult(r)} style={{ padding:'6px 8px', cursor:'pointer', borderBottom:'1px solid var(--admin-border-soft)' }}>
+                          <div style={{ fontWeight:600 }}>{r.display_name}</div>
+                          <div style={{ color:'var(--admin-muted)', fontSize:12 }}>lat {Number(r.lat).toFixed(6)}, lng {Number(r.lon).toFixed(6)}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </Field>
+                  <Field label="Default Zoom">
+                    <input
+                      type="number" min={2} max={20} style={S.input}
+                      value={config.map?.defaultZoom ?? 13}
+                      onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } })}
+                    />
+                  </Field>
+                  <Field label="Geofence Mode">
+                    <select
+                      style={S.input}
+                      value={config.geofence?.mode || 'test'}
+                      onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
+                    >
+                      <option value="test">Test — click to enter (dev)</option>
+                      <option value="live">Live — GPS radius only</option>
+                    </select>
+                  </Field>
                 </div>
-              </Field>
-              <Field label="Default Zoom">
-                <input
-                  type="number" min={2} max={20} style={S.input}
-                  value={config.map?.defaultZoom ?? 13}
-                  onChange={(e)=>setConfig({ ...config, map:{ ...(config.map||{}), defaultZoom: clamp(Number(e.target.value||13), 2, 20) } })}
+                <div style={{ color:'var(--admin-muted)', fontSize:12 }}>
+                  These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
+                </div>
+              </div>
+              <div style={{ minWidth:0 }}>
+                <GlobalLocationSelector
+                  initial={globalLocationSeed}
+                  useAsDefault={Boolean(activeGameMeta?.settings?.useLocationAsDefault)}
+                  onUseAsDefaultChange={(checked) => saveGameFlags({ useLocationAsDefault: checked }).catch(() => {})}
+                  onUpdate={(nextLat, nextLng) => handleUpdateAllPins(nextLat, nextLng)}
                 />
-              </Field>
-              <Field label="Geofence Mode">
-                <select
-                  style={S.input}
-                  value={config.geofence?.mode || 'test'}
-                  onChange={(e)=>setConfig({ ...config, geofence:{ ...(config.geofence||{}), mode: e.target.value } })}
-                >
-                  <option value="test">Test — click to enter (dev)</option>
-                  <option value="live">Live — GPS radius only</option>
-                </select>
-              </Field>
-            </div>
-            <div style={{ color:'var(--admin-muted)', marginTop:8, fontSize:12 }}>
-              These defaults keep pins in the same region. “Geofence Mode” can be used by the Game client to allow click-to-enter in test vs GPS in live.
+              </div>
             </div>
           </div>
 
