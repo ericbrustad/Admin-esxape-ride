@@ -4,18 +4,13 @@
     "mode": "single"
   },
   "game": {
-    "title": "DEFAULT",
+    "title": "copy",
     "type": "Mystery",
     "tags": [
       "default",
-      "default-game",
-      "starfield-station-break"
+      "default-game"
     ],
-    "coverImage": "/media/mediapool/Images/covers/starfield-station-break.svg",
-    "deployEnabled": true,
-    "shortDescription": "",
-    "longDescription": "",
-    "slug": "default"
+    "coverImage": ""
   },
   "forms": {
     "players": 1
@@ -34,67 +29,47 @@
   "icons": {
     "missions": [
       {
-        "key": "briefing-star",
-        "name": "Briefing Star",
-        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "/media/bundles/trivia%20icon.png"
       },
       {
-        "key": "aurora-beacon",
-        "name": "Aurora Beacon",
-        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
-      },
-      {
-        "key": "decoy-glow",
-        "name": "Decoy Glow",
-        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "/media/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
       {
-        "key": "aurora-beacon",
-        "name": "Aurora Beacon",
-        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+        "key": "smoke-shield",
+        "name": "Smoke Shield",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
       },
       {
-        "key": "lumen-halo",
-        "name": "Lumen Halo",
-        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
-      },
-      {
-        "key": "quantum-anchor",
-        "name": "Quantum Anchor",
-        "url": "/media/mediapool/Images/icons/quantum-anchor.svg"
-      },
-      {
-        "key": "chrono-switch",
-        "name": "Chrono Switch",
-        "url": "/media/mediapool/Images/icons/chrono-switch.svg"
-      },
-      {
-        "key": "voyager-dial",
-        "name": "Voyager Dial",
-        "url": "/media/mediapool/Images/icons/voyager-dial.svg"
+        "key": "roaming-robot",
+        "name": "Roaming Robot",
+        "url": "/media/bundles/ROBOT1small.png"
       }
     ],
     "rewards": [
       {
         "key": "evidence",
         "name": "Evidence",
-        "url": "/media/mediapool/Images/bundles/evidence%202.png"
+        "url": "/media/bundles/evidence%202.png"
       },
       {
         "key": "clue",
         "name": "Clue",
-        "url": "/media/mediapool/Images/bundles/CLUEgreen.png"
+        "url": "/media/bundles/CLUEgreen.png"
       },
       {
         "key": "gold-coin",
         "name": "Gold Coin",
-        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png"
+        "url": "/media/bundles/GOLDEN%20COIN.png"
       }
     ]
   },
-  "appearanceSkin": "default",
+  "appearanceSkin": "starfield-dawn",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -121,8 +96,8 @@
     "triggeredMissionId": ""
   },
   "map": {
-    "centerLat": 44.803334,
-    "centerLng": -93.362126,
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
     "defaultZoom": 13
   },
   "geofence": {
