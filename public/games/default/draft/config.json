@@ -1,211 +1,75 @@
 {
   "splash": {
-    "enabled": false,
+    "enabled": true,
     "mode": "single"
   },
   "game": {
-    "title": "Starfield Station Break",
-    "type": "Sci-Fi",
+    "title": "copy",
+    "type": "Mystery",
     "tags": [
-      "starfield-station-break",
+      "default",
       "default-game"
     ],
-    "coverImage": "/media/mediapool/Images/covers/starfield-station-break.svg",
-    "shortDescription": "Sneak through sunrise-lit docking bays to free the crew before lockdown.",
-    "longDescription": "A covert dawn extraction beneath the capital's transit station. Follow beacon clues, disable holo-decoys, and guide the shuttle pilots out before the shutters seal for the day.",
-    "deployEnabled": true
+    "coverImage": ""
   },
   "forms": {
     "players": 1
   },
   "timer": {
-    "durationMinutes": 45,
+    "durationMinutes": 0,
     "alertMinutes": 10
   },
-  "textRules": [
-    "Coordinate with the rail conductor before disabling any locks.",
-    "Return mission tablets to the command desk after every session.",
-    "Report damaged props or lights to maintenance immediately."
-  ],
-  "devices": [
-    {
-      "id": "beacon-alpha",
-      "title": "Beacon Alpha",
-      "type": "signal",
-      "iconKey": "aurora-beacon",
-      "pickupRadius": 90,
-      "effectSeconds": 180,
-      "lat": 38.9072,
-      "lng": -77.0369,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "/media/mediapool/Images/icons/aurora-beacon.svg",
-        "actionLabel": "Broadcast sunrise route",
-        "actionThumbnail": "/media/mediapool/Images/icons/aurora-beacon.svg",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": "m02"
-      }
-    },
-    {
-      "id": "halo-decoy",
-      "title": "Halo Decoy",
-      "type": "decoy",
-      "iconKey": "lumen-halo",
-      "pickupRadius": 75,
-      "effectSeconds": 150,
-      "lat": 38.9125,
-      "lng": -77.0473,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "/media/mediapool/Images/icons/lumen-halo.svg",
-        "actionLabel": "Deploy holographic lantern",
-        "actionThumbnail": "/media/mediapool/Images/icons/lumen-halo.svg",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": "m03"
-      }
-    },
-    {
-      "id": "quantum-anchor",
-      "title": "Quantum Anchor",
-      "type": "lockdown",
-      "iconKey": "quantum-anchor",
-      "pickupRadius": 80,
-      "effectSeconds": 210,
-      "lat": 38.898,
-      "lng": -77.028,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "/media/mediapool/Images/icons/quantum-anchor.svg",
-        "actionLabel": "Stabilize security grid",
-        "actionThumbnail": "/media/mediapool/Images/icons/quantum-anchor.svg",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": ""
-      }
-    },
-    {
-      "id": "chrono-switch",
-      "title": "Chrono Switch",
-      "type": "timer",
-      "iconKey": "chrono-switch",
-      "pickupRadius": 65,
-      "effectSeconds": 120,
-      "lat": 38.9005,
-      "lng": -77.045,
-      "trigger": {
-        "enabled": true,
-        "actionType": "missions",
-        "actionTarget": "m03",
-        "actionLabel": "Prime finale briefing",
-        "actionThumbnail": "",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": "m03"
-      }
-    },
-    {
-      "id": "voyager-dial",
-      "title": "Voyager Dial",
-      "type": "relay",
-      "iconKey": "voyager-dial",
-      "pickupRadius": 85,
-      "effectSeconds": 160,
-      "lat": 38.915,
-      "lng": -77.031,
-      "trigger": {
-        "enabled": true,
-        "actionType": "media",
-        "actionTarget": "/media/mediapool/Images/icons/voyager-dial.svg",
-        "actionLabel": "Cue departure tone",
-        "actionThumbnail": "/media/mediapool/Images/icons/voyager-dial.svg",
-        "triggerDeviceId": "",
-        "triggerDeviceLabel": "",
-        "triggeredResponseKey": "",
-        "triggeredMissionId": "m01"
-      }
-    }
-  ],
+  "textRules": [],
+  "devices": [],
   "powerups": [],
   "media": {
-    "rewardsPool": [
-      {
-        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png",
-        "label": "Golden Coin"
-      },
-      {
-        "url": "/media/mediapool/Images/bundles/evidence%202.png",
-        "label": "Recovered Evidence"
-      }
-    ],
-    "penaltiesPool": [
-      {
-        "url": "/media/mediapool/Images/bundles/SMOKE%20BOMB.png",
-        "label": "Emergency Smoke"
-      }
-    ]
+    "rewardsPool": [],
+    "penaltiesPool": []
   },
   "icons": {
     "missions": [
       {
-        "key": "briefing-star",
-        "name": "Briefing Star",
-        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+        "key": "trivia",
+        "name": "Trivia",
+        "url": "/media/bundles/trivia%20icon.png"
       },
       {
-        "key": "decoy-glow",
-        "name": "Decoy Glow",
-        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
+        "key": "trivia-2",
+        "name": "Trivia 2",
+        "url": "/media/bundles/trivia%20yellow.png"
       }
     ],
     "devices": [
       {
-        "key": "aurora-beacon",
-        "name": "Aurora Beacon",
-        "url": "/media/mediapool/Images/icons/aurora-beacon.svg"
+        "key": "smoke-shield",
+        "name": "Smoke Shield",
+        "url": "/media/bundles/SMOKE%20BOMB.png"
       },
       {
-        "key": "lumen-halo",
-        "name": "Lumen Halo",
-        "url": "/media/mediapool/Images/icons/lumen-halo.svg"
-      },
-      {
-        "key": "quantum-anchor",
-        "name": "Quantum Anchor",
-        "url": "/media/mediapool/Images/icons/quantum-anchor.svg"
-      },
-      {
-        "key": "chrono-switch",
-        "name": "Chrono Switch",
-        "url": "/media/mediapool/Images/icons/chrono-switch.svg"
-      },
-      {
-        "key": "voyager-dial",
-        "name": "Voyager Dial",
-        "url": "/media/mediapool/Images/icons/voyager-dial.svg"
+        "key": "roaming-robot",
+        "name": "Roaming Robot",
+        "url": "/media/bundles/ROBOT1small.png"
       }
     ],
     "rewards": [
       {
-        "key": "golden-coin",
-        "name": "Golden Coin",
-        "url": "/media/mediapool/Images/bundles/GOLDEN%20COIN.png"
-      },
-      {
         "key": "evidence",
         "name": "Evidence",
-        "url": "/media/mediapool/Images/bundles/evidence%202.png"
+        "url": "/media/bundles/evidence%202.png"
+      },
+      {
+        "key": "clue",
+        "name": "Clue",
+        "url": "/media/bundles/CLUEgreen.png"
+      },
+      {
+        "key": "gold-coin",
+        "name": "Gold Coin",
+        "url": "/media/bundles/GOLDEN%20COIN.png"
       }
     ]
   },
+  "appearanceSkin": "starfield-dawn",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -214,12 +78,11 @@
     "textBgOpacity": 0.7,
     "screenBgColor": "#e0dcfa",
     "screenBgOpacity": 0.46,
-    "screenBgImage": "",
+    "screenBgImage": "/media/skins/starfield-dawn.svg",
     "textAlign": "center",
     "textVertical": "top",
-    "screenBgImageEnabled": false
+    "screenBgImageEnabled": true
   },
-  "appearanceSkin": "starfield-dawn",
   "appearanceTone": "light",
   "mediaTriggers": {
     "enabled": false,
@@ -233,11 +96,32 @@
     "triggeredMissionId": ""
   },
   "map": {
-    "centerLat": 38.9072,
-    "centerLng": -77.0369,
-    "defaultZoom": 14
+    "centerLat": 44.9778,
+    "centerLng": -93.265,
+    "defaultZoom": 13
   },
   "geofence": {
     "mode": "test"
-  }
+  },
+  "theme": {
+    "splash": {
+      "fontFamily": "Georgia, serif",
+      "fontSize": 24,
+      "textColor": "#f1f5f9",
+      "align": "left",
+      "backgroundColor": "#0f172a",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    },
+    "missionDefault": {
+      "fontFamily": "system-ui, Arial, sans-serif",
+      "fontSize": 18,
+      "textColor": "#f8fafc",
+      "align": "center",
+      "backgroundColor": "#111827",
+      "backgroundImageUrl": "",
+      "backgroundSize": "cover"
+    }
+  },
+  "gameOrigin": "http://localhost:4000"
 }

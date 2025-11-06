@@ -4,13 +4,16 @@
     "mode": "single"
   },
   "game": {
-    "title": "copy",
-    "type": "Mystery",
+    "title": "Alien Surge",
+    "type": "Thriller",
     "tags": [
-      "default",
-      "default-game"
+      "alien-surge"
     ],
-    "coverImage": ""
+    "coverImage": "/media/icons/1760231568080-erix_coach_and_car_fleet_QR.jpg",
+    "deployEnabled": true,
+    "shortDescription": "They didnt come to eat dinner with you",
+    "longDescription": "A Surge of Aliens becomes to be more than was expected after you invited them to come and live in your city.",
+    "slug": "alien-surge"
   },
   "forms": {
     "players": 1
@@ -69,7 +72,7 @@
       }
     ]
   },
-  "appearanceSkin": "starfield-dawn",
+  "appearanceSkin": "default",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -102,26 +105,5 @@
   },
   "geofence": {
     "mode": "test"
-  },
-  "theme": {
-    "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#f1f5f9",
-      "align": "left",
-      "backgroundColor": "#0f172a",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    },
-    "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#f8fafc",
-      "align": "center",
-      "backgroundColor": "#111827",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    }
-  },
-  "gameOrigin": "http://localhost:4000"
+  }
 }

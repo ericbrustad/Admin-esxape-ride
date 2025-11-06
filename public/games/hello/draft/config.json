@@ -4,13 +4,16 @@
     "mode": "single"
   },
   "game": {
-    "title": "copy",
+    "title": "Hello",
     "type": "Mystery",
     "tags": [
-      "default",
-      "default-game"
+      "hello"
     ],
-    "coverImage": ""
+    "coverImage": "/media/covers/1761017327804-3_ring_answer_02.JPG",
+    "deployEnabled": true,
+    "shortDescription": "",
+    "longDescription": "",
+    "slug": "hello"
   },
   "forms": {
     "players": 1
@@ -29,26 +32,46 @@
   "icons": {
     "missions": [
       {
-        "key": "trivia",
-        "name": "Trivia",
-        "url": "/media/bundles/trivia%20icon.png"
+        "key": "briefing-star",
+        "name": "Briefing Star",
+        "url": "/media/icons/aurora-beacon.svg"
       },
       {
-        "key": "trivia-2",
-        "name": "Trivia 2",
-        "url": "/media/bundles/trivia%20yellow.png"
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
+      },
+      {
+        "key": "decoy-glow",
+        "name": "Decoy Glow",
+        "url": "/media/icons/lumen-halo.svg"
       }
     ],
     "devices": [
       {
-        "key": "smoke-shield",
-        "name": "Smoke Shield",
-        "url": "/media/bundles/SMOKE%20BOMB.png"
+        "key": "aurora-beacon",
+        "name": "Aurora Beacon",
+        "url": "/media/icons/aurora-beacon.svg"
       },
       {
-        "key": "roaming-robot",
-        "name": "Roaming Robot",
-        "url": "/media/bundles/ROBOT1small.png"
+        "key": "lumen-halo",
+        "name": "Lumen Halo",
+        "url": "/media/icons/lumen-halo.svg"
+      },
+      {
+        "key": "quantum-anchor",
+        "name": "Quantum Anchor",
+        "url": "/media/icons/quantum-anchor.svg"
+      },
+      {
+        "key": "chrono-switch",
+        "name": "Chrono Switch",
+        "url": "/media/icons/chrono-switch.svg"
+      },
+      {
+        "key": "voyager-dial",
+        "name": "Voyager Dial",
+        "url": "/media/icons/voyager-dial.svg"
       }
     ],
     "rewards": [
@@ -69,7 +92,7 @@
       }
     ]
   },
-  "appearanceSkin": "starfield-dawn",
+  "appearanceSkin": "default",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -102,26 +125,5 @@
   },
   "geofence": {
     "mode": "test"
-  },
-  "theme": {
-    "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#f1f5f9",
-      "align": "left",
-      "backgroundColor": "#0f172a",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    },
-    "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#f8fafc",
-      "align": "center",
-      "backgroundColor": "#111827",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    }
-  },
-  "gameOrigin": "http://localhost:4000"
+  }
 }

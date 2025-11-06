@@ -4,13 +4,16 @@
     "mode": "single"
   },
   "game": {
-    "title": "copy",
-    "type": "Mystery",
+    "title": "dddds  wc qwx",
+    "type": "Thriller",
     "tags": [
-      "default",
-      "default-game"
+      "dddds-wc-qwx"
     ],
-    "coverImage": ""
+    "coverImage": "/media/covers/1760917344366-20face2eye03.png",
+    "deployEnabled": true,
+    "shortDescription": "gngngn",
+    "longDescription": "gngg g g dhrdhrdff srr r  r",
+    "slug": "dddds-wc-qwx"
   },
   "forms": {
     "players": 1
@@ -20,8 +23,52 @@
     "alertMinutes": 10
   },
   "textRules": [],
-  "devices": [],
-  "powerups": [],
+  "devices": [
+    {
+      "id": "d01",
+      "title": "fffb",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 1745,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "actionLabel": "1759945844073 Diamond complete2",
+        "actionThumbnail": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
+  "powerups": [
+    {
+      "id": "d01",
+      "title": "fffb",
+      "type": "clone",
+      "iconKey": "",
+      "pickupRadius": 1745,
+      "effectSeconds": 120,
+      "trigger": {
+        "enabled": true,
+        "actionType": "media",
+        "actionTarget": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "actionLabel": "1759945844073 Diamond complete2",
+        "actionThumbnail": "/media/uploads/1759945844073-Diamond_complete2.jpg",
+        "triggerDeviceId": "",
+        "triggerDeviceLabel": "",
+        "triggeredResponseKey": "",
+        "triggeredMissionId": ""
+      },
+      "lat": 44.9778,
+      "lng": -93.265
+    }
+  ],
   "media": {
     "rewardsPool": [],
     "penaltiesPool": []
@@ -69,7 +116,7 @@
       }
     ]
   },
-  "appearanceSkin": "starfield-dawn",
+  "appearanceSkin": "default",
   "appearance": {
     "fontFamily": "\"Exo 2\", \"Segoe UI\", sans-serif",
     "fontSizePx": 23,
@@ -102,26 +149,5 @@
   },
   "geofence": {
     "mode": "test"
-  },
-  "theme": {
-    "splash": {
-      "fontFamily": "Georgia, serif",
-      "fontSize": 24,
-      "textColor": "#f1f5f9",
-      "align": "left",
-      "backgroundColor": "#0f172a",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    },
-    "missionDefault": {
-      "fontFamily": "system-ui, Arial, sans-serif",
-      "fontSize": 18,
-      "textColor": "#f8fafc",
-      "align": "center",
-      "backgroundColor": "#111827",
-      "backgroundImageUrl": "",
-      "backgroundSize": "cover"
-    }
-  },
-  "gameOrigin": "http://localhost:4000"
+  }
 }

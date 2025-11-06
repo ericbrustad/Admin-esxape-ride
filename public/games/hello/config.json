@@ -1,0 +1,21 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "Hello",
+    "type": "Mystery",
+    "tags": [
+      "hello"
+    ],
+    "coverImage": "/media/covers/1761017327804-3_ring_answer_02.JPG",
+    "shortDescription": "",
+    "longDescription": "",
+    "slug": "hello"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
