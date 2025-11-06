@@ -1,0 +1,21 @@
+{
+  "splash": {
+    "enabled": true,
+    "mode": "single"
+  },
+  "game": {
+    "title": "booker",
+    "type": "Mystery",
+    "tags": [
+      "booker"
+    ],
+    "coverImage": "/media/uploads/1759944234519-casper.jpg",
+    "shortDescription": "",
+    "longDescription": "",
+    "slug": "booker"
+  },
+  "forms": {
+    "players": 1
+  },
+  "textRules": []
+}
