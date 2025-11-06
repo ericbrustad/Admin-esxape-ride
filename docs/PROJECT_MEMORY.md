@@ -21,24 +21,28 @@
 
 ## Media (global pool)
 - Pool dirs (both apps):
-  - public/media/bundles/
-  - public/media/overlays/
-  - game/public/media/bundles/
-  - game/public/media/overlays/
-- Pick from media reads /media/bundles and /media/overlays
+  - public/media/mediapool/Audio/
+  - public/media/mediapool/Video/
+  - public/media/mediapool/AR Target/
+  - public/media/mediapool/AR Overlay/
+  - public/media/mediapool/Images/ (plus /Images/{bundles,covers,icons,uploads})
+  - public/media/mediapool/Gif/
+  - public/media/mediapool/Other/
+  - Legacy backups live in public/media/*_bak for reference
+- Pick from media reads /media/mediapool/** with type + tag metadata
 - Drag & drop + chooser supported for pool & icon lists
 - Re-apply defaults seeds default entries (does not delete custom)
 - "Key" column = human-readable statement of what pin the icon is for
 
-### Default bundles (shipped every build)
-- /media/bundles/ROBOT1small.png -> "Roaming Robot" — Device icon (type clone)
-- /media/bundles/SMOKE BOMB.png -> "Smoke Shield" — Device icon (type smoke)
-- /media/bundles/GOLDEN COIN.png -> "Gold Coin" — Reward icon
-- /media/bundles/evidence 2.png -> "Evidence" — Reward icon
-- /media/bundles/CLUEgreen.png -> "Clue" — Reward icon
-- /media/bundles/trivia icon.png -> "Trivia" — Mission icon
-- /media/bundles/trivia yellow.png -> "Trivia 2" — Mission icon
-- Overlays: /media/overlays/* (any number, listed dynamically)
+- Default image bundles (shipped every build)
+  - /media/mediapool/Images/bundles/ROBOT1small.png -> "Roaming Robot" — Device icon (type clone)
+  - /media/mediapool/Images/bundles/SMOKE BOMB.png -> "Smoke Shield" — Device icon (type smoke)
+  - /media/mediapool/Images/bundles/GOLDEN COIN.png -> "Gold Coin" — Reward icon
+  - /media/mediapool/Images/bundles/evidence 2.png -> "Evidence" — Reward icon
+  - /media/mediapool/Images/bundles/CLUEgreen.png -> "Clue" — Reward icon
+  - /media/mediapool/Images/bundles/trivia icon.png -> "Trivia" — Mission icon
+  - /media/mediapool/Images/bundles/trivia yellow.png -> "Trivia 2" — Mission icon
+- AR folders split markers vs overlays for assignment (`AR Target`, `AR Overlay`)
 
 ## Missions
 - Types: multiple_choice, short_answer, statement, video, geofence_image, geofence_video, ar_image, ar_video, stored_statement

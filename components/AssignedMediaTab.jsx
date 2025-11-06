@@ -140,6 +140,8 @@ export default function AssignedMediaTab({
     responseWrong: responseWrongUsage = [],
     responseAudio: responseAudioUsage = [],
     actionMedia: actionUsage = [],
+    arTargets: arTargetUsage = [],
+    arOverlays: arOverlayUsage = [],
   } = usageSummary || {};
 
   const pluralize = (word, count) => (count === 1 ? word : `${word}s`);
@@ -226,6 +228,8 @@ export default function AssignedMediaTab({
       ...(responseWrongUsage || []),
       ...(responseAudioUsage || []),
       ...(actionOverview || []),
+      ...(arTargetUsage || []),
+      ...(arOverlayUsage || []),
     ];
 
     const responseTrigger = new Set();
@@ -256,6 +260,8 @@ export default function AssignedMediaTab({
     responseWrongUsage,
     responseAudioUsage,
     actionOverview,
+    arTargetUsage,
+    arOverlayUsage,
   ]);
 
   function renderUsageSection(title, items, {
@@ -322,6 +328,8 @@ export default function AssignedMediaTab({
                           <img src={item.thumbUrl} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : item.kind === 'audio' ? (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>Audio</span>
+                        ) : item.kind === 'ar' ? (
+                          <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>AR</span>
                         ) : (
                           <span style={{ fontSize: 12, color: 'var(--admin-muted)' }}>No preview</span>
                         )}
@@ -484,6 +492,14 @@ export default function AssignedMediaTab({
           noun: 'trigger',
           allowRemove: true,
           onRemove: removeActionMedia,
+        })}
+        {renderUsageSection('AR Targets', arTargetUsage, {
+          emptyLabel: 'No AR targets assigned yet.',
+          noun: 'AR marker',
+        })}
+        {renderUsageSection('AR Overlays', arOverlayUsage, {
+          emptyLabel: 'No AR overlays assigned yet.',
+          noun: 'AR overlay',
         })}
       </Section>
     </div>

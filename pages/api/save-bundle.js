@@ -1,129 +1,79 @@
-// pages/api/save-bundle.js
-// Safely write missions.json + config.json (admin + game copies) in sequence
-// to avoid GitHub 409 "expected <sha>" conflicts.
-import { GAME_ENABLED } from '../../lib/game-switch.js';
+import { supaService } from '../../lib/supabase/server.js';
 
-const owner  = process.env.REPO_OWNER;
-const repo   = process.env.REPO_NAME;
-const branch = process.env.GITHUB_BRANCH || 'main';
-const token  = process.env.GITHUB_TOKEN;
-
-async function ghJson(url, init = {}) {
-  const r = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `token ${token}`,
-      Accept: 'application/vnd.github+json',
-      ...(init.headers || {}),
-    },
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const msg = (j && (j.message || j.error)) || `${r.status}`;
-    throw new Error(`${r.status} ${msg}`);
-  }
-  return j;
-}
-
-async function getSha(path) {
-  try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-    const j = await ghJson(url, { method: 'GET' });
-    return j.sha || null;
-  } catch (e) {
-    if (String(e.message || '').startsWith('404')) return null; // file doesn't exist yet
-    throw e;
-  }
-}
-
-async function putFile(path, content, message) {
-  const b64 = Buffer.from(content, 'utf8').toString('base64');
-  let attempt = 0;
-  while (attempt < 3) {
-    attempt += 1;
-    const sha = await getSha(path);
-    try {
-      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-      const body = { message, content: b64, branch, ...(sha ? { sha } : {}) };
-      return await ghJson(url, { method: 'PUT', body: JSON.stringify(body) });
-    } catch (e) {
-      // GitHub can return 409 if a concurrent update happened — retry a couple times with backoff.
-      if (String(e.message || '').startsWith('409')) {
-        await new Promise(r => setTimeout(r, 400 * attempt));
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw new Error('409 Conflict after retries');
+function normalizeSlug(value) {
+  const slug = String(value || '').trim();
+  if (!slug) return 'default';
+  if (slug === 'root' || slug === 'legacy-root') return 'default';
+  return slug;
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).end('Method Not Allowed');
+  }
+
+  let supa;
+  try {
+    supa = supaService();
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || 'Supabase configuration missing' });
+  }
 
   try {
-    // Accept blank/missing slug as default — be forgiving like the codex branch did.
-    const rawSlug = (req.query.slug || '').toString().trim();
-    const normalized = rawSlug.toLowerCase();
-    const isDefaultSlug = !rawSlug || normalized === 'default' || normalized === 'root' || normalized === 'legacy-root';
-    const slug = isDefaultSlug ? 'default' : rawSlug;
+    const { slug: querySlug } = req.query || {};
+    const { slug: bodySlug, missions: missionsInput, config: configInput } = req.body || {};
 
-    const { missions, config } = req.body || {};
-    if (!missions || !config) return res.status(400).json({ error: 'Missing missions/config' });
-
-    const msg = `save-bundle(${slug}) ${new Date().toISOString()}`;
-
-    const paths = {
-      mAdmin: `public/games/${slug}/draft/missions.json`,
-      cAdmin: `public/games/${slug}/draft/config.json`,
-      mGame:  `game/public/games/${slug}/draft/missions.json`,
-      cGame:  `game/public/games/${slug}/draft/config.json`,
-    };
-
-    const wrote = [];
-
-    // Always write admin copies
-    await putFile(paths.mAdmin, JSON.stringify(missions, null, 2), `${msg} missions(admin)`);
-    wrote.push(paths.mAdmin);
-
-    await putFile(paths.cAdmin, JSON.stringify(config, null, 2), `${msg} config(admin)`);
-    wrote.push(paths.cAdmin);
-
-    // Conditionally write game copies if feature flag enabled
-    if (GAME_ENABLED) {
-      await putFile(paths.mGame, JSON.stringify(missions, null, 2), `${msg} missions(game)`);
-      wrote.push(paths.mGame);
-
-      await putFile(paths.cGame, JSON.stringify(config, null, 2), `${msg} config(game)`);
-      wrote.push(paths.cGame);
+    if (!missionsInput || !configInput) {
+      return res.status(400).json({ ok: false, error: 'Missing missions or config payload' });
     }
 
-    // If this is the 'default' slug, also write legacy locations for backwards compatibility
-    if (isDefaultSlug) {
-      const legacyAdminM = 'public/draft/missions.json';
-      const legacyAdminC = 'public/draft/config.json';
+    const slug = normalizeSlug(bodySlug || querySlug);
+    const now = new Date().toISOString();
 
-      await putFile(legacyAdminM, JSON.stringify(missions, null, 2), `${msg} missions(admin legacy)`);
-      wrote.push(legacyAdminM);
+    const missions = Array.isArray(missionsInput)
+      ? missionsInput
+      : Array.isArray(missionsInput?.missions)
+        ? missionsInput.missions
+        : [];
+    const config = configInput || {};
+    const devices = Array.isArray(config?.devices)
+      ? config.devices
+      : Array.isArray(config?.powerups)
+        ? config.powerups
+        : [];
 
-      await putFile(legacyAdminC, JSON.stringify(config, null, 2), `${msg} config(admin legacy)`);
-      wrote.push(legacyAdminC);
+    const updates = [
+      supa.from('games').upsert({
+        slug,
+        title: config?.game?.title || slug,
+        status: 'draft',
+        theme: config?.appearance || {},
+        map: config?.map || {},
+        config,
+        updated_at: now,
+      }),
+      supa.from('missions').upsert({
+        game_slug: slug,
+        channel: 'draft',
+        items: missions,
+        updated_at: now,
+      }),
+      supa.from('devices').upsert({
+        game_slug: slug,
+        items: devices,
+        updated_at: now,
+      }),
+    ];
 
-      if (GAME_ENABLED) {
-        const legacyGameM = 'game/public/draft/missions.json';
-        const legacyGameC = 'game/public/draft/config.json';
-
-        await putFile(legacyGameM, JSON.stringify(missions, null, 2), `${msg} missions(game legacy)`);
-        wrote.push(legacyGameM);
-
-        await putFile(legacyGameC, JSON.stringify(config, null, 2), `${msg} config(game legacy)`);
-        wrote.push(legacyGameC);
-      }
+    const results = await Promise.all(updates);
+    const failure = results.find((result) => result?.error);
+    if (failure && failure.error) {
+      throw failure.error;
     }
 
-    // Return null slug for default to match previous behavior
-    res.status(200).json({ ok: true, slug: isDefaultSlug ? null : slug, wrote });
-  } catch (e) {
-    res.status(500).json({ error: e?.message || String(e) });
+    return res.status(200).json({ ok: true, slug, updated_at: now });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error?.message || 'Failed to save bundle' });
   }
 }
