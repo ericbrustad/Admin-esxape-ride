@@ -1435,18 +1435,37 @@ export default function Admin() {
 
   async function saveAndPublish() {
     logConversation('You', 'Requested Save & Publish');
-    if (!suite || !config) return;
+    console.log('[saveAndPublish] Save button clicked', { activeSlug });
+    if (!suite || !config) {
+      console.warn('[saveAndPublish] Missing suite or config', { hasSuite: !!suite, hasConfig: !!config });
+      alert('Game data is unavailable. Please reload the page and try again.');
+      return;
+    }
+
     const slug = activeSlug || 'default';
     setSavePubBusy(true);
     setStatus('Saving…');
 
-    const saved = await saveAllWithSlug(slug);
-    if (!saved) { setSavePubBusy(false); return; }
+    try {
+      console.log('[saveAndPublish] Attempting to save', { slug });
+      const saved = await saveAllWithSlug(slug);
+      console.log('[saveAndPublish] saveAllWithSlug result', saved);
+      if (!saved) {
+        console.warn('[saveAndPublish] saveAllWithSlug returned false');
+        return;
+      }
 
-    setStatus('✅ Saved');
-    await reloadGamesList();
-    setPreviewNonce((n) => n + 1);
-    setSavePubBusy(false);
+      setStatus('✅ Saved');
+      await reloadGamesList();
+      setPreviewNonce((n) => n + 1);
+      console.log('[saveAndPublish] Save flow completed successfully');
+    } catch (err) {
+      console.error('[saveAndPublish] Unexpected error during save', err);
+      alert(`Save failed: ${err?.message || err}`);
+      setStatus('❌ Save failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setSavePubBusy(false);
+    }
   }
 
   /* Delete game (with modal confirm) */
